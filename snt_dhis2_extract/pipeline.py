@@ -636,7 +636,10 @@ def add_files_to_dataset(
     dhis2_connection: DHIS2Connection,
     snt_config: dict,
     file_paths: list[str],
-    ready: bool = True,
+    analytics_ready: bool,
+    pop_ready: bool,
+    shapes_ready: bool,
+    pyramid_ready: bool,
 ) -> None:
     """Add files to a dataset version in the workspace.
 
@@ -650,8 +653,14 @@ def add_files_to_dataset(
         Configuration dictionary for SNT settings.
     file_paths : str
         Paths to the files to be added to the dataset.
-    ready : bool, optional
-        Whether the task is ready to run (default is True).
+    analytics_ready : bool, optional
+        Whether the task is ready to run after analytics.
+    pop_ready : bool, optional
+            Whether the task is ready to run after population data.
+    shapes_ready : bool, optional
+        Whether the task is ready to run after shapes data.
+    pyramid_ready : bool, optional
+        Whether the task is ready to run after pyramid data.
 
     Raises
     ------

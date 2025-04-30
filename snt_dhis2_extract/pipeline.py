@@ -699,69 +699,6 @@ def add_files_to_dataset(
     if country_code is None:
         current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-    new_version = get_new_dataset_version(
-        ds_id=dataset_id, prefix=f"{country_code}_dhis2_level{org_unit_level}"
-    )
-
-    for file in file_paths:
-        src = Path(file)
-        if not src.exists():
-            current_run.log_warning(f"File not found: {src}")
-            continue
-
-        try:
-            df = pd.read_parquet(src)
-            with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp:
-                df.to_parquet(tmp.name)
-                new_version.add_file(tmp.name, filename=src.name)
-        except Exception as e:
-            current_run.log_warning(f"Dataset file cannot be saved : {e}")
-            continue
-
-    current_run.log_info(f"New dataset version created : {new_version.name}")
-
-
-def add_files_to_dataset(
-    dataset_id: str,
-    country_code: str,
-    org_unit_level: str,
-    file_paths: list[str],
-    analytics_ready: bool,
-    pop_ready: bool,
-    shapes_ready: bool,
-    pyramid_ready: bool,
-) -> None:
-    """Add files to a dataset version in the workspace.
-
-    Parameters
-    ----------
-    dataset_id : str
-        The ID of the dataset to which files will be added.
-    country_code : str
-        The country code for the dataset.
-    org_unit_level : str
-        The level of the organisation unit for which the DHIS2 Analytics have been downloaded.
-    file_paths : str
-        Paths to the files to be added to the dataset.
-    analytics_ready : bool, optional
-        Whether the task is ready to run after analytics.
-    pop_ready : bool, optional
-            Whether the task is ready to run after population data.
-    shapes_ready : bool, optional
-        Whether the task is ready to run after shapes data.
-    pyramid_ready : bool, optional
-        Whether the task is ready to run after pyramid data.
-
-    Raises
-    ------
-    Exception
-        If an error occurs while creating a new dataset version or adding files.
-    """
-    if dataset_id is None:
-        raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
-    if country_code is None:
-        current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
-
     added_any = False
 
     for file in file_paths:

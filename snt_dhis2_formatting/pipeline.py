@@ -35,10 +35,10 @@ def snt_dhis2_formatting():
         # is_valid_configuration(snt_config_dict)
 
         # format data for SNT
-        # dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        # dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        # dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        # dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+        dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+        dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+        dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+        dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
 
         # add files to a new dataset version
         add_files_to_dataset(

@@ -60,13 +60,12 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         current_run.log_error(f"End period {end} should be greater than start period {start}")
         raise ValueError
 
-    # Set up folders
-    snt_folders_setup(Path(workspace.files_path))
-
     # Set paths
     snt_root_path = Path(workspace.files_path)
-    # pipeline_root_path = Path(workspace.files_path) / "pipelines", "snt_dhis2_extract"
     dhis2_raw_data_path = snt_root_path / "data" / "dhis2_raw"
+
+    # Set up folders
+    snt_folders_setup(snt_root_path)
 
     try:
         # Load configuration
@@ -74,7 +73,9 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
         # get country identifier for naming
-        country_code = (snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None),)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        if country_code is None:
+            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
         # NOTE: check if the configuration is valid in load_configuration_snt function (!)
         # is_valid_configuration(snt_config_dict)
@@ -764,13 +765,13 @@ def snt_folders_setup(root_path: Path) -> None:
     NOTE : The option is to use the snt_config.json file(!).
     """
     folders_to_create = [
-        "SNT Process/configuration",
-        "SNT Process/code",
-        "SNT Process/data/dhis2_raw/population_data",
-        "SNT Process/data/dhis2_raw/pyramid_data",
-        "SNT Process/data/dhis2_raw/routine_data",
-        "SNT Process/data/dhis2_raw/shapes_data",
-        "SNT Process/data/dhis2_formatted",
+        "configuration",
+        "code",
+        "data/dhis2_raw/population_data",
+        "data/dhis2_raw/pyramid_data",
+        "data/dhis2_raw/routine_data",
+        "data/dhis2_raw/shapes_data",
+        "data/dhis2_formatted",
         "pipelines/snt_dhis2_extract",
         "pipelines/snt_dhis2_formatting/code",
         "pipelines/snt_dhis2_formatting/papermill_outputs",

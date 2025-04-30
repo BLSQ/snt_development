@@ -18,7 +18,7 @@ def snt_dhis2_formatting():
     """
     # set paths
     snt_root_path = Path(workspace.files_path)
-    snt_pipeline_path = Path(workspace.files_path) / "pipelines" / "snt_dhis2_formatting"
+    snt_pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_formatting"
     snt_dhis2_formatted_path = snt_root_path / "dhis2_formatted"
 
     try:
@@ -26,6 +26,10 @@ def snt_dhis2_formatting():
         snt_config_dict = load_configuration_snt(
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
+        # get country identifier for naming
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        if country_code is None:
+            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
         # NOTE: check if the configuration is valid in load_configuration_snt function (!)
         # is_valid_configuration(snt_config_dict)
@@ -47,11 +51,12 @@ def snt_dhis2_formatting():
         # add files to a new dataset version
         add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
+            country_code=country_code,
             file_paths=[
-                snt_dhis2_formatted_path / "routine_data" / "dhis2_raw_analytics.parquet",
-                snt_dhis2_formatted_path / "population_data" / "dhis2_raw_population.parquet",
-                snt_dhis2_formatted_path / "shapes_data" / "raw_shapes.parquet",
-                snt_dhis2_formatted_path / "pyramid_data" / "dhis2_pyramid.parquet",
+                snt_dhis2_formatted_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
+                snt_dhis2_formatted_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
+                snt_dhis2_formatted_path / "shapes_data" / f"{country_code}_raw_shapes.parquet",
+                snt_dhis2_formatted_path / "pyramid_data" / f"{country_code}_dhis2_pyramid.parquet",
             ],
         )
 
@@ -240,8 +245,6 @@ def add_files_to_dataset(
     """
     if dataset_id is None:
         raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
-    if country_code is None:
-        current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
     new_version = get_new_dataset_version(ds_id=dataset_id, prefix=f"{country_code}_snt")
 

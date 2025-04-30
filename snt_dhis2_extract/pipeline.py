@@ -60,16 +60,24 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         current_run.log_error(f"End period {end} should be greater than start period {start}")
         raise ValueError
 
+    # Set up folders
+    snt_folders_setup(Path(workspace.files_path))
+
     # Set paths
-    snt_root_path = Path(workspace.files_path) / "SNT Process"
+    snt_root_path = Path(workspace.files_path)
     # pipeline_root_path = Path(workspace.files_path) / "pipelines", "snt_dhis2_extract"
-    raw_dhis2_data_path = Path(snt_root_path) / "data" / "raw_DHIS2"
+    dhis2_raw_data_path = snt_root_path / "data" / "dhis2_raw"
 
     try:
         # Load configuration
         snt_config_dict = load_configuration_snt(
-            config_path=Path(snt_root_path) / "configuration" / "SNT_config.json"
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
+        # get country identifier for naming
+        country_code = (snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None),)
+
+        # NOTE: check if the configuration is valid in load_configuration_snt function (!)
+        # is_valid_configuration(snt_config_dict)
 
         # DHIS2 connection
         dhis2_client = get_dhis2_client(
@@ -77,45 +85,52 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             cache_folder=None,  # Path() / pipeline_root_path / ".cache"
         )
 
-        analytics_ready = download_dhis2_analytics(
-            start=start,
-            end=end,
-            dhis2_client=dhis2_client,
-            snt_config=snt_config_dict,
-            output_dir=Path(raw_dhis2_data_path) / "routine_data",
-            overwrite=overwrite,
-        )
+        # get the dhis2 pyramid
+        dhis2_pyramid = get_organisation_units(dhis2_client)
 
         pop_ready = download_dhis2_population(
             start=start,
             end=end,
+            source_pyramid=dhis2_pyramid,
             dhis2_client=dhis2_client,
             snt_config=snt_config_dict,
-            output_dir=Path(raw_dhis2_data_path) / "population_data",
+            output_dir=dhis2_raw_data_path / "population_data",
             overwrite=overwrite,
         )
 
         shapes_ready = download_dhis2_shapes(
-            output_dir=Path(raw_dhis2_data_path) / "shapes_data",
+            source_pyramid=dhis2_pyramid,
+            output_dir=dhis2_raw_data_path / "shapes_data",
             dhis2_client=dhis2_client,
             snt_config=snt_config_dict,
         )
 
         pyramid_ready = download_dhis2_pyramid(
-            output_dir=Path(raw_dhis2_data_path) / "pyramid_data",
-            dhis2_client=dhis2_client,
+            source_pyramid=dhis2_pyramid,
+            output_dir=dhis2_raw_data_path / "pyramid_data",
             snt_config=snt_config_dict,
         )
 
-        add_files_to_dataset(
-            dataset_id="snt-dhis2-extracts",
-            dhis2_connection=dhis2_connection,
+        analytics_ready = download_dhis2_analytics(
+            start=start,
+            end=end,
+            source_pyramid=dhis2_pyramid,
+            dhis2_client=dhis2_client,
             snt_config=snt_config_dict,
+            output_dir=dhis2_raw_data_path / "routine_data",
+            overwrite=overwrite,
+            ready=pop_ready,
+        )
+
+        add_files_to_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
+            country_code=country_code,
+            org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
             file_paths=[
-                Path(raw_dhis2_data_path) / "routine_data" / "dhis2_raw_analytics.parquet",
-                Path(raw_dhis2_data_path) / "population_data" / "dhis2_raw_population.parquet",
-                Path(raw_dhis2_data_path) / "shapes_data" / "raw_shapes.parquet",
-                Path(raw_dhis2_data_path) / "pyramid_data" / "dhis2_pyramid.parquet",
+                dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
+                dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
+                dhis2_raw_data_path / "shapes_data" / f"{country_code}_raw_shapes.parquet",
+                dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_pyramid.parquet",
             ],
             analytics_ready=analytics_ready,
             pop_ready=pop_ready,
@@ -128,7 +143,6 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         raise
 
 
-@snt_dhis2_extract.task
 def load_configuration_snt(config_path: str) -> dict:
     """Load the SNT configuration from a JSON file.
 
@@ -204,10 +218,12 @@ def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> D
 def download_dhis2_analytics(
     start: int,
     end: int,
+    source_pyramid: pl.DataFrame,
     dhis2_client: DHIS2,
     snt_config: dict,
     output_dir: str,
     overwrite: bool = True,
+    ready: bool = True,
 ) -> bool:
     """Download and save DHIS2 analytics data for the specified period.
 
@@ -217,6 +233,8 @@ def download_dhis2_analytics(
         Start period in YYYYMM format.
     end : int
         End period in YYYYMM format.
+    source_pyramid : pl.DataFrame
+        DataFrame containing the DHIS2 pyramid data.
     dhis2_client : DHIS2
         DHIS2 client instance for API interaction.
     snt_config : dict
@@ -249,14 +267,17 @@ def download_dhis2_analytics(
     # Ensure the output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    if country_code is None:
+        raise ValueError("COUNTRY_CODE is not specified in the configuration.")
+
     # Org units level selection default to level 2
     org_unit_level = snt_config["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None)
     if org_unit_level is None:
         raise ValueError("ANALYTICS_ORG_UNITS_LEVEL is not specified in the configuration.")
 
     # get levels and list of OU ids
-    df_pyramid = get_organisation_units(dhis2_client, max_level=org_unit_level)
-    df_pyramid = df_pyramid.filter(pl.col("level") == org_unit_level).drop(
+    df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
         ["level", "opening_date", "closed_date", "geometry"]
     )
     org_units_list = df_pyramid["id"].unique().to_list()
@@ -282,7 +303,7 @@ def download_dhis2_analytics(
     try:
         for p in periods:
             current_run.log_info(f"Downloading routine data period : {p}")
-            fp = Path(output_dir) / f"raw_analytics_{p}.parquet"
+            fp = Path(output_dir) / f"{country_code}_raw_analytics_{p}.parquet"
 
             if fp.exists() and not overwrite:
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
@@ -331,8 +352,8 @@ def download_dhis2_analytics(
         merge_parquet_files(
             input_dir=output_dir,
             output_dir=output_dir,
-            output_fname="dhis2_raw_analytics.parquet",
-            file_pattern="raw_analytics_*.parquet",
+            output_fname=f"{country_code}_dhis2_raw_analytics.parquet",
+            file_pattern=f"{country_code}_raw_analytics_*.parquet",
         )
     except Exception as e:
         raise Exception(f"Error while merging parquet files: {e}") from e
@@ -384,11 +405,11 @@ def merge_parquet_files(
         current_run.log_info(f"Merged file saved at : {output_path}")
 
 
-# task 3
 @snt_dhis2_extract.task
 def download_dhis2_population(
     start: int,
     end: int,
+    source_pyramid: pl.DataFrame,
     dhis2_client: DHIS2,
     snt_config: dict,
     output_dir: Path,
@@ -402,6 +423,8 @@ def download_dhis2_population(
         Start period in YYYYMM format.
     end : int
         End period in YYYYMM format.
+    source_pyramid : pl.DataFrame
+        DataFrame containing the DHIS2 pyramid data.
     dhis2_client : DHIS2
         DHIS2 client instance for API interaction.
     snt_config : dict
@@ -452,14 +475,12 @@ def download_dhis2_population(
         raise Exception(f"Error ocurred when computing periods start: {start} end : {end} Error : {e}") from e
 
     try:
-        column_selection = f"level_{org_unit_level}_id"
-        df_pyramid = get_organisation_units(dhis2_client, max_level=org_unit_level)
-        df_lvl_selection = df_pyramid.filter(pl.col("level") == org_unit_level).drop(
-            ["id", "name", "level", "opening_date", "closed_date", "geometry"]
+        # Get the organisation units for the specified level
+        df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
+            ["level", "opening_date", "closed_date", "geometry"]
         )
-        org_unit_uids = (
-            df_lvl_selection.select(column_selection).unique().get_column(column_selection).to_list()
-        )
+        org_unit_uids = df_pyramid["id"].unique().to_list()
+        df_pyramid = df_pyramid.to_pandas()
 
         for p in periods:
             current_run.log_info(f"Downloading population for period : {p}")
@@ -482,8 +503,16 @@ def download_dhis2_population(
 
                 current_run.log_info(f"Population data downloaded for period {p}: {len(population_values)}")
                 population_values_df = pd.DataFrame(population_values)
+
+                # Add parent level names (left join with pyramid)
+                merging_col = f"level_{org_unit_level}_id"
+                parent_cols = [
+                    f"level_{ou}{suffix}"
+                    for ou in range(1, org_unit_level + 1)
+                    for suffix in ["_id", "_name"]
+                ]
                 merged_df = population_values_df.merge(
-                    df_lvl_selection.to_pandas(), how="left", left_on="ou", right_on=column_selection
+                    df_pyramid[parent_cols], how="left", left_on="ou", right_on=merging_col
                 )
                 merged_df.to_parquet(fp, engine="pyarrow", index=False)
 
@@ -508,21 +537,20 @@ def download_dhis2_population(
     return True
 
 
-# task 4
 @snt_dhis2_extract.task
 def download_dhis2_shapes(
+    source_pyramid: pl.DataFrame,
     output_dir: Path,
-    dhis2_client: DHIS2,
     snt_config: dict,
 ) -> bool:
     """Download and save DHIS2 shapes data.
 
     Parameters
     ----------
+    source_pyramid : pl.DataFrame
+        DataFrame containing the DHIS2 pyramid data.
     output_dir : Path
         Directory to save the downloaded shapes data.
-    dhis2_client : DHIS2
-        DHIS2 client instance for API interaction.
     snt_config : dict
         Configuration dictionary for SNT settings.
     ready : bool
@@ -545,8 +573,7 @@ def download_dhis2_shapes(
     current_run.log_info(f"Downloading shapes for level : {org_levels}")
 
     try:
-        df_pyramid = get_organisation_units(dhis2_client, max_level=org_levels)
-        df_lvl_selection = df_pyramid.filter(pl.col("level") == org_levels).drop(
+        df_lvl_selection = source_pyramid.filter(pl.col("level") == org_levels).drop(
             ["id", "name", "level", "opening_date", "closed_date"]
         )
         current_run.log_info(f"{df_lvl_selection.shape[0]} shapes downloaded for level {org_levels}.")
@@ -565,15 +592,15 @@ def download_dhis2_shapes(
 
 
 @snt_dhis2_extract.task
-def download_dhis2_pyramid(output_dir: Path, dhis2_client: DHIS2, snt_config: dict) -> None:
+def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_config: dict) -> None:
     """Download and save DHIS2 pyramid data.
 
     Parameters
     ----------
+    source_pyramid : pl.DataFrame
+        DataFrame containing the DHIS2 pyramid data.
     output_dir : Path
         Directory to save the downloaded pyramid data.
-    dhis2_client : DHIS2
-        DHIS2 client instance for API interaction.
     snt_config : dict
         Configuration dictionary for SNT settings.
     ready : bool
@@ -589,8 +616,7 @@ def download_dhis2_pyramid(output_dir: Path, dhis2_client: DHIS2, snt_config: di
         raise ValueError("ANALYTICS_ORG_UNITS_LEVEL is not specified in the configuration.")
 
     try:
-        df_pyramid = get_organisation_units(dhis2_client, max_level=org_unit_level)
-        df_lvl_selection = df_pyramid.filter(pl.col("level") == org_unit_level).drop(
+        df_lvl_selection = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
             ["id", "name", "level", "opening_date", "closed_date", "geometry"]
         )
     except Exception as e:
@@ -633,8 +659,8 @@ def get_unique_data_elements(data_dictionary: dict) -> list[str]:
 @snt_dhis2_extract.task
 def add_files_to_dataset(
     dataset_id: str,
-    dhis2_connection: DHIS2Connection,
-    snt_config: dict,
+    country_code: str,
+    org_unit_level: str,
     file_paths: list[str],
     analytics_ready: bool,
     pop_ready: bool,
@@ -647,10 +673,10 @@ def add_files_to_dataset(
     ----------
     dataset_id : str
         The ID of the dataset to which files will be added.
-    dhis2_connection : DHIS2Connection
-        The DHIS2 connection object to obtain the connection name (NOT IMPLEMENTED).
-    snt_config : dict
-        Configuration dictionary for SNT settings.
+    country_code : str
+        The country code for the dataset.
+    org_unit_level : str
+        The level of the organisation unit for which the DHIS2 Analytics have been downloaded.
     file_paths : str
         Paths to the files to be added to the dataset.
     analytics_ready : bool, optional
@@ -667,8 +693,15 @@ def add_files_to_dataset(
     Exception
         If an error occurs while creating a new dataset version or adding files.
     """
-    org_unit_level = snt_config["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None)
-    new_version = get_new_dataset_version(ds_id=dataset_id, prefix=f"DHIS2_ou_level{org_unit_level}")
+    if dataset_id is None:
+        raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
+    if country_code is None:
+        current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+
+    new_version = get_new_dataset_version(
+        ds_id=dataset_id, prefix=f"{country_code}_dhis2_level{org_unit_level}"
+    )
+
     for file in file_paths:
         src = Path(file)
         if not src.exists():
@@ -716,6 +749,35 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
 
     return new_version
+
+
+def snt_folders_setup(root_path: Path) -> None:
+    """Set up the required folder structure for the SNT pipeline.
+
+    Parameters
+    ----------
+    root_path : Path
+        The root directory where the folder structure will be created.
+
+    This function creates a predefined set of folders under the specified root path
+    to ensure the necessary directory structure for the SNT pipeline.
+    NOTE : The option is to use the snt_config.json file(!).
+    """
+    folders_to_create = [
+        "SNT Process/configuration",
+        "SNT Process/code",
+        "SNT Process/data/dhis2_raw/population_data",
+        "SNT Process/data/dhis2_raw/pyramid_data",
+        "SNT Process/data/dhis2_raw/routine_data",
+        "SNT Process/data/dhis2_raw/shapes_data",
+        "SNT Process/data/dhis2_formatted",
+        "pipelines/snt_dhis2_extract",
+        "pipelines/snt_dhis2_formatting/code",
+        "pipelines/snt_dhis2_formatting/papermill_outputs",
+    ]
+    for relative_path in folders_to_create:
+        full_path = root_path / relative_path
+        full_path.mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == "__main__":

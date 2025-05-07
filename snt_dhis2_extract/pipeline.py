@@ -4,12 +4,17 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import papermill as pm
 import polars as pl
+
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
-from openhexa.toolbox.dhis2.dataframe import get_organisation_units
+from openhexa.toolbox.dhis2.dataframe import (
+    get_organisation_units,
+    get_organisation_unit_levels,
+)
 from openhexa.toolbox.dhis2.periods import period_from_string
 
 
@@ -69,25 +74,25 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
 
     try:
         # Load configuration
+        # NOTE: check if the configuration is valid in load_configuration_snt function (!)
+        # is_valid_configuration(snt_config_dict) ## contains CONFIG? TEST?
         snt_config_dict = load_configuration_snt(
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
-        # get country identifier for naming
+
+        # get country identifier for file naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
         if country_code is None:
             current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-        # NOTE: check if the configuration is valid in load_configuration_snt function (!)
-        # is_valid_configuration(snt_config_dict)
-
         # DHIS2 connection
         dhis2_client = get_dhis2_client(
             dhis2_connection=dhis2_connection,
-            cache_folder=None,  # Path() / pipeline_root_path / ".cache"
+            cache_folder=None,  # snt_root_path / snt_dhis2_extract / ".cache"
         )
 
         # get the dhis2 pyramid
-        dhis2_pyramid = get_organisation_units(dhis2_client)
+        dhis2_pyramid = get_dhis2_pyramid(dhis2_client=dhis2_client, snt_config=snt_config_dict)
 
         pop_ready = download_dhis2_population(
             start=start,
@@ -102,7 +107,6 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         shapes_ready = download_dhis2_shapes(
             source_pyramid=dhis2_pyramid,
             output_dir=dhis2_raw_data_path / "shapes_data",
-            dhis2_client=dhis2_client,
             snt_config=snt_config_dict,
         )
 
@@ -130,8 +134,8 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             file_paths=[
                 dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
                 dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
-                dhis2_raw_data_path / "shapes_data" / f"{country_code}_raw_shapes.parquet",
-                dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_pyramid.parquet",
+                dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
+                dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
             ],
             analytics_ready=analytics_ready,
             pop_ready=pop_ready,
@@ -214,6 +218,49 @@ def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> D
     return dhis2_client
 
 
+def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
+    """Get the DHIS2 pyramid data.
+
+    Parameters
+    ----------
+    dhis2_client : DHIS2
+        The DHIS2 client instance for API interaction.
+    snt_config : dict
+        Configuration dictionary for SNT settings.
+
+    Returns
+    -------
+    pl.DataFrame
+        A DataFrame containing the DHIS2 pyramid data.
+
+    Raises
+    ------
+    Exception
+        If an error occurs while retrieving the pyramid data.
+    """
+    try:
+        current_run.log_info("Downloading DHIS2 pyramid data.")
+        # retrieve the pyramid data
+        dhis2_pyramid = get_organisation_units(dhis2_client)
+
+        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        adm1 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_1", None)
+        adm2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
+
+        # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
+        if country_code == "BFA" and ("level_4" in adm1 or "level_4" in adm2):
+            current_run.log_info("District level (4) filtering for Burkina Faso pyramid")
+            dhis2_pyramid = dhis2_pyramid.filter(
+                (pl.col("level_4_name").str.starts_with("DS")) & (pl.col("geometry").is_not_null())
+            )
+
+        current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
+    except Exception as e:
+        raise Exception(f"An error occurred while retrieving the DHIS2 pyramid data: {e}") from e
+
+    return dhis2_pyramid
+
+
 # Task 2 run DHIS2 analytics extract and formatting
 @snt_dhis2_extract.task
 def download_dhis2_analytics(
@@ -263,8 +310,6 @@ def download_dhis2_analytics(
     Exception
         If an error occurs during the download or processing of data.
     """
-    current_run.log_info("Downloading DHIS2 analytics data.")
-
     # Ensure the output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -272,10 +317,13 @@ def download_dhis2_analytics(
     if country_code is None:
         raise ValueError("COUNTRY_CODE is not specified in the configuration.")
 
-    # Org units level selection default to level 2
+    # Org units level selection for reporting
+    max_level = source_pyramid["level"].max()
     org_unit_level = snt_config["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None)
-    if org_unit_level is None:
-        raise ValueError("ANALYTICS_ORG_UNITS_LEVEL is not specified in the configuration.")
+    if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
+        raise ValueError(
+            f"Incorrect ANALYTICS_ORG_UNITS_LEVEL value, please configure a value between 1 and {max_level}."
+        )
 
     # get levels and list of OU ids
     df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
@@ -302,8 +350,8 @@ def download_dhis2_analytics(
         raise Exception(f"Error ocurred when computing periods start: {start} end : {end} Error : {e}") from e
 
     try:
+        current_run.log_info(f"Downloading routine data for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            current_run.log_info(f"Downloading routine data period : {p}")
             fp = Path(output_dir) / f"{country_code}_raw_analytics_{p}.parquet"
 
             if fp.exists() and not overwrite:
@@ -318,10 +366,12 @@ def download_dhis2_analytics(
                 )
 
                 if len(data_values) == 0:
-                    current_run.log_warning(f"No data found for period {p}.")
+                    current_run.log_warning(f"No analytics data found for period {p}.")
                     continue
 
-                current_run.log_info(f"Rountine data downloaded for period {p}: {len(data_values)}")
+                current_run.log_info(
+                    f"Rountine data downloaded for period {p}: {len(data_values)} data values"
+                )
                 df = pd.DataFrame(data_values)
 
                 # Add dx and co names
@@ -399,6 +449,9 @@ def merge_parquet_files(
                 continue
         df_merged = pd.concat(df_list, ignore_index=True)
 
+        # to UPPER case
+        df_merged.columns = df_merged.columns.str.upper()
+
         # Ensure the output directory exists
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_path = Path(output_dir) / output_fname
@@ -449,7 +502,7 @@ def download_dhis2_population(
     Exception
         If an error occurs during the download or processing of data.
     """
-    current_run.log_info("Downloading DHIS2 population data.")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
     # Ensure the output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -465,8 +518,9 @@ def download_dhis2_population(
 
     # default to level 2 (all countries have at least this?)
     org_unit_level = snt_config["SNT_CONFIG"].get("POPULATION_ORG_UNITS_LEVEL", None)
-    if org_unit_level is None:
-        raise ValueError("POPULATION_ORG_UNITS_LEVEL is not specified in the configuration.")
+    max_level = source_pyramid["level"].max()
+    if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
+        raise ValueError(f"Incorrect POPULATION_ORG_UNITS_LEVEL value, please set between 1 and {max_level}.")
 
     try:
         p1 = period_from_string(str(start))
@@ -483,9 +537,9 @@ def download_dhis2_population(
         org_unit_uids = df_pyramid["id"].unique().to_list()
         df_pyramid = df_pyramid.to_pandas()
 
+        current_run.log_info(f"Downloading population for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            current_run.log_info(f"Downloading population for period : {p}")
-            fp = Path(output_dir) / f"raw_population_{p}.parquet"
+            fp = Path(output_dir) / f"{country_code}_raw_population_{p}.parquet"
 
             if fp.exists() and not overwrite:
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
@@ -499,10 +553,12 @@ def download_dhis2_population(
                 )
 
                 if len(population_values) == 0:
-                    current_run.log_warning(f"No data found for period {p}.")
+                    current_run.log_warning(f"No population data found for period {p}.")
                     continue
 
-                current_run.log_info(f"Population data downloaded for period {p}: {len(population_values)}")
+                current_run.log_info(
+                    f"Population data downloaded for period {p}: {len(population_values)} data values"
+                )
                 population_values_df = pd.DataFrame(population_values)
 
                 # Add parent level names (left join with pyramid)
@@ -529,8 +585,8 @@ def download_dhis2_population(
         merge_parquet_files(
             input_dir=output_dir,
             output_dir=output_dir,
-            output_fname="dhis2_raw_population.parquet",
-            file_pattern="raw_population_*.parquet",
+            output_fname=f"{country_code}_dhis2_raw_population.parquet",
+            file_pattern=f"{country_code}_raw_population_*.parquet",
         )
     except Exception as e:
         raise Exception(f"Error while merging parquet files: {e}") from e
@@ -562,16 +618,17 @@ def download_dhis2_shapes(
     bool
         True if the shapes data is successfully downloaded and saved.
     """
-    current_run.log_info("Downloading DHIS2 shapes data.")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
     # Ensure the output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     org_levels = snt_config["SNT_CONFIG"].get("SHAPES_ORG_UNITS_LEVEL", None)
-    if org_levels is None:
-        raise ValueError("Organisation level for Shape not defined SHAPES_ORG_UNITS_LEVEL")
-
-    current_run.log_info(f"Downloading shapes for level : {org_levels}")
+    max_level = source_pyramid["level"].max()
+    if org_levels is None or org_levels > max_level or org_levels < 1:
+        raise ValueError(
+            f"Incorrect SHAPES_ORG_UNITS_LEVEL value, please configure a value between 1 and {max_level}."
+        )
 
     try:
         df_lvl_selection = source_pyramid.filter(pl.col("level") == org_levels).drop(
@@ -579,11 +636,12 @@ def download_dhis2_shapes(
         )
         current_run.log_info(f"{df_lvl_selection.shape[0]} shapes downloaded for level {org_levels}.")
     except Exception as e:
-        raise Exception(f"Error while retrieving shapes data: {e}") from e
+        raise Exception(f"Error while filtering shapes data: {e}") from e
 
     try:
-        fp = Path(output_dir) / "raw_shapes.parquet"
+        fp = Path(output_dir) / f"{country_code}_dhis2_raw_shapes.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
+        df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
         current_run.log_info(f"Shapes data saved at : {fp}")
     except Exception as e:
@@ -607,7 +665,7 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
     ready : bool
         Whether the task is ready to run.
     """
-    current_run.log_info("Downloading DHIS2 pyramid data.")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
     # Ensure the output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -624,10 +682,11 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
         raise Exception(f"An error occured while downloading the DHIS2 pyramid : {e}") from e
 
     try:
-        fp = Path(output_dir) / "dhis2_pyramid.parquet"
+        fp = Path(output_dir) / f"{country_code}_dhis2_raw_pyramid.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
+        df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
-        current_run.log_info(f"DHIS2 pyramid data saved at : {fp}")
+        current_run.log_info(f"{country_code} DHIS2 pyramid data saved at : {fp}")
     except Exception as e:
         raise Exception(f"Error while saving DHIS2 pyramid data: {e}") from e
 
@@ -735,7 +794,7 @@ def add_files_to_dataset(
                 new_version.add_file(tmp.name, filename=src.name)
                 current_run.log_info(f"File {src.name} added to dataset version : {new_version.name}")
         except Exception as e:
-            current_run.log_warning(f"File {src.name} cannot be saved : {e}")
+            current_run.log_warning(f"File {src.name} cannot be added : {e}")
             continue
 
     if not added_any:
@@ -800,6 +859,32 @@ def snt_folders_setup(root_path: Path) -> None:
     for relative_path in folders_to_create:
         full_path = root_path / relative_path
         full_path.mkdir(parents=True, exist_ok=True)
+
+
+def run_notebook(nb_name: str, nb_path: Path, out_nb_path: Path, parameters: dict):
+    """Execute a Jupyter notebook using Papermill.
+
+    Parameters
+    ----------
+    nb_name : str
+        The name of the notebook to execute (without the .ipynb extension).
+    nb_path : str
+        The path to the directory containing the notebook.
+    out_nb_path : str
+        The path to the directory where the output notebook will be saved.
+    parameters : dict
+        A dictionary of parameters to pass to the notebook.
+    """
+    nb_full_path = nb_path / f"{nb_name}.ipynb"
+    current_run.log_info(f"Executing notebook: {nb_full_path}")
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    out_nb_fname = f"{nb_name}_OUTPUT_{execution_timestamp}.ipynb"
+    out_nb_full_path = out_nb_path / out_nb_fname
+
+    try:
+        pm.execute_notebook(input_path=nb_full_path, output_path=out_nb_full_path, parameters=parameters)
+    except Exception as e:
+        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
 
 
 if __name__ == "__main__":

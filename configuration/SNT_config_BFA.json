@@ -1,0 +1,30 @@
+{
+	"SNT_CONFIG": {
+		"COUNTRY_CODE": "BFA",	
+		"COUNTRY_NAME": "BURKINA FASO",	
+		"NA_TREATMENT": "SET_0_TO_NA",		
+		"DHIS2_ADMINISTRATION_1": "level_2_name",
+		"DHIS2_ADMINISTRATION_2": "level_4_name",
+		"ANALYTICS_ORG_UNITS_LEVEL" : 6,
+		"POPULATION_ORG_UNITS_LEVEL" : 4,
+		"SHAPES_ORG_UNITS_LEVEL" : 4		
+	},
+	"SNT_DATASET_IDENTIFIERS" : {
+		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted"
+	},
+	"DHIS2_DATA_DEFINITIONS" : {
+		"POPULATION_INDICATOR_DEFINITIONS": {
+			"TOT_POPULATION": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"]
+		},		
+		"DHIS2_INDICATOR_DEFINITIONS": {			
+			"SUSP": ["qkhx1DbWUFV", "OhPA8Hq1KYf","nfRYeVm4dCt","YwRi5giAozg"],
+			"TEST": ["qlwFHwrxnH9","GW43RcB9FbB", "MMekmRHBcSD","yHBQQEsP1Zi", "nhSrxeBE209","BIGNssi5RZS"],
+			"CONF": ["gPlZieTaMLy","f2fnat9bu09","OG8BQGl6Sm1"],
+			"PRES": ["l4ckoEMDjsG", "uaIgq7rkTBJ","CuC2TRA7OqL","bfFuyDjy7Tc"],
+			"MALTREAT": ["zwt1RsszBe2", "iaUXQh7HGOp","wBPQDiqFHCN","MzKdVsKINA7"],
+			"MALADM": ["LfwPBU33gxe", "YGI8s8uUfux","pdvpFvz3iGD","hPJgypEErD6"],
+			"MALDTH": ["Rhoc3VZXzh0", "Rzl70MRimfO","YS5G7zpDSAy","iQkLfVVchzb"]
+		}
+	}
+}

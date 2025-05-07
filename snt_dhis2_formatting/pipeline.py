@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import geopandas as gpd
 import papermill as pm
 from openhexa.sdk import current_run, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
@@ -45,13 +46,13 @@ def snt_dhis2_formatting():
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
             country_code=country_code,
             file_paths=[
-                snt_dhis2_formatted_path / f"{country_code}_routine_data.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_routine_data.csv",
-                snt_dhis2_formatted_path / f"{country_code}_population_data.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_population_data.csv",
-                snt_dhis2_formatted_path / f"{country_code}_shapes_data.geojson",
-                snt_dhis2_formatted_path / f"{country_code}_pyramid_data.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_pyramid_data.csv",
+                snt_dhis2_formatted_path / f"{country_code}_routine.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_routine.csv",
+                snt_dhis2_formatted_path / f"{country_code}_population.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_population.csv",
+                snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
+                snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
             ],
         )
 
@@ -257,6 +258,9 @@ def add_files_to_dataset(
             elif ext == ".csv":
                 df = pd.read_csv(src)
                 tmp_suffix = ".csv"
+            elif ext == ".geojson":
+                gdf = gpd.read_file(src)
+                tmp_suffix = ".geojson"
             else:
                 current_run.log_warning(f"Unsupported file format: {src.name}")
                 continue
@@ -264,8 +268,10 @@ def add_files_to_dataset(
             with tempfile.NamedTemporaryFile(suffix=tmp_suffix) as tmp:
                 if ext == ".parquet":
                     df.to_parquet(tmp.name)
-                else:
+                elif ext == ".csv":
                     df.to_csv(tmp.name, index=False)
+                elif ext == ".geojson":
+                    gdf.to_file(tmp.name, driver="GeoJSON")
 
                 if not added_any:
                     new_version = get_new_dataset_version(ds_id=dataset_id, prefix=f"{country_code}_snt")
@@ -274,7 +280,7 @@ def add_files_to_dataset(
                 new_version.add_file(tmp.name, filename=src.name)
                 current_run.log_info(f"File {src.name} added to dataset version : {new_version.name}")
         except Exception as e:
-            current_run.log_warning(f"File {src.name} cannot be saved : {e}")
+            current_run.log_warning(f"File {src.name} cannot be added : {e}")
             continue
 
     if not added_any:

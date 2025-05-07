@@ -11,10 +11,7 @@ from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
-from openhexa.toolbox.dhis2.dataframe import (
-    get_organisation_units,
-    get_organisation_unit_levels,
-)
+from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
 
 

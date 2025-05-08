@@ -59,8 +59,8 @@ def snt_dhis2_formatting():
         )
 
         run_report_notebook(
-            nb_file=snt_pipeline_path / "code" / "SNT_dhis2_indicators_report.ipynb",
-            nb_output_path=snt_pipeline_path / "papermill_outputs",
+            nb_file=snt_pipeline_path / "reporting" / "SNT_dhis2_indicators_report.ipynb",
+            nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             ready=files_ready,
         )
 

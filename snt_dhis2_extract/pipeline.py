@@ -144,8 +144,8 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         )
 
         run_report_notebook(
-            nb_file=pipeline_path / "code" / "SNT_dhis2_extract_report.ipynb",
-            nb_output_path=snt_root_path / "pipelines" / "snt_dhis2_extract" / "papermill_outputs",
+            nb_file=pipeline_path / "reporting" / "SNT_dhis2_extract_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
             ready=files_ready,
         )
 

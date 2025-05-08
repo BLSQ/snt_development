@@ -13,6 +13,8 @@ from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
+import subprocess
+from subprocess import CalledProcessError
 
 
 @pipeline("snt_dhis2_extract", timeout=28800)
@@ -64,6 +66,7 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
 
     # Set paths
     snt_root_path = Path(workspace.files_path)
+    pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
     dhis2_raw_data_path = snt_root_path / "data" / "dhis2_raw"
 
     # Set up folders
@@ -124,7 +127,7 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             ready=pop_ready,
         )
 
-        add_files_to_dataset(
+        files_ready = add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
             country_code=country_code,
             org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
@@ -138,6 +141,12 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             pop_ready=pop_ready,
             shapes_ready=shapes_ready,
             pyramid_ready=pyramid_ready,
+        )
+
+        run_report_notebook(
+            nb_file=pipeline_path / "code" / "SNT_dhis2_extract_report.ipynb",
+            nb_output_path=snt_root_path / "pipelines" / "snt_dhis2_extract" / "papermill_outputs",
+            ready=files_ready,
         )
 
     except Exception as e:
@@ -723,7 +732,7 @@ def add_files_to_dataset(
     pop_ready: bool,
     shapes_ready: bool,
     pyramid_ready: bool,
-) -> None:
+) -> bool:
     """Add files to a dataset version in the workspace.
 
     Parameters
@@ -749,6 +758,11 @@ def add_files_to_dataset(
     ------
     Exception
         If an error occurs while creating a new dataset version or adding files.
+
+    Returns
+    -------
+    Bool
+        True if files were successfully added to the dataset version, False otherwise.
     """
     if dataset_id is None:
         raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
@@ -796,6 +810,9 @@ def add_files_to_dataset(
 
     if not added_any:
         current_run.log_info("No valid files found. Dataset version was not created.")
+        return False
+
+    return True
 
 
 def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
@@ -858,30 +875,70 @@ def snt_folders_setup(root_path: Path) -> None:
         full_path.mkdir(parents=True, exist_ok=True)
 
 
-def run_notebook(nb_name: str, nb_path: Path, out_nb_path: Path, parameters: dict):
+@snt_dhis2_extract.task
+def run_report_notebook(
+    nb_file: Path,
+    nb_output_path: Path,
+    ready: bool = True,
+) -> None:
     """Execute a Jupyter notebook using Papermill.
 
     Parameters
     ----------
-    nb_name : str
-        The name of the notebook to execute (without the .ipynb extension).
-    nb_path : str
-        The path to the directory containing the notebook.
-    out_nb_path : str
+    nb_file : str
+        The full file path to the notebook.
+    nb_output_path : str
         The path to the directory where the output notebook will be saved.
-    parameters : dict
-        A dictionary of parameters to pass to the notebook.
+    ready : bool, optional
+        Whether the notebook should be executed (default is True).
     """
-    nb_full_path = nb_path / f"{nb_name}.ipynb"
-    current_run.log_info(f"Executing notebook: {nb_full_path}")
+    if not ready:
+        current_run.log_info("Reporting execution skipped.")
+        return
+
+    current_run.log_info(f"Executing notebook: {nb_file}")
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    out_nb_fname = f"{nb_name}_OUTPUT_{execution_timestamp}.ipynb"
-    out_nb_full_path = out_nb_path / out_nb_fname
+    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
 
     try:
-        pm.execute_notebook(input_path=nb_full_path, output_path=out_nb_full_path, parameters=parameters)
+        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
+        generate_html_report(nb_output_full_path)
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+
+
+def generate_html_report(output_notebook_path: Path) -> None:
+    """Generate an HTML report from a Jupyter notebook.
+
+    Parameters
+    ----------
+    output_notebook_path : Path
+        Path to the output notebook file.
+
+    Raises
+    ------
+    RuntimeError
+        If an error occurs during the conversion process.
+    """
+    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
+        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
+
+    report_path = output_notebook_path.with_suffix(".html")
+    current_run.log_info(f"Generating HTML report {report_path}")
+    try:
+        subprocess.run(
+            [
+                "jupyter",
+                "nbconvert",
+                "--to=html",
+                str(output_notebook_path),
+            ],
+            check=True,
+        )
+    except CalledProcessError as e:
+        raise RuntimeError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+
+    current_run.add_file_output(str(report_path))
 
 
 if __name__ == "__main__":

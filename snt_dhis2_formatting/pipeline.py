@@ -8,6 +8,8 @@ import geopandas as gpd
 import papermill as pm
 from openhexa.sdk import current_run, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
+import subprocess
+from subprocess import CalledProcessError
 
 
 @pipeline("snt_dhis2_formatting")
@@ -42,7 +44,7 @@ def snt_dhis2_formatting():
         dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
 
         # add files to a new dataset version
-        add_files_to_dataset(
+        files_ready = add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
             country_code=country_code,
             file_paths=[
@@ -54,6 +56,12 @@ def snt_dhis2_formatting():
                 snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
                 snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
             ],
+        )
+
+        run_report_notebook(
+            nb_file=snt_pipeline_path / "code" / "SNT_dhis2_indicators_report.ipynb",
+            nb_output_path=snt_pipeline_path / "papermill_outputs",
+            ready=files_ready,
         )
 
     except Exception as e:
@@ -221,7 +229,7 @@ def add_files_to_dataset(
     dataset_id: str,
     country_code: str,
     file_paths: list[str],
-) -> None:
+) -> bool:
     """Add files to a new dataset version.
 
     Parameters
@@ -237,6 +245,11 @@ def add_files_to_dataset(
     ------
     ValueError
         If the dataset ID is not specified in the configuration.
+
+    Returns
+    -------
+    bool
+        True if at least one file was added successfully, False otherwise.
     """
     if dataset_id is None:
         raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
@@ -285,6 +298,9 @@ def add_files_to_dataset(
 
     if not added_any:
         current_run.log_info("No valid files found. Dataset version was not created.")
+        return False
+
+    return True
 
 
 def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
@@ -316,6 +332,72 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
 
     return new_version
+
+
+@snt_dhis2_formatting.task
+def run_report_notebook(
+    nb_file: Path,
+    nb_output_path: Path,
+    ready: bool = True,
+) -> None:
+    """Execute a Jupyter notebook using Papermill.
+
+    Parameters
+    ----------
+    nb_file : str
+        The full file path to the notebook.
+    nb_output_path : str
+        The path to the directory where the output notebook will be saved.
+    ready : bool, optional
+        Whether the notebook should be executed (default is True).
+    """
+    if not ready:
+        current_run.log_info("Reporting execution skipped.")
+        return
+
+    current_run.log_info(f"Executing notebook: {nb_file}")
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+
+    try:
+        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
+        generate_html_report(nb_output_full_path)
+    except Exception as e:
+        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+
+
+def generate_html_report(output_notebook_path: Path) -> None:
+    """Generate an HTML report from a Jupyter notebook.
+
+    Parameters
+    ----------
+    output_notebook_path : Path
+        Path to the output notebook file.
+
+    Raises
+    ------
+    RuntimeError
+        If an error occurs during the conversion process.
+    """
+    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
+        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
+
+    report_path = output_notebook_path.with_suffix(".html")
+    current_run.log_info(f"Generating HTML report {report_path}")
+    try:
+        subprocess.run(
+            [
+                "jupyter",
+                "nbconvert",
+                "--to=html",
+                str(output_notebook_path),
+            ],
+            check=True,
+        )
+    except CalledProcessError as e:
+        raise RuntimeError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+
+    current_run.add_file_output(str(report_path))
 
 
 if __name__ == "__main__":

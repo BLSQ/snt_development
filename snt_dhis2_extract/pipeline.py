@@ -15,6 +15,7 @@ from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
 import subprocess
 from subprocess import CalledProcessError
+from nbclient.exceptions import CellTimeoutError
 
 
 @pipeline("snt_dhis2_extract", timeout=28800)
@@ -525,6 +526,7 @@ def download_dhis2_population(
     # default to level 2 (all countries have at least this?)
     org_unit_level = snt_config["SNT_CONFIG"].get("POPULATION_ORG_UNITS_LEVEL", None)
     max_level = source_pyramid["level"].max()
+    current_run.log_debug(f"Population org unit level : {org_unit_level} max level: {max_level}")
     if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
         raise ValueError(f"Incorrect POPULATION_ORG_UNITS_LEVEL value, please set between 1 and {max_level}.")
 
@@ -902,18 +904,22 @@ def run_report_notebook(
 
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
-        generate_html_report(nb_output_full_path)
+    except CellTimeoutError as e:
+        raise Exception(f"Notebook execution timed out: {e}") from e
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+    generate_html_report(nb_output_full_path)
 
 
-def generate_html_report(output_notebook_path: Path) -> None:
+def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
     """Generate an HTML report from a Jupyter notebook.
 
     Parameters
     ----------
     output_notebook_path : Path
         Path to the output notebook file.
+    out_format : str
+        output extension
 
     Raises
     ------
@@ -925,18 +931,16 @@ def generate_html_report(output_notebook_path: Path) -> None:
 
     report_path = output_notebook_path.with_suffix(".html")
     current_run.log_info(f"Generating HTML report {report_path}")
+    cmd = [
+        "jupyter",
+        "nbconvert",
+        f"--to={out_format}",
+        str(output_notebook_path),
+    ]
     try:
-        subprocess.run(
-            [
-                "jupyter",
-                "nbconvert",
-                "--to=html",
-                str(output_notebook_path),
-            ],
-            check=True,
-        )
+        subprocess.run(cmd, check=True)
     except CalledProcessError as e:
-        raise RuntimeError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
 
     current_run.add_file_output(str(report_path))
 

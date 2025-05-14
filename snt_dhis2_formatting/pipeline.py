@@ -6,14 +6,23 @@ from pathlib import Path
 import pandas as pd
 import geopandas as gpd
 import papermill as pm
-from openhexa.sdk import current_run, pipeline, workspace
+from openhexa.sdk import current_run, pipeline, workspace, parameter
 from openhexa.sdk.datasets.dataset import DatasetVersion
 import subprocess
 from subprocess import CalledProcessError
+from nbclient.exceptions import CellTimeoutError
 
 
 @pipeline("snt_dhis2_formatting")
-def snt_dhis2_formatting():
+@parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
+def snt_dhis2_formatting(run_report_only: bool):
     """Write your pipeline orchestration here.
 
     Pipeline functions should only call tasks and should never perform IO operations or
@@ -25,38 +34,41 @@ def snt_dhis2_formatting():
     snt_dhis2_formatted_path = snt_root_path / "data" / "dhis2_formatted"
 
     try:
-        # Load configuration
-        snt_config_dict = load_configuration_snt(
-            config_path=snt_root_path / "configuration" / "SNT_config.json"
-        )
-        # get country identifier for naming
-        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-        if country_code is None:
-            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+        if not run_report_only:
+            # Load configuration
+            snt_config_dict = load_configuration_snt(
+                config_path=snt_root_path / "configuration" / "SNT_config.json"
+            )
+            # get country identifier for naming
+            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+            if country_code is None:
+                current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-        # NOTE: check if the configuration is valid in load_configuration_snt function (!)
-        # is_valid_configuration(snt_config_dict)
+            # NOTE: check if the configuration is valid in load_configuration_snt function (!)
+            # is_valid_configuration(snt_config_dict)
 
-        # format data for SNT
-        dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-        dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            # format data for SNT
+            dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
 
-        # add files to a new dataset version
-        files_ready = add_files_to_dataset(
-            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
-            country_code=country_code,
-            file_paths=[
-                snt_dhis2_formatted_path / f"{country_code}_routine.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_routine.csv",
-                snt_dhis2_formatted_path / f"{country_code}_population.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_population.csv",
-                snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
-                snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
-                snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
-            ],
-        )
+            # add files to a new dataset version
+            files_ready = add_files_to_dataset(
+                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
+                country_code=country_code,
+                file_paths=[
+                    snt_dhis2_formatted_path / f"{country_code}_routine.parquet",
+                    snt_dhis2_formatted_path / f"{country_code}_routine.csv",
+                    snt_dhis2_formatted_path / f"{country_code}_population.parquet",
+                    snt_dhis2_formatted_path / f"{country_code}_population.csv",
+                    snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
+                    snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
+                    snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
+                ],
+            )
+        else:
+            files_ready = True
 
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "SNT_dhis2_indicators_report.ipynb",
@@ -65,7 +77,8 @@ def snt_dhis2_formatting():
         )
 
     except Exception as e:
-        raise Exception(f"Error in SNT DHIS2 formatting: {e}") from e
+        current_run.log_error(f"Error in SNT DHIS2 formatting: {e}")
+        raise
 
 
 def load_configuration_snt(config_path: str) -> dict:
@@ -182,7 +195,7 @@ def dhis2_pyramid_formatting(
     pipeline_root_path: Path,
 ) -> None:
     """Format DHIS2 pyramid data for SNT."""
-    current_run.log_info("Formatting DHIS2 shapes data.")
+    current_run.log_info("Formatting DHIS2 pyramid data.")
 
     # set parameters for notebook
     nb_parameter = {
@@ -334,7 +347,6 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     return new_version
 
 
-@snt_dhis2_formatting.task
 def run_report_notebook(
     nb_file: Path,
     nb_output_path: Path,
@@ -355,24 +367,28 @@ def run_report_notebook(
         current_run.log_info("Reporting execution skipped.")
         return
 
-    current_run.log_info(f"Executing notebook: {nb_file}")
+    current_run.log_info(f"Executing report notebook: {nb_file}")
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
 
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
-        generate_html_report(nb_output_full_path)
+    except CellTimeoutError as e:
+        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+    generate_html_report(nb_output_full_path)
 
 
-def generate_html_report(output_notebook_path: Path) -> None:
+def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
     """Generate an HTML report from a Jupyter notebook.
 
     Parameters
     ----------
     output_notebook_path : Path
         Path to the output notebook file.
+    out_format : str
+        output extension
 
     Raises
     ------
@@ -384,18 +400,16 @@ def generate_html_report(output_notebook_path: Path) -> None:
 
     report_path = output_notebook_path.with_suffix(".html")
     current_run.log_info(f"Generating HTML report {report_path}")
+    cmd = [
+        "jupyter",
+        "nbconvert",
+        f"--to={out_format}",
+        str(output_notebook_path),
+    ]
     try:
-        subprocess.run(
-            [
-                "jupyter",
-                "nbconvert",
-                "--to=html",
-                str(output_notebook_path),
-            ],
-            check=True,
-        )
+        subprocess.run(cmd, check=True)
     except CalledProcessError as e:
-        raise RuntimeError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
 
     current_run.add_file_output(str(report_path))
 

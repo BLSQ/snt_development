@@ -11,7 +11,8 @@
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted"
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
+		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {

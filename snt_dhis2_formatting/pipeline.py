@@ -265,7 +265,9 @@ def add_files_to_dataset(
         True if at least one file was added successfully, False otherwise.
     """
     if dataset_id is None:
-        raise ValueError("DHIS2_DATASET_EXTRACTS is not specified in the configuration.")
+        raise ValueError(
+            "DHIS2_DATASET_FORMATTED is not specified in the configuration."
+        )  # TODO: make the error to refer to the corresponding dataset..
 
     added_any = False
 

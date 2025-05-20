@@ -1,5 +1,7 @@
 import requests
 from pathlib import Path
+import rasterio
+from rasterio.enums import Compression
 
 
 class WorldPopClient:
@@ -8,19 +10,26 @@ class WorldPopClient:
     Source: https://www.worldpop.org/rest/data/
     """
 
-    def __init__(self, project_alias: str = "pop", subproject: str = "wpgp"):
+    def __init__(
+        self,
+        url: str = "https://www.worldpop.org/rest/data",
+        project_alias: str = "pop",
+        subproject: str = "wpgp",
+    ):
         """Initialize the client with a specific project alias and subproject.
 
         NOTE: For the moment we only point to population data /pop.
 
         Parameters
         ----------
+        url : str
+            The base URL for the WorldPop API.
         project_alias : str
             The main project alias (e.g., 'pop', 'births', 'pregnancies').
         subproject : str
             The subproject under the main project (e.g., 'wpgp').
         """
-        self.base_url = f"https://www.worldpop.org/rest/data/{project_alias}/{subproject}"
+        self.base_url = f"{url}/{project_alias}/{subproject}"
         self._country_cache = {}  # Cache to store datasets per country
 
     @staticmethod
@@ -98,9 +107,7 @@ class WorldPopClient:
 
         return [d for d in datasets if self._matches(d, keyword)]
 
-    def get_population_grid_for_country_and_year(
-        self, country_iso3: str, year: int, output_dir: Path, fname: str
-    ) -> Path:
+    def get_population_geotiff(self, country_iso3: str, year: int, output_dir: Path, fname: str) -> Path:
         """Download and save the WorldPop raster dataset (GeoTIFF) for a given country and year.
 
         This method retrieves a population raster dataset from the WorldPop API
@@ -156,3 +163,62 @@ class WorldPopClient:
             raise OSError(f"Failed to write raster file to {tif_path}: {e}") from e
 
         return tif_path
+
+    @staticmethod
+    def compress_geotiff(
+        src_path: Path,
+        dst_path: Path,
+        compression: Compression = Compression.deflate,
+        predictor: int = 2,
+        blockxsize: int = 512,
+        blockysize: int = 512,
+    ) -> Path:
+        """Read a GeoTIFF and write out a compressed, tiled GeoTIFF (COG style).
+
+        Parameters
+        ----------
+        src_path : Path
+            Path to the source GeoTIFF file.
+        dst_path : Path
+            Path where the compressed GeoTIFF will be saved.
+        compression : Compression, optional
+            Compression algorithm (e.g., `Compression.deflate`, `Compression.lzw`, `Compression.zstd`),
+            by default `Compression.deflate`.
+        predictor : int, optional
+            Predictor type (2 is best for continuous data), by default 2.
+        blockxsize : int, optional
+            Tile width in pixels, by default 512.
+        blockysize : int, optional
+            Tile height in pixels, by default 512.
+
+        Returns
+        -------
+        Path
+            The `dst_path` of the newly written compressed GeoTIFF.
+
+        Raises
+        ------
+        RuntimeError
+            If reading or writing fails.
+        """
+        profile = None
+
+        try:
+            with rasterio.open(src_path) as src:
+                profile = src.profile.copy()
+                profile.update(
+                    compress=compression,
+                    predictor=predictor,
+                    tiled=True,
+                    blockxsize=blockxsize,
+                    blockysize=blockysize,
+                )
+
+                with rasterio.open(dst_path, "w", **profile) as dst:
+                    for band in range(1, src.count + 1):
+                        data = src.read(band)
+                        dst.write(data, band)
+        except Exception as e:
+            raise RuntimeError(f"Failed to compress {src_path.name} → {dst_path.name}: {e}") from e
+
+        return dst_path

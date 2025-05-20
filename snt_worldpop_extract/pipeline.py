@@ -1,10 +1,16 @@
 import json
-from datetime import datetime
+import subprocess
 import tempfile
+import shutil
+from datetime import datetime
 from pathlib import Path
-import pandas as pd
+from collections.abc import Callable
+from subprocess import CalledProcessError
+from nbclient.exceptions import CellTimeoutError
 
-# import papermill as pm
+import pandas as pd
+import papermill as pm
+
 from openhexa.sdk import current_run, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from worlpopclient import WorldPopClient
@@ -15,33 +21,43 @@ def snt_worldpop_extract():
     """Write your pipeline orchestration here."""
     # set paths
     snt_root_path = Path(workspace.files_path)
+    pipeline_path = snt_root_path / "pipelines" / "snt_worldpop_extract"
 
-    # get configuration
-    snt_config_dict = load_configuration_snt(config_path=snt_root_path / "configuration" / "SNT_config.json")
+    try:
+        # get configuration
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
 
-    # get country identifier for file naming
-    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-    if country_code is None:
-        current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+        # get country identifier for file naming
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        if country_code is None:
+            raise ValueError("COUNTRY_CODE is not specified in the configuration.")
 
-    # Set output directory
-    output_dir = snt_root_path / "data" / "worldpop_raw" / "population_data"
-    pop_file_path = retrieve_population(country=country_code, output_dir=output_dir)
+        # Set output directory
+        output_dir = snt_root_path / "data" / "worldpop_raw" / "population_data"
+        pop_file_path = retrieve_population_data(country=country_code, output_path=output_dir)
 
-    add_files_to_dataset(
-        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT", None),
-        country_code=country_code,
-        file_paths=[pop_file_path],
-    )
+        if pop_file_path is None:
+            current_run.log_warning("No population data retrieved.")
+            return
 
-    # run_report_notebook(
-    #     nb_file=pipeline_path / "reporting" / "SNT_dhis2_extract_report.ipynb",
-    #     nb_output_path=pipeline_path / "reporting" / "outputs",
-    #     ready=files_ready,
-    # )
+        add_files_to_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACTS", None),
+            country_code=country_code,
+            file_paths=[pop_file_path],
+        )
+
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "SNT_wpop_population_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+        )
+    except Exception as e:
+        current_run.log_error(f"An error occurred in the pipeline: {e}")
+        raise
 
 
-def retrieve_population(country: str, output_path: Path) -> Path:
+def retrieve_population_data(country: str, output_path: Path) -> Path:
     """Retrieve raster population data from worldpop.
 
     Returns
@@ -49,13 +65,14 @@ def retrieve_population(country: str, output_path: Path) -> Path:
     Path
         The path to the saved WorldPop population data file.
     """
-    current_run.log_info("Retrieve raster population data from worldpop ")
+    current_run.log_info("Retrieving population data grid from worldpop.")
     wpop_client = WorldPopClient()
+    current_run.log_info(f"Connected to WorldPop endpoint : {wpop_client.base_url}")
 
     try:
         all_datasets = wpop_client.get_datasets_by_country(country_iso3=country)
         last_year = get_latest_population_year(all_datasets)
-        current_run.log_info(f"Latest available population data for year : {last_year}")
+        current_run.log_info(f"Latest population data for {country} is from {last_year}.")
     except Exception as e:
         current_run.log_error(f"Error retrieving datasets for country {country}: {e}")
         raise
@@ -64,14 +81,18 @@ def retrieve_population(country: str, output_path: Path) -> Path:
     Path.mkdir(output_path, exist_ok=True)
 
     try:
-        pop_data_path = wpop_client.get_population_grid_for_country_and_year(
+        pop_tif_path = wpop_client.get_population_geotiff(
             country_iso3=country,
             year=last_year,
             output_dir=output_path,
-            fname=f"wpop_{country}_pop_{last_year}.tif",
+            fname=f"{country}_wpop_population_{last_year}.tif",
         )
-        current_run.log_info(f"WorldPop population data saved: {pop_data_path}")
-        return pop_data_path
+        pop_compressed_path = wpop_client.compress_geotiff(
+            src_path=pop_tif_path,
+            dst_path=pop_tif_path.with_name(f"{country}_wpop_population_{last_year}_compressed.tif"),
+        )
+        current_run.log_info(f"WorldPop population data saved: {pop_compressed_path}")
+        return pop_compressed_path
     except ValueError as e:
         current_run.log_warning(f"No data population retrieved {e}")
         return None
@@ -174,24 +195,35 @@ def add_files_to_dataset(
             current_run.log_warning(f"File not found: {file}")
             continue
 
+        ext = file.suffix.lower()
+        tmp_suffix = file.suffix
+
         try:
-            # Determine file extension
-            ext = file.suffix.lower()
+            write_tmp: Callable[[str], None]
+
             if ext == ".parquet":
-                df = pd.read_parquet(file)
-                tmp_suffix = ".parquet"
+                df: pd.DataFrame = pd.read_parquet(file)
+
+                def write_tmp(path: str, df: pd.DataFrame = df) -> None:
+                    df.to_parquet(path)
+
             elif ext == ".csv":
-                df = pd.read_csv(file)
-                tmp_suffix = ".csv"
+                df: pd.DataFrame = pd.read_csv(file)
+
+                def write_tmp(path: str, df: pd.DataFrame = df) -> None:
+                    df.to_csv(path, index=False)
+
+            elif ext == ".tif":
+
+                def write_tmp(path: str, file: Path = file) -> None:
+                    shutil.copy(file, path)
+
             else:
                 current_run.log_warning(f"Unsupported file format: {file.name}")
                 continue
 
             with tempfile.NamedTemporaryFile(suffix=tmp_suffix) as tmp:
-                if ext == ".parquet":
-                    df.to_parquet(tmp.name)
-                else:
-                    df.to_csv(tmp.name, index=False)
+                write_tmp(tmp.name)
 
                 if not added_any:
                     new_version = get_new_dataset_version(ds_id=dataset_id, prefix=f"{country_code}_worldpop")
@@ -239,6 +271,66 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
 
     return new_version
+
+
+def run_report_notebook(
+    nb_file: Path,
+    nb_output_path: Path,
+) -> None:
+    """Execute a Jupyter notebook using Papermill.
+
+    Parameters
+    ----------
+    nb_file : str
+        The full file path to the notebook.
+    nb_output_path : str
+        The path to the directory where the output notebook will be saved.
+    """
+    current_run.log_info(f"Executing report notebook: {nb_file}")
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+
+    try:
+        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
+    except CellTimeoutError as e:
+        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
+    except Exception as e:
+        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+    generate_html_report(nb_output_full_path)
+
+
+def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
+    """Generate an HTML report from a Jupyter notebook.
+
+    Parameters
+    ----------
+    output_notebook_path : Path
+        Path to the output notebook file.
+    out_format : str
+        output extension
+
+    Raises
+    ------
+    RuntimeError
+        If an error occurs during the conversion process.
+    """
+    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
+        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
+
+    report_path = output_notebook_path.with_suffix(".html")
+    current_run.log_info(f"Generating HTML report {report_path}")
+    cmd = [
+        "jupyter",
+        "nbconvert",
+        f"--to={out_format}",
+        str(output_notebook_path),
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+    except CalledProcessError as e:
+        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+
+    current_run.add_file_output(str(report_path))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from io import BytesIO
 from math import ceil
 from pathlib import Path
@@ -94,7 +95,10 @@ def era5_extract(
     current_run.log_info(f"Using area of interest: {bounds}")
 
     if not end_date:
-        end_date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%d")
+        # end_date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%d")
+        end_date = (datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
         current_run.log_info(f"End date set to {end_date}")
 
     output_dir = Path(workspace.files_path, output_dir)

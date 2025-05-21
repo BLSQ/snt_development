@@ -57,29 +57,28 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
     Pipeline functions should only call tasks and should never perform IO operations or
     expensive computations.
     """
-    if start is None or end is None:
-        current_run.log_error("Empty period input start-end")
-        raise ValueError
-
-    if start > end:
-        current_run.log_error(f"End period {end} should be greater than start period {start}")
-        raise ValueError
+    try:
+        validate_period_range(start, end)
+    except ValueError as e:
+        current_run.log_error(f"Start and end period validation failed: {e}")
+        raise
 
     # Set paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
-    dhis2_raw_data_path = snt_root_path / "data" / "dhis2_raw"
+    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "raw"
 
     # Set up folders
     snt_folders_setup(snt_root_path)
 
     try:
         # Load configuration
-        # NOTE: check if the configuration is valid in load_configuration_snt function (!)
-        # is_valid_configuration(snt_config_dict) ## contains CONFIG? TEST?
         snt_config_dict = load_configuration_snt(
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
+
+        # Validate configuration
+        validate_config(snt_config_dict)
 
         # get country identifier for file naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
@@ -181,7 +180,6 @@ def load_configuration_snt(config_path: str) -> dict:
         # Load the JSON file
         with Path.open(config_path, "r") as file:
             config_json = json.load(file)
-
         current_run.log_info(f"SNT configuration loaded: {config_path}")
 
     except FileNotFoundError as e:
@@ -268,7 +266,6 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
     return dhis2_pyramid
 
 
-# Task 2 run DHIS2 analytics extract and formatting
 @snt_dhis2_extract.task
 def download_dhis2_analytics(
     start: int,
@@ -276,7 +273,7 @@ def download_dhis2_analytics(
     source_pyramid: pl.DataFrame,
     dhis2_client: DHIS2,
     snt_config: dict,
-    output_dir: str,
+    output_dir: Path,
     overwrite: bool = True,
     ready: bool = True,
 ) -> bool:
@@ -318,7 +315,7 @@ def download_dhis2_analytics(
         If an error occurs during the download or processing of data.
     """
     # Ensure the output directory exists
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
     if country_code is None:
@@ -349,19 +346,22 @@ def download_dhis2_analytics(
     if len(data_elements) == 0:
         raise ValueError("No routine DHSI2 data elements found in the configuration.")
 
+    p1 = period_from_string(str(start))
+    p2 = period_from_string(str(end))
+    periods = [p1] if p1 == p2 else p1.get_range(p2)
+
     try:
-        p1 = period_from_string(str(start))
-        p2 = period_from_string(str(end))
-        periods = [p1] if p1 == p2 else p1.get_range(p2)
+        if overwrite:
+            delete_raw_analytics_files(output_dir, pattern=f"{country_code}_raw_analytics_*.parquet")
     except Exception as e:
-        raise Exception(f"Error ocurred when computing periods start: {start} end : {end} Error : {e}") from e
+        raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
     try:
         current_run.log_info(f"Downloading routine data for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            fp = Path(output_dir) / f"{country_code}_raw_analytics_{p}.parquet"
+            fp = output_dir / f"{country_code}_raw_analytics_{p}.parquet"
 
-            if fp.exists() and not overwrite:
+            if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
                 continue
 
@@ -478,6 +478,8 @@ def download_dhis2_population(
 ) -> bool:
     """Download and save DHIS2 population data for the specified period.
 
+    The period for population data has a yearly (YYYY) frequency.
+
     Parameters
     ----------
     start : int
@@ -530,12 +532,15 @@ def download_dhis2_population(
     if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
         raise ValueError(f"Incorrect POPULATION_ORG_UNITS_LEVEL value, please set between 1 and {max_level}.")
 
+    p1 = period_from_string(str(start)[:4])
+    p2 = period_from_string(str(end)[:4])
+    periods = [p1] if p1 == p2 else p1.get_range(p2)
+
     try:
-        p1 = period_from_string(str(start))
-        p2 = period_from_string(str(end))
-        periods = [p1] if p1 == p2 else p1.get_range(p2)
+        if overwrite:
+            delete_raw_analytics_files(output_dir, pattern=f"{country_code}_raw_population_*.parquet")
     except Exception as e:
-        raise Exception(f"Error ocurred when computing periods start: {start} end : {end} Error : {e}") from e
+        raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
     try:
         # Get the organisation units for the specified level
@@ -549,7 +554,7 @@ def download_dhis2_population(
         for p in periods:
             fp = Path(output_dir) / f"{country_code}_raw_population_{p}.parquet"
 
-            if fp.exists() and not overwrite:
+            if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
                 continue
 
@@ -865,14 +870,15 @@ def snt_folders_setup(root_path: Path) -> None:
     folders_to_create = [
         "configuration",
         "code",
-        "data/dhis2_raw/population_data",
-        "data/dhis2_raw/pyramid_data",
-        "data/dhis2_raw/routine_data",
-        "data/dhis2_raw/shapes_data",
-        "data/dhis2_formatted",
-        "pipelines/snt_dhis2_extract",
+        "data/dhis2/raw/population_data",
+        "data/dhis2/raw/pyramid_data",
+        "data/dhis2/raw/routine_data",
+        "data/dhis2/raw/shapes_data",
+        "data/dhis2/formatted",
+        "data/worldpop/raw/populationpipelines/snt_dhis2_extract",
         "pipelines/snt_dhis2_formatting/code",
         "pipelines/snt_dhis2_formatting/papermill_outputs",
+        "pipelines/snt_worldpop_extract",
     ]
     for relative_path in folders_to_create:
         full_path = root_path / relative_path
@@ -945,6 +951,96 @@ def generate_html_report(output_notebook_path: Path, out_format: str = "html") -
         raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
 
     current_run.add_file_output(str(report_path))
+
+
+def validate_config(config: dict) -> None:
+    """Validate that the critical configuration values are set properly."""
+    try:
+        snt_config = config["SNT_CONFIG"]
+        dataset_ids = config["SNT_DATASET_IDENTIFIERS"]
+        definitions = config["DHIS2_DATA_DEFINITIONS"]
+    except KeyError as e:
+        raise KeyError(f"Missing top-level key in config: {e}") from e
+
+    # Required keys in SNT_CONFIG
+    required_snt_keys = [
+        "COUNTRY_CODE",
+        "DHIS2_ADMINISTRATION_1",
+        "DHIS2_ADMINISTRATION_2",
+        "ANALYTICS_ORG_UNITS_LEVEL",
+        "POPULATION_ORG_UNITS_LEVEL",
+        "SHAPES_ORG_UNITS_LEVEL",
+    ]
+    for key in required_snt_keys:
+        if key not in snt_config or snt_config[key] in [None, ""]:
+            raise ValueError(f"Missing or empty configuration for: SNT_CONFIG.{key}")
+
+    # Required dataset identifiers
+    required_dataset_keys = [
+        "DHIS2_DATASET_EXTRACTS",
+        "DHIS2_DATASET_FORMATTED",
+        "WORLDPOP_DATASET_EXTRACTS",
+    ]
+    for key in required_dataset_keys:
+        if key not in dataset_ids or dataset_ids[key] in [None, ""]:
+            raise ValueError(f"Missing or empty configuration for: SNT_DATASET_IDENTIFIERS.{key}")
+
+    # Check population indicator
+    pop_indicators = definitions.get("POPULATION_INDICATOR_DEFINITIONS", {})
+    tot_population = pop_indicators.get("TOT_POPULATION", [])
+    if not tot_population:
+        raise ValueError("Missing or empty TOT_POPULATION indicator definition.")
+
+    # Check at least one indicator under DHIS2_INDICATOR_DEFINITIONS
+    indicator_defs = definitions.get("DHIS2_INDICATOR_DEFINITIONS", {})
+    flat_indicators = [val for sublist in indicator_defs.values() for val in sublist]
+    if not flat_indicators:
+        raise ValueError("No indicators defined under DHIS2_INDICATOR_DEFINITIONS.")
+
+
+def validate_yyyymm(value: int) -> None:
+    """Validate that the input is an integer in yyyymm format."""
+    yyyymm_str = str(value)
+    if len(yyyymm_str) != 6:
+        raise ValueError("Input must be a 6-digit integer in yyyymm format.")
+
+    # year = int(yyyymm_str[:4])
+    month = int(yyyymm_str[4:])
+    if month < 1 or month > 12:
+        raise ValueError(f"Month must be between 01 and 12 in {value}, got {month}.")
+
+
+def validate_period_range(start: int, end: int) -> None:
+    """Validate that start and end are valid yyyymm values and ordered correctly."""
+    if start is None or end is None:
+        raise ValueError("Start or end period is missing.")
+
+    validate_yyyymm(start)
+    validate_yyyymm(end)
+
+    if start > end:
+        raise ValueError("Start period must not be after end period.")
+
+
+def delete_raw_analytics_files(directory: Path, pattern: str) -> None:
+    """Delete raw analytics parquet files for a given country code in the specified directory.
+
+    Parameters
+    ----------
+    directory : Path
+        The directory in which to search for files to delete.
+    pattern : str
+        The pattern to match files for deletion.
+
+    This function deletes all files matching the pattern in the given directory.
+    """
+    files_to_delete = list(directory.glob(pattern))
+
+    for file in files_to_delete:
+        try:
+            file.unlink()
+        except Exception as e:
+            raise Exception(f"Failed to delete {file}: {e}") from e
 
 
 if __name__ == "__main__":

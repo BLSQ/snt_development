@@ -29,25 +29,29 @@ def snt_worldpop_extract():
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
 
+        # Validate configuration
+        validate_config(snt_config_dict)
+
         # get country identifier for file naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
         if country_code is None:
             raise ValueError("COUNTRY_CODE is not specified in the configuration.")
 
         # Set output directory
-        output_dir = snt_root_path / "data" / "worldpop_raw" / "population_data"
+        output_dir = snt_root_path / "data" / "worldpop" / "raw" / "population"
         pop_file_path = retrieve_population_data(country=country_code, output_path=output_dir)
-
         if pop_file_path is None:
             current_run.log_warning("No population data retrieved.")
             return
 
+        # Add files to dataset
         add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACTS", None),
             country_code=country_code,
             file_paths=[pop_file_path],
         )
 
+        # Run report notebook
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "SNT_wpop_population_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
@@ -331,6 +335,51 @@ def generate_html_report(output_notebook_path: Path, out_format: str = "html") -
         raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
 
     current_run.add_file_output(str(report_path))
+
+
+def validate_config(config: dict) -> None:
+    """Validate that the critical configuration values are set properly."""
+    try:
+        snt_config = config["SNT_CONFIG"]
+        dataset_ids = config["SNT_DATASET_IDENTIFIERS"]
+        definitions = config["DHIS2_DATA_DEFINITIONS"]
+    except KeyError as e:
+        raise KeyError(f"Missing top-level key in config: {e}") from e
+
+    # Required keys in SNT_CONFIG
+    required_snt_keys = [
+        "COUNTRY_CODE",
+        "DHIS2_ADMINISTRATION_1",
+        "DHIS2_ADMINISTRATION_2",
+        "ANALYTICS_ORG_UNITS_LEVEL",
+        "POPULATION_ORG_UNITS_LEVEL",
+        "SHAPES_ORG_UNITS_LEVEL",
+    ]
+    for key in required_snt_keys:
+        if key not in snt_config or snt_config[key] in [None, ""]:
+            raise ValueError(f"Missing or empty configuration for: SNT_CONFIG.{key}")
+
+    # Required dataset identifiers
+    required_dataset_keys = [
+        "DHIS2_DATASET_EXTRACTS",
+        "DHIS2_DATASET_FORMATTED",
+        "WORLDPOP_DATASET_EXTRACTS",
+    ]
+    for key in required_dataset_keys:
+        if key not in dataset_ids or dataset_ids[key] in [None, ""]:
+            raise ValueError(f"Missing or empty configuration for: SNT_DATASET_IDENTIFIERS.{key}")
+
+    # Check population indicator
+    pop_indicators = definitions.get("POPULATION_INDICATOR_DEFINITIONS", {})
+    tot_population = pop_indicators.get("TOT_POPULATION", [])
+    if not tot_population:
+        raise ValueError("Missing or empty TOT_POPULATION indicator definition.")
+
+    # Check at least one indicator under DHIS2_INDICATOR_DEFINITIONS
+    indicator_defs = definitions.get("DHIS2_INDICATOR_DEFINITIONS", {})
+    flat_indicators = [val for sublist in indicator_defs.values() for val in sublist]
+    if not flat_indicators:
+        raise ValueError("No indicators defined under DHIS2_INDICATOR_DEFINITIONS.")
 
 
 if __name__ == "__main__":

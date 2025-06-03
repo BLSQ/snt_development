@@ -12,7 +12,8 @@
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
 		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
-		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract"
+		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract",
+		"ERA5_DATASET_CLIMATE" : "snt-era5-climate"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {

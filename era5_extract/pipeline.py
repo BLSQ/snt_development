@@ -69,21 +69,12 @@ from openhexa.toolbox.era5.cds import CDS, VARIABLES
     ],
     help="ERA5-Land variable of interest",
 )
-@parameter(
-    "output_dir",
-    name="Output directory",
-    type=str,
-    help="Output directory for the extracted data",
-    required=True,
-    default="data/era5/raw",
-)
 def era5_extract(
     start_date: str,
     end_date: str,
     cds_connection: CustomConnection,
     boundaries_dataset: Dataset,
     variable: str,
-    output_dir: str,
     boundaries_file: str | None = None,
 ) -> None:
     """Download ERA5 products from the Climate Data Store."""
@@ -101,7 +92,7 @@ def era5_extract(
         )
         current_run.log_info(f"End date set to {end_date}")
 
-    output_dir = Path(workspace.files_path, output_dir)
+    output_dir = Path(workspace.files_path) / "data" / "era5" / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # find variable code and shortname from fullname provided in parameters

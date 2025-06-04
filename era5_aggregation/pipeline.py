@@ -409,6 +409,8 @@ def add_files_to_dataset(
 def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     """Create and return a new dataset version.
 
+    Also creates a new dataset if it does not exist.
+
     Parameters
     ----------
     ds_id : str
@@ -426,7 +428,15 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     Exception
         If an error occurs while creating the new dataset version.
     """
-    dataset = workspace.get_dataset(ds_id)
+    existing_datasets = workspace.list_datasets()
+    if ds_id in [eds.id for eds in existing_datasets]:
+        dataset = workspace.get_dataset(ds_id)
+    else:
+        current_run.log_warning(f"Dataset with ID {ds_id} not found, creating a new one.")
+        dataset = workspace.create_dataset(
+            name=ds_id.replace("-", "_").upper(), description="SNT Process dataset"
+        )
+
     version_name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M')}"
 
     try:

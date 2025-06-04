@@ -390,7 +390,7 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         If an error occurs while creating the new dataset version.
     """
     existing_datasets = workspace.list_datasets()
-    if ds_id in [eds.id for eds in existing_datasets]:
+    if ds_id in [eds.slug for eds in existing_datasets]:
         dataset = workspace.get_dataset(ds_id)
     else:
         current_run.log_warning(f"Dataset with ID {ds_id} not found, creating a new one.")

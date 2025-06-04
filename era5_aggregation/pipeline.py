@@ -429,7 +429,7 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         If an error occurs while creating the new dataset version.
     """
     existing_datasets = workspace.list_datasets()
-    if ds_id in [eds.id for eds in existing_datasets]:
+    if ds_id in [eds.slug for eds in existing_datasets]:
         dataset = workspace.get_dataset(ds_id)
     else:
         current_run.log_warning(f"Dataset with ID {ds_id} not found, creating a new one.")
@@ -471,5 +471,13 @@ def apply_snt_formatting(
         df.columns = aggregation_columns[aggregation]
     else:
         raise ValueError(f"Unknown aggregation type: {aggregation}")
+
+    if aggregation == "monthly":
+        df = df.with_columns(
+            [
+                pl.col("PERIOD").cast(pl.Utf8).str.slice(0, 4).cast(pl.Int32).alias("YEAR"),
+                pl.col("PERIOD").cast(pl.Utf8).str.slice(4, 2).cast(pl.Int32).alias("MONTH"),
+            ]
+        )
 
     return df

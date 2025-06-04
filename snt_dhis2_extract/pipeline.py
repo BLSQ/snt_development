@@ -875,7 +875,7 @@ def snt_folders_setup(root_path: Path) -> None:
         "data/dhis2/raw/routine_data",
         "data/dhis2/raw/shapes_data",
         "data/dhis2/formatted",
-        "data/worldpop/raw/populationpipelines/snt_dhis2_extract",
+        "data/worldpop/raw/population",
         "pipelines/snt_dhis2_formatting/code",
         "pipelines/snt_dhis2_formatting/papermill_outputs",
         "pipelines/snt_worldpop_extract",

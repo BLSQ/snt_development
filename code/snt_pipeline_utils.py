@@ -1,84 +1,121 @@
 import json
 from datetime import datetime
 from pathlib import Path
+import pandas as pd
+import geopandas as gpd
 import tempfile
 import papermill as pm
-import geopandas as gpd
-import pandas as pd
+from openhexa.sdk import current_run, workspace
 import subprocess
 from subprocess import CalledProcessError
 from nbclient.exceptions import CellTimeoutError
-from openhexa.sdk import current_run, pipeline, workspace, parameter
 from openhexa.sdk.datasets.dataset import DatasetVersion
 
 
-@pipeline("dhis2_reporting_rate")
-@parameter(
-    "reporting_rate_threshold",
-    name="Reporting Rate Threshold",
-    help="Threshold for considering reporting rate 'good' (0-1)",
-    type=float,
-    default=0.8,
-    required=True,
-)
-@parameter(
-    "run_report_only",
-    name="Run reporting only",
-    help="This will only execute the reporting notebook",
-    type=bool,
-    default=False,
-    required=False,
-)
-def dhis2_reporting_rate(reporting_rate_threshold: float, run_report_only: bool = False):
-    """Pipeline for calculating DHIS2 reporting rates with configurable parameters."""
-    current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
-    current_run.log_info("PIPELINE PARAMETERS:")
-    current_run.log_info(f"Reporting threshold: {reporting_rate_threshold}")
+def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):
+    """Execute a Jupyter notebook using Papermill.
+
+    Parameters
+    ----------
+    nb_name : str
+        The name of the notebook to execute (without the .ipynb extension).
+    nb_path : Path
+        The path to the directory containing the notebook.
+    out_nb_path : Path
+        The path to the directory where the output notebook will be saved.
+    parameters : dict
+        A dictionary of parameters to pass to the notebook.
+    kernel_name : str, optional
+        The name of the kernel to use for execution (default is "ir" for R, python3 for Python).
+    """
+    current_run.log_info(f"Executing notebook: {nb_path}")
+    file_stem = nb_path.stem
+    extension = nb_path.suffix
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    out_nb_full_path = out_nb_path / f"{file_stem}_OUTPUT_{execution_timestamp}{extension}"
+    out_nb_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Set paths
-        root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate"
-        data_path = root_path / "data" / "dhis2_reporting_rate"
-
-        # Load configuration
-        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
-        validate_config(snt_config)
-        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-
-        if not run_report_only:
-            run_notebook(
-                nb_path=pipeline_path / "code" / "SNT_dhis2_reporting_rate.ipynb",
-                out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "SNT_ROOT_PATH": root_path.as_posix(),
-                    "REPORTING_RATE_THRESHOLD": reporting_rate_threshold,
-                },
-            )
-
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
-                country_code=country_code,
-                file_paths=[
-                    data_path / f"{country_code}_reporting_rate_any_month.parquet",
-                    data_path / f"{country_code}_reporting_rate_any_month.csv",
-                    data_path / f"{country_code}_reporting_rate_conf_month.parquet",
-                    data_path / f"{country_code}_reporting_rate_conf_month.csv",
-                ],
-            )
-        else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
-
-        run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "SNT_dhis2_reporting_rate_report.ipynb",
-            nb_output_path=pipeline_path / "reporting" / "outputs",
+        pm.execute_notebook(
+            input_path=nb_path,
+            output_path=out_nb_full_path,
+            parameters=parameters,
+            kernel_name=kernel_name,
+            request_save_on_cell_execute=False,
         )
-
-        current_run.log_info("Pipeline completed successfully!")
-
     except Exception as e:
-        current_run.log_error(f"Pipeline failed: {e}")
-        raise
+        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+
+
+def run_report_notebook(
+    nb_file: Path,
+    nb_output_path: Path,
+    nb_parameters: dict | None = None,
+    ready: bool = True,
+) -> None:
+    """Execute a Jupyter notebook using Papermill.
+
+    Parameters
+    ----------
+    nb_file : Path
+        The full file path to the notebook.
+    nb_output_path : Path
+        The path to the directory where the output notebook will be saved.
+    ready : bool, optional
+        Whether the notebook should be executed (default is True).
+    nb_parameters : dict | None, optional
+        A dictionary of parameters to pass to the notebook (default is None).
+    """
+    if not ready:
+        current_run.log_info("Reporting execution skipped.")
+        return
+
+    current_run.log_info(f"Executing report notebook: {nb_file}")
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+    nb_output_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
+    except CellTimeoutError as e:
+        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
+    except Exception as e:
+        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+    generate_html_report(nb_output_full_path)
+
+
+def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
+    """Generate an HTML report from a Jupyter notebook.
+
+    Parameters
+    ----------
+    output_notebook_path : Path
+        Path to the output notebook file.
+    out_format : str
+        output extension
+
+    Raises
+    ------
+    RuntimeError
+        If an error occurs during the conversion process.
+    """
+    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
+        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
+
+    report_path = output_notebook_path.with_suffix(".html")
+    current_run.log_info(f"Generating HTML report {report_path}")
+    cmd = [
+        "jupyter",
+        "nbconvert",
+        f"--to={out_format}",
+        str(output_notebook_path),
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+    except CalledProcessError as e:
+        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+
+    current_run.add_file_output(report_path.as_posix())
 
 
 def load_configuration_snt(config_path: str) -> dict:
@@ -165,41 +202,6 @@ def validate_config(config: dict) -> None:
     flat_indicators = [val for sublist in indicator_defs.values() for val in sublist]
     if not flat_indicators:
         raise ValueError("No indicators defined under DHIS2_INDICATOR_DEFINITIONS.")
-
-
-def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):
-    """Execute a Jupyter notebook using Papermill.
-
-    Parameters
-    ----------
-    nb_name : str
-        The name of the notebook to execute (without the .ipynb extension).
-    nb_path : Path
-        The path to the directory containing the notebook.
-    out_nb_path : Path
-        The path to the directory where the output notebook will be saved.
-    parameters : dict
-        A dictionary of parameters to pass to the notebook.
-    kernel_name : str, optional
-        The name of the kernel to use for execution (default is "ir" for R, python3 for Python).
-    """
-    current_run.log_info(f"Executing notebook: {nb_path}")
-    file_stem = nb_path.stem
-    extension = nb_path.suffix
-    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    out_nb_full_path = out_nb_path / f"{file_stem}_OUTPUT_{execution_timestamp}{extension}"
-    out_nb_path.mkdir(parents=True, exist_ok=True)
-
-    try:
-        pm.execute_notebook(
-            input_path=nb_path,
-            output_path=out_nb_full_path,
-            parameters=parameters,
-            kernel_name=kernel_name,
-            request_save_on_cell_execute=False,
-        )
-    except Exception as e:
-        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
 
 
 def add_files_to_dataset(
@@ -316,73 +318,7 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     return new_version
 
 
-def run_report_notebook(
-    nb_file: Path,
-    nb_output_path: Path,
-    ready: bool = True,
-) -> None:
-    """Execute a Jupyter notebook using Papermill.
-
-    Parameters
-    ----------
-    nb_file : Path
-        The full file path to the notebook.
-    nb_output_path : Path
-        The path to the directory where the output notebook will be saved.
-    ready : bool, optional
-        Whether the notebook should be executed (default is True).
-    """
-    if not ready:
-        current_run.log_info("Reporting execution skipped.")
-        return
-
-    current_run.log_info(f"Executing report notebook: {nb_file}")
-    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
-    nb_output_path.mkdir(parents=True, exist_ok=True)
-
-    try:
-        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
-    except CellTimeoutError as e:
-        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
-    except Exception as e:
-        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
-    generate_html_report(nb_output_full_path)
-
-
-def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
-    """Generate an HTML report from a Jupyter notebook.
-
-    Parameters
-    ----------
-    output_notebook_path : Path
-        Path to the output notebook file.
-    out_format : str
-        output extension
-
-    Raises
-    ------
-    RuntimeError
-        If an error occurs during the conversion process.
-    """
-    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
-        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
-
-    report_path = output_notebook_path.with_suffix(".html")
-    current_run.log_info(f"Generating HTML report {report_path}")
-    cmd = [
-        "jupyter",
-        "nbconvert",
-        f"--to={out_format}",
-        str(output_notebook_path),
-    ]
-    try:
-        subprocess.run(cmd, check=True)
-    except CalledProcessError as e:
-        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
-
-    current_run.add_file_output(report_path.as_posix())
-
-
-if __name__ == "__main__":
-    dhis2_reporting_rate()
+def test_function(parameter: int):
+    """A simple test function to verify the module is working."""
+    current_run.log_info(f"Test function executed successfully {parameter}")
+    return

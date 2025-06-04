@@ -771,10 +771,6 @@ def add_files_to_dataset(
     Bool
         True if files were successfully added to the dataset version, False otherwise.
     """
-    if dataset_id is None:
-        raise ValueError(
-            "DHIS2_DATASET_EXTRACTS is not specified in the configuration."
-        )  # TODO: make the error to refer to the corresponding dataset..
     if country_code is None:
         current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
@@ -899,31 +895,35 @@ def snt_folders_setup(root_path: Path) -> None:
 def run_report_notebook(
     nb_file: Path,
     nb_output_path: Path,
+    nb_parameters: dict | None = None,
     ready: bool = True,
 ) -> None:
     """Execute a Jupyter notebook using Papermill.
 
     Parameters
     ----------
-    nb_file : str
+    nb_file : Path
         The full file path to the notebook.
-    nb_output_path : str
+    nb_output_path : Path
         The path to the directory where the output notebook will be saved.
     ready : bool, optional
         Whether the notebook should be executed (default is True).
+    nb_parameters : dict | None, optional
+        A dictionary of parameters to pass to the notebook (default is None).
     """
     if not ready:
         current_run.log_info("Reporting execution skipped.")
         return
 
-    current_run.log_info(f"Executing notebook: {nb_file}")
+    current_run.log_info(f"Executing report notebook: {nb_file}")
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+    nb_output_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
+        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
     except CellTimeoutError as e:
-        raise Exception(f"Notebook execution timed out: {e}") from e
+        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
     generate_html_report(nb_output_full_path)
@@ -989,7 +989,10 @@ def validate_config(config: dict) -> None:
     required_dataset_keys = [
         "DHIS2_DATASET_EXTRACTS",
         "DHIS2_DATASET_FORMATTED",
+        "DHIS2_REPORTING_RATE",
+        "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
+        "ERA5_DATASET_CLIMATE",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:

@@ -149,7 +149,10 @@ def validate_config(config: dict) -> None:
     required_dataset_keys = [
         "DHIS2_DATASET_EXTRACTS",
         "DHIS2_DATASET_FORMATTED",
+        "DHIS2_REPORTING_RATE",
+        "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
+        "ERA5_DATASET_CLIMATE",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:
@@ -182,8 +185,7 @@ def dhis2_analytics_formatting(
 
     try:
         run_notebook(
-            nb_name="SNT_dhis2_routine_format",
-            nb_path=pipeline_root_path / "code",
+            nb_path=pipeline_root_path / "code" / "SNT_dhis2_routine_format.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -204,8 +206,7 @@ def dhis2_population_formatting(
     }
     try:
         run_notebook(
-            nb_name="SNT_dhis2_population_format",
-            nb_path=pipeline_root_path / "code",
+            nb_path=pipeline_root_path / "code" / "SNT_dhis2_population_format.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -226,8 +227,7 @@ def dhis2_shapes_formatting(
     }
     try:
         run_notebook(
-            nb_name="SNT_dhis2_shapes_format",
-            nb_path=pipeline_root_path / "code",
+            nb_path=pipeline_root_path / "code" / "SNT_dhis2_shapes_format.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -252,8 +252,7 @@ def dhis2_pyramid_formatting(
     }
     try:
         run_notebook(
-            nb_name="SNT_dhis2_pyramid_format",
-            nb_path=pipeline_root_path / "code",
+            nb_path=pipeline_root_path / "code" / "SNT_dhis2_pyramid_format.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -261,28 +260,37 @@ def dhis2_pyramid_formatting(
         raise Exception(f"Error in formatting pyramid data: {e}") from e
 
 
-def run_notebook(nb_name: str, nb_path: Path, out_nb_path: Path, parameters: dict):
+def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):
     """Execute a Jupyter notebook using Papermill.
 
     Parameters
     ----------
     nb_name : str
         The name of the notebook to execute (without the .ipynb extension).
-    nb_path : str
+    nb_path : Path
         The path to the directory containing the notebook.
-    out_nb_path : str
+    out_nb_path : Path
         The path to the directory where the output notebook will be saved.
     parameters : dict
         A dictionary of parameters to pass to the notebook.
+    kernel_name : str, optional
+        The name of the kernel to use for execution (default is "ir" for R, python3 for Python).
     """
-    nb_full_path = nb_path / f"{nb_name}.ipynb"
-    current_run.log_info(f"Executing notebook: {nb_full_path}")
+    current_run.log_info(f"Executing notebook: {nb_path}")
+    file_stem = nb_path.stem
+    extension = nb_path.suffix
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    out_nb_fname = f"{nb_name}_OUTPUT_{execution_timestamp}.ipynb"
-    out_nb_full_path = out_nb_path / out_nb_fname
+    out_nb_full_path = out_nb_path / f"{file_stem}_OUTPUT_{execution_timestamp}{extension}"
+    out_nb_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        pm.execute_notebook(input_path=nb_full_path, output_path=out_nb_full_path, parameters=parameters)
+        pm.execute_notebook(
+            input_path=nb_path,
+            output_path=out_nb_full_path,
+            parameters=parameters,
+            kernel_name=kernel_name,
+            request_save_on_cell_execute=False,
+        )
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
 
@@ -313,11 +321,6 @@ def add_files_to_dataset(
     bool
         True if at least one file was added successfully, False otherwise.
     """
-    if dataset_id is None:
-        raise ValueError(
-            "DHIS2_DATASET_FORMATTED is not specified in the configuration."
-        )  # TODO: make the error to refer to the corresponding dataset..
-
     added_any = False
 
     for file in file_paths:
@@ -417,9 +420,9 @@ def run_report_notebook(
 
     Parameters
     ----------
-    nb_file : str
+    nb_file : Path
         The full file path to the notebook.
-    nb_output_path : str
+    nb_output_path : Path
         The path to the directory where the output notebook will be saved.
     ready : bool, optional
         Whether the notebook should be executed (default is True).
@@ -431,6 +434,7 @@ def run_report_notebook(
     current_run.log_info(f"Executing report notebook: {nb_file}")
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+    nb_output_path.mkdir(parents=True, exist_ok=True)
 
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)

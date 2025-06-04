@@ -185,10 +185,6 @@ def add_files_to_dataset(
     Bool
         True if files were successfully added to the dataset version, False otherwise.
     """
-    if dataset_id is None:
-        raise ValueError(
-            "WORLDPOP_DATASET_EXTRACTS is not specified in the configuration."
-        )  # TODO: make the error to refer to the corresponding dataset..
     if country_code is None:
         current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
@@ -295,14 +291,15 @@ def run_report_notebook(
 
     Parameters
     ----------
-    nb_file : str
+    nb_file : Path
         The full file path to the notebook.
-    nb_output_path : str
+    nb_output_path : Path
         The path to the directory where the output notebook will be saved.
     """
     current_run.log_info(f"Executing report notebook: {nb_file}")
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
+    nb_output_path.mkdir(parents=True, exist_ok=True)
 
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path)
@@ -373,7 +370,10 @@ def validate_config(config: dict) -> None:
     required_dataset_keys = [
         "DHIS2_DATASET_EXTRACTS",
         "DHIS2_DATASET_FORMATTED",
+        "DHIS2_REPORTING_RATE",
+        "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
+        "ERA5_DATASET_CLIMATE",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:

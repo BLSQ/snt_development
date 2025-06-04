@@ -38,7 +38,7 @@ def dhis2_reporting_rate(reporting_rate_threshold: float, run_report_only: bool 
     try:
         # Set paths
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "dhis2_reporting_rate"
+        pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate"
         data_path = root_path / "data" / "dhis2_reporting_rate"
         papermill_output_path = pipeline_path / "papermill_outputs"
         papermill_output_path.mkdir(parents=True, exist_ok=True)

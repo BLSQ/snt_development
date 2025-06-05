@@ -81,6 +81,11 @@ def era5_aggregate(
     if country_code is None:
         current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
+    era5_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("ERA5_DATASET_CLIMATE", None)
+    if era5_dataset_id is None:
+        current_run.log_error("ERA5_DATASET_CLIMATE is not specified in the configuration.")
+        raise ValueError
+
     # subdirs containing raw data are named after variable names
     subdirs = [d for d in input_dir.iterdir() if d.is_dir()]
     variables = [d.name for d in subdirs if d.name in VARIABLES]
@@ -170,7 +175,7 @@ def era5_aggregate(
         )
 
     add_files_to_dataset(
-        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("ERA5_DATASET_CLIMATE", None),
+        dataset_id=era5_dataset_id,
         country_code=country_code,
         file_paths=filename_list,
     )
@@ -352,11 +357,6 @@ def add_files_to_dataset(
     bool
         True if at least one file was added successfully, False otherwise.
     """
-    if dataset_id is None:
-        raise ValueError(
-            "ERA5_DATASET_CLIMATE is not specified in the configuration."
-        )  # TODO: make the error to refer to the corresponding dataset..
-
     added_any = False
 
     for file in file_paths:

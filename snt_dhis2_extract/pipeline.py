@@ -1,21 +1,22 @@
 import json
+import re
+import subprocess
 import tempfile
 from datetime import datetime
+from itertools import product
 from pathlib import Path
+from subprocess import CalledProcessError
 
 import pandas as pd
 import papermill as pm
 import polars as pl
-
+from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
-import subprocess
-from subprocess import CalledProcessError
-from nbclient.exceptions import CellTimeoutError
 
 
 @pipeline("snt_dhis2_extract", timeout=28800)
@@ -87,8 +88,7 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
 
         # DHIS2 connection
         dhis2_client = get_dhis2_client(
-            dhis2_connection=dhis2_connection,
-            cache_folder=None,  # snt_root_path / snt_dhis2_extract / ".cache"
+            dhis2_connection=dhis2_connection, cache_folder=pipeline_path / ".cache"
         )
 
         # get the dhis2 pyramid
@@ -127,6 +127,17 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
             ready=pop_ready,
         )
 
+        reporting_ready = download_dhis2_reporting_rates(
+            start=start,
+            end=end,
+            source_pyramid=dhis2_pyramid,
+            dhis2_client=dhis2_client,
+            snt_config=snt_config_dict,
+            output_dir=dhis2_raw_data_path / "reporting_data",
+            overwrite=overwrite,
+            ready=analytics_ready,
+        )
+
         files_ready = add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
             country_code=country_code,
@@ -136,11 +147,13 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
                 dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
                 dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
                 dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
+                dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
             ],
             analytics_ready=analytics_ready,
             pop_ready=pop_ready,
             shapes_ready=shapes_ready,
             pyramid_ready=pyramid_ready,
+            reporting_ready=reporting_ready,
         )
 
         run_report_notebook(
@@ -267,6 +280,234 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
 
 
 @snt_dhis2_extract.task
+def download_dhis2_reporting_rates(
+    start: int,
+    end: int,
+    source_pyramid: pl.DataFrame,
+    dhis2_client: DHIS2,
+    snt_config: dict,
+    output_dir: Path,
+    overwrite: bool = True,
+    ready: bool = True,
+) -> bool:
+    """Download and save DHIS2 reporting rates data.
+
+    Returns
+    -------
+    bool
+        True if the reporting rates data is successfully downloaded and saved.
+    """
+    # Ensure the output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    if country_code is None:
+        raise ValueError("COUNTRY_CODE is not specified in the configuration.")
+
+    # Org units level selection for reporting
+    org_unit_level_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
+    if org_unit_level_name is None:
+        raise ValueError("DHIS2_ADMINISTRATION_2 value not configured.")
+    # Extract the numeric level from a string like "level_2_name"
+    match = re.search(r"level_(\d+)_", org_unit_level_name)
+    if not match:
+        raise ValueError(f"Could not extract org unit level from '{org_unit_level_name}'")
+    org_unit_level = int(match.group(1))
+
+    # get levels and list of OU ids
+    df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
+        ["level", "opening_date", "closed_date", "geometry"]
+    )
+    org_units_list = df_pyramid["id"].unique().to_list()
+    current_run.log_info(
+        f"Downloading analytics for {len(org_units_list)} org units at level {org_unit_level}"
+    )
+
+    reporting_rates = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_DATASETS"].get("REPORTING_RATES")
+    if len(reporting_rates) == 0:
+        current_run.log_info("No reporting rates to download.")
+        return True
+
+    # Download datasets metadata
+    current_run.log_info("Downloading datasets metadata from DHIS2.")
+    datasets_metadata = dhis2_client.meta.datasets()
+    datasets_metadata_df = pl.DataFrame(datasets_metadata)
+
+    # validate reporting_rates
+    valid_reporting_rates = validate_reporting_rates(reporting_rates, datasets_metadata_df)
+
+    # setup periods
+    p1 = period_from_string(str(start))
+    p2 = period_from_string(str(end))
+    periods = [p1] if p1 == p2 else p1.get_range(p2)
+
+    try:
+        if overwrite:
+            delete_raw_files(output_dir, pattern=f"{country_code}_raw_reporting_*.parquet")
+    except Exception as e:
+        raise Exception(f"Error while cleaning old raw reporting rate files: {e}") from e
+
+    try:
+        current_run.log_info(f"Downloading reporting data for period : {periods[0]} to {periods[-1]}")
+        for p in periods:
+            fp = output_dir / f"{country_code}_raw_reporting_{p}.parquet"
+
+            if fp.exists():
+                current_run.log_info(f"File {fp} already exists. Skipping download.")
+                continue
+
+            reporting_rate_period = []
+            for rate in valid_reporting_rates:
+                dataset_uid = rate.get("DATASET")
+                metrics = rate.get("METRICS", [])
+                reporting_des = [f"{ds}.{metric}" for ds, metric in product([dataset_uid], metrics)]
+                # Get dataset name
+                try:
+                    # Filter and select the name
+                    filtered_name_series = (
+                        datasets_metadata_df.filter(pl.col("id") == dataset_uid).select("name").to_series()
+                    )
+                    if filtered_name_series.is_empty():
+                        dataset_name = "[Name not found]"
+                    else:
+                        dataset_name = filtered_name_series.item(0)
+                        if dataset_name is None or not dataset_name:
+                            dataset_name = "[Name not found]"
+                except Exception as e:
+                    dataset_name = "[Name not found]"
+                    current_run.log_debug(f"An unexpected error occurred during dataset name retrieval: {e}")
+
+                current_run.log_info(
+                    f"Downloading reporting rates {list(metrics.keys())} from : "
+                    f"{dataset_name} ({dataset_uid}) period : {p}"
+                )
+                try:
+                    data_elements = dhis2_client.analytics.get(
+                        data_elements=reporting_des,
+                        periods=[p],
+                        org_units=org_units_list,
+                        include_cocs=False,
+                    )
+                except Exception as e:
+                    current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
+                    continue
+
+                if len(data_elements) == 0:
+                    current_run.log_warning(f"No data found for period {p}")
+                    continue
+
+                # Format the extracted data
+                data_elements_df = pl.DataFrame(data_elements)
+                df_formatted = raw_reporting_format(
+                    df=data_elements_df,
+                    dataset_name=dataset_name,
+                    org_unit_level=org_unit_level,
+                    pyramid_metadata=df_pyramid,
+                )
+                reporting_rate_period.append(df_formatted)
+
+            # concat
+            reporting_rates_concat = pl.concat(reporting_rate_period, how="vertical")
+            reporting_rates_concat.write_parquet(fp, use_pyarrow="pyarrow")
+
+    except Exception as e:
+        raise Exception(f"Error while downloading reporting rates: {e}") from e
+
+    # merge all parquet files into one
+    try:
+        merge_parquet_files(
+            input_dir=output_dir,
+            output_dir=output_dir,
+            output_fname=f"{country_code}_dhis2_raw_reporting.parquet",
+            file_pattern=f"{country_code}_raw_reporting_*.parquet",
+        )
+    except Exception as e:
+        raise Exception(f"Error while merging reporting parquet files: {e}") from e
+
+    return True
+
+
+def raw_reporting_format(
+    df: pl.DataFrame,
+    dataset_name: str,
+    org_unit_level: int,
+    pyramid_metadata: pl.DataFrame,
+) -> pl.DataFrame:
+    """Format reporting data by splitting data element codes, add dataset names and join with pyramid.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        DataFrame containing raw reporting data.
+    dataset_name : str
+        Name of the dataset to which the reporting data belongs.
+    org_unit_level : int
+        Organisational unit level for merging.
+    pyramid_metadata : pl.DataFrame
+        DataFrame containing pyramid (org unit) metadata.
+
+    Returns
+    -------
+    pl.DataFrame
+        Formatted DataFrame with additional columns and joined metadata.
+    """
+    df = df.with_columns(
+        [
+            pl.col("dx").str.split(".").list.get(0).alias("ds_uid"),
+            pl.col("dx").str.split(".").list.get(1).alias("ds_metric"),
+            pl.col("value").cast(pl.Float64),
+            pl.lit(dataset_name).alias("ds_name"),
+        ]
+    ).drop("dx")
+
+    # Add parent level names (left join with pyramid)
+    merging_col = f"level_{org_unit_level}_id"
+    parent_cols = [
+        f"level_{ou}{suffix}" for ou in range(1, org_unit_level + 1) for suffix in ["_id", "_name"]
+    ]
+
+    return df.join(pyramid_metadata[parent_cols], how="left", left_on="ou", right_on=merging_col)
+
+
+def validate_reporting_rates(rates: list, datasets_metadata: pl.DataFrame) -> list:
+    """Validate the reporting rates configuration against available DHIS2 datasets metadata.
+
+    Parameters
+    ----------
+    rates : list
+        List of reporting rate definitions to validate.
+    datasets_metadata : pl.DataFrame
+        DataFrame containing metadata about available DHIS2 datasets.
+
+    Returns
+    -------
+    list
+        List of valid reporting rate definitions.
+    """
+    valid_rates = []
+    for rate in rates:
+        valid_rate = {"DATASET": None, "METRICS": []}
+
+        dataset_uid = rate.get("DATASET")
+        metrics = rate.get("METRICS")
+        if dataset_uid in datasets_metadata["id"]:
+            valid_rate["DATASET"] = dataset_uid
+        else:
+            current_run.log_warning(f"Reporting dataset {dataset_uid} not found in DHIS2 available datasets.")
+
+        if metrics and len(metrics) > 0:
+            valid_rate["METRICS"] = metrics
+        else:
+            current_run.log_warning(f"No metrics defined for reporting dataset {dataset_uid}")
+
+        # Only add valid rates with both dataset and metrics defined
+        if valid_rate["DATASET"] and valid_rate["METRICS"]:
+            valid_rates.append(valid_rate)
+
+    return valid_rates
+
+
+@snt_dhis2_extract.task
 def download_dhis2_analytics(
     start: int,
     end: int,
@@ -352,7 +593,7 @@ def download_dhis2_analytics(
 
     try:
         if overwrite:
-            delete_raw_analytics_files(output_dir, pattern=f"{country_code}_raw_analytics_*.parquet")
+            delete_raw_files(output_dir, pattern=f"{country_code}_raw_analytics_*.parquet")
     except Exception as e:
         raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
@@ -512,9 +753,11 @@ def download_dhis2_population(
         If an error occurs during the download or processing of data.
     """
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    if country_code is None:
+        raise ValueError("COUNTRY_CODE is not specified in the configuration.")
 
     # Ensure the output directory exists
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Get population data elements
     data_elements = get_unique_data_elements(
@@ -538,7 +781,7 @@ def download_dhis2_population(
 
     try:
         if overwrite:
-            delete_raw_analytics_files(output_dir, pattern=f"{country_code}_raw_population_*.parquet")
+            delete_raw_files(output_dir, pattern=f"{country_code}_raw_population_*.parquet")
     except Exception as e:
         raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
@@ -634,7 +877,7 @@ def download_dhis2_shapes(
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
     # Ensure the output directory exists
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     org_levels = snt_config["SNT_CONFIG"].get("SHAPES_ORG_UNITS_LEVEL", None)
     max_level = source_pyramid["level"].max()
@@ -656,7 +899,7 @@ def download_dhis2_shapes(
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
         df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
-        current_run.log_info(f"Shapes data saved at : {fp}")
+        current_run.log_info(f"{country_code} DHIS2 Shapes data saved at : {fp}")
     except Exception as e:
         raise Exception(f"Error while saving shapes data: {e}") from e
 
@@ -681,7 +924,7 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
     # Ensure the output directory exists
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     org_unit_level = snt_config["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None)
     if org_unit_level is None:
@@ -739,6 +982,7 @@ def add_files_to_dataset(
     pop_ready: bool,
     shapes_ready: bool,
     pyramid_ready: bool,
+    reporting_ready: bool,
 ) -> bool:
     """Add files to a dataset version in the workspace.
 
@@ -760,6 +1004,8 @@ def add_files_to_dataset(
         Whether the task is ready to run after shapes data.
     pyramid_ready : bool, optional
         Whether the task is ready to run after pyramid data.
+    reporting_ready : bool, optional
+        Whether the task is ready to run after reporting data.
 
     Raises
     ------
@@ -876,15 +1122,9 @@ def snt_folders_setup(root_path: Path) -> None:
     folders_to_create = [
         "configuration",
         "code",
-        "data/dhis2/raw/population_data",
-        "data/dhis2/raw/pyramid_data",
-        "data/dhis2/raw/routine_data",
-        "data/dhis2/raw/shapes_data",
-        "data/dhis2/formatted",
-        "data/worldpop/raw/population",
-        "pipelines/snt_dhis2_formatting/code",
-        "pipelines/snt_dhis2_formatting/papermill_outputs",
-        "pipelines/snt_worldpop_extract",
+        "data",
+        "pipelines",
+        "results",
     ]
     for relative_path in folders_to_create:
         full_path = root_path / relative_path
@@ -1035,8 +1275,8 @@ def validate_period_range(start: int, end: int) -> None:
         raise ValueError("Start period must not be after end period.")
 
 
-def delete_raw_analytics_files(directory: Path, pattern: str) -> None:
-    """Delete raw analytics parquet files for a given country code in the specified directory.
+def delete_raw_files(directory: Path, pattern: str) -> None:
+    """Delete raw parquet files for a given country code in the specified directory.
 
     Parameters
     ----------

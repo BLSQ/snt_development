@@ -11,8 +11,11 @@
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
-		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract"
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
+		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
+		"DHIS2_INCIDENCE" : "snt-dhis2-incidence",
+		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract",
+		"ERA5_DATASET_CLIMATE" : "snt-era5-climate"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {
@@ -26,6 +29,9 @@
 			"MALTREAT": ["zwt1RsszBe2", "iaUXQh7HGOp","wBPQDiqFHCN","MzKdVsKINA7"],
 			"MALADM": ["LfwPBU33gxe", "YGI8s8uUfux","pdvpFvz3iGD","hPJgypEErD6"],
 			"MALDTH": ["Rhoc3VZXzh0", "Rzl70MRimfO","YS5G7zpDSAy","iQkLfVVchzb"]
+		},
+		"DHIS2_REPORTING_DATASETS" : {
+			
 		}
 	}
 }

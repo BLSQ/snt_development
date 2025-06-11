@@ -29,7 +29,9 @@
 			"PRESSEV": [],
 			"MALTREAT": ["nRm30I4w9En"],
 			"MALADM": ["AxJhIi7tUam"],
-			"MALDTH": ["wfmDVt6RVm2"]		
+			"MALDTH": ["wfmDVt6RVm2"],
+			"CASRECU" : ["UxD03qX5O0t"],
+			"CPN1" : ["kGmdIbd3mbn"]
 		},
 		"DHIS2_REPORTING_DATASETS" : {
 			"REPORTING_RATES": [

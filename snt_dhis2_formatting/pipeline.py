@@ -48,14 +48,14 @@ def snt_dhis2_formatting(run_report_only: bool):
             if country_code is None:
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-            # NOTE: check if the configuration is valid in load_configuration_snt function (!)
-            # is_valid_configuration(snt_config_dict)
-
             # format data for SNT
             dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
             dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
             dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
             dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            dhis2_reporting_rates_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path
+            )
 
             # add files to a new dataset version
             files_ready = add_files_to_dataset(
@@ -69,6 +69,8 @@ def snt_dhis2_formatting(run_report_only: bool):
                     snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
                     snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
                     snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
+                    snt_dhis2_formatted_path / f"{country_code}_reporting.parquet",
+                    snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
                 ],
             )
         else:
@@ -258,6 +260,27 @@ def dhis2_pyramid_formatting(
         )
     except Exception as e:
         raise Exception(f"Error in formatting pyramid data: {e}") from e
+
+
+def dhis2_reporting_rates_formatting(
+    snt_root_path: Path,
+    pipeline_root_path: Path,
+) -> None:
+    """Format DHIS2 reporting data for SNT."""
+    current_run.log_info("Formatting DHIS2 reporting rates data.")
+
+    # set parameters for notebook
+    nb_parameter = {
+        "SNT_ROOT_PATH": str(snt_root_path),
+    }
+    try:
+        run_notebook(
+            nb_path=pipeline_root_path / "code" / "SNT_dhis2_reporting_rates_format.ipynb",
+            out_nb_path=pipeline_root_path / "papermill_outputs",
+            parameters=nb_parameter,
+        )
+    except Exception as e:
+        raise Exception(f"Error in formatting reporting rates data: {e}") from e
 
 
 def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):

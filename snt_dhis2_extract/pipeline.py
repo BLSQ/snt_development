@@ -34,7 +34,7 @@ from openhexa.toolbox.dhis2.periods import period_from_string
     help="Start of DHIS2 period (YYYYMM)",
     type=int,
     default=None,
-    required=False,
+    required=True,
 )
 @parameter(
     "end",
@@ -42,7 +42,7 @@ from openhexa.toolbox.dhis2.periods import period_from_string
     help="End of DHIS2 period (YYYYMM)",
     type=int,
     default=None,
-    required=False,
+    required=True,
 )
 @parameter(
     "overwrite",
@@ -451,22 +451,28 @@ def raw_reporting_format(
     pl.DataFrame
         Formatted DataFrame with additional columns and joined metadata.
     """
-    df = df.with_columns(
-        [
-            pl.col("dx").str.split(".").list.get(0).alias("ds_uid"),
-            pl.col("dx").str.split(".").list.get(1).alias("ds_metric"),
-            pl.col("value").cast(pl.Float64),
-            pl.lit(dataset_name).alias("ds_name"),
-        ]
-    ).drop("dx")
+    merging_col = f"level_{org_unit_level}_id"
+    df = (
+        df.with_columns(
+            [
+                pl.col("dx").str.split(".").list.get(0).alias("ds_uid"),
+                pl.col("dx").str.split(".").list.get(1).alias("ds_metric"),
+                pl.col("value").cast(pl.Float64),
+                pl.lit(dataset_name).alias("ds_name"),
+            ]
+        )
+        .drop("dx")
+        .rename({"ou": merging_col})
+    )
 
     # Add parent level names (left join with pyramid)
-    merging_col = f"level_{org_unit_level}_id"
     parent_cols = [
         f"level_{ou}{suffix}" for ou in range(1, org_unit_level + 1) for suffix in ["_id", "_name"]
     ]
 
-    return df.join(pyramid_metadata[parent_cols], how="left", left_on="ou", right_on=merging_col)
+    return df.join(
+        pyramid_metadata.select(parent_cols), how="left", left_on=merging_col, right_on=merging_col
+    )
 
 
 def validate_reporting_rates(rates: list, datasets_metadata: pl.DataFrame) -> list:

@@ -50,12 +50,20 @@ def snt_dhis2_formatting(run_report_only: bool):
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
             # format data for SNT
-            dhis2_analytics_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-            dhis2_population_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-            dhis2_shapes_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
-            dhis2_pyramid_formatting(snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path)
+            dhis2_analytics_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
+            dhis2_population_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
+            dhis2_shapes_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
+            dhis2_pyramid_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
             dhis2_reporting_rates_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
 
             # add files to a new dataset version
@@ -178,6 +186,7 @@ def validate_config(config: dict) -> None:
 def dhis2_analytics_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
+    snt_config: dict,
 ) -> None:
     """Format DHIS2 analytics data for SNT."""
     current_run.log_info("Formatting DHIS2 analytics data.")
@@ -186,6 +195,13 @@ def dhis2_analytics_formatting(
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
     }
+
+    # Check if the reporting rates data file exists
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_EXTRACTS"]
+    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_dhis2_raw_analytics.parquet"):
+        current_run.log_info("File analytics data not found, skipping formatting.")
+        return
 
     try:
         run_notebook(
@@ -200,6 +216,7 @@ def dhis2_analytics_formatting(
 def dhis2_population_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
+    snt_config: dict,
 ) -> None:
     """Format DHIS2 population data for SNT."""
     current_run.log_info("Formatting DHIS2 population data.")
@@ -208,6 +225,14 @@ def dhis2_population_formatting(
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
     }
+
+    # Check if the reporting rates data file exists
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_EXTRACTS"]
+    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_dhis2_raw_population.parquet"):
+        current_run.log_info("File population data not found, skipping formatting.")
+        return
+
     try:
         run_notebook(
             nb_path=pipeline_root_path / "code" / "SNT_dhis2_population_format.ipynb",
@@ -221,6 +246,7 @@ def dhis2_population_formatting(
 def dhis2_shapes_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
+    snt_config: dict,
 ) -> None:
     """Format DHIS2 shapes data for SNT."""
     current_run.log_info("Formatting DHIS2 shapes data.")
@@ -229,6 +255,14 @@ def dhis2_shapes_formatting(
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
     }
+
+    # Check if the reporting rates data file exists
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_EXTRACTS"]
+    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_dhis2_raw_shapes.parquet"):
+        current_run.log_info("File shapes data not found, skipping formatting.")
+        return
+
     try:
         run_notebook(
             nb_path=pipeline_root_path / "code" / "SNT_dhis2_shapes_format.ipynb",
@@ -246,6 +280,7 @@ def dhis2_shapes_formatting(
 def dhis2_pyramid_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
+    snt_config: dict,
 ) -> None:
     """Format DHIS2 pyramid data for SNT."""
     current_run.log_info("Formatting DHIS2 pyramid data.")
@@ -254,6 +289,14 @@ def dhis2_pyramid_formatting(
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
     }
+
+    # Check if the reporting rates data file exists
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_EXTRACTS"]
+    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_dhis2_raw_pyramid.parquet"):
+        current_run.log_info("File pyramid data not found, skipping formatting.")
+        return
+
     try:
         run_notebook(
             nb_path=pipeline_root_path / "code" / "SNT_dhis2_pyramid_format.ipynb",
@@ -267,6 +310,7 @@ def dhis2_pyramid_formatting(
 def dhis2_reporting_rates_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
+    snt_config: dict,
 ) -> None:
     """Format DHIS2 reporting data for SNT."""
     current_run.log_info("Formatting DHIS2 reporting rates data.")
@@ -275,6 +319,14 @@ def dhis2_reporting_rates_formatting(
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
     }
+
+    # Check if the reporting rates data file exists
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_EXTRACTS"]
+    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_dhis2_raw_reporting.parquet"):
+        current_run.log_info("File reporting rates data not found, skipping formatting.")
+        return
+
     try:
         run_notebook(
             nb_path=pipeline_root_path / "code" / "SNT_dhis2_reporting_rates_format.ipynb",
@@ -502,6 +554,28 @@ def generate_html_report(output_notebook_path: Path, out_format: str = "html") -
         raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
 
     current_run.add_file_output(str(report_path))
+
+
+def dataset_file_exists(ds_id: str, filename: str) -> bool:
+    """Check if a file exists in a dataset.
+
+    Parameters
+    ----------
+    ds_id : str
+        The ID of the dataset to check.
+    filename : str
+        The name of the file to check for.
+
+    Returns
+    -------
+    bool
+        True if the file exists, False otherwise.
+    """
+    try:
+        dataset = workspace.get_dataset(ds_id)
+        return any(file.filename == filename for file in dataset.latest_version.files)
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

@@ -323,7 +323,9 @@ def download_dhis2_reporting_rates(
         f"Downloading analytics for {len(org_units_list)} org units at level {org_unit_level}"
     )
 
-    reporting_rates = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_DATASETS"].get("REPORTING_RATES")
+    reporting_rates = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_DATASETS"].get(
+        "REPORTING_RATES", []
+    )
     if len(reporting_rates) == 0:
         current_run.log_info("No reporting rates to download.")
         return True
@@ -1239,6 +1241,7 @@ def validate_config(config: dict) -> None:
         "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
         "ERA5_DATASET_CLIMATE",
+        "SNT_SEASONALITY",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:

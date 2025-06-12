@@ -149,6 +149,7 @@ def validate_config(config: dict) -> None:
         "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
         "ERA5_DATASET_CLIMATE",
+        "SNT_SEASONALITY",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:

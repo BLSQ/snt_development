@@ -32,6 +32,7 @@ def snt_dhis2_formatting(run_report_only: bool):
     snt_root_path = Path(workspace.files_path)
     snt_pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_formatting"
     snt_dhis2_formatted_path = snt_root_path / "data" / "dhis2" / "formatted"
+    snt_dhis2_formatted_path.mkdir(parents=True, exist_ok=True)
 
     try:
         if not run_report_only:

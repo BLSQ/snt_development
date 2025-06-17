@@ -9,65 +9,80 @@ import geopandas as gpd
 import pandas as pd
 import papermill as pm
 from nbclient.exceptions import CellTimeoutError
-from openhexa.sdk import DatasetVersion, current_run, parameter, pipeline, workspace
+from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.sdk.datasets.dataset import DatasetVersion
 
 
 @pipeline("snt_seasonality")
 @parameter(
-    "get_months_per_block",
-    name="Number of months per block",
+    "run_precipitation",
+    name="Run precipitation seasonality",
     help="",
-    type=int,
-    default=4,
-    required=False,
+    type=bool,
+    default=True,
 )
 @parameter(
-    "get_minimum_periods",
-    name="Minimum number of year-month periods necessary for the analysis",
+    "run_cases",
+    name="Run cases seasonality",
+    help="",
+    type=bool,
+    default=True,
+)
+@parameter(
+    "minimum_periods",
+    name="Minimum number of periods",
     help="",
     type=int,
     default=48,
-    required=False,
+    required=True,
 )
 @parameter(
-    "get_threshold_cases",
-    name="Minimal proportion of cases for seasonality",
+    "maximum_proportion_missings_overall",
+    name="Maximum proportion of missing datapoints overall",
+    help="",
+    type=float,
+    default=0.1,
+    required=True,
+)
+@parameter(
+    "maximum_proportion_missings_per_district",
+    name="Maximum proportion of missing datapoints per distric",
+    help="",
+    type=float,
+    default=0.2,
+    required=True,
+)
+@parameter(
+    "minimum_month_block_size",
+    name="Minimum month block size",
+    help="",
+    type=int,
+    default=3,
+    required=True,
+)
+@parameter(
+    "maximum_month_block_size",
+    name="Maximum month block size",
+    help="",
+    type=int,
+    default=5,
+    required=True,
+)
+@parameter(
+    "threshold_for_seasonality",
+    name="Threshold for seasonality",
     help="",
     type=float,
     default=0.6,
     required=True,
 )
 @parameter(
-    "get_threshold_rain",
-    name="Minimal proportion of rainfall for seasonality",
+    "threshold_proportion_seasonal_years",
+    name="Threshold proportion seasonal years",
     help="",
     type=float,
-    default=0.6,
+    default=0.5,
     required=True,
-)
-@parameter(
-    "get_threshold_rain_disjoint",
-    name="Proportion if threshold for rain duration different from rain seasonality",
-    help="",
-    type=float,
-    default=0.8,
-    required=False,
-)
-@parameter(
-    "get_proportion_seasonal_years_cases",
-    name="Minimal proportion of seasonal years for cases",
-    help="",
-    type=float,
-    default=0.5,
-    required=False,
-)
-@parameter(
-    "get_proportion_seasonal_years_rainfall",
-    name="Minimal proportion of seasonal years for rainfall",
-    help="",
-    type=float,
-    default=0.5,
-    required=False,
 )
 @parameter(
     "run_report_only",
@@ -75,75 +90,108 @@ from openhexa.sdk import DatasetVersion, current_run, parameter, pipeline, works
     help="This will only execute the reporting notebook",
     type=bool,
     default=False,
-    required=False,
 )
 def snt_seasonality(
-    get_months_per_block: int,
-    get_minimum_periods: int,
-    get_threshold_cases: float,
-    get_threshold_rain: float,
-    get_threshold_rain_disjoint: float,
-    get_proportion_seasonal_years_cases: float,
-    get_proportion_seasonal_years_rainfall: float,
+    run_precipitation: bool,
+    run_cases: bool,
+    minimum_periods: int,
+    maximum_proportion_missings_overall: float,
+    maximum_proportion_missings_per_district: float,
+    minimum_month_block_size: int,
+    maximum_month_block_size: int,
+    threshold_for_seasonality: float,
+    threshold_proportion_seasonal_years: float,
     run_report_only: bool,
 ):
-    """Retrieves case and rainfall data by ADM2 level.
+    """Computes whether or not the admin unit qualifies as seasonal from a case and precipitation perspective.
 
-    Computes whether or not the admin unit qualifies as seasonal from a case and rainfall perspective
-    For rainfall, computes the duration of the seasonal block (in months)
+    Duration of the seasonal block is in months.
 
     """
     # paths
-    pipeline_path = Path(workspace.files_path) / "pipelines" / "snt_seasonality"
+    root_path = Path(workspace.files_path)
+    pipeline_path = root_path / "pipelines" / "snt_seasonality"
+    data_path = root_path / "data" / "seasonality"
 
     try:
-        # Set paths
-        root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_seasonality"
-        data_path = root_path / "data" / "seasonality"
-
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         params = {
-            "possible_month_block_sizes": get_months_per_block,
-            "minimum_periods": get_minimum_periods,
-            "threshold_cases": get_threshold_cases,
-            "threshold_rain": get_threshold_rain,
-            "threshold_rain_disjoint": get_threshold_rain_disjoint,
-            "proportion_seasonal_years_cases": get_proportion_seasonal_years_cases,
-            "proportion_seasonal_years_rainfall": get_proportion_seasonal_years_rainfall,
+            "minimum_periods": minimum_periods,
+            "maximum_proportion_missings_overall": maximum_proportion_missings_overall,
+            "maximum_proportion_missings_per_district": maximum_proportion_missings_per_district,
+            "minimum_month_block_size": minimum_month_block_size,
+            "maximum_month_block_size": maximum_month_block_size,
+            "threshold_for_seasonality": threshold_for_seasonality,
+            "threshold_proportion_seasonal_years": threshold_proportion_seasonal_years,
         }
-
-        for current_parameter, current_value in params.items():
-            if current_value < 0:
-                raise ValueError("Please supply only positive values.")
-            if current_parameter in ["possible_month_block_sizes", "minimum_periods"]:
-                if not isinstance(current_value, int):
-                    raise TypeError("Please supply integer values for number of months/periods.")
-            else:
-                if current_value > 1:
-                    raise ValueError("Proportions values should be between 0 and 1.")
+        validate_parameters(params)
 
         if not run_report_only:
-            run_notebook(
-                nb_path=pipeline_path / "code" / "SNT_seasonality.ipynb",
-                out_nb_path=pipeline_path / "papermill_outputs",
-                parameters=params,
-            )
+            files_to_ds = []
+            error_messages = ["ERROR 1", "ERROR 2", "ERROR 3"]
+            seasonality_nb = pipeline_path / "code" / "SNT_seasonality.ipynb"
+
+            # Precipitation seasonality
+            if run_precipitation:
+                current_run.log_info(f"Running precipitation analysis with notebook : {seasonality_nb}")
+                try:
+                    params["type_of_seasonality"] = "precipitation"
+                    run_notebook_for_type(
+                        nb_path=seasonality_nb,
+                        seasonality_type="precipitation",
+                        out_nb_path=pipeline_path / "papermill_outputs",
+                        parameters=params,
+                    )
+                    files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.parquet")
+                    files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.csv")
+                    files_to_ds.append(data_path / f"{country_code}_precipitation_imputed.parquet")
+                    files_to_ds.append(data_path / f"{country_code}_precipitation_imputed.csv")
+                except Exception as e:
+                    if any(msg in str(e) for msg in error_messages):
+                        current_run.log_warning(
+                            "The precipitation analysis cannot be performed. Process stopped."
+                        )
+                    else:
+                        raise Exception(
+                            f"Unexpected error occurred during the precipitation seasonality execution: {e}"
+                        ) from e
+
+            # Cases seasonality
+            if run_cases:
+                current_run.log_info(f"Running cases analysis with notebook : {seasonality_nb}")
+                try:
+                    params["type_of_seasonality"] = "cases"
+                    run_notebook_for_type(
+                        nb_path=seasonality_nb,
+                        seasonality_type="cases",
+                        out_nb_path=pipeline_path / "papermill_outputs",
+                        parameters=params,
+                    )
+                    files_to_ds.append(data_path / f"{country_code}_cases_seasonality.parquet")
+                    files_to_ds.append(data_path / f"{country_code}_cases_seasonality.csv")
+                    files_to_ds.append(data_path / f"{country_code}_cases_imputed.parquet")
+                    files_to_ds.append(data_path / f"{country_code}_cases_imputed.csv")
+                except Exception as e:
+                    if any(msg in str(e) for msg in error_messages):
+                        current_run.log_warning(
+                            "The cases seasonality analysis cannot be performed. Process stopped."
+                        )
+                    else:
+                        raise Exception(
+                            f"Unexpected error occurred during the cases seasonality execution: {e}."
+                        ) from e
 
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY"],
                 country_code=country_code,
-                file_paths=[
-                    data_path / f"{country_code}_seasonality.parquet",
-                    data_path / f"{country_code}_seasonality.csv",
-                ],
+                file_paths=files_to_ds,
             )
         else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
+            current_run.log_info("Skipping processing, running only the reporting.")
 
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "SNT_seasonality_report.ipynb",
@@ -226,6 +274,7 @@ def validate_config(config: dict) -> None:
         "WORLDPOP_DATASET_EXTRACTS",
         "ERA5_DATASET_CLIMATE",
         "SNT_SEASONALITY",
+        "SNT_MAP_EXTRACT",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:
@@ -244,7 +293,62 @@ def validate_config(config: dict) -> None:
         raise ValueError("No indicators defined under DHIS2_INDICATOR_DEFINITIONS.")
 
 
-def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):
+def validate_parameters(parameters: dict):
+    """Validate the pipeline parameters for correct types and value ranges.
+
+    Parameters
+    ----------
+    parameters : dict
+        Dictionary of parameter names and their values.
+
+    Raises
+    ------
+    ValueError
+        If a parameter value is negative or a proportion is not between 0 and 1.
+    TypeError
+        If a parameter expected to be an integer is not an integer.
+    """
+    for current_parameter, current_value in parameters.items():
+        if current_value < 0:
+            raise ValueError("Please supply only positive values.")
+        if current_parameter in ["minimum_periods", "minimum_month_block_size", "maximum_month_block_size"]:
+            if not isinstance(current_value, int):
+                raise TypeError("Please supply integer values for number of months/periods.")
+        else:
+            if current_value > 1:
+                raise ValueError("Proportions values should be between 0 and 1.")
+
+
+def load_dataset_file_from(dataset_id: str, filename: str) -> object:
+    """Load a file from a dataset by its ID and filename.
+
+    Parameters
+    ----------
+    dataset_id : str
+        The ID of the dataset to load the file from.
+    filename : str
+        The name of the file to load.
+
+    Returns
+    -------
+    object
+        The loaded file object.
+
+    Raises
+    ------
+    Exception
+        If there is an error loading the file from the dataset.
+    """
+    try:
+        snt_dataset = workspace.get_dataset(dataset_id)
+        return snt_dataset.latest_version.get_file(filename=filename)
+    except Exception as e:
+        raise Exception(f"Error loading the file {filename} from dataset {dataset_id}") from e
+
+
+def run_notebook_for_type(
+    nb_path: Path, seasonality_type: str, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"
+):
     """Execute a Jupyter notebook using Papermill.
 
     Parameters
@@ -253,6 +357,8 @@ def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name
         The name of the notebook to execute (without the .ipynb extension).
     nb_path : Path
         The path to the directory containing the notebook.
+    seasonality_type : str
+        Type of analysis to be added in the output notebook name.
     out_nb_path : Path
         The path to the directory where the output notebook will be saved.
     parameters : dict
@@ -263,8 +369,8 @@ def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name
     current_run.log_info(f"Executing notebook: {nb_path}")
     file_stem = nb_path.stem
     extension = nb_path.suffix
-    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    out_nb_full_path = out_nb_path / f"{file_stem}_OUTPUT_{execution_timestamp}{extension}"
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    out_nb_full_path = out_nb_path / f"{file_stem}_{seasonality_type}_OUTPUT_{execution_timestamp}{extension}"
     out_nb_path.mkdir(parents=True, exist_ok=True)
 
     try:

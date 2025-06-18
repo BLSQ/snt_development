@@ -6,14 +6,17 @@
 		"DHIS2_ADMINISTRATION_1": "level_2_name",
 		"DHIS2_ADMINISTRATION_2": "level_3_name",
 		"ANALYTICS_ORG_UNITS_LEVEL" : 5,
-		"POPULATION_ORG_UNITS_LEVEL" : 4,
-		"SHAPES_ORG_UNITS_LEVEL" : 3		
+		"POPULATION_ORG_UNITS_LEVEL" : 3		
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
+		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
+		"DHIS2_INCIDENCE" : "snt-dhis2-incidence",
 		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract",
-		"ERA5_DATASET_CLIMATE" : "snt-era5-climate"
+		"ERA5_DATASET_CLIMATE" : "snt-era5-climate",
+		"SNT_SEASONALITY" : "snt-seasonality",
+		"SNT_MAP_EXTRACT" : "snt-map-extract"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {
@@ -27,7 +30,34 @@
 			"PRESSEV": [],
 			"MALTREAT": ["nRm30I4w9En"],
 			"MALADM": ["AxJhIi7tUam"],
-			"MALDTH": ["wfmDVt6RVm2"]		
-		}		
+			"MALDTH": ["wfmDVt6RVm2"],
+			"CASRECU" : ["UxD03qX5O0t"],
+			"CPN1" : ["kGmdIbd3mbn"]
+		},
+		"DHIS2_REPORTING_DATASETS" : {
+			"REPORTING_RATES": [
+				{
+					"DATASET" : "pMbC0FJPkcm",				
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				},
+				{
+					"DATASET" : "maDtHIFrSHx",				
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				},
+				{
+					"DATASET" : "OeWrFwkFMvf",				
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				}
+			]		
+		}	
 	}
 }

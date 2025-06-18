@@ -13,12 +13,12 @@ import papermill as pm
 import requests
 from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import (
-    DatasetVersion,
     current_run,
     parameter,
     pipeline,
     workspace,
 )
+from openhexa.sdk.datasets.dataset import DatasetVersion
 from rasterstats import zonal_stats
 
 # os.environ["PROJ_LIB"] = "/opt/conda/share/proj"
@@ -27,29 +27,66 @@ from rasterstats import zonal_stats
 
 @pipeline("snt_map_extract")
 @parameter(
+    "metric_names",
+    name="metric selection",
+    type=str,
+    multiple=True,
+    choices=[
+        "Pf_PR-rate",
+        "Pv_PR-rate",
+        "Pf_mortality-rate",
+        "Pf_incidence-rate",
+        "Pv_incidence-rate",
+        "Pf_incidence-count",
+        "Pf_mortality-count",
+        "Pv_incidence-count",
+        "ITN_access-rate",
+        "ITN_use-rate",
+        "ITN_use_rate-rate",
+        "IRS_coverage-rate",
+        "Antimalarial_EFT-rate",
+    ],
+    default=[
+        "Pf_PR-rate",
+        "Pv_PR-rate",
+        "Pf_mortality-rate",
+        "Pf_incidence-rate",
+        "Pv_incidence-rate",
+        "Pf_incidence-count",
+        "Pf_mortality-count",
+        "Pv_incidence-count",
+        "ITN_access-rate",
+        "ITN_use-rate",
+        "ITN_use_rate-rate",
+        "IRS_coverage-rate",
+        "Antimalarial_EFT-rate",
+    ],
+    required=True,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
     type=bool,
     default=False,
-    required=False,
 )
-def snt_map_extract(run_report_only: bool) -> None:
+def snt_map_extract(run_report_only: bool, metric_names: list[str]) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
-    pipeline_path = root_path / "pipeline" / "snt_map_extract"
+    pipeline_path = root_path / "pipelines" / "snt_map_extract"
+    pipeline_path.mkdir(parents=True, exist_ok=True)
 
     try:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
 
-        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-        dataset_shapes_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_MAP_EXTRACT"]
+        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+        dataset_shapes_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
+        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACT")
 
         # get org unit level
-        # TODO: move this validation to validate_config()
+        # TODO: move this validation to validate_config() ?
         admin_level_2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2")
         match = re.search(r"\d+", admin_level_2)
         if match:
@@ -64,46 +101,17 @@ def snt_map_extract(run_report_only: bool) -> None:
         shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
         current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
-        mapping_coverage_indicators = {
-            "Malaria": {
-                "Malaria__202206_Global_Pf_Mortality_Count": "Pf_mortality-count",
-                "Malaria__202406_Global_Pf_Mortality_Count": "Pf_mortality-count",
-                "Malaria__202206_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
-                "Malaria__202406_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
-                "Malaria__202206_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
-                "Malaria__202406_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
-                "Malaria__202206_Global_Pf_Incidence_Count": "Pf_incidence-count",
-                "Malaria__202406_Global_Pf_Incidence_Count": "Pf_incidence-count",
-                "Malaria__202206_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
-                "Malaria__202406_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
-                "Malaria__202206_Global_Pv_Incidence_Count": "Pv_incidence-count",
-                "Malaria__202406_Global_Pv_Incidence_Count": "Pv_incidence-count",
-                "Malaria__202206_Global_Pf_Parasite_Rate": "Pf_PR-rate",
-                "Malaria__202406_Global_Pf_Parasite_Rate": "Pf_PR-rate",
-                "Malaria__202206_Global_Pv_Parasite_Rate": "Pv_PR-rate",
-                "Malaria__202406_Global_Pv_Parasite_Rate": "Pv_PR-rate",
-            },
-            "Interventions": {
-                "Interventions__202106_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
-                "Interventions__202406_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
-                "Interventions__202106_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
-                "Interventions__202406_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
-                "Interventions__202106_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
-                "Interventions__202406_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
-                "Interventions__202106_Africa_IRS_Coverage": "IRS_coverage-rate",
-                "Interventions__202106_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
-                "Interventions__202406_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
-            },
-        }
+        mapping_coverage_indicators = filter_metric_dictionary_with(metric_names)
 
-        if run_report_only:
+        if not run_report_only:
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
             make_table(
                 mapping_coverage_indicators,
+                country_code=country_code,
                 shapes=shapes,
-                org_level=org_level,
+                level=org_level,
                 output_path=output_path,
             )
 
@@ -111,8 +119,8 @@ def snt_map_extract(run_report_only: bool) -> None:
                 dataset_id=dataset_id,
                 country_code=country_code,
                 file_paths=[
-                    output_path / f"{country_code}_map_data.parquet",
-                    output_path / f"{country_code}_map_data.csv",
+                    output_path / "formatted" / f"{country_code}_map_data.parquet",
+                    output_path / "formatted" / f"{country_code}_map_data.csv",
                 ],
             )
 
@@ -120,7 +128,7 @@ def snt_map_extract(run_report_only: bool) -> None:
             current_run.log_info("Skipping calculations, running only the reporting.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "SNT_seasonality_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "SNT_map_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
         )
 
@@ -159,6 +167,59 @@ def get_file_from_dataset(dataset_id: str, filename: str) -> gpd.GeoDataFrame:
         raise ValueError(f"File {filename} not found in dataset {dataset_id}.")
 
     return gpd.read_file(file_path)
+
+
+def filter_metric_dictionary_with(metric_names: list[str]) -> dict:
+    """Filter the metric dictionary to include only metrics specified in metric_names.
+
+    Parameters
+    ----------
+    metric_names : list[str]
+        List of metric names to filter for.
+
+    Returns
+    -------
+    dict
+        Filtered dictionary containing only the requested metrics.
+    """
+    filtered_dict = {}
+    metric_dictionary = {
+        "Malaria": {
+            "Malaria__202206_Global_Pf_Mortality_Count": "Pf_mortality-count",
+            "Malaria__202406_Global_Pf_Mortality_Count": "Pf_mortality-count",
+            "Malaria__202206_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
+            "Malaria__202406_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
+            "Malaria__202206_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
+            "Malaria__202406_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
+            "Malaria__202206_Global_Pf_Incidence_Count": "Pf_incidence-count",
+            "Malaria__202406_Global_Pf_Incidence_Count": "Pf_incidence-count",
+            "Malaria__202206_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
+            "Malaria__202406_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
+            "Malaria__202206_Global_Pv_Incidence_Count": "Pv_incidence-count",
+            "Malaria__202406_Global_Pv_Incidence_Count": "Pv_incidence-count",
+            "Malaria__202206_Global_Pf_Parasite_Rate": "Pf_PR-rate",
+            "Malaria__202406_Global_Pf_Parasite_Rate": "Pf_PR-rate",
+            "Malaria__202206_Global_Pv_Parasite_Rate": "Pv_PR-rate",
+            "Malaria__202406_Global_Pv_Parasite_Rate": "Pv_PR-rate",
+        },
+        "Interventions": {
+            "Interventions__202106_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
+            "Interventions__202406_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
+            "Interventions__202106_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
+            "Interventions__202406_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
+            "Interventions__202106_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
+            "Interventions__202406_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
+            "Interventions__202106_Africa_IRS_Coverage": "IRS_coverage-rate",
+            "Interventions__202106_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
+            "Interventions__202406_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
+        },
+    }
+
+    for category, metrics in metric_dictionary.items():
+        filtered_metrics = {k: v for k, v in metrics.items() if v in metric_names}
+        filtered_dict[category] = filtered_metrics
+
+    return filtered_dict
 
 
 def add_files_to_dataset(
@@ -514,16 +575,17 @@ def make_table(
     pd.DataFrame
         DataFrame containing the processed zonal statistics.
     """
-    invalid_shapes = shapes[shapes.geometry is None]
+    invalid_shapes = shapes[shapes.geometry.isna()]
     if len(invalid_shapes) > 0:
         current_run.log_warning(
             f"DHIS2 units with no geometry: {list(invalid_shapes[f'level_{level}_name'].unique())}"
         )
-    shapes = shapes[shapes.geometry is not None]
+    shapes = shapes[shapes.geometry.notna()]
     if len(shapes) > 0:
         minx, miny, maxx, maxy = shapes.total_bounds
         rasters_path = output_path / "raster_files"
         rasters_path.mkdir(parents=True, exist_ok=True)
+
         download_raster_data(rasters_path, mapping_coverage_indicators, minx, maxx, miny, maxy)
 
         # Step 1: Load Admin Polygons
@@ -531,7 +593,6 @@ def make_table(
         for category, layers in mapping_coverage_indicators.items():
             current_run.log_info(f"Processing {category}...")
             for layer_name in layers:
-                # raster_filename = output_path / "raster_files" / f"{layer_name}.tif"
                 version = layer_name.split("__")[1]
                 zstats = zonal_stats(
                     shapes,
@@ -547,7 +608,7 @@ def make_table(
                 result_gdf["metric_category"] = category
                 result_gdf["metric_name"] = mapping_coverage_indicators[category][layer_name]
                 metric_columns = ["mean"]
-                ref_columns = set(result_gdf.columns).difference(set(metric_columns))
+                ref_columns = {col for col in result_gdf.columns if col not in metric_columns}
 
                 # Melt to long format
                 melt_df = result_gdf.melt(
@@ -557,7 +618,9 @@ def make_table(
                     value_name="value",
                 )
                 melt_df["version"] = version
-                melt_df["value"] = melt_df["value"].astype(float)
+                melt_df["period"] = version.split("_")[0]
+                melt_df["YEAR"] = melt_df["period"].str[:4].astype(int)
+                melt_df["MONTH"] = melt_df["period"].str[4:].astype(int)
                 melt_df["value"] = pd.to_numeric(melt_df["value"], errors="coerce")
                 melt_df = melt_df[np.isfinite(melt_df["value"])]
                 final_df = pd.concat([final_df, melt_df], ignore_index=True)
@@ -565,6 +628,16 @@ def make_table(
         # Step 5: Save Output
         formatted_path = output_path / "formatted"
         formatted_path.mkdir(parents=True, exist_ok=True)
+
+        # SNT format
+        final_df.columns = [
+            re.sub(r"(^_+|_+$)", "", re.sub(r"[\s\-]+", "_", col.strip().upper())) for col in final_df.columns
+        ]
+        final_df["METRIC_NAME"] = (
+            final_df["METRIC_NAME"].str.strip().str.replace("-", "_").str.replace(r"\s+", "_", regex=True)
+        )
+
+        # Save file
         final_df.to_parquet(formatted_path / f"{country_code}_map_data.parquet", index=False)
         final_df.to_csv(formatted_path / f"{country_code}_map_data.csv", index=False)
         current_run.log_info(f"Output file saved under : {formatted_path / f'{country_code}_map_data.csv'}")

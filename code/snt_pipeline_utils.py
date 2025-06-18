@@ -317,3 +317,25 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
 
     return new_version
+
+
+def remove_all_files(folder_path: str) -> None:
+    """Remove all files from the specified folder.
+
+    Parameters
+    ----------
+    folder_path : str
+        Path to the folder from which all files will be removed.
+
+    Raises
+    ------
+    ValueError
+        If the provided path is not a valid directory.
+    """
+    folder = Path(folder_path)
+    if not folder.is_dir():
+        raise ValueError(f'"{folder_path}" is not a valid directory')
+
+    for item in folder.iterdir():
+        if item.is_file():
+            item.unlink()

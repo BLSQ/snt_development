@@ -1,0 +1,4 @@
+pygadm
+rasterstats
+psycopg2
+geoalchemy2

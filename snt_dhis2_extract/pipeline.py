@@ -79,6 +79,7 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
         )
 
         # Validate configuration
+        # TODO: Validate config against pyramid.
         validate_config(snt_config_dict)
 
         # get country identifier for file naming
@@ -887,18 +888,28 @@ def download_dhis2_shapes(
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    org_levels = snt_config["SNT_CONFIG"].get("SHAPES_ORG_UNITS_LEVEL", None)
-    max_level = source_pyramid["level"].max()
-    if org_levels is None or org_levels > max_level or org_levels < 1:
+    # get org unit level
+    # TODO: move this validation to validate_config()
+    admin_level_2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2")
+    match = re.search(r"\d+", admin_level_2)
+    if match:
+        org_level = int(match.group())
+    else:
         raise ValueError(
-            f"Incorrect SHAPES_ORG_UNITS_LEVEL value, please configure a value between 1 and {max_level}."
+            f"Invalid DHIS2_ADMINISTRATION_2 format expected: 'level_NUMBER_name' received: {admin_level_2}"
+        )
+
+    max_level = source_pyramid["level"].max()
+    if org_level is None or org_level > max_level or org_level < 1:
+        raise ValueError(
+            f"Incorrect DHIS2_ADMINISTRATION_2 value, please set a value between level 1 and {max_level}."
         )
 
     try:
-        df_lvl_selection = source_pyramid.filter(pl.col("level") == org_levels).drop(
+        df_lvl_selection = source_pyramid.filter(pl.col("level") == org_level).drop(
             ["id", "name", "level", "opening_date", "closed_date"]
         )
-        current_run.log_info(f"{df_lvl_selection.shape[0]} shapes downloaded for level {org_levels}.")
+        current_run.log_info(f"{df_lvl_selection.shape[0]} shapes downloaded for level {org_level}.")
     except Exception as e:
         raise Exception(f"Error while filtering shapes data: {e}") from e
 
@@ -1227,7 +1238,6 @@ def validate_config(config: dict) -> None:
         "DHIS2_ADMINISTRATION_2",
         "ANALYTICS_ORG_UNITS_LEVEL",
         "POPULATION_ORG_UNITS_LEVEL",
-        "SHAPES_ORG_UNITS_LEVEL",
     ]
     for key in required_snt_keys:
         if key not in snt_config or snt_config[key] in [None, ""]:

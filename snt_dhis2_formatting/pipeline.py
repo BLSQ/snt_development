@@ -150,7 +150,6 @@ def validate_config(config: dict) -> None:
         "DHIS2_ADMINISTRATION_2",
         "ANALYTICS_ORG_UNITS_LEVEL",
         "POPULATION_ORG_UNITS_LEVEL",
-        "SHAPES_ORG_UNITS_LEVEL",
     ]
     for key in required_snt_keys:
         if key not in snt_config or snt_config[key] in [None, ""]:

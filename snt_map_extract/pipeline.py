@@ -43,18 +43,22 @@ def snt_map_extract(run_report_only: bool) -> None:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
+
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
         dataset_shapes_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
         dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_MAP_EXTRACT"]
-        admin_level_2 = snt_config["SNT_CONFIG"][
-            "DHIS2_ADMINISTRATION_2"
-        ]  # NOTE: SHAPES (Extract) SHOULD ! use DHIS2_ADMINISTRATION_2 parameter
 
+        # get org unit level
+        # TODO: move this validation to validate_config()
+        admin_level_2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2")
         match = re.search(r"\d+", admin_level_2)
         if match:
             org_level = int(match.group())
         else:
-            raise ValueError(f"Invalid admin level format: {admin_level_2}")
+            raise ValueError(
+                f"Invalid DHIS2_ADMINISTRATION_2 "
+                f"format expected: 'level_NUMBER_name' received: {admin_level_2}"
+            )
 
         # Get shapes
         shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
@@ -393,7 +397,6 @@ def validate_config(config: dict) -> None:
         "DHIS2_ADMINISTRATION_2",
         "ANALYTICS_ORG_UNITS_LEVEL",
         "POPULATION_ORG_UNITS_LEVEL",
-        "SHAPES_ORG_UNITS_LEVEL",
     ]
     for key in required_snt_keys:
         if key not in snt_config or snt_config[key] in [None, ""]:

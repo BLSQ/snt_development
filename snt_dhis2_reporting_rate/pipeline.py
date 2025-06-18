@@ -64,6 +64,8 @@ def dhis2_reporting_rate(reporting_rate_threshold: float, run_report_only: bool 
                     data_path / f"{country_code}_reporting_rate_any_month.csv",
                     data_path / f"{country_code}_reporting_rate_conf_month.parquet",
                     data_path / f"{country_code}_reporting_rate_conf_month.csv",
+                    data_path / f"{country_code}_reporting_rate_dhis2_month.parquet",
+                    data_path / f"{country_code}_reporting_rate_dhis2_month.csv",
                 ],
             )
         else:

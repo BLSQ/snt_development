@@ -172,7 +172,6 @@ def validate_config(config: dict) -> None:
         "DHIS2_ADMINISTRATION_2",
         "ANALYTICS_ORG_UNITS_LEVEL",
         "POPULATION_ORG_UNITS_LEVEL",
-        "SHAPES_ORG_UNITS_LEVEL",
     ]
     for key in required_snt_keys:
         if key not in snt_config or snt_config[key] in [None, ""]:
@@ -186,6 +185,8 @@ def validate_config(config: dict) -> None:
         "DHIS2_INCIDENCE",
         "WORLDPOP_DATASET_EXTRACTS",
         "ERA5_DATASET_CLIMATE",
+        "SNT_SEASONALITY",
+        "SNT_MAP_EXTRACT",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:
@@ -316,9 +317,3 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
         raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
 
     return new_version
-
-
-def test_function(parameter: int):
-    """A simple test function to verify the module is working."""
-    current_run.log_info(f"Test function executed successfully {parameter}")
-    return

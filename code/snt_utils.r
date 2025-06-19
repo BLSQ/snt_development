@@ -7,13 +7,15 @@
 # Dependencies: stringi, httr, arrow, tools, jsonlite
 # Notes:
 #   - [Optional: Any special considerations, references, or tips]
-# ================================================
-
-
+# ================================================                 
+                           
 # add any other matching logic here
 format_names <- function(x) {
     x <- stri_trans_general(str = x, id = "Latin-ASCII") # remove weird characters
-    trimws(gsub("  +", " ", toupper(gsub("[^a-zA-Z0-9]", " ", x))))  # keep numbers, remove spaces
+    x <- gsub("[^a-zA-Z0-9]", " ", toupper(x))                     # replace non-alphanum with space
+    x <- gsub("(?i)PROVINCE|ZONE DE SANTE|AIRE DE SANTE|CENTRE DE SANTE", "", x)         
+    x <- gsub("  +", " ", x)                     # collapse multiple spaces 
+    trimws(x)
 }
 
                            

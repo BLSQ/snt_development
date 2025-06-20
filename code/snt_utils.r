@@ -3,18 +3,18 @@
 # Description: This script contains utility functions used for SNT computation workflow.
 # Author: Esteban Montandon
 # Created: [2024-10-01]
-# Last updated: [2025-06-17]
+# Last updated: [2025-06-20]
 # Dependencies: stringi, httr, arrow, tools, jsonlite
 # Notes:
 #   - [Optional: Any special considerations, references, or tips]
-# ================================================                 
+# ================================================
                            
 # add any other matching logic here
 format_names <- function(x) {
     x <- stri_trans_general(str = x, id = "Latin-ASCII") # remove weird characters
-    x <- gsub("[^a-zA-Z0-9]", " ", toupper(x))                     # replace non-alphanum with space
-    x <- gsub("(?i)PROVINCE|ZONE DE SANTE|AIRE DE SANTE|CENTRE DE SANTE", "", x)         
-    x <- gsub("  +", " ", x)                     # collapse multiple spaces 
+    x <- gsub("[^a-zA-Z0-9]", " ", toupper(x))           # replace non-alphanum with space
+    # x <- gsub("(?i)PROVINCE|ZONE DE SANTE|AIRE DE SANTE|CENTRE DE SANTE", "", x) # TEMPORARY SKIP
+    x <- gsub("  +", " ", x)       # collapse multiple spaces
     trimws(x)
 }
 

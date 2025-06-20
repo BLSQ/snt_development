@@ -21,7 +21,7 @@
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {
-			"TOT_POPULATION": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"]
+			"POPULATION": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"]
 		},		
 		"DHIS2_INDICATOR_DEFINITIONS": {			
 			"SUSP": ["qkhx1DbWUFV", "OhPA8Hq1KYf","nfRYeVm4dCt","YwRi5giAozg"],

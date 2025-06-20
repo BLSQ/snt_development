@@ -197,9 +197,9 @@ def validate_config(config: dict) -> None:
 
     # Check population indicator
     pop_indicators = definitions.get("POPULATION_INDICATOR_DEFINITIONS", {})
-    tot_population = pop_indicators.get("TOT_POPULATION", [])
+    tot_population = pop_indicators.get("POPULATION", [])
     if not tot_population:
-        raise ValueError("Missing or empty TOT_POPULATION indicator definition.")
+        raise ValueError("Missing or empty POPULATION indicator definition.")
 
     # Check at least one indicator under DHIS2_INDICATOR_DEFINITIONS
     indicator_defs = definitions.get("DHIS2_INDICATOR_DEFINITIONS", {})

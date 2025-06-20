@@ -1,5 +1,5 @@
 {
-    "ADM2_POP": {
+    "POPULATION": {
         "LABEL": "Population",
         "DESCRIPTION": "Population at ADM2 level",
         "SOURCE": "DHIS2",

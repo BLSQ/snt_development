@@ -8,6 +8,7 @@ from snt_pipeline_utils import (
     get_file_from_dataset,
     load_configuration_snt,
     validate_config,
+    copy_json_file,
 )
 
 
@@ -22,7 +23,7 @@ def snt_assemble_results():
     """
     # paths
     root_path = Path(workspace.files_path)
-    # pipeline_path = root_path / "pipelines" / "snt_assemble_results"
+    pipeline_path = root_path / "pipelines" / "snt_assemble_results"
     results_path = root_path / "results"
 
     try:
@@ -31,6 +32,13 @@ def snt_assemble_results():
         current_run.log_debug("config loaded")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+
+        # Get metadata file
+        copy_json_file(
+            source_folder=root_path / "configuration",
+            destination_folder=pipeline_path / "data",
+            json_filename="SNT_metadata.json",
+        )
 
         assemble_snt_results(snt_config=snt_config, output_path=results_path)
 
@@ -204,7 +212,7 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     return results_table
 
 
-def update_metadata(variable: str, attribute: str, value: any) -> None:
+def update_metadata(variable: str, attribute: str, value: any, filename: str = "SNT_metadata.json") -> None:
     """Update a specific attribute of a variable in the metadata JSON file.
 
     Parameters
@@ -215,14 +223,17 @@ def update_metadata(variable: str, attribute: str, value: any) -> None:
         The attribute of the variable to update.
     value : any
         The new value to set for the attribute.
+    filename: str
+        Metadata filename
 
     Raises
     ------
     KeyError
         If the variable or attribute does not exist in the metadata JSON.
     """
-    # NOTE: hardcoded SNT path
-    metadata_path = Path(workspace.files_path) / "configuration" / "metadata.json"
+    # NOTE: hardcoded SNT paths
+    root_path = Path(workspace.files_path)
+    metadata_path = root_path / "pipelines" / "snt_assemble_results" / "data" / filename
 
     try:
         with Path.open(metadata_path, "r") as file:
@@ -241,10 +252,10 @@ def update_metadata(variable: str, attribute: str, value: any) -> None:
     with Path.open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata_json, f, indent=4, ensure_ascii=True)
 
-    current_run.log_info(f"SNT metadata variable {variable} updated: {metadata_path}")
+    current_run.log_info(f"SNT metadata variable {variable} updated.")
 
 
-def build_metadata_table(output_path: Path, country_code: str):
+def build_metadata_table(output_path: Path, country_code: str, filename: str = "SNT_metadata.json"):
     """Build and save a metadata table from the metadata JSON file.
 
     Parameters
@@ -253,6 +264,8 @@ def build_metadata_table(output_path: Path, country_code: str):
         The directory where the metadata table files will be saved.
     country_code : str
         The country code used for naming the output files.
+    filename : str
+        Metadata filename
 
     Raises
     ------
@@ -260,7 +273,9 @@ def build_metadata_table(output_path: Path, country_code: str):
         If there is an error reading the metadata file.
     """
     # NOTE: hardcoded SNT path
-    metadata_path = Path(workspace.files_path) / "configuration" / "metadata.json"
+    root_path = Path(workspace.files_path)
+    metadata_path = root_path / "pipelines" / "snt_assemble_results" / "data" / filename
+    output_path.mkdir(parents=True, exist_ok=True)
 
     try:
         with Path.open(metadata_path, "r") as file:

@@ -11,6 +11,7 @@ from subprocess import CalledProcessError
 from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk.datasets.dataset import DatasetVersion
 import requests
+import shutil
 
 
 def run_notebook(nb_path: Path, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"):
@@ -391,3 +392,30 @@ def get_file_from_dataset(dataset_id: str, filename: str) -> pd.DataFrame | gpd.
         return gpd.read_file(file_path)
 
     raise ValueError(f"Unsupported file type: {suffix}")
+
+
+def copy_json_file(source_folder: Path, destination_folder: Path, json_filename: str) -> None:
+    """Copies a JSON file directly from a source folder to a destination folder using pathlib.
+
+    This method does not read or modify the file's content in Python.
+
+    Args:
+        source_folder (str or Path): The path to the folder containing the source JSON file.
+        destination_folder (str or Path): The path to the folder where the JSON file will be copied.
+        json_filename (str): The name of the JSON file (e.g., "my_data.json").
+    """
+    source_path = source_folder / json_filename
+    destination_path = destination_folder / json_filename
+
+    try:
+        # Ensure the destination folder exists (parents=True creates parent directories if needed)
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+        shutil.copy(source_path, destination_path)
+        current_run.log_debug(
+            f"Successfully copied '{json_filename}' from '{source_folder}' to '{destination_folder}'."
+        )
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Error: Source file '{source_path}' not found.") from e
+    except Exception as e:
+        raise Exception(f"An error occurred while copying '{json_filename}': {e}") from e

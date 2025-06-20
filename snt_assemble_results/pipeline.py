@@ -111,13 +111,17 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
 
     latest_period = dhis2_population["YEAR"].max()
     update_metadata(variable="POPULATION", attribute="PERIOD", value=latest_period)
-
     dhis2_population_f = dhis2_population[
         (dhis2_population["ADM2_ID"].isin(table["ADM2_ID"])) & (dhis2_population["YEAR"] == latest_period)
     ]
 
-    merged_df = table.merge(dhis2_population_f[["ADM2_ID", "POPULATION"]], how="left", on="ADM2_ID")
-    table["POPULATION"] = merged_df["POPULATION"]
+    merged_df = table.merge(
+        dhis2_population_f[["ADM2_ID", "POPULATION"]],
+        how="left",
+        on="ADM2_ID",
+        suffixes=("", "_population_f"),
+    )
+    table["POPULATION"] = merged_df["POPULATION_population_f"]
 
     return table
 

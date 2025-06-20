@@ -83,7 +83,7 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
 
     Selection :
         matching: ADM2_ID
-        values : ADM2_POP
+        values : POPULATION
 
     Parameters
     ----------
@@ -109,15 +109,15 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         current_run.log_warning(f"Error while loading population data: {e}")
         return table
 
-    latest_period = dhis2_population["PERIOD"].max()
-    update_metadata(variable="ADM2_POP", attribute="PERIOD", value=latest_period)
+    latest_period = dhis2_population["YEAR"].max()
+    update_metadata(variable="POPULATION", attribute="PERIOD", value=latest_period)
 
     dhis2_population_f = dhis2_population[
-        (dhis2_population["ADM2_ID"].isin(table["ADM2_ID"])) & (dhis2_population["PERIOD"] == latest_period)
+        (dhis2_population["ADM2_ID"].isin(table["ADM2_ID"])) & (dhis2_population["YEAR"] == latest_period)
     ]
 
-    merged_df = table.merge(dhis2_population_f[["ADM2_ID", "TOT_POPULATION"]], how="left", on="ADM2_ID")
-    table["ADM2_POP"] = merged_df["TOT_POPULATION"]
+    merged_df = table.merge(dhis2_population_f[["ADM2_ID", "POPULATION"]], how="left", on="ADM2_ID")
+    table["POPULATION"] = merged_df["POPULATION"]
 
     return table
 
@@ -166,7 +166,7 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
         "ADM1_ID",
         "ADM2",
         "ADM2_ID",
-        "ADM2_POP",
+        "POPULATION",
         "INCIDENCE_CRUDE_MEDIAN",
         "INCIDENCE_PRESUMED_MEDIAN",
         "INCIDENCE_RR_MEDIAN",

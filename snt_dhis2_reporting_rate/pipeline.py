@@ -14,14 +14,6 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
 
 @pipeline("dhis2_reporting_rate")
 @parameter(
-    "reporting_rate_threshold",
-    name="Reporting Rate Threshold",
-    help="Threshold for considering reporting rate 'good' (0-1)",
-    type=float,
-    default=0.8,
-    required=True,
-)
-@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -29,11 +21,10 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
     default=False,
     required=False,
 )
-def dhis2_reporting_rate(reporting_rate_threshold: float, run_report_only: bool = False):
+def dhis2_reporting_rate(run_report_only: bool = False):
     """Pipeline for calculating DHIS2 reporting rates with configurable parameters."""
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
     current_run.log_info("PIPELINE PARAMETERS:")
-    current_run.log_info(f"Reporting threshold: {reporting_rate_threshold}")
 
     try:
         # Set paths
@@ -52,7 +43,6 @@ def dhis2_reporting_rate(reporting_rate_threshold: float, run_report_only: bool 
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),
-                    "REPORTING_RATE_THRESHOLD": reporting_rate_threshold,
                 },
             )
 

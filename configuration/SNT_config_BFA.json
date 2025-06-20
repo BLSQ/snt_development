@@ -16,7 +16,8 @@
 		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract",
 		"ERA5_DATASET_CLIMATE" : "snt-era5-climate",
 		"SNT_SEASONALITY" : "snt-seasonality",
-		"SNT_MAP_EXTRACT" : "snt-map-extract"
+		"SNT_MAP_EXTRACT" : "snt-map-extract",
+		"SNT_RESULTS" : "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {

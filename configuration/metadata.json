@@ -1,0 +1,12 @@
+{
+    "ADM2_POP": {
+        "LABEL": "Population",
+        "DESCRIPTION": "Population at ADM2 level",
+        "SOURCE": "DHIS2",
+        "UNITS": "COUNT",
+        "COMMENTS": null,
+        "CATEGORY": "Population",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    }
+}

@@ -21,48 +21,8 @@ from openhexa.sdk import (
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from rasterstats import zonal_stats
 
-# os.environ["PROJ_LIB"] = "/opt/conda/share/proj"
-# os.environ["GDAL_DATA"] = "/opt/conda/share/gdal"
-
 
 @pipeline("snt_map_extract")
-@parameter(
-    "metric_names",
-    name="metric selection",
-    type=str,
-    multiple=True,
-    choices=[
-        "Pf_PR-rate",
-        "Pv_PR-rate",
-        "Pf_mortality-rate",
-        "Pf_incidence-rate",
-        "Pv_incidence-rate",
-        "Pf_incidence-count",
-        "Pf_mortality-count",
-        "Pv_incidence-count",
-        "ITN_access-rate",
-        "ITN_use-rate",
-        "ITN_use_rate-rate",
-        "IRS_coverage-rate",
-        "Antimalarial_EFT-rate",
-    ],
-    default=[
-        "Pf_PR-rate",
-        "Pv_PR-rate",
-        "Pf_mortality-rate",
-        "Pf_incidence-rate",
-        "Pv_incidence-rate",
-        "Pf_incidence-count",
-        "Pf_mortality-count",
-        "Pv_incidence-count",
-        "ITN_access-rate",
-        "ITN_use-rate",
-        "ITN_use_rate-rate",
-        "IRS_coverage-rate",
-        "Antimalarial_EFT-rate",
-    ],
-    required=True,
-)
 @parameter(
     "run_report_only",
     name="Run reporting only",
@@ -70,11 +30,13 @@ from rasterstats import zonal_stats
     type=bool,
     default=False,
 )
-def snt_map_extract(run_report_only: bool, metric_names: list[str]) -> None:
+def snt_map_extract(run_report_only: bool) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extract"
     pipeline_path.mkdir(parents=True, exist_ok=True)
+
+    # NOTE: ZIP both names and code into a single named list (labels, indicator)
 
     try:
         # Load configuration
@@ -101,6 +63,18 @@ def snt_map_extract(run_report_only: bool, metric_names: list[str]) -> None:
         shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
         current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
+        # legacy variable
+        metric_names = [
+            "Pf_PR-rate",
+            "Pf_mortality-rate",
+            "Pf_incidence-rate",
+            "Pv_incidence-rate",
+            "Pv_PR-rate",
+            "ITN_access-rate",
+            "ITN_use_rate-rate",
+            "IRS_coverage-rate",
+            "Antimalarial_EFT-rate",
+        ]
         mapping_coverage_indicators = filter_metric_dictionary_with(metric_names)
 
         if not run_report_only:

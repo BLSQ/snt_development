@@ -1,11 +1,171 @@
 {
     "POPULATION": {
         "LABEL": "Population",
-        "DESCRIPTION": "Population at ADM2 level",
+        "DESCRIPTION": "Population at ADM2 level.",
         "SOURCE": "DHIS2",
         "UNITS": "COUNT",
         "COMMENTS": null,
         "CATEGORY": "Population",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+	"CRUDE_INCIDENCE": {
+        "LABEL": "Crude incidence",
+        "DESCRIPTION": "The number of new malaria cases.",
+        "SOURCE": "DHIS2",
+        "UNITS": "Cases Per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "WHO incidence",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "INCIDENCE_ADJ_TESTING": {
+        "LABEL": "Incidence adjusted for testing",
+        "DESCRIPTION": "The number of new malaria cases adjusted for Test Positivity Rate (TPR).",
+        "SOURCE": "DHIS2",
+        "UNITS": "Cases Per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "WHO incidence",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "INCIDENCE_ADJ_REPORTING": {
+        "LABEL": "Incidence adjusted for reporting rate",
+        "DESCRIPTION": "The number of new malaria cases adjusted for Test Positivity Rate (TPR) and Reporting Rate.",
+        "SOURCE": "DHIS2",
+        "UNITS": "Cases Per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "WHO incidence",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "INCIDENCE_ADJ_CARESEEKING": {
+        "LABEL": "Incidence adjusted for care seeking behavior",
+        "DESCRIPTION": "The number of new malaria cases adjusted for Test Positivity Rate (TPR), Reporting Rate and Care Seeking Behavior.",
+        "SOURCE": "DHIS2",
+        "UNITS": "Cases Per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "WHO incidence",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+	"PF_PR_RATE": {
+        "LABEL": "Pf Infection Prevalence",
+        "DESCRIPTION": "The proportion of children 2 to 10 years with Plasmodium falciparum infection at a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 children",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Malaria",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "PF_MORTALITY_RATE": {
+        "LABEL": "Pf Mortality Rate",
+        "DESCRIPTION": "The number of deaths from Plasmodium falciparum per 100,000 population during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Deaths per 100 Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Malaria",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "PF_INCIDENCE_RATE": {
+        "LABEL": "Pf Incidence Rate",
+        "DESCRIPTION": "The number of newly diagnosed Plasmodium falciparum cases per 1,000 population during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Cases per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Malaria",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "PV_INCIDENCE_RATE": {
+        "LABEL": "Pv Incidence Rate",
+        "DESCRIPTION": "The number of newly diagnosed Plasmodium vivax cases per 1,000 population during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Cases per Thousand",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Malaria",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "PV_PR_RATE": {
+        "LABEL": "Pv Infection Prevalence",
+        "DESCRIPTION": "The proportion of population with Plasmodium vivax infection at a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 People",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Malaria",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "ITN_ACCESS_RATE": {
+        "LABEL": "Insecticide Treated Net Access",
+        "DESCRIPTION": "Proportion of population with access to an Inseticide-Treated Net in their Household during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 People",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Interventions",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "ITN_USE_RATE_RATE": {
+        "LABEL": "Insecticide Treated Net Use Rate",
+        "DESCRIPTION": "Proportion of people sleeping under an Inseticide-Treated Net, among those with access to an ITN in their household during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 People",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Interventions",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "IRS_COVERAGE_RATE": {
+        "LABEL": "Indoor Residual Spraying",
+        "DESCRIPTION": "Proportion of households covered with Indoor Residual Spraying during a defined year.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 Households",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Interventions",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "ANTIMALARIAL_EFT_RATE": {
+        "LABEL": "Treatment with Antimalarial",
+        "DESCRIPTION": "Proportion of malaria cases that receive effective treatment with an antimalarial medicine.",
+        "SOURCE": "MAP",
+        "UNITS": "Per 100 Cases",
+        "COMMENTS": null,
+        "CATEGORY": "MAP Interventions",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "SEASONALITY_PRECIPITATION": {
+        "LABEL": "Seasonal by rainfall",
+        "DESCRIPTION": "Classification of seasonal malaria transmission based on rainfall trends, used to identify areas eligible for seasonal interventions such as SMC.",
+        "SOURCE": "ERA5",
+        "UNITS": "Bolean (0 = not seasonal; 1 = seasonal)",
+        "COMMENTS": null,
+        "CATEGORY": "WHO Seasonality",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "SEASONALITY_CASES": {
+        "LABEL": "Seasonal by cases",
+        "DESCRIPTION": "Classification of seasonal malaria transmission based on case data, used to identify areas eligible for seasonal interventions such as SMC.",
+        "SOURCE": "DHIS2",
+        "UNITS": "Bolean (0 = not seasonal; 1 = seasonal)",
+        "COMMENTS": null,
+        "CATEGORY": "WHO Seasonality",
+        "UNIT_SYMBOL": null,
+        "PERIOD": null
+    },
+    "SEASONAL_BLOCK_DURATION_PRECIPITATION": {
+        "LABEL": "Length of transmission season by rainfall",
+        "DESCRIPTION": "Estimated number of consecutive months per year with elevated malaria transmission based on rainfall patterns.",
+        "SOURCE": "ERA5",
+        "UNITS": "Number of months",
+        "COMMENTS": null,
+        "CATEGORY": "WHO Seasonality",
         "UNIT_SYMBOL": null,
         "PERIOD": null
     }

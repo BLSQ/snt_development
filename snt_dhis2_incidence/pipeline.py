@@ -14,19 +14,35 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
 
 
 @pipeline("snt_dhis2_incidence")
+# @parameter(
+#     "careseeking_filename",
+#     name="File path to Care Seeking Data File data/*",
+#     help="Include path after data/ folder, e.g. 'dummy_data/careseeking_data.csv'.",
+#     type=str,
+#     default=None,
+#     required=False,
+# )
 @parameter(
-    "careseeking_filename",
-    name="File path to Care Seeking Data File data/*",
-    help="Include path after data/ folder, e.g. 'dummy_data/careseeking_data.csv'.",
+    "reporting_rate_method",
+    name="Reporting Rate to use",
+    help="Which Reporting Rate method to use for the analysis. Note: Reporting Rate was calculated previously, and is simply imported here.",
+    choices=["dhis2", "conf", "any"],
     type=str,
-    default=None,
-    required=False,
+    required=True,
 )
 @parameter(
-    "reporting_rate_choice",
-    name="Reporting Rate to use",
-    help="Choose Reporting Rate (method) to use for the analysis",
-    choices=["conf", "any", "dummy-snis"],
+    "routine_data_choice",
+    name="Routine data to use",
+    help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned; 'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`); 'imputed' contains inputed values after outliers removal. ",
+    choices=["raw", "raw_without_outliers", "imputed"],
+    type=str,
+    required=True,
+)
+@parameter(
+    "outlier_detection_method",
+    name="Outlier detection method",
+    help="Method to use for outlier detection in the routine data.",
+    choices=["median3mad", "mean3sd", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"],
     type=str,
     required=True,
 )
@@ -38,7 +54,10 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
     default=False,
     required=False,
 )
-def snt_dhis2_incidence(careseeking_filename: str, reporting_rate_choice: str, run_report_only: bool):
+def snt_dhis2_incidence(reporting_rate_method: str, 
+                        routine_data_choice: str, 
+                        outlier_detection_method: str, 
+                        run_report_only: bool):
     """Pipeline entry point for running the SNT DHIS2 incidence notebook with specified parameters.
 
     Parameters
@@ -57,7 +76,8 @@ def snt_dhis2_incidence(careseeking_filename: str, reporting_rate_choice: str, r
         data_path = root_path / "data" / "dhis2_incidence"
 
         # Load configuration
-        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        # snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        snt_config = load_configuration_snt(config_path=str(root_path / "configuration" / "SNT_config.json")) # fixed "Path" is not assignable to "str" 
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
@@ -65,18 +85,20 @@ def snt_dhis2_incidence(careseeking_filename: str, reporting_rate_choice: str, r
             input_notebook_path = pipeline_path / "code" / "SNT_dhis2_incidence.ipynb"
             current_run.log_info(f"Running notebook: {input_notebook_path}")
 
-            if careseeking_filename is not None:
-                careseeking_full_path = data_path / careseeking_filename
-                if not careseeking_full_path.exists():
-                    current_run.log_warning(f"Care seeking data file not found: {careseeking_full_path}")
-                    careseeking_full_path = None
+            # if careseeking_filename is not None:
+            #     careseeking_full_path = data_path / careseeking_filename
+            #     if not careseeking_full_path.exists():
+            #         current_run.log_warning(f"Care seeking data file not found: {careseeking_full_path}")
+            #         careseeking_full_path = None
 
             run_notebook(
                 nb_path=input_notebook_path,
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
-                    "CARESEEKING_DATA_FILENAME": careseeking_full_path,
-                    "REPORTING_RATE_CHOICE": reporting_rate_choice,
+                    # "CARESEEKING_DATA_FILENAME": careseeking_full_path,
+                    "REPORTING_RATE_METHOD": reporting_rate_method,
+                    "ROUTINE_DATA_CHOICE": routine_data_choice,
+                    "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "ROOT_PATH": root_path.as_posix(),
                 },
             )
@@ -84,9 +106,9 @@ def snt_dhis2_incidence(careseeking_filename: str, reporting_rate_choice: str, r
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_INCIDENCE"],
                 country_code=country_code,
-                file_paths=[
-                    data_path / f"{country_code}_incidence_year_rr_{reporting_rate_choice}.parquet",
-                    data_path / f"{country_code}_incidence_year_rr_{reporting_rate_choice}.csv",
+                file_paths=[ # data/dhis2_incidence/COD_incidence_year_routine-data-raw_rr-method-dhis2.csv
+                    str(data_path / f"{country_code}_incidence_year_routine-data-{routine_data_choice}_rr-method-{reporting_rate_method}.parquet"),
+                    str(data_path / f"{country_code}_incidence_year_routine-data-{routine_data_choice}_rr-method-{reporting_rate_method}.csv"),
                 ],
             )
 
@@ -171,8 +193,8 @@ def generate_html_report(output_notebook_path: Path, out_format: str = "html") -
     try:
         subprocess.run(cmd, check=True)
     except CalledProcessError as e:
-        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
-
+        # raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
+        raise CalledProcessError(e.returncode, e.cmd, output=e.output, stderr=e.stderr) from e
     current_run.add_file_output(report_path.as_posix())
 
 
@@ -200,7 +222,7 @@ def load_configuration_snt(config_path: str) -> dict:
     """
     try:
         # Load the JSON file
-        with Path.open(config_path, "r") as file:
+        with Path(config_path).open("r") as file:
             config_json = json.load(file)
         current_run.log_info(f"SNT configuration loaded: {config_path}")
 
@@ -229,8 +251,8 @@ def validate_config(config: dict) -> None:
         "DHIS2_ADMINISTRATION_1",
         "DHIS2_ADMINISTRATION_2",
         "ANALYTICS_ORG_UNITS_LEVEL",
-        "POPULATION_ORG_UNITS_LEVEL",
-        "SHAPES_ORG_UNITS_LEVEL",
+        "POPULATION_ORG_UNITS_LEVEL"#,
+        # "SHAPES_ORG_UNITS_LEVEL",
     ]
     for key in required_snt_keys:
         if key not in snt_config or snt_config[key] in [None, ""]:
@@ -241,9 +263,9 @@ def validate_config(config: dict) -> None:
         "DHIS2_DATASET_EXTRACTS",
         "DHIS2_DATASET_FORMATTED",
         "DHIS2_REPORTING_RATE",
-        "DHIS2_INCIDENCE",
-        "WORLDPOP_DATASET_EXTRACTS",
-        "ERA5_DATASET_CLIMATE",
+        "DHIS2_INCIDENCE"#,
+        # "WORLDPOP_DATASET_EXTRACTS",
+        # "ERA5_DATASET_CLIMATE",
     ]
     for key in required_dataset_keys:
         if key not in dataset_ids or dataset_ids[key] in [None, ""]:
@@ -251,9 +273,10 @@ def validate_config(config: dict) -> None:
 
     # Check population indicator
     pop_indicators = definitions.get("POPULATION_INDICATOR_DEFINITIONS", {})
-    tot_population = pop_indicators.get("TOT_POPULATION", [])
+    # tot_population = pop_indicators.get("TOT_POPULATION", [])
+    tot_population = pop_indicators.get("POPULATION", [])
     if not tot_population:
-        raise ValueError("Missing or empty TOT_POPULATION indicator definition.")
+        raise ValueError("Missing or empty POPULATION indicator definition.") # TOT_POPULATION
 
     # Check at least one indicator under DHIS2_INDICATOR_DEFINITIONS
     indicator_defs = definitions.get("DHIS2_INDICATOR_DEFINITIONS", {})
@@ -363,7 +386,7 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     else:
         current_run.log_warning(f"Dataset with ID {ds_id} not found, creating a new one.")
         dataset = workspace.create_dataset(
-            name=ds_id.replace("-", "_").upper(), description="SNT Process dataset"
+            name=ds_id.replace("-", "_").upper(), description="SNT Process dataset: Incidence" # "SNT Process dataset"
         )
 
     version_name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M')}"

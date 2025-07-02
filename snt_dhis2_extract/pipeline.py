@@ -1,22 +1,24 @@
-import json
 import re
-import subprocess
 import tempfile
 from datetime import datetime
 from itertools import product
 from pathlib import Path
-from subprocess import CalledProcessError
 
 import pandas as pd
 import papermill as pm
 import polars as pl
 from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import current_run, parameter, pipeline, workspace
-from openhexa.sdk.datasets.dataset import DatasetVersion
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
+from snt_lib.snt_pipeline_utils import (
+    generate_html_report,
+    get_new_dataset_version,
+    load_configuration_snt,
+    validate_config,
+)
 
 
 @pipeline("snt_dhis2_extract", timeout=28800)
@@ -166,44 +168,6 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
     except Exception as e:
         current_run.log_error(f"Error in pipeline execution: {e}")
         raise
-
-
-def load_configuration_snt(config_path: str) -> dict:
-    """Load the SNT configuration from a JSON file.
-
-    Parameters
-    ----------
-    config_path : str
-        Path to the configuration JSON file.
-
-    Returns
-    -------
-    dict
-        The loaded configuration as a dictionary.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the configuration file is not found.
-    ValueError
-        If the configuration file contains invalid JSON.
-    Exception
-        For any other unexpected errors.
-    """
-    try:
-        # Load the JSON file
-        with Path.open(config_path, "r") as file:
-            config_json = json.load(file)
-        current_run.log_info(f"SNT configuration loaded: {config_path}")
-
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"Error: The file {config_path} was not found.") from e
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Error: The file contains invalid JSON {e}") from e
-    except Exception as e:
-        raise Exception(f"An unexpected error occurred: {e}") from e
-
-    return config_json
 
 
 def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> DHIS2:
@@ -642,7 +606,7 @@ def download_dhis2_analytics(
                     for ou in range(1, org_unit_level + 1)
                     for suffix in ["_id", "_name"]
                 ]
-                df_orgunits = df.merge(
+                df_orgunits = df.merge(  # type: ignore[reportAttributeAccessIssue]
                     df_pyramid[parent_cols], how="left", left_on="ou", right_on=merging_col
                 )
 
@@ -670,8 +634,8 @@ def download_dhis2_analytics(
 
 
 def merge_parquet_files(
-    input_dir: str,
-    output_dir: str,
+    input_dir: Path,
+    output_dir: Path,
     output_fname: str,
     file_pattern: str = "raw_*.parquet",
 ) -> None:
@@ -900,7 +864,10 @@ def download_dhis2_shapes(
         )
 
     max_level = source_pyramid["level"].max()
-    if org_level is None or org_level > max_level or org_level < 1:
+    if max_level is None:
+        raise ValueError("source_pyramid['level'] is empty, cannot determine max level")
+
+    if org_level is None or org_level > max_level or org_level < 1:  # type: ignore[operator]
         raise ValueError(
             f"Incorrect DHIS2_ADMINISTRATION_2 value, please set a value between level 1 and {max_level}."
         )
@@ -1085,47 +1052,6 @@ def add_files_to_dataset(
     return True
 
 
-def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
-    """Create and return a new dataset version.
-
-    Also creates a new dataset if it does not exist.
-
-    Parameters
-    ----------
-    ds_id : str
-        The ID of the dataset for which a new version will be created.
-    prefix : str, optional
-        Prefix for the dataset version name (default is "ds").
-
-    Returns
-    -------
-    DatasetVersion
-        The newly created dataset version.
-
-    Raises
-    ------
-    Exception
-        If an error occurs while creating the new dataset version.
-    """
-    existing_datasets = workspace.list_datasets()
-    if ds_id in [eds.slug for eds in existing_datasets]:
-        dataset = workspace.get_dataset(ds_id)
-    else:
-        current_run.log_warning(f"Dataset with ID {ds_id} not found, creating a new one.")
-        dataset = workspace.create_dataset(
-            name=ds_id.replace("-", "_").upper(), description="SNT Process dataset"
-        )
-
-    version_name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M')}"
-
-    try:
-        new_version = dataset.create_version(version_name)
-    except Exception as e:
-        raise Exception(f"An error occurred while creating the new dataset version: {e}") from e
-
-    return new_version
-
-
 def snt_folders_setup(root_path: Path) -> None:
     """Set up the required folder structure for the SNT pipeline.
 
@@ -1186,90 +1112,6 @@ def run_report_notebook(
     except Exception as e:
         raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
     generate_html_report(nb_output_full_path)
-
-
-def generate_html_report(output_notebook_path: Path, out_format: str = "html") -> None:
-    """Generate an HTML report from a Jupyter notebook.
-
-    Parameters
-    ----------
-    output_notebook_path : Path
-        Path to the output notebook file.
-    out_format : str
-        output extension
-
-    Raises
-    ------
-    RuntimeError
-        If an error occurs during the conversion process.
-    """
-    if not output_notebook_path.is_file() or output_notebook_path.suffix.lower() != ".ipynb":
-        raise RuntimeError(f"Invalid notebook path: {output_notebook_path}")
-
-    report_path = output_notebook_path.with_suffix(".html")
-    current_run.log_info(f"Generating HTML report {report_path}")
-    cmd = [
-        "jupyter",
-        "nbconvert",
-        f"--to={out_format}",
-        str(output_notebook_path),
-    ]
-    try:
-        subprocess.run(cmd, check=True)
-    except CalledProcessError as e:
-        raise CalledProcessError(f"Error converting notebook to HTML (exit {e.returncode}): {e}") from e
-
-    current_run.add_file_output(str(report_path))
-
-
-def validate_config(config: dict) -> None:
-    """Validate that the critical configuration values are set properly."""
-    try:
-        snt_config = config["SNT_CONFIG"]
-        dataset_ids = config["SNT_DATASET_IDENTIFIERS"]
-        definitions = config["DHIS2_DATA_DEFINITIONS"]
-    except KeyError as e:
-        raise KeyError(f"Missing top-level key in config: {e}") from e
-
-    # Required keys in SNT_CONFIG
-    required_snt_keys = [
-        "COUNTRY_CODE",
-        "DHIS2_ADMINISTRATION_1",
-        "DHIS2_ADMINISTRATION_2",
-        "ANALYTICS_ORG_UNITS_LEVEL",
-        "POPULATION_ORG_UNITS_LEVEL",
-    ]
-    for key in required_snt_keys:
-        if key not in snt_config or snt_config[key] in [None, ""]:
-            raise ValueError(f"Missing or empty configuration for: SNT_CONFIG.{key}")
-
-    # Required dataset identifiers
-    required_dataset_keys = [
-        "DHIS2_DATASET_EXTRACTS",
-        "DHIS2_DATASET_FORMATTED",
-        "DHIS2_REPORTING_RATE",
-        "DHIS2_INCIDENCE",
-        "WORLDPOP_DATASET_EXTRACTS",
-        "ERA5_DATASET_CLIMATE",
-        "SNT_SEASONALITY",
-        "SNT_MAP_EXTRACT",
-        "SNT_RESULTS",
-    ]
-    for key in required_dataset_keys:
-        if key not in dataset_ids or dataset_ids[key] in [None, ""]:
-            raise ValueError(f"Missing or empty configuration for: SNT_DATASET_IDENTIFIERS.{key}")
-
-    # Check population indicator
-    pop_indicators = definitions.get("POPULATION_INDICATOR_DEFINITIONS", {})
-    tot_population = pop_indicators.get("POPULATION", [])
-    if not tot_population:
-        raise ValueError("Missing or empty POPULATION indicator definition.")
-
-    # Check at least one indicator under DHIS2_INDICATOR_DEFINITIONS
-    indicator_defs = definitions.get("DHIS2_INDICATOR_DEFINITIONS", {})
-    flat_indicators = [val for sublist in indicator_defs.values() for val in sublist]
-    if not flat_indicators:
-        raise ValueError("No indicators defined under DHIS2_INDICATOR_DEFINITIONS.")
 
 
 def validate_yyyymm(value: int) -> None:

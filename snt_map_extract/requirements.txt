@@ -2,3 +2,4 @@ pygadm
 rasterstats
 psycopg2
 geoalchemy2
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git

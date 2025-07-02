@@ -107,8 +107,11 @@ def snt_dhis2_incidence(reporting_rate_method: str,
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_INCIDENCE"],
                 country_code=country_code,
                 file_paths=[ # data/dhis2_incidence/COD_incidence_year_routine-data-raw_rr-method-dhis2.csv
-                    str(data_path / f"{country_code}_incidence_year_routine-data-{routine_data_choice}_rr-method-{reporting_rate_method}.parquet"),
-                    str(data_path / f"{country_code}_incidence_year_routine-data-{routine_data_choice}_rr-method-{reporting_rate_method}.csv"),
+                    # str(data_path / f"{country_code}_incidence_year_routine-data-{routine_data_choice}_rr-method-{reporting_rate_method}.parquet"),
+                    *[str(p) for p in (data_path.glob(f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet"))],
+                    *[str(p) for p in (data_path.glob(f"{country_code}_incidence_year_routine-data-*_rr-method-*.csv"))],
+                    *[str(p) for p in (data_path.glob(f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.parquet"))],
+                    *[str(p) for p in (data_path.glob(f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.csv"))],
                 ],
             )
 

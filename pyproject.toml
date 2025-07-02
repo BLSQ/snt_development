@@ -1,7 +1,7 @@
 [project]
 name = "openhexa-templates-ds"
 version = "0.1.0"
-description = "OpenHEXA pipeline templates library maintained by Bluesquare Data Services team"
+description = "SNT pipelines maintained by Bluesquare Data Services team"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
-from snt_pipeline_utils import (
+from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     copy_json_file,
     get_file_from_dataset,
@@ -134,7 +135,7 @@ def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_sel
     """
     updated_table = add_population_to(table, snt_config)
     updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_selection)
-    return updated_table
+    return updated_table  # noqa: RET504
 
 
 def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
@@ -308,7 +309,7 @@ def add_seasonality_indicators_to(table: pd.DataFrame, snt_config: dict) -> pd.D
     """
     updated_table = add_precipitation_seasonality(table, snt_config)
     updated_table = add_cases_seasonality(updated_table, snt_config)
-    return updated_table
+    return updated_table  # noqa: RET504
 
 
 def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
@@ -449,7 +450,7 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     return results_table
 
 
-def update_metadata(variable: str, attribute: str, value: any, filename: str = "SNT_metadata.json") -> None:
+def update_metadata(variable: str, attribute: str, value: Any, filename: str = "SNT_metadata.json") -> None:  # noqa: ANN401
     """Update a specific attribute of a variable in the metadata JSON file.
 
     Parameters

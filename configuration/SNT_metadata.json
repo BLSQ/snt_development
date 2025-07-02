@@ -9,8 +9,8 @@
         "UNIT_SYMBOL": null,
         "PERIOD": null
     },
-	"CRUDE_INCIDENCE": {
-        "LABEL": "Crude incidence",
+	"INCIDENCE_CRUDE": {
+        "LABEL": "Incidence crude",
         "DESCRIPTION": "The number of new malaria cases.",
         "SOURCE": "DHIS2",
         "UNITS": "Cases Per Thousand",

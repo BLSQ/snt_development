@@ -216,7 +216,7 @@ def add_incidence_indicators_to(
 
     columns_selection = [
         "ADM2_ID",
-        "CRUDE_INCIDENCE",
+        "INCIDENCE_CRUDE",
         "INCIDENCE_ADJ_TESTING",
         "INCIDENCE_ADJ_REPORTING",
         "INCIDENCE_ADJ_CARESEEKING",
@@ -409,7 +409,7 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
         "ADM2",
         "ADM2_ID",
         "POPULATION",
-        "CRUDE_INCIDENCE",
+        "INCIDENCE_CRUDE",
         "INCIDENCE_ADJ_TESTING",
         "INCIDENCE_ADJ_REPORTING",
         "INCIDENCE_ADJ_CARESEEKING",

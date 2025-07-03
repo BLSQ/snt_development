@@ -37,8 +37,8 @@
 			"CASRECU" : ["UxD03qX5O0t"],
 			"CPN1" : ["kGmdIbd3mbn"]
 		},
-		"DHIS2_REPORTING_DATASETS" : {
-			"REPORTING_RATES": [
+		"DHIS2_REPORTING_RATES" : {
+			"REPORTING_DATASETS": [
 				{
 					"DATASET" : "pMbC0FJPkcm",				
 					"METRICS": {
@@ -60,7 +60,11 @@
 						"EXPECTED_REPORTS": "float"
 					}
 				}
-			]		
+			],			
+			"REPORTING_INDICATORS" : {
+				"ACTUAL_REPORTS" : "",
+				"EXPECTED_REPORTS": ""
+			}
 		}	
 	}
 }

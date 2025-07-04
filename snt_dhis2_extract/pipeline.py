@@ -18,6 +18,7 @@ from snt_lib.snt_pipeline_utils import (
     get_new_dataset_version,
     load_configuration_snt,
     validate_config,
+    delete_raw_files,
 )
 
 
@@ -233,9 +234,7 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
         if country_code == "BFA" and ("level_4" in adm1 or "level_4" in adm2):
             current_run.log_info("District level (4) filtering for Burkina Faso pyramid")
-            dhis2_pyramid = dhis2_pyramid.filter(
-                (pl.col("level_4_name").str.starts_with("DS")) & (pl.col("geometry").is_not_null())
-            )
+            dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_4_name").str.starts_with("DS"))
 
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
     except Exception as e:
@@ -273,6 +272,7 @@ def download_dhis2_reporting_rates(
     org_unit_level_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
     if org_unit_level_name is None:
         raise ValueError("DHIS2_ADMINISTRATION_2 value not configured.")
+
     # Extract the numeric level from a string like "level_2_name"
     match = re.search(r"level_(\d+)_", org_unit_level_name)
     if not match:
@@ -288,12 +288,70 @@ def download_dhis2_reporting_rates(
         f"Downloading analytics for {len(org_units_list)} org units at level {org_unit_level}"
     )
 
-    reporting_rates = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_DATASETS"].get(
-        "REPORTING_RATES", []
+    # setup periods
+    p1 = period_from_string(str(start))
+    p2 = period_from_string(str(end))
+    periods = [p1] if p1 == p2 else p1.get_range(p2)
+
+    rep_datasets = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_RATES"].get("REPORTING_DATASETS", [])
+    rep_indicators = snt_config["DHIS2_DATA_DEFINITIONS"]["DHIS2_REPORTING_RATES"].get(
+        "REPORTING_INDICATORS", {}
     )
-    if len(reporting_rates) == 0:
+
+    try:
+        ds_downloaded = handle_reporting_datasets(
+            reporting_datasets=rep_datasets,
+            country_code=country_code,
+            org_units_list=org_units_list,
+            org_unit_level=org_unit_level,
+            pyramid_df=df_pyramid,
+            dhis2_client=dhis2_client,
+            periods=periods,
+            output=output_dir,
+            overwrite=overwrite,
+        )
+        ind_downloaded = handle_reporting_indicators(
+            ds_downloaded=ds_downloaded,
+            reporting_indicators=rep_indicators,
+            country_code=country_code,
+            org_units_list=org_units_list,
+            org_unit_level=org_unit_level,
+            pyramid_df=df_pyramid,
+            dhis2_client=dhis2_client,
+            periods=periods,
+            output=output_dir,
+            overwrite=overwrite,
+        )
+    except Exception as e:
+        raise Exception(f"Error while retrieving reporting rates: {e}") from e
+
+    if not (ds_downloaded or ind_downloaded):
         current_run.log_info("No reporting rates to download.")
-        return True
+
+    return True
+
+
+def handle_reporting_datasets(
+    reporting_datasets: list,
+    country_code: str,
+    org_units_list: list,
+    org_unit_level: int,
+    pyramid_df: pl.DataFrame,
+    dhis2_client: DHIS2,
+    periods: list,
+    output: Path,
+    overwrite: bool,
+) -> bool:
+    """Download reporting datasets from DHIS2 and save them after validation and formatting.
+
+    Returns
+    -------
+    bool
+        True if the reporting datasets are successfully downloaded and saved, False otherwise.
+    """
+    if len(reporting_datasets) == 0:
+        current_run.log_info("No reporting datasets provided to download.")
+        return False
 
     # Download datasets metadata
     current_run.log_info("Downloading datasets metadata from DHIS2.")
@@ -301,23 +359,27 @@ def download_dhis2_reporting_rates(
     datasets_metadata_df = pl.DataFrame(datasets_metadata)
 
     # validate reporting_rates
-    valid_reporting_rates = validate_reporting_rates(reporting_rates, datasets_metadata_df)
+    valid_reporting_rates = validate_reporting_rates(reporting_datasets, datasets_metadata_df)
+    if len(valid_reporting_rates) == 0:
+        current_run.log_info("No valid reporting dataset configured. Process skipped.")
+        return False
 
-    # setup periods
-    p1 = period_from_string(str(start))
-    p2 = period_from_string(str(end))
-    periods = [p1] if p1 == p2 else p1.get_range(p2)
+    output_path = output / "datasets"
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # delete the available reporting file (clean)
+    delete_raw_files(output, pattern=f"{country_code}_dhis2_raw_reporting.parquet")
 
     try:
         if overwrite:
-            delete_raw_files(output_dir, pattern=f"{country_code}_raw_reporting_*.parquet")
+            delete_raw_files(output_path, pattern=f"{country_code}_raw_reporting_ds_*.parquet")
     except Exception as e:
         raise Exception(f"Error while cleaning old raw reporting rate files: {e}") from e
 
     try:
         current_run.log_info(f"Downloading reporting data for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            fp = output_dir / f"{country_code}_raw_reporting_{p}.parquet"
+            fp = output_path / f"{country_code}_raw_reporting_{p}.parquet"
 
             if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
@@ -365,28 +427,28 @@ def download_dhis2_reporting_rates(
 
                 # Format the extracted data
                 data_elements_df = pl.DataFrame(data_elements)
-                df_formatted = raw_reporting_format(
+                df_formatted = raw_reporting_ds_format(
                     df=data_elements_df,
                     dataset_name=dataset_name,
                     org_unit_level=org_unit_level,
-                    pyramid_metadata=df_pyramid,
+                    pyramid_metadata=pyramid_df,
                 )
                 reporting_rate_period.append(df_formatted)
 
             # concat
             reporting_rates_concat = pl.concat(reporting_rate_period, how="vertical")
-            reporting_rates_concat.write_parquet(fp, use_pyarrow="pyarrow")
+            reporting_rates_concat.write_parquet(fp, use_pyarrow=True)
 
     except Exception as e:
         raise Exception(f"Error while downloading reporting rates: {e}") from e
 
-    # merge all parquet files into one
     try:
+        # merge all parquet files into one
         merge_parquet_files(
-            input_dir=output_dir,
-            output_dir=output_dir,
+            input_dir=output_path,
+            output_dir=output,
             output_fname=f"{country_code}_dhis2_raw_reporting.parquet",
-            file_pattern=f"{country_code}_raw_reporting_*.parquet",
+            file_pattern=f"{country_code}_raw_reporting_ds_*.parquet",
         )
     except Exception as e:
         raise Exception(f"Error while merging reporting parquet files: {e}") from e
@@ -394,7 +456,113 @@ def download_dhis2_reporting_rates(
     return True
 
 
-def raw_reporting_format(
+def handle_reporting_indicators(
+    ds_downloaded: bool,
+    reporting_indicators: dict,
+    country_code: str,
+    org_units_list: list,
+    org_unit_level: int,
+    pyramid_df: pl.DataFrame,
+    dhis2_client: DHIS2,
+    periods: list,
+    output: Path,
+    overwrite: bool,
+) -> bool:
+    """Download reporting indicators from DHIS2 and save them after validation and formatting.
+
+    Returns
+    -------
+    bool
+        True if the reporting indicators are successfully downloaded and saved, False otherwise.
+    """
+    if ds_downloaded:
+        current_run.log_info("Reporting dataset downloaded. skip indicators")
+        return False
+
+    if len(reporting_indicators) == 0:
+        current_run.log_info("No reporting indicators provided to download.")
+        return False
+
+    # reporting_indicators = {"ACTUAL_REPORTS" : "","EXPECTED_REPORTS": None}
+    valid_indicators = {
+        key: value for key, value in reporting_indicators.items() if isinstance(value, str) and value.strip()
+    }
+
+    if not valid_indicators:
+        current_run.log_info("No reporting indicators provided to download in configuration.")
+        return False
+
+    output_path = output / "indicators"
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # delete the available reporting file (clean)
+    delete_raw_files(output, pattern=f"{country_code}_dhis2_raw_reporting.parquet")
+    current_run.log_info(f"Downloading indicators metrics : {valid_indicators}")
+
+    try:
+        if overwrite:
+            delete_raw_files(output_path, pattern=f"{country_code}_raw_reporting_ind_*.parquet")
+    except Exception as e:
+        raise Exception(f"Error while cleaning raw indicator rate files: {e}") from e
+
+    try:
+        current_run.log_info(f"Downloading reporting indicators for period : {periods[0]} to {periods[-1]}")
+        for p in periods:
+            fp = output_path / f"{country_code}_raw_reporting_ind_{p}.parquet"
+
+            if fp.exists():
+                current_run.log_info(f"File {fp} already exists. Skipping download.")
+                continue
+
+            current_run.log_info(f"Downloading reporting indicators metrics for period : {p}")
+            try:
+                data_elements = dhis2_client.analytics.get(
+                    indicators=list(valid_indicators.values()),
+                    periods=[p],
+                    org_units=org_units_list,
+                    include_cocs=False,
+                )
+            except Exception as e:
+                current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
+                continue
+
+            if len(data_elements) == 0:
+                current_run.log_warning(f"No data found for period {p}")
+                continue
+
+            # Format the extracted data
+            data_elements_df = pd.DataFrame(data_elements)
+            data_elements_df = dhis2_client.meta.add_dx_name_column(dataframe=data_elements_df)
+            if not isinstance(data_elements_df, pd.DataFrame):
+                raise TypeError("Expected a pandas DataFrame output after adding dx_names")  # pyright
+            df_formatted = raw_reporting_ind_format(
+                df=data_elements_df,
+                metrics=valid_indicators,
+                org_unit_level=org_unit_level,
+                pyramid_metadata=pyramid_df,
+            )
+
+            # df_formatted.write_parquet(fp, use_pyarrow="pyarrow")
+            df_formatted.to_parquet(fp, index=False)
+
+    except Exception as e:
+        raise Exception(f"Error while downloading reporting rates: {e}") from e
+
+    try:
+        # merge all parquet files into one
+        merge_parquet_files(
+            input_dir=output_path,
+            output_dir=output,
+            output_fname=f"{country_code}_dhis2_raw_reporting.parquet",
+            file_pattern=f"{country_code}_raw_reporting_ind_*.parquet",
+        )
+    except Exception as e:
+        raise Exception(f"Error while merging reporting indicators parquet files: {e}") from e
+
+    return True
+
+
+def raw_reporting_ds_format(
     df: pl.DataFrame,
     dataset_name: str,
     org_unit_level: int,
@@ -422,10 +590,10 @@ def raw_reporting_format(
     df = (
         df.with_columns(
             [
-                pl.col("dx").str.split(".").list.get(0).alias("ds_uid"),
-                pl.col("dx").str.split(".").list.get(1).alias("ds_metric"),
+                pl.col("dx").str.split(".").list.get(0).alias("product_uid"),
+                pl.col("dx").str.split(".").list.get(1).alias("product_metric"),
                 pl.col("value").cast(pl.Float64),
-                pl.lit(dataset_name).alias("ds_name"),
+                pl.lit(dataset_name).alias("product_name"),
             ]
         )
         .drop("dx")
@@ -440,6 +608,35 @@ def raw_reporting_format(
     return df.join(
         pyramid_metadata.select(parent_cols), how="left", left_on=merging_col, right_on=merging_col
     )
+
+
+def raw_reporting_ind_format(
+    df: pd.DataFrame,
+    metrics: dict,
+    org_unit_level: int,
+    pyramid_metadata: pl.DataFrame,
+) -> pd.DataFrame:
+    """Format reporting indicator data by mapping metrics and joining with pyramid metadata.
+
+    Returns
+    -------
+    pd.DataFrame
+        Formatted DataFrame with mapped metrics and joined pyramid metadata.
+    """
+    # Invert the dictionary: value -> key
+    metric_map = {v: k for k, v in metrics.items()}
+    df["product_metric"] = df["dx"].map(metric_map)
+
+    # rename
+    df = df.rename(columns={"dx": "product_uid", "dx_name": "product_name"})
+
+    merging_col = f"level_{org_unit_level}_id"
+    parent_cols = [
+        f"level_{ou}{suffix}" for ou in range(1, org_unit_level + 1) for suffix in ["_id", "_name"]
+    ]
+    pyramid_pd = pyramid_metadata.to_pandas()
+    merged = df.merge(pyramid_pd[parent_cols], how="left", left_on="ou", right_on=merging_col)
+    return merged.drop(columns=["ou"])
 
 
 def validate_reporting_rates(rates: list, datasets_metadata: pl.DataFrame) -> list:
@@ -461,12 +658,15 @@ def validate_reporting_rates(rates: list, datasets_metadata: pl.DataFrame) -> li
     for rate in rates:
         valid_rate = {"DATASET": None, "METRICS": []}
 
-        dataset_uid = rate.get("DATASET")
+        dataset_uid = rate.get("DATASET", "").strip()
         metrics = rate.get("METRICS")
         if dataset_uid in datasets_metadata["id"]:
             valid_rate["DATASET"] = dataset_uid
         else:
-            current_run.log_warning(f"Reporting dataset {dataset_uid} not found in DHIS2 available datasets.")
+            if dataset_uid:
+                current_run.log_warning(
+                    f"Reporting dataset {dataset_uid} not found in DHIS2 available datasets."
+                )
 
         if metrics and len(metrics) > 0:
             valid_rate["METRICS"] = metrics
@@ -1136,27 +1336,6 @@ def validate_period_range(start: int, end: int) -> None:
 
     if start > end:
         raise ValueError("Start period must not be after end period.")
-
-
-def delete_raw_files(directory: Path, pattern: str) -> None:
-    """Delete raw parquet files for a given country code in the specified directory.
-
-    Parameters
-    ----------
-    directory : Path
-        The directory in which to search for files to delete.
-    pattern : str
-        The pattern to match files for deletion.
-
-    This function deletes all files matching the pattern in the given directory.
-    """
-    files_to_delete = list(directory.glob(pattern))
-
-    for file in files_to_delete:
-        try:
-            file.unlink()
-        except Exception as e:
-            raise Exception(f"Failed to delete {file}: {e}") from e
 
 
 if __name__ == "__main__":

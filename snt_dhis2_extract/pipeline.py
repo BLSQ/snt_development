@@ -379,7 +379,7 @@ def handle_reporting_datasets(
     try:
         current_run.log_info(f"Downloading reporting data for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            fp = output_path / f"{country_code}_raw_reporting_{p}.parquet"
+            fp = output_path / f"{country_code}_raw_reporting_ds_{p}.parquet"
 
             if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")

@@ -23,14 +23,6 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
 #     required=False,
 # )
 @parameter(
-    "reporting_rate_method",
-    name="Reporting Rate to use",
-    help="Which Reporting Rate method to use for the analysis. Note: Reporting Rate was calculated previously, and is simply imported here.",
-    choices=["dhis2", "conf", "any"],
-    type=str,
-    required=True,
-)
-@parameter(
     "routine_data_choice",
     name="Routine data to use",
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned; 'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`); 'imputed' contains inputed values after outliers removal. ",
@@ -47,6 +39,22 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
     required=True,
 )
 @parameter(
+    "reporting_rate_method",
+    name="Reporting Rate to use",
+    help="Which Reporting Rate method to use for the analysis. Note: Reporting Rate was calculated previously, and is simply imported here.",
+    choices=["dhis2", "conf", "any"],
+    type=str,
+    required=True,
+)
+@parameter(
+    "use_csb_data",
+    name="Use Care Seeking Data (DHS)?",
+    help="If True, the pipeline will use Care Seeking Data (DHS) for the analysis, and calculate incidence adjusted for care seeking.",
+    type=bool,
+    default=False,
+    required=True,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -54,9 +62,11 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
     default=False,
     required=False,
 )
-def snt_dhis2_incidence(reporting_rate_method: str, 
-                        routine_data_choice: str, 
+
+def snt_dhis2_incidence(routine_data_choice: str, 
                         outlier_detection_method: str, 
+                        reporting_rate_method: str,
+                        use_csb_data: bool, 
                         run_report_only: bool):
     """Pipeline entry point for running the SNT DHIS2 incidence notebook with specified parameters.
 
@@ -96,9 +106,10 @@ def snt_dhis2_incidence(reporting_rate_method: str,
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     # "CARESEEKING_DATA_FILENAME": careseeking_full_path,
-                    "REPORTING_RATE_METHOD": reporting_rate_method,
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
+                    "REPORTING_RATE_METHOD": reporting_rate_method,
+                    "USE_CSB_DATA": use_csb_data,
                     "ROOT_PATH": root_path.as_posix(),
                 },
             )

@@ -67,8 +67,6 @@ def snt_map_extract(run_report_only: bool) -> None:
             "Pf_PR-rate",
             "Pf_mortality-rate",
             "Pf_incidence-rate",
-            "Pv_incidence-rate",
-            "Pv_PR-rate",
             "ITN_access-rate",
             "ITN_use_rate-rate",
             "IRS_coverage-rate",
@@ -309,7 +307,8 @@ def make_table(
             re.sub(r"(^_+|_+$)", "", re.sub(r"[\s\-]+", "_", col.strip().upper())) for col in final_df.columns
         ]
         final_df["METRIC_NAME"] = (
-            final_df["METRIC_NAME"].str.strip().str.replace("-", "_").str.replace(r"\s+", "_", regex=True)
+            final_df["METRIC_NAME"].str.strip()
+            # final_df["METRIC_NAME"].str.strip().str.replace("-", "_").str.replace(r"\s+", "_", regex=True)
         )
 
         # Save file

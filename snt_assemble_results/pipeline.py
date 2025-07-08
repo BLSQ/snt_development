@@ -15,11 +15,29 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_assemble_results")
 @parameter(
-    "incidence_selection",
-    name="Incidence selection",
+    "reporting_method",
+    name="Reporting method",
     type=str,
     multiple=False,
-    choices=["any", "conf", "dummy_snis"],
+    choices=["any", "conf", "dhis2"],
+    default="any",
+    required=True,
+)
+@parameter(
+    "incidence_data",
+    name="Incidence data selection",
+    type=str,
+    multiple=False,
+    choices=["raw", "imputed"],
+    default="raw",
+    required=True,
+)
+@parameter(
+    "incidence_method",
+    name="Incidence method",
+    type=str,
+    multiple=False,
+    choices=["dhis2", "any", "conf"],
     default="any",
     required=True,
 )
@@ -29,30 +47,28 @@ from snt_lib.snt_pipeline_utils import (
     type=str,
     multiple=True,
     choices=[
-        "Pf_mortality_rate",
-        "Pf_incidence_rate",
-        "Pv_incidence_rate",
-        "Pf_PR_rate",
-        "Pv_PR_rate",
-        "ITN_access_rate",
-        "IRS_coverage_rate",
-        "ITN_use_rate_rate",
-        "Antimalarial_EFT_rate",
+        "Pf_PR-rate",
+        "Pf_mortality-rate",
+        "Pf_incidence-rate",
+        "ITN_access-rate",
+        "ITN_use_rate-rate",
+        "IRS_coverage-rate",
+        "Antimalarial_EFT-rate",
     ],
     default=[
-        "Pf_mortality_rate",
-        "Pf_incidence_rate",
-        "Pv_incidence_rate",
-        "Pf_PR_rate",
-        "Pv_PR_rate",
-        "ITN_access_rate",
-        "IRS_coverage_rate",
-        "ITN_use_rate_rate",
-        "Antimalarial_EFT_rate",
+        "Pf_PR-rate",
+        "Pf_mortality-rate",
+        "Pf_incidence-rate",
+        "ITN_access-rate",
+        "ITN_use_rate-rate",
+        "IRS_coverage-rate",
+        "Antimalarial_EFT-rate",
     ],
     required=True,
 )
-def snt_assemble_results(incidence_selection: str, map_selection: list[str]):
+def snt_assemble_results(
+    reporting_method: str, incidence_data: str, incidence_method: str, map_selection: list[str]
+):
     """Assemble SNT results by loading configuration, validating it, and preparing paths for processing.
 
     Raises
@@ -82,7 +98,9 @@ def snt_assemble_results(incidence_selection: str, map_selection: list[str]):
         assemble_snt_results(
             snt_config=snt_config,
             output_path=results_path,
-            incidence_selection=incidence_selection,
+            reporting_method=reporting_method,
+            incidence_data=incidence_data,
+            incidence_method=incidence_method,
             map_selection=map_selection,
         )
 
@@ -106,17 +124,24 @@ def snt_assemble_results(incidence_selection: str, map_selection: list[str]):
 
 
 def assemble_snt_results(
-    snt_config: dict, output_path: Path, incidence_selection: str, map_selection: list[str]
+    snt_config: dict,
+    output_path: Path,
+    reporting_method: str,
+    incidence_data: str,
+    incidence_method: str,
+    map_selection: list[str],
 ) -> None:
     """Assembles SNT results using the provided configuration dictionary."""
     # initialize table
     results_table = build_results_table(snt_config)
 
     # Add indicators based on source
-    results_table = add_dhis2_indicators_to(results_table, snt_config, incidence_selection)
+    results_table = add_dhis2_indicators_to(
+        results_table, snt_config, reporting_method, incidence_data, incidence_method
+    )
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
-    # ADD THE REST OF THE INDICATORS
+    results_table = add_dhs_indicators_to(results_table, snt_config)
 
     # Save files
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
@@ -125,7 +150,9 @@ def assemble_snt_results(
     results_table.to_csv(output_path / f"{country_code}_results_dataset.csv", index=False)
 
 
-def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_selection: str) -> pd.DataFrame:
+def add_dhis2_indicators_to(
+    table: pd.DataFrame, snt_config: dict, reporting_method: str, incidence_data: str, incidence_method: str
+) -> pd.DataFrame:
     """Add DHIS2 indicators to the results table by sequentially applying indicator functions.
 
     Returns
@@ -134,7 +161,8 @@ def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_sel
         The updated results table with DHIS2 indicators added.
     """
     updated_table = add_population_to(table, snt_config)
-    updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_selection)
+    updated_table = add_reporting_rate_to(table, snt_config, reporting_method)
+    updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_data, incidence_method)
     return updated_table  # noqa: RET504
 
 
@@ -183,8 +211,55 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     return table
 
 
+def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_method: str) -> pd.DataFrame:
+    """Add reporting data to the results table by merging with DHIS2 rates information.
+
+    Selection :
+        matching: ADM2_ID
+        values : REPORTING_RATE
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which population data will be added.
+    snt_config : dict
+        The SNT configuration dictionary containing dataset identifiers and country code.
+    reporting_method :  dict
+        Method selection (file name)
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with population data merged.
+    """
+    current_run.log_info("Loading DHIS2 population data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_REPORTING_RATE")
+    try:
+        dhis2_reporting = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_reporting_rate_{reporting_method}_month.parquet",
+        )
+    except Exception as e:
+        current_run.log_warning(f"Error while loading population data: {e}")
+        return table
+
+    latest_period = dhis2_reporting["YEAR"].max()
+    update_metadata(variable="REPORTING_RATE", attribute="PERIOD", value=str(latest_period))
+
+    table.update(
+        table.merge(
+            dhis2_reporting[dhis2_reporting["YEAR"] == latest_period][["ADM2_ID", "REPORTING_RATE"]],
+            how="left",
+            on="ADM2_ID",
+            suffixes=("_old", ""),
+        )["REPORTING_RATE"]
+    )
+    return table
+
+
 def add_incidence_indicators_to(
-    table: pd.DataFrame, snt_config: dict, incidence_selection: str
+    table: pd.DataFrame, snt_config: dict, incidence_data: str, incidence_method: str
 ) -> pd.DataFrame:
     """Add incidence indicators to the results table using DHIS2 incidence data.
 
@@ -194,8 +269,10 @@ def add_incidence_indicators_to(
         The results table to which incidence indicators will be added.
     snt_config : dict
         The SNT configuration dictionary containing dataset identifiers and country code.
-    incidence_selection : list[str]
-        List of incidence selection criteria.
+    incidence_data : str
+        Incidence data selection.
+    incidence_method : str
+        List of incidence methods.
 
     Returns
     -------
@@ -203,37 +280,45 @@ def add_incidence_indicators_to(
         The updated results table with incidence indicators added.
     """
     current_run.log_info("Loading incidence data")
-    current_run.log_debug(f"Incidence selection: {incidence_selection}")
+
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
     try:
-        dhis2_incidence = get_file_from_dataset(
-            dataset_id=dataset_id,
-            filename=f"{country_code}_incidence_year_rr-method-{incidence_selection}.parquet",
-        )
+        f_name = f"{country_code}_incidence_year_routine-data-{incidence_data}_rr-method-{incidence_method}.parquet"
+        dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name)
+        current_run.log_debug(f"Incidence file selection: {f_name}")
     except Exception as e:
         current_run.log_warning(f"Error while loading incidence data: {e}")
         return table
 
     columns_selection = [
-        "ADM2_ID",
         "INCIDENCE_CRUDE",
         "INCIDENCE_ADJ_TESTING",
         "INCIDENCE_ADJ_REPORTING",
         "INCIDENCE_ADJ_CARESEEKING",
     ]
-
     latest_period = dhis2_incidence["YEAR"].max()
-    for col in columns_selection[1:]:
-        update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
-    dhis2_incidence.columns = dhis2_incidence.columns.str.upper()  # REMOVE THIS should already be formatted
-    current_run.log_debug(f"Incidence columns: {dhis2_incidence.columns}")
+    dhis2_incidence.columns = dhis2_incidence.columns.str.upper()  # This should be already formatted
+    dhis2_incidence = dhis2_incidence[dhis2_incidence["YEAR"] == latest_period]  # select last period
+    matched_columns = [col for col in columns_selection if col in dhis2_incidence.columns]
+    current_run.log_debug(f"Found incidence cols: {matched_columns}")
+    missing_columns = [col for col in columns_selection if col not in dhis2_incidence.columns]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in incidence data: {missing_columns}")
 
-    table.update(
-        table.merge(dhis2_incidence[columns_selection], how="left", on="ADM2_ID", suffixes=("_old", ""))[
-            columns_selection[1:]
-        ]
+    # merge
+    merged = table.merge(
+        dhis2_incidence[["ADM2_ID"] + matched_columns],
+        how="left",
+        on="ADM2_ID",
+        suffixes=("", "_new"),
     )
+
+    # Update each column if it is available in dhis2_incidence
+    for col in matched_columns:
+        table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
+        update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
+
     return table
 
 
@@ -267,12 +352,30 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
         current_run.log_warning(f"Error while loading MAP data: {e}")
         return table
 
+    col_mappings = {
+        "Pf_PR-rate": "PF_PR_RATE",
+        "Pf_mortality-rate": "PF_MORTALITY_RATE",
+        "Pf_incidence-rate": "PF_INCIDENCE_RATE",
+        "ITN_access-rate": "ITN_ACCESS_RATE",
+        "ITN_use_rate-rate": "ITN_USE_RATE_RATE",
+        "IRS_coverage-rate": "IRS_COVERAGE_RATE",
+        "Antimalarial_EFT-rate": "ANTIMALARIAL_EFT_RATE",
+    }
+    convertions = {
+        "PF_PR_RATE": 100,
+        "PF_MORTALITY_RATE": 100000,
+        "PF_INCIDENCE_RATE": 1000,
+        "ITN_ACCESS_RATE": 100,
+        "ITN_USE_RATE_RATE": 100,
+        "IRS_COVERAGE_RATE": 100,
+        "ANTIMALARIAL_EFT_RATE": 100,
+    }
     for metric in map_selection:
         try:
             indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric]
             latest_period = indicator_data["YEAR"].max()
 
-            update_metadata(variable=metric.upper(), attribute="PERIOD", value=str(latest_period))
+            update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))
 
             current_run.log_debug(f"Latest period for {metric.upper()}: {latest_period}")
 
@@ -281,13 +384,22 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
                 latest_period = str(latest_period)
             else:
                 latest_period = int(latest_period)
-            latest_df = pivot_df[[latest_period]].rename(columns={latest_period: metric.upper()})
+            latest_df = pivot_df[[latest_period]].rename(columns={latest_period: col_mappings[metric]})
             latest_df = latest_df.reset_index()
             merged = table.merge(latest_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
-            table.update(merged[[metric.upper()]])
+            table.update(merged[[col_mappings[metric]]])
         except Exception as e:
             current_run.log_warning(f"Error while updating MAP data for metric {metric}: {e}")
             continue
+
+    # convertions
+    for col in col_mappings.values():
+        if col in table.columns:
+            table[col] = pd.to_numeric(table[col], errors="coerce")
+            table[col] = table[col] * convertions[col]
+            table[col] = table[col].round(2)
+        else:
+            current_run.log_warning(f"The column {col} was not found in results while updating MAP data.")
 
     return table
 
@@ -352,6 +464,11 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
             suffixes=("_old", ""),
         )[columns_selection[1:]]
     )
+
+    table["SEASONALITY_PRECIPITATION"] = pd.to_numeric(table["SEASONALITY_PRECIPITATION"], errors="coerce")
+    table["SEASONALITY_PRECIPITATION"] = table["SEASONALITY_PRECIPITATION"].replace(
+        {0: "not-seasonal", 1: "seasonal"}
+    )
     current_run.log_info("Precipitation seasonality data loaded successfully.")
     return table
 
@@ -391,8 +508,484 @@ def add_cases_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
             suffixes=("_old", ""),
         )["SEASONALITY_CASES"]
     )
+
+    table["SEASONALITY_PRECIPITATION"] = pd.to_numeric(table["SEASONALITY_PRECIPITATION"], errors="coerce")
+    table["SEASONALITY_CASES"] = table["SEASONALITY_CASES"].replace({0: "not-seasonal", 1: "seasonal"})
     current_run.log_info("Cases seasonality data loaded successfully.")
     return table
+
+
+def add_dhs_indicators_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add various DHS indicators to the results table using the provided configuration.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which DHS indicators will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with DHS indicators added.
+    """
+    updated_table = add_careseeking_to(table, snt_config)
+    updated_table = add_dropout_dtp_to(updated_table, snt_config)
+    updated_table = add_proportion_dpt_to(updated_table, snt_config)
+    updated_table = add_under5_mortality_to(updated_table, snt_config)
+    updated_table = add_under5_prevalence_to(updated_table, snt_config)
+    updated_table = add_itn_access_sample_to(updated_table, snt_config)
+    updated_table = add_itn_use_to(updated_table, snt_config)
+    return updated_table  # noqa: RET504
+
+
+def add_careseeking_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add care seeking data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which care seeking data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with care seeking data added.
+    """
+    current_run.log_info("Loading DHS care seeking data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    try:
+        # NOTE : FIX this
+        # dhs_careseeking = get_file_from_dataset(
+        #     dataset_id=dataset_id,
+        #     filename=f"{country_code}_DHS_ADM1_CARESEEKING_SAMPLE_AVERAGE.parquet",
+        # )
+        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
+        dhs_careseeking_v = dhs_indicators_dataset.latest_version.get_file(
+            f"{country_code}_DHS_ADM1_CARESEEKING_SAMPLE_AVERAGE.parquet"
+        )
+        dhs_careseeking = pd.read_parquet(dhs_careseeking_v.download_url)
+        current_run.log_debug(f"Columns: {dhs_careseeking.columns}")
+    except Exception as e:
+        current_run.log_warning(f"Error while loading dhs careseeking data: {e}")
+        return table
+
+    columns_selection = [
+        "PUBLIC_CARE",
+        "PRIVATE_CARE",
+        "NO_CARE",
+    ]
+
+    matched_columns = [col for col in columns_selection if col in dhs_careseeking.columns]
+    current_run.log_debug(f"Found care seeking cols: {matched_columns}")
+    missing_columns = [col for col in columns_selection if col not in dhs_careseeking.columns]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in care seeking data: {missing_columns}")
+
+    merged = table.merge(
+        dhs_careseeking[["ADM1_ID"] + matched_columns],  # NOTE: only ADM1_ID level
+        how="left",
+        on="ADM1_ID",
+        suffixes=("", "_new"),
+    )
+
+    # Update each column if it is available in dhs_careseeking
+    for col in matched_columns:
+        table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
+        # NOTE: Theres no period available in the file (!)
+        # update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
+
+    return table
+
+
+def add_dropout_dtp_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add dropout DTP data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which dropout DTP data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with dropout DTP data added.
+    """
+    current_run.log_info("Loading DHS dropout dtp data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    try:
+        # NOTE : FIX this
+        # dhs_dropout = get_file_from_dataset(
+        #     dataset_id=dataset_id,
+        #     filename=f"{country_code}_DHS_ADM1_DROPOUT_DTP.parquet",
+        # )
+        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
+        dhs_ds_v = dhs_indicators_dataset.latest_version.get_file(
+            f"{country_code}_DHS_ADM1_DROPOUT_DTP.parquet"
+        )
+        dhs_dropout = pd.read_parquet(dhs_ds_v.download_url)
+        current_run.log_debug(f"Columns: {dhs_dropout.columns}")
+    except Exception as e:
+        current_run.log_warning(f"Error while loading dropout Ddtp data: {e}")
+        return table
+
+    columns_selection = [
+        "DROPOUT_DTP_1_2",
+        "DROPOUT_DTP_1_3",
+        "DROPOUT_DTP_2_3",
+    ]
+    matched_columns = [col for col in columns_selection if col in dhs_dropout.columns]
+    current_run.log_debug(f"Found care seeking cols: {matched_columns}")
+    missing_columns = [col for col in columns_selection if col not in dhs_dropout.columns]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in care seeking data: {missing_columns}")
+    merged = table.merge(
+        dhs_dropout[["ADM1_ID"] + matched_columns],  # NOTE: only ADM1_ID level
+        how="left",
+        on="ADM1_ID",
+        suffixes=("", "_new"),
+    )
+
+    # Update each column if it is available in dhs_dropout
+    for col in matched_columns:
+        table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
+        # NOTE: Theres no period available in the file (!)
+        # update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
+
+    return table
+
+
+def add_proportion_dpt_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add proportion DTP indicators from DHS to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which proportion DTP indicators will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with proportion DTP indicators added.
+    """
+    updated_table = add_proportion_dtp_1_to(table, snt_config)
+    updated_table = add_proportion_dtp_2_to(updated_table, snt_config)
+    updated_table = add_proportion_dtp_3_to(updated_table, snt_config)
+    return updated_table  # noqa: RET504
+
+
+def add_proportion_dtp_1_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add proportion DTP1 data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which proportion DTP1 data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with proportion DTP1 data added.
+    """
+    current_run.log_info("Loading DHS proportion dtp 1 data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    return update_table_with(
+        table_df=table,
+        dataset_id=dataset_id,
+        filename=f"{country_code}_DHS_ADM1_PROP_DTP1.parquet",
+        column_id="ADM1_ID",
+        column_data="PROP_DTP1_SAMPLE_AVERAGE",
+        msg_text="proportion dtp 1",
+    )
+
+
+def add_proportion_dtp_2_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add proportion DTP2 data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which proportion DTP2 data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with proportion DTP2 data added.
+    """
+    current_run.log_info("Loading DHS proportion dtp 2 data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    return update_table_with(
+        table_df=table,
+        dataset_id=dataset_id,
+        filename=f"{country_code}_DHS_ADM1_PROP_DTP2.parquet",
+        column_id="ADM1_ID",
+        column_data="PROP_DTP2_SAMPLE_AVERAGE",
+        msg_text="proportion dtp 2",
+    )
+
+
+def add_proportion_dtp_3_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add proportion DTP3 data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which proportion DTP3 data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with proportion DTP3 data added.
+    """
+    current_run.log_info("Loading DHS proportion dtp 3 data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    return update_table_with(
+        table_df=table,
+        dataset_id=dataset_id,
+        filename=f"{country_code}_DHS_ADM1_PROP_DTP3.parquet",
+        column_id="ADM1_ID",
+        column_data="PROP_DTP3_SAMPLE_AVERAGE",
+        msg_text="proportion dtp 3",
+    )
+
+
+def add_under5_mortality_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add under 5 mortality data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which under 5 mortality data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with under 5 mortality data added.
+    """
+    current_run.log_info("Loading DHS under 5 mortality data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    try:
+        # NOTE : FIX this
+        # dhs_u5_mortality = get_file_from_dataset(
+        #     dataset_id=dataset_id,
+        #     filename=f"{country_code}_DHS_ADM1_U5MR_PERMIL.parquet",
+        # )
+        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
+        dhs_u5_mortality_v = dhs_indicators_dataset.latest_version.get_file(
+            f"{country_code}_DHS_ADM1_U5MR_PERMIL.parquet"
+        )
+        dhs_u5_mortality = pd.read_parquet(dhs_u5_mortality_v.download_url)
+        current_run.log_debug(f"Columns: {dhs_u5_mortality.columns}")
+    except Exception as e:
+        current_run.log_warning(f"Error while loading DHS under 5 mortality data: {e}")
+        return table
+
+    dhs_u5_mortality.columns = [col.upper() for col in dhs_u5_mortality.columns]
+    missing_columns = [
+        col for col in ["ADM1_ID", "U5MR_PERMIL_SAMPLE_AVERAGE"] if col not in dhs_u5_mortality.columns
+    ]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in DHS under 5 mortality file: {missing_columns}")
+        return table
+
+    merged = table.merge(
+        dhs_u5_mortality[["ADM1_ID", "U5MR_PERMIL_SAMPLE_AVERAGE"]],
+        how="left",
+        on="ADM1_ID",
+        suffixes=("", ""),
+    )
+    # table["U5MR"] = merged["U5MR_PERMIL_SAMPLE_AVERAGE"]
+    table["U5MR"] = pd.to_numeric(merged["U5MR_PERMIL_SAMPLE_AVERAGE"], errors="coerce").round(2)
+    current_run.log_info("DHS under 5 mortality column U5MR updated.")
+
+    return table
+
+
+def add_under5_prevalence_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add under 5 prevalence data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which under 5 prevalence data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with under 5 prevalence data added.
+    """
+    current_run.log_info("Loading DHS under 5 prevalence data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    try:
+        # NOTE : FIX this
+        # dhs_u5_prevalence = get_file_from_dataset(
+        #     dataset_id=dataset_id,
+        #     filename=f"{country_code}_DHS_ADM1_U5_PREV_RDT.parquet",
+        # )
+        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
+        dhs_u5_prev_v = dhs_indicators_dataset.latest_version.get_file(
+            f"{country_code}_DHS_ADM1_U5_PREV_RDT.parquet"
+        )
+        dhs_u5_prevalence = pd.read_parquet(dhs_u5_prev_v.download_url)
+        current_run.log_debug(f"Columns: {dhs_u5_prevalence.columns}")
+    except Exception as e:
+        current_run.log_warning(f"Error while loading DHS under 5 prevalence data: {e}")
+        return table
+
+    dhs_u5_prevalence.columns = [col.upper() for col in dhs_u5_prevalence.columns]
+    missing_columns = [
+        col for col in ["ADM1_ID", "U5_PREV_RDT_SAMPLE_AVERAGE"] if col not in dhs_u5_prevalence.columns
+    ]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in DHS under 5 prevalence file: {missing_columns}")
+        return table
+
+    merged = table.merge(
+        dhs_u5_prevalence[["ADM1_ID", "U5_PREV_RDT_SAMPLE_AVERAGE"]],
+        how="left",
+        on="ADM1_ID",
+        suffixes=("", ""),
+    )
+    # table["U5_PREVALENCE"] = merged["U5_PREV_RDT_SAMPLE_AVERAGE"]
+    table["U5_PREVALENCE"] = pd.to_numeric(merged["U5_PREV_RDT_SAMPLE_AVERAGE"], errors="coerce").round(2)
+    current_run.log_info("DHS under 5 prevalence column U5_PREVALENCE updated.")
+
+    return table
+
+
+def add_itn_access_sample_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add ITN access data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which ITN access data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with ITN access data added.
+    """
+    current_run.log_info("Loading DHS ITN access data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    return update_table_with(
+        table_df=table,
+        dataset_id=dataset_id,
+        filename=f"{country_code}_DHS_ADM1_ITN_ACCESS.parquet",
+        column_id="ADM1_ID",
+        column_data="ITN_ACCESS_SAMPLE_AVERAGE",
+        msg_text="ITN access",
+    )
+
+
+def add_itn_use_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add ITN use data from DHS indicators to the results table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which ITN use data will be added.
+    snt_config : dict
+        The SNT configuration dictionary.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with ITN use data added.
+    """
+    current_run.log_info("Loading DHS ITN use data")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    return update_table_with(
+        table_df=table,
+        dataset_id=dataset_id,
+        filename=f"{country_code}_DHS_ADM1_ITN_USE.parquet",
+        column_id="ADM1_ID",
+        column_data="ITN_USE_SAMPLE_AVERAGE",
+        msg_text="ITN use",
+    )
+
+
+def update_table_with(
+    table_df: pd.DataFrame,
+    dataset_id: str,
+    filename: str,
+    column_id: str,
+    column_data: str,
+    msg_text: str = "population",
+) -> pd.DataFrame:
+    """Update the given table DataFrame by merging it with a dataset file on a specified column.
+
+    Parameters
+    ----------
+    table_df : pd.DataFrame
+        The DataFrame to update.
+    dataset_id : str
+        The dataset identifier to fetch the file from.
+    filename : str
+        The filename to load from the dataset.
+    column_id : str
+        The column name to join on.
+    column_data : str
+        The column name containing the data to update.
+    msg_text : str, optional
+        Message text for logging purposes (default is "population").
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame after merging and updating the specified column.
+    """
+    try:
+        dataset_file = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=filename,
+        )
+    except Exception as e:
+        current_run.log_warning(f"Error while loading {msg_text} data: {e}")
+        return table_df
+
+    dataset_file.columns = [col.upper() for col in dataset_file.columns]
+    missing_columns = [col for col in [column_id, column_data] if col not in dataset_file.columns]
+    if missing_columns:
+        current_run.log_warning(f"Missing columns in {msg_text} file: {missing_columns}")
+        return table_df
+
+    merged = table_df.merge(
+        dataset_file[[column_id, column_data]], how="left", on=column_id, suffixes=("", "_new")
+    )
+    # table_df[column_data] = merged[f"{column_data}_new"] ## if round:
+    table_df[column_data] = pd.to_numeric(merged[f"{column_data}_new"], errors="coerce").round(2)
+    current_run.log_info(f"{msg_text} column {column_data} updated.")
+
+    return table_df
 
 
 def build_results_table(snt_config: dict) -> pd.DataFrame:
@@ -403,30 +996,17 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     pd.DataFrame
         An empty DataFrame with the specified columns for SNT results.
     """
-    # NOTE: Should we consider taking the column names from the metadata file?
+    # Read the json metadata
+    # NOTE: Hardcoded path
+    metadata_json = read_json(
+        Path(workspace.files_path) / "pipelines" / "snt_assemble_results" / "data" / "SNT_metadata.json"
+    )
     column_names = [
-        "ADM1",
+        "ADM1_NAME",
         "ADM1_ID",
-        "ADM2",
+        "ADM2_NAME",
         "ADM2_ID",
-        "POPULATION",
-        "INCIDENCE_CRUDE",
-        "INCIDENCE_ADJ_TESTING",
-        "INCIDENCE_ADJ_REPORTING",
-        "INCIDENCE_ADJ_CARESEEKING",
-        "PF_PR_RATE",
-        "PF_MORTALITY_RATE",
-        "PF_INCIDENCE_RATE",
-        "PV_INCIDENCE_RATE",
-        "PV_PR_RATE",
-        "ITN_ACCESS_RATE",
-        "ITN_USE_RATE_RATE",
-        "IRS_COVERAGE_RATE",
-        "ANTIMALARIAL_EFT_RATE",
-        "SEASONALITY_PRECIPITATION",
-        "SEASONAL_BLOCK_DURATION_PRECIPITATION",
-        "SEASONALITY_CASES",
-    ]
+    ] + list(metadata_json.keys())
 
     # Load names from pyramid
     current_run.log_debug("Loading DHIS2 pyramid")
@@ -443,11 +1023,36 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     admin2_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2").upper()
     admin1_id = admin1_name.replace("_NAME", "_ID")
     admin2_id = admin2_name.replace("_NAME", "_ID")
-    results_table[["ADM1", "ADM1_ID", "ADM2", "ADM2_ID"]] = (
+    results_table[["ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID"]] = (
         dhis2_pyramid[[admin1_name, admin1_id, admin2_name, admin2_id]].drop_duplicates().to_numpy()
     )
 
     return results_table
+
+
+def read_json(json_path: Path) -> json:
+    """Read and return the contents of a JSON file.
+
+    Parameters
+    ----------
+    json_path : Path
+        The path to the JSON file.
+
+    Returns
+    -------
+    dict
+        The contents of the JSON file as a dictionary.
+
+    Raises
+    ------
+    Exception
+        If there is an error reading the metadata file.
+    """
+    try:
+        with Path.open(json_path, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        raise Exception(f"Error reading the metadata file {e}") from e
 
 
 def update_metadata(variable: str, attribute: str, value: Any, filename: str = "SNT_metadata.json") -> None:  # noqa: ANN401
@@ -469,15 +1074,9 @@ def update_metadata(variable: str, attribute: str, value: Any, filename: str = "
     KeyError
         If the variable or attribute does not exist in the metadata JSON.
     """
-    # NOTE: hardcoded SNT paths
-    root_path = Path(workspace.files_path)
-    metadata_path = root_path / "pipelines" / "snt_assemble_results" / "data" / filename
-
-    try:
-        with Path.open(metadata_path, "r") as file:
-            metadata_json = json.load(file)
-    except Exception as e:
-        raise Exception(f"Error reading the metadata file {e}") from e
+    # NOTE: hardcoded SNT metadata path
+    metadata_path = Path(workspace.files_path) / "pipelines" / "snt_assemble_results" / "data" / filename
+    metadata_json = read_json(metadata_path)
 
     if variable in metadata_json:
         if attribute in metadata_json.get(variable):
@@ -510,16 +1109,10 @@ def build_metadata_table(output_path: Path, country_code: str, filename: str = "
     Exception
         If there is an error reading the metadata file.
     """
-    # NOTE: hardcoded SNT path
-    root_path = Path(workspace.files_path)
-    metadata_path = root_path / "pipelines" / "snt_assemble_results" / "data" / filename
+    # NOTE: hardcoded SNT metadata path
+    metadata_path = Path(workspace.files_path) / "pipelines" / "snt_assemble_results" / "data" / filename
     output_path.mkdir(parents=True, exist_ok=True)
-
-    try:
-        with Path.open(metadata_path, "r") as file:
-            metadata_json = json.load(file)
-    except Exception as e:
-        raise Exception(f"Error reading the metadata file {e}") from e
+    metadata_json = read_json(metadata_path)
 
     # Convert to a pandas DataFrame
     metadata_table = pd.DataFrame.from_dict(metadata_json, orient="index")

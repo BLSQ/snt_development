@@ -284,7 +284,10 @@ def add_incidence_indicators_to(
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
     try:
-        f_name = f"{country_code}_incidence_year_routine-data-{incidence_data}_rr-method-{incidence_method}.parquet"
+        f_name = (
+            f"{country_code}_incidence_year_routine-data-"
+            f"{incidence_data}_rr-method-{incidence_method}.parquet"
+        )
         dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name)
         current_run.log_debug(f"Incidence file selection: {f_name}")
     except Exception as e:

@@ -15,30 +15,21 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_assemble_results")
 @parameter(
-    "reporting_method",
-    name="Reporting method",
-    type=str,
-    multiple=False,
-    choices=["any", "conf", "dhis2"],
-    default="any",
-    required=True,
-)
-@parameter(
     "incidence_data",
-    name="Incidence data selection",
+    name="Incidence data (based on raw, cleaned, or imputed routine data)",
     type=str,
     multiple=False,
-    choices=["raw", "imputed"],
+    choices=["raw", "raw_without_outliers", "imputed"],
     default="raw",
     required=True,
 )
 @parameter(
     "incidence_method",
-    name="Incidence method",
+    name="Incidence calculated using the following reporting method",
     type=str,
     multiple=False,
     choices=["dhis2", "any", "conf"],
-    default="any",
+    default="dhis2",
     required=True,
 )
 @parameter(
@@ -66,9 +57,7 @@ from snt_lib.snt_pipeline_utils import (
     ],
     required=True,
 )
-def snt_assemble_results(
-    reporting_method: str, incidence_data: str, incidence_method: str, map_selection: list[str]
-):
+def snt_assemble_results(incidence_data: str, incidence_method: str, map_selection: list[str]):
     """Assemble SNT results by loading configuration, validating it, and preparing paths for processing.
 
     Raises
@@ -98,7 +87,7 @@ def snt_assemble_results(
         assemble_snt_results(
             snt_config=snt_config,
             output_path=results_path,
-            reporting_method=reporting_method,
+            reporting_method=incidence_method,
             incidence_data=incidence_data,
             incidence_method=incidence_method,
             map_selection=map_selection,
@@ -292,6 +281,9 @@ def add_incidence_indicators_to(
         current_run.log_debug(f"Incidence file selection: {f_name}")
     except Exception as e:
         current_run.log_warning(f"Error while loading incidence data: {e}")
+        current_run.log_warning(
+            f"Please make sure the incidence file {f_name} exists or re-run the pipeline."
+        )
         return table
 
     columns_selection = [

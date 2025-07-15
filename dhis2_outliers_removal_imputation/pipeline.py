@@ -2,12 +2,20 @@ from datetime import datetime
 from pathlib import Path
 
 # Import the specific run_notebook function from snt_pipeline_utils.py
-from snt_lib.snt_pipeline_utils import run_notebook  
+from snt_lib.snt_pipeline_utils import (
+    run_notebook,
+    run_report_notebook,
+    generate_html_report,
+    validate_config,
+    load_configuration_snt,
+    add_files_to_dataset
+)  
 
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 
 
-@pipeline("DHIS2 Outliers Removal and Imputation") 
+@pipeline(name="A.5 DHIS2 Outliers Removal and Imputation",
+          code="snt-dhis2-outliers-removal-imputation") 
 @parameter(
     "outlier_method", 
     name="Method used for outlier detection",
@@ -16,88 +24,76 @@ from openhexa.sdk import current_run, pipeline, workspace, parameter
     type=str,
     required=True
 )
-
-def run_pipeline_task(outlier_method: str): # Renamed the pipeline function to avoid confusion with the utility function
-    """
-    Runs a notebook with specified parameters using the snt_pipeline_utils.run_notebook function.
-    """
-    
+@parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
+def run_pipeline_task(outlier_method: str,
+                      run_report_only: bool):  
+    """Orchestration function. Calls other functions within the pipeline."""
     try:
-        # Format: workspace_files/pipelines/[pipeline_name]/code/[notebook_name].ipynb
-        notebook_name = "01_outliers_removal_imputation" 
+        current_run.log_info("Starting SNT DHIS2 Outliers Removal and Imputation Pipeline...")
+
+        # Define paths and notebook names
+        notebook_name = "SNT_dhis2_outliers_removal_imputation" 
+        report_notebook_name = "SNT_dhis2_outliers_removal_imputation_report"
         pipeline_folder_name = "dhis2_outliers_removal_imputation" 
-        input_notebook_path = Path(workspace.files_path) / "pipelines" / pipeline_folder_name / "code" / f"{notebook_name}.ipynb"
+        root_path = Path(workspace.files_path)
+        pipeline_path = root_path / "pipelines" / pipeline_folder_name
+        data_path = root_path / "data" / "dhis2_outliers_removal_imputation"
         
-        # The run_notebook function handles the full output path creation including timestamp
-        papermill_outputs_dir = Path(workspace.files_path) / "pipelines" / pipeline_folder_name / "papermill_outputs"
-        
-        notebook_parameters = {
-            "OUTLIER_METHOD": outlier_method,         
-            "ROOT_PATH": str(Path(workspace.files_path)), 
-        }
-        
-        current_run.log_info(f"⚙️ Running notebook: {input_notebook_path}")
-        # Call the utility function!
-        run_notebook(
-            nb_path=input_notebook_path,
-            out_nb_path=papermill_outputs_dir,
-            parameters=notebook_parameters,
-            kernel_name="ir" # Still using the R kernel
+        # Load configuration
+        config_path = root_path / "configuration" / "SNT_config.json"
+        snt_config = load_configuration_snt(config_path=config_path)
+        validate_config(snt_config)
+        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+        # current_run.log_info(f"📄 SNT configuration loaded from : {config_path}")
+
+        if not run_report_only:
+            input_notebook_path = pipeline_path / "code" / f"{notebook_name}.ipynb"  
+            papermill_outputs_dir = pipeline_path / "papermill_outputs"  
+            # current_run.log_info(f"⚙️ Running notebook : {input_notebook_path}")
+
+            # Run the notebook  
+            run_notebook(
+                nb_path=input_notebook_path,
+                out_nb_path=papermill_outputs_dir,
+                kernel_name="ir",
+                parameters={
+                "OUTLIER_METHOD": outlier_method, 
+                "ROOT_PATH": str(Path(workspace.files_path)), 
+                }
+            )
+            # Add files to Dataset
+            add_files_to_dataset(
+                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_REMOVAL_IMPUTATION"],
+                country_code=country_code,
+                file_paths=[
+                    *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.parquet"))],
+                    *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.csv"))]
+                ],
+            )
+            
+        else:
+            current_run.log_info(
+                "🦘 Skipping outliers removal and imputation calculations, running only the reporting notebook."
+            )
+
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / f"{report_notebook_name}.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
         )
         
-        current_run.log_info(f"✅ Success! Notebook executed and output saved to: {papermill_outputs_dir}")
-        
+        current_run.log_info("Pipeline finished!")
+
     except Exception as e:
         current_run.log_error(f"❌ Notebook execution failed: {str(e)}")
         raise
 
+
 if __name__ == "__main__":
-    run_pipeline_task() 
-
-# # OLD =========================================
-# def run_notebook(outlier_method: str):
-#     """
-#     Runs a notebook with specified parameters.
-    
-#     HOW TO CUSTOMIZE:
-#     1. Change pipeline name above
-#     2. Add/remove parameters above
-#     3. Set notebook location below
-#     4. Configure parameters passed to notebook
-#     """
-    
-#     try:
-#         # Format: workspace_files/pipelines/[pipeline_name]/code/[notebook_name].ipynb
-#         notebook_name = "01_outliers_removal_imputation"  # <<< CHANGE THIS to your notebook's name
-#         pipeline_folder_name = "dhis2_outliers_removal_imputation" # <<< CHANGE THIS to your pipeline's FOLDER name
-#         input_notebook_path = Path(workspace.files_path) / "pipelines" / pipeline_folder_name / "code" / f"{notebook_name}.ipynb"
-        
-#         papermill_outputs_dir = Path(workspace.files_path) / "pipelines" / pipeline_folder_name / "papermill_outputs"
-#         papermill_outputs_dir.mkdir(parents=True, exist_ok=True)
-        
-#         # Create a descriptive output filename with timestamp
-#         executed_notebook_path = papermill_outputs_dir / f"EXECUTED_{notebook_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ipynb"
-        
-#         notebook_parameters = {
-#             "OUTLIER_METHOD": outlier_method,      
-#             "ROOT_PATH": str(Path(workspace.files_path)),  # Standard workspace path
-#         }
-        
-#         # Execute the notebook (usually no changes needed here)
-#         current_run.log_info(f"⚙️ Running notebook: {input_notebook_path}")
-#         pm.execute_notebook(
-#             input_path=str(input_notebook_path),
-#             output_path=str(executed_notebook_path),
-#             parameters=notebook_parameters,
-#             kernel_name="ir",  
-#             request_save_on_cell_execute=False
-#         )
-        
-#         current_run.log_info(f"✅ Success! Executed notebook saved to: {executed_notebook_path}")
-        
-#     except Exception as e:
-#         current_run.log_error(f"❌ Notebook execution failed: {str(e)}")
-#         raise
-
-# if __name__ == "__main__":
-#     run_notebook()
+    run_pipeline_task()

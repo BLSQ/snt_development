@@ -236,15 +236,13 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_metho
     latest_period = dhis2_reporting["YEAR"].max()
     update_metadata(variable="REPORTING_RATE", attribute="PERIOD", value=str(latest_period))
 
-    table.update(
-        table.merge(
-            dhis2_reporting[dhis2_reporting["YEAR"] == latest_period][["ADM2_ID", "REPORTING_RATE"]],
-            how="left",
-            on="ADM2_ID",
-            suffixes=("_old", ""),
-        )["REPORTING_RATE"]
-    )
-    return table
+    # Average of reporting dates per ADM2_ID across all months and years
+    dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].mean().reset_index()
+    dhis2_reporting_agg = dhis2_reporting_agg.rename(columns={"REPORTING_RATE": "AVG_REPORTING_RATE"})
+
+    table_updated = table.merge(dhis2_reporting_agg, on="ADM2_ID", how="left")
+    table_updated["REPORTING_RATE"] = table_updated["AVG_REPORTING_RATE"].round(2)
+    return table_updated.drop(columns=["AVG_REPORTING_RATE"])
 
 
 def add_incidence_indicators_to(
@@ -555,15 +553,10 @@ def add_careseeking_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
         # NOTE : FIX this
-        # dhs_careseeking = get_file_from_dataset(
-        #     dataset_id=dataset_id,
-        #     filename=f"{country_code}_DHS_ADM1_CARESEEKING_SAMPLE_AVERAGE.parquet",
-        # )
-        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
-        dhs_careseeking_v = dhs_indicators_dataset.latest_version.get_file(
-            f"{country_code}_DHS_ADM1_CARESEEKING_SAMPLE_AVERAGE.parquet"
+        dhs_careseeking = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_DHS_ADM1_CARESEEKING_SAMPLE_AVERAGE.parquet",
         )
-        dhs_careseeking = pd.read_parquet(dhs_careseeking_v.download_url)
         current_run.log_debug(f"Columns: {dhs_careseeking.columns}")
     except Exception as e:
         current_run.log_warning(f"Error while loading dhs careseeking data: {e}")
@@ -617,15 +610,10 @@ def add_dropout_dtp_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
         # NOTE : FIX this
-        # dhs_dropout = get_file_from_dataset(
-        #     dataset_id=dataset_id,
-        #     filename=f"{country_code}_DHS_ADM1_DROPOUT_DTP.parquet",
-        # )
-        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
-        dhs_ds_v = dhs_indicators_dataset.latest_version.get_file(
-            f"{country_code}_DHS_ADM1_DROPOUT_DTP.parquet"
+        dhs_dropout = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_DHS_ADM1_DROPOUT_DTP.parquet",
         )
-        dhs_dropout = pd.read_parquet(dhs_ds_v.download_url)
         current_run.log_debug(f"Columns: {dhs_dropout.columns}")
     except Exception as e:
         current_run.log_warning(f"Error while loading dropout Ddtp data: {e}")
@@ -782,15 +770,10 @@ def add_under5_mortality_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
         # NOTE : FIX this
-        # dhs_u5_mortality = get_file_from_dataset(
-        #     dataset_id=dataset_id,
-        #     filename=f"{country_code}_DHS_ADM1_U5MR_PERMIL.parquet",
-        # )
-        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
-        dhs_u5_mortality_v = dhs_indicators_dataset.latest_version.get_file(
-            f"{country_code}_DHS_ADM1_U5MR_PERMIL.parquet"
+        dhs_u5_mortality = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_DHS_ADM1_U5MR_PERMIL.parquet",
         )
-        dhs_u5_mortality = pd.read_parquet(dhs_u5_mortality_v.download_url)
         current_run.log_debug(f"Columns: {dhs_u5_mortality.columns}")
     except Exception as e:
         current_run.log_warning(f"Error while loading DHS under 5 mortality data: {e}")
@@ -837,15 +820,10 @@ def add_under5_prevalence_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFr
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
         # NOTE : FIX this
-        # dhs_u5_prevalence = get_file_from_dataset(
-        #     dataset_id=dataset_id,
-        #     filename=f"{country_code}_DHS_ADM1_U5_PREV_RDT.parquet",
-        # )
-        dhs_indicators_dataset = workspace.get_dataset(dataset_id)
-        dhs_u5_prev_v = dhs_indicators_dataset.latest_version.get_file(
-            f"{country_code}_DHS_ADM1_U5_PREV_RDT.parquet"
+        dhs_u5_prevalence = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_DHS_ADM1_U5_PREV_RDT.parquet",
         )
-        dhs_u5_prevalence = pd.read_parquet(dhs_u5_prev_v.download_url)
         current_run.log_debug(f"Columns: {dhs_u5_prevalence.columns}")
     except Exception as e:
         current_run.log_warning(f"Error while loading DHS under 5 prevalence data: {e}")

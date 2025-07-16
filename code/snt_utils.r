@@ -3,7 +3,7 @@
 # Description: This script contains utility functions used for SNT computation workflow.
 # Author: Esteban Montandon
 # Created: [2024-10-01]
-# Last updated: [2025-06-20]
+# Last updated: [2025-07-16]
 # Dependencies: stringi, httr, arrow, tools, jsonlite
 # Notes:
 #   - [Optional: Any special considerations, references, or tips]
@@ -118,7 +118,7 @@ log_msg <- function(msg , level="info") {
 
 
 
-# iulia -------------------------------------------------------------------
+# SEASONALITY -------------------------------------------------------------------
                                                  
 #############
 convert_columns <- function(dt, col_type_map) {
@@ -366,8 +366,6 @@ fill_missing_cases_ts <- function(district_data, original_values_colname, estima
   return(district_data_filled)
 }
 
-
-
 #############
 compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_threshold = 0.6) {
   #' create forward-looking month blocks summing values based on the WHO month-block reasoning for seasonality computation - allows for different block sizes
@@ -380,7 +378,6 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
   #' @param montn_colname month grouping column
   #' @param proportion_threshold the proportion of indicator which needs to occur in a block, to qualify for seasonality
   #' @return an output data table with the additional column
-  
   
   indicator <- toupper(indicator)
   
@@ -584,4 +581,398 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
   
   print(duration_plot)
   return(duration_plot)
+}
+
+
+# DHS -------------------------------------------------------------
+
+######################################
+extract_latest_dhs_recode_filename <- function(data_folder_path, recode_name, file_type='SV'){
+  #' Get the file name of the most recent version of a specific DHS recode
+  #' @param data_folder_path the path to all of the DHS files (zips)
+  #' @param recode_name the name of the recode: 'KR', 'BR', 'IR', 'HR', 'IR', etc.
+  #' @param file_type the file type to be used (part of the name of the zip; generally extracting 'SV')
+  #' @returns the name of the target file
+  
+  # candidate_files <- dir(path = data_folder_path, pattern = glue("*{toupper(recode_name)}*"))
+  candidate_files <- list.files(
+    path = data_folder_path,
+    pattern = glue(".*{recode_name}.*{file_type}\\.zip$"),  # e.g. 'PR' followed by anything, then by "SV", ending with '.zip'
+    full.names = FALSE,
+    ignore.case = TRUE
+  )
+  all_versions <- sapply(candidate_files, (function(x) as.numeric(gsub("\\D", "", x))) )
+  latest_version <- max(all_versions)
+  chosen_file <- grep(as.character(latest_version), candidate_files, value=TRUE)
+  return(chosen_file)
+}
+
+###################################
+check_dhs_same_version <- function(dhs_filename_a, dhs_filename_b) {
+  #' check if two DHS filenames have the same version and issue numbers
+  #' @param dhs_filename_a
+  #' @param dhs_filename_b
+  #' @returns True if both the version and issue are the same
+  #' 
+  
+  a_number <- stri_extract_all_regex(dhs_filename_a, "\\d+")
+  b_number <- stri_extract_all_regex(dhs_filename_b, "\\d+")
+  
+  return(as.integer(a_number) == as.integer(b_number))
+}
+
+##################################
+check_perfect_match <- function(dt_a, merge_col_a, dt_b, merge_col_b){
+  #' check if two columns have exactly the same unique values
+  #' 
+  #' @param dt_a first data frame
+  #' @param merge_col_a column name (string) in dt_a to compare
+  #' @param dt_b second data frame
+  #' @param merge_col_b column name (string) in dt_b to compare
+  #' 
+  #' @return TRUE if both columns have the same unique values, FALSE otherwise
+  values_a <- dt_a[[merge_col_a]]
+  values_b <- dt_b[[merge_col_b]]
+  values_only_a <- setdiff(values_a, values_b)
+  values_only_b <- setdiff(values_b, values_a)
+  return(
+    ((length(values_only_a) == 0) & (length(values_only_b) == 0))
+    )
+}
+                                           
+#######################################
+delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
+  #' Delete files which don't have a given extension, from a given folder
+  #' @param folder_path the directory path
+  #' @param extension_to_retain the extension with which files will be keps
+  
+  pattern_to_keep <- paste0("*", extension_to_retain)
+  non_delete_files <- dir(path = folder_path, pattern = pattern_to_keep, ignore.case=TRUE)
+  delete_files <- setdiff(dir(path = folder_path), non_delete_files)
+  if (length(delete_files) == 0){
+    print("No files to delete.")
+  } else{
+    if(length(non_delete_files) == 0){
+      print("Deleting all files from folder.")
+    }
+    unlink(file.path(folder_path, delete_files), recursive=TRUE)
+  }
+}
+                                           
+############################################
+make_dhs_admin_df <- function(input_dhs_df, original_admin_column="V024", new_admin_name_colname='DHS_ADM1_NAME', new_admin_code_colname='DHS_ADM1_CODE'){
+  
+  #' make a data.table with admin names and admin id columns for DHS data, for easier matching with DHIS2 data
+  #' @param input_dhs_df the DHS data
+  #' @param original_admin_column the column which contains the named vector of codes + labels for the admin units
+  #' @param new_admin_name_column how to call the admin labels column
+  #' @param new_admin_code_column how to call the admin codes column (these will be used for merging later on)
+  #' @returns a data.table with only the codes and the names of the admin units, for subsequent merging with the DHS full data
+  admin_labels <- attr(input_dhs_df[[original_admin_column]], "labels")
+  admin_dt <- data.frame(
+    names = names(admin_labels),
+    ids = as.vector(admin_labels),
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+  setDT(admin_dt)
+  setnames(admin_dt, c("names", "ids"), c(new_admin_name_colname, new_admin_code_colname))
+  return(admin_dt)
+}
+
+make_dhs_adm1_u5mort_dt <- function(dhs_adm1_dt){
+  #' TODO see about adding column names as params (case-insensitive)
+  #' use chmort from DHS.rates library, to compute smaple avg, lower/upper 95% CI for under-five (u5) mortality
+  #' chmort results for under-five mortality (mortalité infanto-juvénile) tested against Burkina Faso 2021 DHS report
+  #' @param dhs_adm1_dt a data.table containing only one region (adm1 unit)
+  #' @returns a data.table with the DHS adm1 id, u5 mortality (sample average, lower CI, upper CI)
+  #' 
+  adm1_id <- as.integer(unique(dhs_adm1_dt[["V024"]]))
+  mort_dt <- as.data.table(
+    chmort(
+      dhs_adm1_dt,
+      JK = "Yes",
+      Strata = "V023",
+      Cluster = "V021",
+      Weight = "V005",
+      Date_of_interview = end_date_col,
+      Date_of_birth = "B3",
+      Age_at_death = "B7",
+      Period = 120
+    ),
+    keep.rownames = TRUE
+  )
+  
+  u5mort_dt <- mort_dt[
+    rn == "U5MR",
+    .SD,
+    .SDcols = c('R', 'LCI', 'UCI')
+  ]
+  u5mort_dt[, DHS_ADM1_CODE := adm1_id]
+  
+  # print(u5mort_dt)
+  return(u5mort_dt)
+}
+                                           
+# MISC -------------------------------------------
+                                           
+#########################################
+aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
+  #' aggregate the geometries of sf data, at a specified level, given by id and name columns
+  #' @param sf_data the input data
+  #' @param admin_id_colname the column name which contains the id's
+  #' @param admin_name_colname the column name which contains the names
+  #' @returns the aggregated sf data
+  by_list <- list(
+    sf_data[[admin_id_colname]],
+    sf_data[[admin_name_colname]]
+  )
+  names(by_list) <- c(admin_id_colname, admin_name_colname)
+  
+  result <- aggregate(sf_data["geometry"], by = by_list, FUN = sf::st_union)
+  return(result)
+}
+
+#############################################
+clean_admin_names <- function(input_vector, string_to_remove='province') {
+  #' Clean the admin names of certain countries' pyramids, by removing the string_to_remove if present (these are usually "Province" or "Zone de santé" or "District") and then removing the prefix (some countries hav)
+  #' @param input_vector the vector of admin names to clean
+  #' @param string_to_remove the substring to delete from the admin names, if a string indicating the admin unit type is present
+  #' @returns the cleaned vector
+  sapply(input_vector, function(input_string) {
+    parts <- strsplit(input_string, " ")[[1]]
+    parts <- parts[toupper(parts) != toupper(string_to_remove)]
+    if (length(parts) > 1) {
+      parts_without_prefix <- parts[-1]
+      output_string <- paste(parts_without_prefix, collapse = " ")
+    } else {
+      output_string <- ""  # if input has <=2 words
+    }
+    return(output_string)
+  }, USE.NAMES = FALSE)
+}
+        
+                                           
+# VACCINATION -----------------------------------------------------------------------
+
+###################################
+make_dose_plot <- function(plot_dt, plot_colname, title_name, scale_limits = c(0, 1)) {
+  #' make, show and save vaccine coverage map (coropleth of vaccine coverage proportions
+  #' prints the plot, saves it to a file, and returns the plot object
+  #'
+  #' @param plot_dt spatial df with attribute data
+  #' @param plot_colname string with the name of the column that contains the coverage values
+  #' @param title_name name for the title
+  #' @param scale_limits vector for range of scale values
+  #' @return ggplot object of the map
+  
+  plot_obj <- ggplot(plot_dt) +
+    geom_sf(aes(fill = get(plot_colname))) +
+    coord_sf() +
+    scale_fill_gradient(
+      limits = scale_limits,
+      low = "white",
+      high = "navy",
+      na.value = "grey90"
+    ) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0.5),
+      legend.position = "bottom",
+      legend.key.width = unit(2, "cm"),
+      legend.text = element_text(size = 10)
+    ) +
+    labs(
+      title = title_name,
+      fill = "Proportion"
+    )
+  
+  print(plot_obj)
+  
+  return(plot_obj)
+}
+                                           
+####################################
+make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, title_name, x_title, y_title){
+  #' Make confidence interval plots for DHS data
+  ci_plot <- ggplot(data = df_to_plot)
+  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
+  ci_plot <- ci_plot + geom_errorbar(aes(
+    x=get(admin_colname),
+    ymin=get(ci_lower_colname),
+    ymax=get(ci_upper_colname)),
+    width = 0.4, color ="#091bb8", linewidth = 1.5
+  )
+  # # Uncomment below to add value labels
+  # # text for the lower bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_lower_colname),
+  #   label = round(get(ci_lower_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  # # text for the upper bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_upper_colname),
+  #   label = round(get(ci_upper_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  ci_plot <- ci_plot + labs(title = title_name)
+  ci_plot <- ci_plot + labs(x= x_title, y = y_title)
+  ci_plot <- ci_plot + theme_minimal()
+  ci_plot <- ci_plot + coord_flip()
+  print(ci_plot)
+  return(ci_plot)
+}
+
+#################################
+delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
+  #' Delete files which don't have a given extension, from a given folder
+  #' @param folder_path the directory path
+  #' @param extension_to_retain the extension with which files will be keps
+  
+  pattern_to_keep <- paste0("*", extension_to_retain)
+  non_delete_files <- dir(path = folder_path, pattern = pattern_to_keep, ignore.case=TRUE)
+  delete_files <- setdiff(dir(path = folder_path), non_delete_files)
+  if (length(delete_files) == 0){
+    print("No files to delete.")
+  } else{
+    if(length(non_delete_files) == 0){
+      print("Deleting all files from folder.")
+    }
+    unlink(file.path(folder_path, delete_files), recursive=TRUE)
+  }
+}
+
+##########################
+clean_admin_names <- function(input_vector, string_to_remove='province') {
+  #' Clean the admin names of certain countries' pyramids, by removing the string_to_remove if present (these are usually "Province" or "Zone de santé" or "District") and then removing the prefix (some countries hav)
+  #' @param input_vector the vector of admin names to clean
+  #' @param string_to_remove the substring to delete from the admin names, if a string indicating the admin unit type is present
+  #' @returns the cleaned vector
+  sapply(input_vector, function(input_string) {
+    parts <- strsplit(input_string, " ")[[1]]
+    parts <- parts[toupper(parts) != toupper(string_to_remove)]
+    if (length(parts) > 1) {
+      parts_without_prefix <- parts[-1]
+      output_string <- paste(parts_without_prefix, collapse = " ")
+    } else {
+      output_string <- ""  # if input has <=2 words
+    }
+    return(output_string)
+  }, USE.NAMES = FALSE)
+}
+
+#################################
+make_dhs_admin_df <- function(input_dhs_df, original_admin_column="V024", new_admin_name_colname='ADM1', new_admin_code_colname='DHS_ADM1_CODE'){
+  
+  #' make a data.table with admin names and admin id columns for DHS data, for easier matching with DHIS2 data
+  #' @param input_dhs_df the DHS data
+  #' @param original_admin_column the column which contains the named vector of codes + labels for the admin units
+  #' @param new_admin_name_column how to call the admin labels column
+  #' @param new_admin_code_column how to call the admin codes column (these will be used for merging later on)
+  #' @returns a data.table with only the codes and the names of the admin units, for subsequent merging with the DHS full data
+  admin_labels <- attr(input_dhs_df[[original_admin_column]], "labels")
+  admin_dt <- data.frame(
+    names = names(admin_labels),
+    ids = as.vector(admin_labels),
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+  setDT(admin_dt)
+  setnames(admin_dt, c("names", "ids"), c(new_admin_name_colname, new_admin_code_colname))
+  return(admin_dt)
+}
+
+####################
+filter_files_to_save <- function(
+    target_path,
+    vector_of_file_suffixes = c('wide', 'long'),
+    vector_of_extensions = c('.csv', '.parquet'),
+    must_contain_string = ""){
+    # build pattern to check
+    pattern <- paste0("(", paste0(vector_of_file_suffixes, collapse = "|"), ")",
+                      "(", paste0("\\", vector_of_extensions, collapse = "|"), ")$")
+
+    # list matching files
+    target_files <- list.files(path = target_path, pattern = pattern, full.names = TRUE)
+
+    # further filter by the string which must appear in the filename
+    target_files <- target_files[grepl(must_contain_string, basename(target_files))]
+
+    # check if there are any files which match the pattern
+    if (length(target_files) == 0) {
+        stop("No files found in directory: ", target_path, " matching the conditions.")
+    }
+
+    # print files which match the pattern
+    print("Files found:")
+    print(target_files)
+}
+                                        
+########################                                                 
+check_or_create_dataset <- function(
+    target_workspace, 
+    target_dataset_slug, 
+    target_dataset_name, 
+    target_dataset_description) {
+  
+  #' Check if a dataset with the given slug exists in the given workspace
+  #' If not, create it; if yes, retrieve it
+  #' @param target_workspace the workspace to search/create in
+  #' @param target_dataset_slug identifier of the dataset to create/search
+  #' @param target_dataset_name the name of the new dataset to create (if necessary)
+  #' @param target_dataset_description the description of the new dataset to create (if necessary)
+  #' @returns the new or existing dataset which matches the slug
+  #'
+  # fetch existing datasets
+  existing_datasets <- target_workspace$list_datasets()
+  
+  # check if the dataset already exists
+  output_dataset <- NULL
+  matching_datasets <- Filter(function(x) x$slug == target_dataset_slug, existing_datasets)
+  
+  if (length(matching_datasets) > 0) {
+    output_dataset <- matching_datasets[[1]]
+    message(paste("Dataset already exists:", output_dataset$slug))
+  } else {
+    # create a new dataset
+    output_dataset <- target_workspace$create_dataset(
+      name = target_dataset_name,
+      description = target_dataset_description
+    )
+    message(paste("Created new dataset:", output_dataset$slug))
+  }
+  
+  # check if the dataset has any versions
+  if (is.null(output_dataset$latest_version)) {
+    message("Dataset has no versions. Creating initial version 'v0'...")
+    initial_version <- output_dataset$create_version("v0")
+    message(paste("Created version:", initial_version$name))
+  } else {
+    message(paste("Dataset already has versions. Latest version:", output_dataset$latest_version$name))
+  }
+  
+  return(output_dataset)
+  
+}
+
+######################                             
+make_new_dataset_version <- function(target_dataset){
+    #' create a new version of a given dataset
+    #' increments the latest version number of the given dataset and create a new version
+    #' @param target_dataset the dataset to make the new version in; must already have an initial version
+    #' @returns a new dataset version object created with an incremented version number
+    
+    # get latest dataset version name
+    latest_version_name <- target_dataset$latest_version$name
+    latest_version_num <- as.numeric(gsub("v", "", latest_version_name))
+    
+    # create a new version, which increments the current version by 1
+    new_version <- target_dataset$create_version(paste0("v", latest_version_num + 1))
+
+    return(new_version)
 }

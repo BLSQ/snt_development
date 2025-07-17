@@ -974,12 +974,6 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     metadata_json = read_json(
         Path(workspace.files_path) / "pipelines" / "snt_assemble_results" / "data" / "SNT_metadata.json"
     )
-    column_names = [
-        "ADM1_NAME",
-        "ADM1_ID",
-        "ADM2_NAME",
-        "ADM2_ID",
-    ] + list(metadata_json.keys())
 
     # Load names from pyramid
     current_run.log_debug("Loading DHIS2 pyramid")
@@ -991,7 +985,22 @@ def build_results_table(snt_config: dict) -> pd.DataFrame:
     )
 
     # Complete table with administrative names/ids
+    column_names = [
+        "ADM1_NAME",
+        "ADM1_ID",
+        "ADM2_NAME",
+        "ADM2_ID",
+    ] + list(metadata_json.keys())
+    # TODO: define a schema for the results table using metadata_json file
+    # table_schema = {
+    #         "ADM1_NAME": pd.Series(dtype="string"),
+    #         "ADM1_ID": pd.Series(dtype="string"),
+    #         "ADM2_NAME": pd.Series(dtype="string"),
+    #         "ADM2_ID": pd.Series(dtype="string"),
+    #         **{key: pd.Series(dtype="float") for key in metadata_json.keys()}
+    #     }
     results_table = pd.DataFrame(columns=column_names)
+    # results_table = results_table.astype(table_schema)
     admin1_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_1").upper()
     admin2_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2").upper()
     admin1_id = admin1_name.replace("_NAME", "_ID")

@@ -14,6 +14,7 @@ from openhexa.toolbox.dhis2 import DHIS2
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     generate_html_report,
     get_new_dataset_version,
     load_configuration_snt,
@@ -55,7 +56,17 @@ from snt_lib.snt_pipeline_utils import (
     default=True,
     required=False,
 )
-def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, overwrite: bool) -> None:
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def snt_dhis2_extract(
+    dhis2_connection: DHIS2Connection, start: int, end: int, overwrite: bool, pull_scripts: bool
+) -> None:
     """Write your pipeline code here.
 
     Pipeline functions should only call tasks and should never perform IO operations or
@@ -72,8 +83,19 @@ def snt_dhis2_extract(dhis2_connection: DHIS2Connection, start: int, end: int, o
     pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
     dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "raw"
 
-    # Set up folders
-    snt_folders_setup(snt_root_path)
+    # Set up folders (not yet used)
+    # snt_folders_setup(snt_root_path)
+
+    # pull pipeline scripts if requested
+    # The input path list will be re-created in the local working directory structure.
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            script_paths=[
+                Path("pipelines") / "snt_dhis2_extract" / "reporting" / "SNT_dhis2_extract_report.ipynb",
+            ],
+            root_path=snt_root_path,
+        )
 
     try:
         # Load configuration
@@ -194,6 +216,7 @@ def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> D
         If an error occurs while connecting to the DHIS2 server.
     """
     try:
+        cache_folder.mkdir(parents=True, exist_ok=True)
         dhis2_client = DHIS2(dhis2_connection, cache_dir=cache_folder)  # set a default cache folder
         current_run.log_info(f"Connected to {dhis2_connection.url}")
     except Exception as e:

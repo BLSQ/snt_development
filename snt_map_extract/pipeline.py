@@ -12,6 +12,7 @@ from openhexa.sdk import (
     workspace,
 )
 from rasterstats import zonal_stats
+from owslib.wcs import WebCoverageService
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
@@ -36,7 +37,6 @@ def snt_map_extract(run_report_only: bool) -> None:
     pipeline_path.mkdir(parents=True, exist_ok=True)
 
     # NOTE: ZIP both names and code into a single named list (labels, indicator)
-
     try:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
@@ -62,24 +62,27 @@ def snt_map_extract(run_report_only: bool) -> None:
         shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
         current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
-        # legacy variable
-        metric_names = [
-            "Pf_PR-rate",
-            "Pf_mortality-rate",
-            "Pf_incidence-rate",
-            "ITN_access-rate",
-            "ITN_use_rate-rate",
-            "IRS_coverage-rate",
-            "Antimalarial_EFT-rate",
-        ]
-        mapping_coverage_indicators = filter_metric_dictionary_with(metric_names)
+        # MAP indicators
+        snt_indicators = {
+            "Malaria": {
+                "Pf_Parasite_Rate",
+                "Pf_Mortality_Rate",
+                "Pf_Incidence_Rate",
+            },
+            "Interventions": {
+                "Insecticide_Treated_Net_Access",
+                "Insecticide_Treated_Net_Use_Rate",
+                "IRS_Coverage",
+                "Antimalarial_Effective_Treatment",
+            },
+        }
 
         if not run_report_only:
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
             make_table(
-                mapping_coverage_indicators,
+                coverage_indicators=snt_indicators,
                 country_code=country_code,
                 shapes=shapes,  # type: ignore[reportArgumentType]
                 level=org_level,
@@ -111,59 +114,6 @@ def snt_map_extract(run_report_only: bool) -> None:
         raise e
 
 
-def filter_metric_dictionary_with(metric_names: list[str]) -> dict:
-    """Filter the metric dictionary to include only metrics specified in metric_names.
-
-    Parameters
-    ----------
-    metric_names : list[str]
-        List of metric names to filter for.
-
-    Returns
-    -------
-    dict
-        Filtered dictionary containing only the requested metrics.
-    """
-    filtered_dict = {}
-    metric_dictionary = {
-        "Malaria": {
-            "Malaria__202206_Global_Pf_Mortality_Count": "Pf_mortality-count",
-            "Malaria__202406_Global_Pf_Mortality_Count": "Pf_mortality-count",
-            "Malaria__202206_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
-            "Malaria__202406_Global_Pf_Mortality_Rate": "Pf_mortality-rate",
-            "Malaria__202206_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
-            "Malaria__202406_Global_Pf_Incidence_Rate": "Pf_incidence-rate",
-            "Malaria__202206_Global_Pf_Incidence_Count": "Pf_incidence-count",
-            "Malaria__202406_Global_Pf_Incidence_Count": "Pf_incidence-count",
-            "Malaria__202206_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
-            "Malaria__202406_Global_Pv_Incidence_Rate": "Pv_incidence-rate",
-            "Malaria__202206_Global_Pv_Incidence_Count": "Pv_incidence-count",
-            "Malaria__202406_Global_Pv_Incidence_Count": "Pv_incidence-count",
-            "Malaria__202206_Global_Pf_Parasite_Rate": "Pf_PR-rate",
-            "Malaria__202406_Global_Pf_Parasite_Rate": "Pf_PR-rate",
-            "Malaria__202206_Global_Pv_Parasite_Rate": "Pv_PR-rate",
-            "Malaria__202406_Global_Pv_Parasite_Rate": "Pv_PR-rate",
-        },
-        "Interventions": {
-            "Interventions__202106_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
-            "Interventions__202406_Global_Antimalarial_Effective_Treatment": "Antimalarial_EFT-rate",
-            "Interventions__202106_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
-            "Interventions__202406_Africa_Insecticide_Treated_Net_Use_Rate": "ITN_use-rate",
-            "Interventions__202106_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
-            "Interventions__202406_Africa_Insecticide_Treated_Net_Access": "ITN_access-rate",
-            "Interventions__202106_Africa_IRS_Coverage": "IRS_coverage-rate",
-            "Interventions__202106_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
-            "Interventions__202406_Africa_Insecticide_Treated_Net_Use": "ITN_use_rate-rate",
-        },
-    }
-
-    for category, metrics in metric_dictionary.items():
-        filtered_metrics = {k: v for k, v in metrics.items() if v in metric_names}
-        filtered_dict[category] = filtered_metrics
-
-    return filtered_dict
-
-
 def download_raster_data(
     output_path: Path,
     mapping_coverage_indicators: dict,
@@ -190,12 +140,12 @@ def download_raster_data(
     maxy : float
         Maximum latitude of the bounding box.
     geoserver_url : str, optional
-        The base URL of the GeoServer WCS service (default is "https://data.malariaatlas.org/geoserver/").
+        The base URL of the GeoServer WCS service (default: "https://data.malariaatlas.org/geoserver/").
     """
     # Example malaria raster layer (adjust this to match exact layer name)
     for category, layers in mapping_coverage_indicators.items():
         url = f"{geoserver_url}{category}/wcs"
-        for layer_name in layers:
+        for _, layer_name in layers.items():
             params = {
                 "service": "WCS",
                 "version": "2.0.1",
@@ -221,8 +171,42 @@ def download_raster_data(
                 current_run.log_info(f"Raster for {layer_name} already downloaded.")
 
 
+# Example malaria raster layer (adjust this to match exact layer name)
+def build_latest_map(category: str) -> dict:
+    """Retrieve the latest map coverage IDs for a given category from the malaria atlas WCS service.
+
+    Parameters
+    ----------
+    category : str
+        The category of the map layers (e.g., "Malaria" or "Interventions").
+
+    Returns
+    -------
+    dict
+        A dictionary mapping layer keys to a tuple of (coverage ID, date string).
+    """
+    url = f"https://data.malariaatlas.org/geoserver/{category}/wcs?service=WCS&request=GetCapabilities"
+    wcs = WebCoverageService(url, version="2.0.1")
+    latest_map = {}
+
+    for cov_id in wcs.contents:
+        parts = cov_id.split("__", 2)
+        prefix = parts[0]
+        date_str, suffix = parts[1].split("_", 1)
+        key = f"{prefix}__{suffix}".replace("Global_", "").replace("Africa_", "")
+        # if we already have one, check which date is newer
+        if key in latest_map:
+            _, existing_date = latest_map[key]
+            if date_str > existing_date:
+                latest_map[key] = (cov_id, date_str)
+        else:
+            latest_map[key] = (cov_id, date_str)
+
+    return latest_map
+
+
 def make_table(
-    mapping_coverage_indicators: dict,
+    coverage_indicators: dict,
     country_code: str,
     shapes: gpd.GeoDataFrame,
     level: int,
@@ -232,7 +216,7 @@ def make_table(
 
     Parameters
     ----------
-    mapping_coverage_indicators : dict
+    coverage_indicators : dict
         Dictionary mapping categories to indicator layer names.
     country_code : str
         The country code used for naming output files.
@@ -248,6 +232,8 @@ def make_table(
     pd.DataFrame
         DataFrame containing the processed zonal statistics.
     """
+    found_indicators = filter_available_indicators(coverage_indicators)
+
     invalid_shapes = shapes[shapes.geometry.isna()]
     if len(invalid_shapes) > 0:
         current_run.log_warning(
@@ -259,13 +245,13 @@ def make_table(
         rasters_path = output_path / "raster_files"
         rasters_path.mkdir(parents=True, exist_ok=True)
 
-        download_raster_data(rasters_path, mapping_coverage_indicators, minx, maxx, miny, maxy)
+        download_raster_data(rasters_path, found_indicators, minx, maxx, miny, maxy)
 
         # Step 1: Load Admin Polygons
         final_df = pd.DataFrame()
-        for category, layers in mapping_coverage_indicators.items():
+        for category, layers in found_indicators.items():
             current_run.log_info(f"Processing {category}...")
-            for layer_name in layers:
+            for indicator, layer_name in layers.items():
                 version = layer_name.split("__")[1]
                 zstats = zonal_stats(
                     shapes,
@@ -279,7 +265,7 @@ def make_table(
 
                 # Step 4: Reshape to Output Format
                 result_gdf["metric_category"] = category
-                result_gdf["metric_name"] = mapping_coverage_indicators[category][layer_name]
+                result_gdf["metric_name"] = indicator
                 metric_columns = ["mean"]
                 ref_columns = {col for col in result_gdf.columns if col not in metric_columns}
 
@@ -303,13 +289,8 @@ def make_table(
         formatted_path.mkdir(parents=True, exist_ok=True)
 
         # SNT format
-        final_df.columns = [
-            re.sub(r"(^_+|_+$)", "", re.sub(r"[\s\-]+", "_", col.strip().upper())) for col in final_df.columns
-        ]
-        final_df["METRIC_NAME"] = (
-            final_df["METRIC_NAME"].str.strip()
-            # final_df["METRIC_NAME"].str.strip().str.replace("-", "_").str.replace(r"\s+", "_", regex=True)
-        )
+        final_df.columns = [col.strip().upper() for col in final_df.columns]
+        final_df["METRIC_NAME"] = final_df["METRIC_NAME"].str.strip()
 
         # Save file
         final_df.to_parquet(formatted_path / f"{country_code}_map_data.parquet", index=False)
@@ -317,6 +298,38 @@ def make_table(
         current_run.log_info(f"Output file saved under : {formatted_path / f'{country_code}_map_data.csv'}")
 
     return final_df
+
+
+def filter_available_indicators(indicators: dict) -> dict:
+    """Filter and retrieve available indicator coverage IDs for specified categories.
+
+    Parameters
+    ----------
+    indicators : dict
+        Dictionary mapping categories to lists of indicator names.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping categories to available indicator coverage IDs.
+    """
+    filtered_indicators = {}
+    available_indicators = {}
+    for category in indicators:
+        available_indicators[category] = build_latest_map(category)
+
+    for category, keys in indicators.items():
+        result = {}
+        for key in keys:
+            full_key = f"{category}__{key}"
+            if full_key in available_indicators[category]:
+                result[key] = available_indicators[category][full_key][0]
+            else:
+                current_run.log_warning(
+                    f"Coverage indicator {full_key} not found in available indicators for {category}."
+                )
+        filtered_indicators[category] = result
+    return filtered_indicators
 
 
 if __name__ == "__main__":

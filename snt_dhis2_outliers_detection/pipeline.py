@@ -102,8 +102,8 @@ def run_pipeline_task(deviation_mean: int,
                     "DEVIATION_MEAN": deviation_mean,
                     "DEVIATION_MEDIAN": deviation_median,
                     "DEVIATION_IQR": deviation_iqr,
-                    "RUN_MG_PARTIAL": run_mg_partial,
-                    "RUN_MG_COMPLETE": run_mg_complete
+                    "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
+                    "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete
                 }
             )
             # Add files to Dataset

@@ -14,14 +14,14 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
 
 
 @pipeline("snt_dhis2_incidence")
-# @parameter(
-#     "careseeking_filename",
-#     name="File path to Care Seeking Data File data/*",
-#     help="Include path after data/ folder, e.g. 'dummy_data/careseeking_data.csv'.",
-#     type=str,
-#     default=None,
-#     required=False,
-# )
+@parameter(
+    "n1_method",
+    name="Method for N1 calculations",
+    help="Calculate N1 using `PRES` or `SUSP-TEST`?",
+    choices=["PRES", "SUSP-TEST"],
+    type=str,
+    required=True,
+)
 @parameter(
     "routine_data_choice",
     name="Routine data to use",
@@ -63,7 +63,8 @@ from openhexa.sdk.datasets.dataset import DatasetVersion
     required=False,
 )
 
-def snt_dhis2_incidence(routine_data_choice: str, 
+def snt_dhis2_incidence(n1_method: str, 
+                        routine_data_choice: str,
                         outlier_detection_method: str, 
                         reporting_rate_method: str,
                         use_csb_data: bool, 
@@ -105,7 +106,7 @@ def snt_dhis2_incidence(routine_data_choice: str,
                 nb_path=input_notebook_path,
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
-                    # "CARESEEKING_DATA_FILENAME": careseeking_full_path,
+                    "N1_METHOD": n1_method,
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,

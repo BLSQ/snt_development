@@ -250,14 +250,19 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         # retrieve the pyramid data
         dhis2_pyramid = get_organisation_units(dhis2_client)
 
-        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
-        adm1 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_1", None)
-        adm2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
+        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", "")        
+        country_code = country_code.upper().strip() # not None     
+        current_run.log_debug(f"Country code found: {country_code}")
 
         # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
-        if country_code == "BFA" and ("level_4" in adm1 or "level_4" in adm2):
-            current_run.log_info("District level (4) filtering for Burkina Faso pyramid")
+        if country_code == "BFA": 
+            current_run.log_info("Filtering district names at level 4 for Burkina Faso pyramid.")
             dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_4_name").str.starts_with("DS"))
+        
+        # NOTE: Filtering for Niger due to mixed levels in the pyramid (district: "DS")
+        if country_code == "NER":
+            current_run.log_info("Filtering district names at level 3 for Niger pyramid.")
+            dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_3_name").str.starts_with("DS"))
 
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
     except Exception as e:

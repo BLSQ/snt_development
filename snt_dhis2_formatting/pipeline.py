@@ -87,6 +87,7 @@ def snt_dhis2_formatting(run_report_only: bool):
             nb_file=snt_pipeline_path / "reporting" / "SNT_dhis2_indicators_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
+            error_label_severity_map={"[DATA NOT FOUND]": "warning"},
             ready=files_ready,
         )
 

@@ -1,0 +1,58 @@
+{
+	"SNT_CONFIG": {
+		"COUNTRY_CODE": "NER",
+		"COUNTRY_NAME": "NIGER",
+		"NA_TREATMENT": "SET_0_TO_NA",
+		"DHIS2_ADMINISTRATION_1": "level_2_name",
+		"DHIS2_ADMINISTRATION_2": "level_3_name",
+		"ANALYTICS_ORG_UNITS_LEVEL" : 6,
+		"POPULATION_ORG_UNITS_LEVEL" : 3,
+		"REPORTING_RATE_PRODUCT_UID" : []
+	},
+	"SNT_DATASET_IDENTIFIERS" : {
+		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
+		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
+		"DHIS2_OUTLIERS_DETECTION" : "dhis2-outliers-detection",
+		"DHIS2_OUTLIERS_REMOVAL_IMPUTATION" : "dhis2-outliers-removal-imputation",
+		"DHIS2_INCIDENCE" : "dhis2-incidence",
+		"DHS_INDICATORS" : "snt-dhs-indicators",
+		"WORLDPOP_DATASET_EXTRACTS" : "snt-worldpop-extract",
+		"ERA5_DATASET_CLIMATE" : "snt-era5-climate",
+		"SNT_SEASONALITY" : "snt-seasonality",
+		"SNT_MAP_EXTRACT" : "snt-map-extract",
+		"SNT_RESULTS" : "snt-results"
+	},
+	"DHIS2_DATA_DEFINITIONS" : {
+		"POPULATION_INDICATOR_DEFINITIONS": {
+			"POPULATION": ["SnBgcu2eE1B"]
+		},
+		"DHIS2_INDICATOR_DEFINITIONS": {
+			"SUSP": ["SE8vUT7xeWO"],
+			"TEST": ["Hc1bP08WsJf"],
+			"CONF": ["S4S3iPZMvPb"],
+			"PRES": ["Dq6jCpvgXjN"],
+			"PRESSEV": [],
+			"MALTREAT": ["DLrfnBPUmH2"],
+			"MALADM": ["VJN9TulWOl7"],
+			"MALDTH": ["dl7lZ8HoO1K"],
+			"CASRECU" : [],
+			"CPN1" : []
+		},
+		"DHIS2_REPORTING_RATES" : {
+			"REPORTING_DATASETS": [
+				{
+					"DATASET" : "",
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				}
+			],			
+			"REPORTING_INDICATORS" : {
+				"ACTUAL_REPORTS" : "",
+				"EXPECTED_REPORTS": ""
+			}
+		}	
+	}
+}

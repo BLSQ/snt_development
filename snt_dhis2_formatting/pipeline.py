@@ -63,9 +63,8 @@ def snt_dhis2_formatting(run_report_only: bool):
             dhis2_reporting_rates_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
-
-            # add files to a new dataset version
-            files_ready = add_files_to_dataset(
+            
+            _ = add_files_to_dataset(
                 dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
                 country_code=country_code,
                 file_paths=[
@@ -80,15 +79,12 @@ def snt_dhis2_formatting(run_report_only: bool):
                     snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
                 ],
             )
-        else:
-            files_ready = True
 
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "SNT_dhis2_indicators_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
-            error_label_severity_map={"[DATA NOT FOUND]": "warning"},
-            ready=files_ready,
+            error_label_severity_map={"[DATA NOT FOUND]": "warning"},            
         )
 
     except Exception as e:

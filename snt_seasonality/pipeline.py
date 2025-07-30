@@ -130,7 +130,7 @@ def snt_seasonality(
         if not run_report_only:
             files_to_ds = []
             error_messages = ["ERROR 1", "ERROR 2", "ERROR 3"]
-            seasonality_nb = pipeline_path / "code" / "SNT_seasonality.ipynb"
+            seasonality_nb = pipeline_path / "code" / "snt_seasonality.ipynb"
 
             # Precipitation seasonality
             if run_precipitation:
@@ -191,7 +191,7 @@ def snt_seasonality(
             current_run.log_info("Skipping processing, running only the reporting.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "SNT_seasonality_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_seasonality_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
         )

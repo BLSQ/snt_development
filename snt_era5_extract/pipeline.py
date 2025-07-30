@@ -9,21 +9,20 @@ from pathlib import Path
 import geopandas as gpd
 from openhexa.sdk import (
     CustomConnection,
-    Dataset,
     current_run,
     parameter,
     pipeline,
     workspace,
 )
-from snt_lib.snt_pipeline_utils import (    
-    load_configuration_snt,    
+from snt_lib.snt_pipeline_utils import (
+    load_configuration_snt,
     validate_config,
 )
 from openhexa.sdk.datasets import DatasetFile
 from openhexa.toolbox.era5.cds import CDS, VARIABLES
 
 
-@pipeline("SNT ERA5 Extract")
+@pipeline("snt_era5_extract")
 @parameter(
     "start_date",
     type=str,
@@ -49,14 +48,14 @@ from openhexa.toolbox.era5.cds import CDS, VARIABLES
 def era5_extract(
     start_date: str,
     end_date: str,
-    cds_connection: CustomConnection,    
+    cds_connection: CustomConnection,
 ) -> None:
     """Download ERA5 products from the Climate Data Store."""
     root_path = Path(workspace.files_path)
 
     cds = CDS(key=cds_connection.key)
     current_run.log_info("Successfully connected to the Climate Data Store")
-    variable = "Total precipitation" 
+    variable = "Total precipitation"
     current_run.log_info(f"Downloading ERA5 data for variable: {variable}")
 
     try:
@@ -65,33 +64,31 @@ def era5_extract(
         if not is_valid_ymd(end_date):
             raise ValueError(f"Invalid end date format: {end_date}. Expected format: YYYY-MM-DD")
 
-        snt_config_dict = load_configuration_snt(
-            config_path=root_path / "configuration" / "SNT_config.json"
-            )
-        validate_config(snt_config_dict)        
+        snt_config_dict = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        validate_config(snt_config_dict)
         dhis2_formatted_dataset = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
-        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")       
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
         # get boundaries geometries from formatted dataset
-        boundaries = read_boundaries(dhis2_formatted_dataset, filename=f"{country_code}_shapes.geojson") 
+        boundaries = read_boundaries(dhis2_formatted_dataset, filename=f"{country_code}_shapes.geojson")
         bounds = get_bounds(boundaries)
         current_run.log_info(f"Using area of interest: {bounds}")
 
         if start_date:
             # Ensure start date is the first of the month
-            start_date = start_date[0:8] + "01"  
+            start_date = start_date[0:8] + "01"
         current_run.log_info(f"Start date set to {start_date}")
 
         if not end_date:
             # end_date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%d")
-            end_date = (datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)).strftime(
-                "%Y-%m-%d"
-            )
+            end_date = (
+                datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
+            ).strftime("%Y-%m-%d")
             current_run.log_info(f"End date set to last day of previous month {end_date}")
         else:
             # Push the end date to the last day of the previous month
             end_date = to_last_day_previous_month(end_date)
-            current_run.log_info(f"End date set to last day of month {end_date}")        
+            current_run.log_info(f"End date set to last day of month {end_date}")
 
         output_dir = Path(workspace.files_path) / "data" / "era5" / "raw"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -133,8 +130,8 @@ def read_boundaries(boundaries_id: str, filename: str | None = None) -> gpd.GeoD
 
     Parameters
     ----------
-    boundaries_dataset : Dataset
-        Input dataset containing a "*district*.parquet" geoparquet file
+    boundaries_id : str
+        Input dataset id containing a SNT shapes file
     filename : str
         Filename of the boundaries file to read if there are several.
         If set to None, the 1st parquet file found will be loaded.
@@ -153,7 +150,7 @@ def read_boundaries(boundaries_id: str, filename: str | None = None) -> gpd.GeoD
         boundaries_dataset = workspace.get_dataset(boundaries_id)
     except Exception as e:
         raise Exception(f"Dataset {boundaries_id} not found.") from e
-    
+
     ds = boundaries_dataset.latest_version
     if not ds:
         raise FileNotFoundError(f"Dataset {boundaries_id} has no versions available.")
@@ -237,8 +234,8 @@ def download(
         current_run.log_error(msg)
         raise ValueError(msg)
 
-    start = datetime.strptime(start, "%Y-%m-%d").astimezone(timezone.utc)
-    end = datetime.strptime(end, "%Y-%m-%d").astimezone(timezone.utc)
+    start = datetime.strptime(start, "%Y-%m-%d").astimezone(timezone.utc)  # noqa: UP017
+    end = datetime.strptime(end, "%Y-%m-%d").astimezone(timezone.utc)  # noqa: UP017
 
     dst_dir = output_dir / variable
     dst_dir.mkdir(parents=True, exist_ok=True)
@@ -249,16 +246,40 @@ def download(
 
 
 def is_valid_ymd(date_str: str) -> bool:
+    """Check if a date string is in the format YYYY-MM-DD.
+
+    Parameters
+    ----------
+    date_str : str
+        Date string to validate.
+
+    Returns
+    -------
+    bool
+        True if the date string is valid or empty, False otherwise.
+    """
     if date_str:
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
             return True
         except ValueError:
             return False
-    return True # If date_str is empty, consider it valid
-    
+    return True  # If date_str is empty, consider it valid
+
 
 def to_last_day_previous_month(date_str: str) -> str:
+    """Return the last day of the previous month for a given date string.
+
+    Parameters
+    ----------
+    date_str : str
+        Date string in the format YYYY-MM-DD.
+
+    Returns
+    -------
+    str
+        Date string representing the last day of the previous month.
+    """
     dt = datetime.strptime(date_str, "%Y-%m-%d")
     today = datetime.today()
 
@@ -274,4 +295,3 @@ def to_last_day_previous_month(date_str: str) -> str:
     first_day_of_month = dt.replace(day=1)
     last_day_prev_month = first_day_of_month - timedelta(days=1)
     return last_day_prev_month.strftime("%Y-%m-%d")
-  

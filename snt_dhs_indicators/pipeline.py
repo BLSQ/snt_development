@@ -9,7 +9,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("SNT DHS indicators")
+@pipeline("snt_dhs_indicators")
 def dhs_indicators():
     """Pipeline to compute and report on DHS indicators."""
     data_source = "DHS"
@@ -34,32 +34,32 @@ def dhs_indicators():
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
-            computation_notebook_name="SNT_bednets_computation.ipynb",
-            reporting_notebook_name="SNT_bednets_plots.ipynb",
+            computation_notebook_name="snt_dhs_bednets_computation.ipynb",
+            reporting_notebook_name="snt_dhs_bednets_report.ipynb",
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
-            computation_notebook_name="SNT_careseeking_computation.ipynb",
-            reporting_notebook_name="SNT_careseeking_plots.ipynb",
+            computation_notebook_name="snt_dhs_careseeking_computation.ipynb",
+            reporting_notebook_name="snt_dhs_careseeking_report.ipynb",
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
-            computation_notebook_name="SNT_mortality_computation.ipynb",
-            reporting_notebook_name="SNT_mortality_plots.ipynb",
+            computation_notebook_name="snt_dhs_mortality_computation.ipynb",
+            reporting_notebook_name="snt_dhs_mortality_report.ipynb",
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
-            computation_notebook_name="SNT_prevalence_computation.ipynb",
-            reporting_notebook_name="SNT_prevalence_plots.ipynb",
+            computation_notebook_name="snt_dhs_prevalence_computation.ipynb",
+            reporting_notebook_name="snt_dhs_prevalence_report.ipynb",
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
-            computation_notebook_name="SNT_vaccination_computation.ipynb",
-            reporting_notebook_name="SNT_vaccination_plots.ipynb",
+            computation_notebook_name="snt_dhs_vaccination_computation.ipynb",
+            reporting_notebook_name="snt_dhs_vaccination_report.ipynb",
         )
 
         # add files to a new dataset version

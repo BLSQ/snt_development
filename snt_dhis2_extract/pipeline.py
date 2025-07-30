@@ -92,7 +92,7 @@ def snt_dhis2_extract(
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
             script_paths=[
-                Path("pipelines") / "snt_dhis2_extract" / "reporting" / "SNT_dhis2_extract_report.ipynb",
+                Path("pipelines") / "snt_dhis2_extract" / "reporting" / "snt_dhis2_extract_report.ipynb",
             ],
             root_path=snt_root_path,
         )
@@ -183,7 +183,7 @@ def snt_dhis2_extract(
         )
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "SNT_dhis2_extract_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             ready=files_ready,
         )

@@ -250,15 +250,15 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         # retrieve the pyramid data
         dhis2_pyramid = get_organisation_units(dhis2_client)
 
-        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", "")        
-        country_code = country_code.upper().strip() # not None     
+        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", "")
+        country_code = country_code.upper().strip()  # not None
         current_run.log_debug(f"Country code found: {country_code}")
 
         # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
-        if country_code == "BFA": 
+        if country_code == "BFA":
             current_run.log_info("Filtering district names at level 4 for Burkina Faso pyramid.")
             dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_4_name").str.starts_with("DS"))
-        
+
         # NOTE: Filtering for Niger due to mixed levels in the pyramid (district: "DS")
         if country_code == "NER":
             current_run.log_info("Filtering district names at level 3 for Niger pyramid.")

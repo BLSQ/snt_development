@@ -162,7 +162,7 @@ def run_dhs_indicator_notebooks(
         reporting_notebook_name (str): Filename of the reporting notebook.
 
     """
-    computation_notebook_path = Path(pipeline_root_path, "code", computation_notebook_name)
+    computation_notebook_path = pipeline_root_path / "code" / computation_notebook_name
     papermill_folder_path = pipeline_root_path / "papermill_outputs"
     reporting_folder_path = pipeline_root_path / "reporting"
 

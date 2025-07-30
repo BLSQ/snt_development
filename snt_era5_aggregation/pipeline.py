@@ -1,6 +1,5 @@
 import tempfile
 from datetime import datetime
-import json
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -9,7 +8,7 @@ from shutil import copyfile
 import geopandas as gpd
 import polars as pl
 import pandas as pd
-from openhexa.sdk import Dataset, current_run, parameter, pipeline, workspace
+from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.datasets import DatasetFile
 from openhexa.sdk.datasets.dataset import DatasetVersion
 from openhexa.toolbox.era5.aggregate import (
@@ -29,7 +28,7 @@ from snt_lib.snt_pipeline_utils import (
 from openhexa.toolbox.era5.cds import VARIABLES
 
 
-@pipeline("SNT ERA5 Aggregate")
+@pipeline("snt_era5_aggregate")
 @parameter(
     "run_report_only",
     name="Run reporting only",
@@ -45,16 +44,8 @@ def era5_aggregate(
 
     Parameters
     ----------
-    input_dir : str
-        Input directory with raw ERA5 extracts.
-    output_dir : str
-        Output directory for the aggregated data.
-    boundaries_dataset : Dataset
-        Input dataset containing boundaries geometries.
-    boundaries_column_uid : str
-        Column name containing unique identifier for boundaries geometries.
-    boundaries_file : str, optional
-        Filename of the boundaries file to use in the boundaries dataset.
+    run_report_only : bool, optional
+        If True, only the reporting notebook will be executed, skipping the aggregation steps.
     """
     root_path = Path(workspace.files_path)
     input_dir = root_path / "data" / "era5" / "raw"
@@ -62,24 +53,28 @@ def era5_aggregate(
     snt_pipeline_path = root_path / "pipelines" / "snt_era5_aggregate"
 
     try:
-        if not run_report_only:            
+        if not run_report_only:
             snt_config_dict = load_configuration_snt(
                 config_path=root_path / "configuration" / "SNT_config.json"
-                )
+            )
             validate_config(snt_config_dict)
-                        
+
             country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
-            dhis2_formatted_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
+            dhis2_formatted_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
+                "DHIS2_DATASET_FORMATTED"
+            )
             era5_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("ERA5_DATASET_CLIMATE")
 
             # get boundaries geometries from formatted dataset
-            boundaries = read_boundaries(dhis2_formatted_dataset_id, filename=f"{country_code}_shapes.geojson")
+            boundaries = read_boundaries(
+                dhis2_formatted_dataset_id, filename=f"{country_code}_shapes.geojson"
+            )
 
             # subdirs containing raw data are named after variable names
             subdirs = [d for d in input_dir.iterdir() if d.is_dir()]
             variables = [d.name for d in subdirs if d.name in VARIABLES]
 
-            if not variables:            
+            if not variables:
                 raise FileNotFoundError("No variables found in input directory")
 
             filename_list = []
@@ -113,7 +108,9 @@ def era5_aggregate(
                     sum_aggregation=sum_aggregation,
                 )
 
-                current_run.log_info(f"Applied epi. weekly aggregation to {variable} data ({len(epi_weekly)} rows)")
+                current_run.log_info(
+                    f"Applied epi. weekly aggregation to {variable} data ({len(epi_weekly)} rows)"
+                )
                 monthly = aggregate_per_month(
                     daily=daily,
                     column_uid="boundary_id",
@@ -135,16 +132,12 @@ def era5_aggregate(
                 # current_run.add_file_output(weekly_fname.as_posix())
 
                 epi_weekly_fname = dst_dir / f"{country_code}_{variable}_epi_weekly.parquet"
-                epi_weekly = apply_snt_formatting(
-                    epi_weekly, aggregation="epi_weekly"
-                )
+                epi_weekly = apply_snt_formatting(epi_weekly, aggregation="epi_weekly")
                 epi_weekly.write_parquet(epi_weekly_fname)
                 # current_run.add_file_output(epi_weekly_fname.as_posix())
 
                 monthly_fname = dst_dir / f"{country_code}_{variable}_monthly.parquet"
-                monthly = apply_snt_formatting(
-                    monthly, aggregation="monthly"
-                )
+                monthly = apply_snt_formatting(monthly, aggregation="monthly")
                 monthly.write_parquet(monthly_fname)
                 # current_run.add_file_output(monthly_fname.as_posix())
 
@@ -163,9 +156,9 @@ def era5_aggregate(
             )
 
         run_report_notebook(
-            nb_file=snt_pipeline_path / "reporting" / "SNT_era5_report.ipynb",
+            nb_file=snt_pipeline_path / "reporting" / "snt_era5_aggregate_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,            
+            nb_parameters=None,
         )
 
     except Exception as e:
@@ -178,8 +171,8 @@ def read_boundaries(boundaries_id: str, filename: str | None = None) -> gpd.GeoD
 
     Parameters
     ----------
-    boundaries_dataset : Dataset
-        Input dataset containing a "*district*.parquet" geoparquet file
+    boundaries_id : str
+        Input dataset id containing a SNT shapes file
     filename : str
         Filename of the boundaries file to read if there are several.
         If set to None, the 1st parquet file found will be loaded.
@@ -198,7 +191,7 @@ def read_boundaries(boundaries_id: str, filename: str | None = None) -> gpd.GeoD
         boundaries_dataset = workspace.get_dataset(boundaries_id)
     except Exception as e:
         raise Exception(f"Dataset {boundaries_id} not found.") from e
-    
+
     ds = boundaries_dataset.latest_version
     if not ds:
         raise FileNotFoundError(f"Dataset {boundaries_id} has no versions available.")
@@ -290,7 +283,7 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
 
     return daily
 
- 
+
 def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     """Create and return a new dataset version.
 
@@ -332,9 +325,7 @@ def get_new_dataset_version(ds_id: str, prefix: str = "ds") -> DatasetVersion:
     return new_version
 
 
-def apply_snt_formatting(
-    df: pd.DataFrame, aggregation: str = "monthly"
-) -> pd.DataFrame:
+def apply_snt_formatting(df: pd.DataFrame, aggregation: str = "monthly") -> pd.DataFrame:
     """Apply SNT formatting to the aggregated ERA5 data.
 
     This function is a placeholder for any future formatting requirements specific to SNT.

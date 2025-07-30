@@ -9,7 +9,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("dhis2_reporting_rate")
+@pipeline("snt_dhis2_reporting_rate")
 @parameter(
     "run_report_only",
     name="Run reporting only",
@@ -36,7 +36,7 @@ def dhis2_reporting_rate(run_report_only: bool = False):
 
         if not run_report_only:
             run_notebook(
-                nb_path=pipeline_path / "code" / "SNT_dhis2_reporting_rate.ipynb",
+                nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate.ipynb",  # SNT_dhis2_reporting_rate
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),
@@ -59,7 +59,7 @@ def dhis2_reporting_rate(run_report_only: bool = False):
             current_run.log_info("Skipping calculations, running only the reporting.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "SNT_dhis2_reporting_rate_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
         )

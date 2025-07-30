@@ -81,7 +81,7 @@ def snt_dhis2_formatting(run_report_only: bool):
             )
 
         run_report_notebook(
-            nb_file=snt_pipeline_path / "reporting" / "SNT_dhis2_indicators_report.ipynb",
+            nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_formatting_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
             error_label_severity_map={"[DATA NOT FOUND]": "warning"},
@@ -114,7 +114,7 @@ def dhis2_analytics_formatting(
 
     try:
         run_notebook(
-            nb_path=pipeline_root_path / "code" / "SNT_dhis2_routine_format.ipynb",
+            nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_routine.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -144,7 +144,7 @@ def dhis2_population_formatting(
 
     try:
         run_notebook(
-            nb_path=pipeline_root_path / "code" / "SNT_dhis2_population_format.ipynb",
+            nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_population.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -174,7 +174,7 @@ def dhis2_shapes_formatting(
 
     try:
         run_notebook(
-            nb_path=pipeline_root_path / "code" / "SNT_dhis2_shapes_format.ipynb",
+            nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_shapes.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -208,7 +208,7 @@ def dhis2_pyramid_formatting(
 
     try:
         run_notebook(
-            nb_path=pipeline_root_path / "code" / "SNT_dhis2_pyramid_format.ipynb",
+            nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_pyramid.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )
@@ -238,7 +238,7 @@ def dhis2_reporting_rates_formatting(
 
     try:
         run_notebook(
-            nb_path=pipeline_root_path / "code" / "SNT_dhis2_reporting_rates_format.ipynb",
+            nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_reporting_rates.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
         )

@@ -21,7 +21,6 @@ from snt_lib.snt_pipeline_utils import (
 def dhis2_reporting_rate(run_report_only: bool = False):
     """Pipeline for calculating DHIS2 reporting rates with configurable parameters."""
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
-    current_run.log_info("PIPELINE PARAMETERS:")
 
     try:
         # Set paths
@@ -36,7 +35,7 @@ def dhis2_reporting_rate(run_report_only: bool = False):
 
         if not run_report_only:
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate.ipynb",  # SNT_dhis2_reporting_rate
+                nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),

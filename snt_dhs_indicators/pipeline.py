@@ -177,7 +177,7 @@ def run_dhs_indicator_notebooks(
 
     try:
         run_report_notebook(
-            nb_file=reporting_folder_path / "code" / reporting_notebook_name,
+            nb_file=reporting_folder_path / reporting_notebook_name,
             nb_output_path=reporting_folder_path / "outputs",
             nb_parameters=None,
         )

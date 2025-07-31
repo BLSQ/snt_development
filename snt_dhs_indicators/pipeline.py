@@ -1,6 +1,7 @@
 from pathlib import Path
-from openhexa.sdk import current_run, pipeline, workspace
+from openhexa.sdk import current_run, pipeline, parameter, workspace
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
     run_notebook,
@@ -10,7 +11,23 @@ from snt_lib.snt_pipeline_utils import (
 
 
 @pipeline("snt_dhs_indicators")
-def dhs_indicators():
+@parameter(
+    "run_reports_only",
+    name="Run reportings only",
+    help="This will only execute the report notebooks",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
     """Pipeline to compute and report on DHS indicators."""
     data_source = "DHS"
     admin_level = "ADM1"
@@ -19,6 +36,26 @@ def dhs_indicators():
     snt_root_path = Path(workspace.files_path)
     data_output_path = snt_root_path / "data" / "dhs" / "indicators"
     pipeline_path = snt_root_path / "pipelines" / "snt_dhs_indicators"
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_dhs_indicators",
+            report_scripts=[
+                "snt_dhs_bednets_report.ipynb",
+                "snt_dhs_careseeking_report.ipynb",
+                "snt_dhs_mortality_report.ipynb",
+                "snt_dhs_prevalence_report.ipynb",
+                "snt_dhs_vaccination_report.ipynb",
+            ],
+            code_scripts=[
+                "snt_dhs_bednets_computation.ipynb",
+                "snt_dhs_careseeking_computation.ipynb",
+                "snt_dhs_mortality_computation.ipynb",
+                "snt_dhs_prevalence_computation.ipynb",
+                "snt_dhs_vaccination_computation.ipynb",
+            ],
+        )
 
     try:
         # Load configuration
@@ -36,30 +73,35 @@ def dhs_indicators():
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_bednets_computation.ipynb",
             reporting_notebook_name="snt_dhs_bednets_report.ipynb",
+            run_report_only=run_reports_only,
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_careseeking_computation.ipynb",
             reporting_notebook_name="snt_dhs_careseeking_report.ipynb",
+            run_report_only=run_reports_only,
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_mortality_computation.ipynb",
             reporting_notebook_name="snt_dhs_mortality_report.ipynb",
+            run_report_only=run_reports_only,
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_prevalence_computation.ipynb",
             reporting_notebook_name="snt_dhs_prevalence_report.ipynb",
+            run_report_only=run_reports_only,
         )
 
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_vaccination_computation.ipynb",
             reporting_notebook_name="snt_dhs_vaccination_report.ipynb",
+            run_report_only=run_reports_only,
         )
 
         # add files to a new dataset version
@@ -152,7 +194,10 @@ def dhs_indicators():
 
 
 def run_dhs_indicator_notebooks(
-    pipeline_root_path: Path, computation_notebook_name: str, reporting_notebook_name: str
+    pipeline_root_path: Path,
+    computation_notebook_name: str,
+    reporting_notebook_name: str,
+    run_report_only: bool = False,
 ) -> None:
     """Execute the computation notebook and generate a report using the reporting notebook.
 
@@ -160,20 +205,22 @@ def run_dhs_indicator_notebooks(
         pipeline_root_path (Path): Directory of the pipeline.
         computation_notebook_name (str): Filename of the computation notebook.
         reporting_notebook_name (str): Filename of the reporting notebook.
+        run_report_only (bool): If True, only the reporting notebook will be executed.
 
     """
     computation_notebook_path = pipeline_root_path / "code" / computation_notebook_name
     papermill_folder_path = pipeline_root_path / "papermill_outputs"
     reporting_folder_path = pipeline_root_path / "reporting"
 
-    try:
-        run_notebook(
-            nb_path=computation_notebook_path,
-            out_nb_path=papermill_folder_path,
-            parameters=None,
-        )
-    except Exception as e:
-        raise Exception(f"Error running computation notebook '{computation_notebook_name}': {e}") from e
+    if not run_report_only:
+        try:
+            run_notebook(
+                nb_path=computation_notebook_path,
+                out_nb_path=papermill_folder_path,
+                parameters=None,
+            )
+        except Exception as e:
+            raise Exception(f"Error running computation notebook '{computation_notebook_name}': {e}") from e
 
     try:
         run_report_notebook(

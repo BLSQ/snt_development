@@ -14,6 +14,7 @@ from openhexa.sdk import (
 from rasterstats import zonal_stats
 from owslib.wcs import WebCoverageService
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
     run_report_notebook,
@@ -30,11 +31,27 @@ from snt_lib.snt_pipeline_utils import (
     type=bool,
     default=False,
 )
-def snt_map_extract(run_report_only: bool) -> None:
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def snt_map_extract(run_report_only: bool, pull_scripts: bool) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extract"
     pipeline_path.mkdir(parents=True, exist_ok=True)
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_map_extract",
+            report_scripts=["snt_map_extract_report.ipynb"],
+            code_scripts=[],
+        )
 
     # NOTE: ZIP both names and code into a single named list (labels, indicator)
     try:

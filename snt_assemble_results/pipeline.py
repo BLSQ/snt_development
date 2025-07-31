@@ -118,9 +118,7 @@ def assemble_snt_results(
     #   -POPULATION
     #   -REPORTING_RATE
     #   -INCIDENCE_CRUDE
-    results_table = add_dhis2_indicators_to(
-        results_table, snt_config, incidence_metric
-    )
+    results_table = add_dhis2_indicators_to(results_table, snt_config, incidence_metric)
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
     results_table = add_dhs_indicators_to(results_table, snt_config)
@@ -132,9 +130,7 @@ def assemble_snt_results(
     results_table.to_csv(output_path / f"{country_code}_results_dataset.csv", index=False)
 
 
-def add_dhis2_indicators_to(
-    table: pd.DataFrame, snt_config: dict, incidence_metric: str
-) -> pd.DataFrame:
+def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_metric: str) -> pd.DataFrame:
     """Add DHIS2 indicators to the results table by sequentially applying indicator functions.
 
     Returns
@@ -142,9 +138,9 @@ def add_dhis2_indicators_to(
     pd.DataFrame
         The updated results table with DHIS2 indicators added.
     """
-    updated_table = add_population_to(table, snt_config)    
+    updated_table = add_population_to(table, snt_config)
     updated_table = add_reporting_rate_to(table, snt_config)
-    updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_metric) 
+    updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_metric)
     return updated_table  # noqa: RET504
 
 
@@ -180,8 +176,6 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         return table
 
     latest_period = dhis2_population["YEAR"].max()
-    update_metadata(variable="POPULATION", attribute="PERIOD", value=str(latest_period))
-
     table.update(
         table.merge(
             dhis2_population[dhis2_population["YEAR"] == latest_period][["ADM2_ID", "POPULATION"]],
@@ -190,6 +184,9 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
             suffixes=("_old", ""),
         )["POPULATION"]
     )
+
+    update_metadata(variable="POPULATION", attribute="PERIOD", value=str(int(float(latest_period))))
+
     return table
 
 
@@ -219,7 +216,9 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
     # Determine which RR method was used based on Incidence filename (dataset)
     reporting_method = get_reporting_method_from_incidence_filename(snt_config)
     if not reporting_method:
-        current_run.log_warning("No reporting method found in incidence filename. Reporting rate data not added.")
+        current_run.log_warning(
+            "No reporting method found in incidence filename. Reporting rate data not added."
+        )
         return table
     current_run.log_debug(f"Using reporting method: {reporting_method}")
 
@@ -233,8 +232,7 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
         return table
 
     latest_period = dhis2_reporting["YEAR"].max()
-    update_metadata(variable="REPORTING_RATE", attribute="PERIOD", value=str(latest_period))
-
+    update_metadata(variable="REPORTING_RATE", attribute="PERIOD", value=str(int(float(latest_period))))
     # Average of reporting dates per ADM2_ID across all months and years
     dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].mean().reset_index()
     dhis2_reporting_agg = dhis2_reporting_agg.rename(columns={"REPORTING_RATE": "AVG_REPORTING_RATE"})
@@ -244,9 +242,7 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
     return table_updated.drop(columns=["AVG_REPORTING_RATE"])
 
 
-def add_incidence_indicators_to(
-    table: pd.DataFrame, snt_config: dict, incidence_metric: str
-) -> pd.DataFrame:
+def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_metric: str) -> pd.DataFrame:
     """Add incidence indicators to the results table using DHIS2 incidence data.
 
     Parameters
@@ -255,10 +251,8 @@ def add_incidence_indicators_to(
         The results table to which incidence indicators will be added.
     snt_config : dict
         The SNT configuration dictionary containing dataset identifiers and country code.
-    incidence_data : str
-        Incidence data selection.
-    incidence_method : str
-        List of incidence methods.
+    incidence_metric : str
+        Incidence metric selection.
 
     Returns
     -------
@@ -269,16 +263,16 @@ def add_incidence_indicators_to(
 
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
-    
+
     try:
         f_name = get_matching_filename_from_dataset_last_version(
             dataset_id=dataset_id,
-            filename_pattern= f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet",
+            filename_pattern=f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet",
         )
     except Exception as e:
         current_run.log_warning(f"Error while getting incidence filename: {e}")
         return table
-    
+
     try:
         dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name)
         current_run.log_debug(f"Incidence file selection: {f_name}")
@@ -296,8 +290,8 @@ def add_incidence_indicators_to(
         "INCIDENCE_ADJ_CARESEEKING",
     ]
 
-    period_start = dhis2_incidence["YEAR"].min()
-    period_end = dhis2_incidence["YEAR"].max()
+    period_start = int(float(dhis2_incidence["YEAR"].min()))
+    period_end = int(float(dhis2_incidence["YEAR"].max()))
     dhis2_incidence.columns = dhis2_incidence.columns.str.upper()  # This should be already formatted
     matched_columns = [col for col in columns_selection if col in dhis2_incidence.columns]
     current_run.log_debug(f"Found incidence cols: {matched_columns}")
@@ -310,10 +304,8 @@ def add_incidence_indicators_to(
         current_run.log_warning(f"Missing columns in incidence data: {missing_columns}")
 
     # Compute incidence metric
-    incidence_metric = "mean"
-    dhis2_incidence_agg = (
-        dhis2_incidence.groupby("ADM2_ID", as_index=False)
-        .agg({col: incidence_metric for col in matched_columns})
+    dhis2_incidence_agg = dhis2_incidence.groupby("ADM2_ID", as_index=False).agg(
+        {col: incidence_metric for col in matched_columns}
     )
 
     # merge
@@ -891,7 +883,7 @@ def update_table_with(
     column_id: str,
     column_data: str,
     msg_text: str = "population",
-    rounding: int = 2,  
+    rounding: int = 2,
 ) -> pd.DataFrame:
     """Update the given table DataFrame by merging it with a dataset file on a specified column.
 
@@ -909,6 +901,8 @@ def update_table_with(
         The column name containing the data to update.
     msg_text : str, optional
         Message text for logging purposes (default is "population").
+    rounding : int, optional
+        Number of decimal places to round the updated column (default is 2).
 
     Returns
     -------
@@ -1096,17 +1090,17 @@ def get_reporting_method_from_incidence_filename(snt_config: dict) -> str:
     str
         The reporting method extracted from the incidence filename.
     """
-    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE") 
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     try:
         filename = get_matching_filename_from_dataset_last_version(
             dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE"),
-            filename_pattern=f"{country_code}_incidence_year_routine-*_rr-method-*.parquet",            
+            filename_pattern=f"{country_code}_incidence_year_routine-*_rr-method-*.parquet",
         )
-    except Exception as e:
+    except Exception:
         return None
- 
+
     match = re.search(r"rr-method-([^.]+)\.parquet", filename)
-    if match:        
+    if match:
         return match.group(1)
     return None
 

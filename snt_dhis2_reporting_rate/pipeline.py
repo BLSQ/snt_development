@@ -1,6 +1,7 @@
 from pathlib import Path
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
     run_notebook,
@@ -18,9 +19,25 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def dhis2_reporting_rate(run_report_only: bool = False):
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def dhis2_reporting_rate(run_report_only: bool, pull_scripts: bool):
     """Pipeline for calculating DHIS2 reporting rates with configurable parameters."""
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_dhis2_reporting_rate",
+            report_scripts=["snt_dhis2_reporting_rate_report.ipynb"],
+            code_scripts=["snt_dhis2_reporting_rate.ipynb"],
+        )
 
     try:
         # Set paths

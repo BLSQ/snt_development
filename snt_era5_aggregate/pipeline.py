@@ -20,6 +20,7 @@ from openhexa.toolbox.era5.aggregate import (
     merge,
 )
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
     run_report_notebook,
@@ -37,20 +38,36 @@ from openhexa.toolbox.era5.cds import VARIABLES
     default=False,
     required=False,
 )
-def era5_aggregate(
-    run_report_only: bool = False,
-):
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def era5_aggregate(run_report_only: bool, pull_scripts: bool):
     """Aggregate ERA5 climate data by applying spatial and temporal aggregation to raw input files.
 
     Parameters
     ----------
     run_report_only : bool, optional
         If True, only the reporting notebook will be executed, skipping the aggregation steps.
+    pull_scripts : bool, optional
+        If True, the latest scripts will be pulled from the repository before running the pipeline.
     """
     root_path = Path(workspace.files_path)
     input_dir = root_path / "data" / "era5" / "raw"
     output_dir = root_path / "data" / "era5" / "aggregate"
     snt_pipeline_path = root_path / "pipelines" / "snt_era5_aggregate"
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_era5_aggregate",
+            report_scripts=["snt_era5_aggregate_report.ipynb"],
+            code_scripts=[],
+        )
 
     try:
         if not run_report_only:

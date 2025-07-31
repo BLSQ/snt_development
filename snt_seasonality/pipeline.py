@@ -3,6 +3,7 @@ from pathlib import Path
 import papermill as pm
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
     run_report_notebook,
@@ -88,6 +89,14 @@ from snt_lib.snt_pipeline_utils import (
     type=bool,
     default=False,
 )
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
 def snt_seasonality(
     run_precipitation: bool,
     run_cases: bool,
@@ -99,6 +108,7 @@ def snt_seasonality(
     threshold_for_seasonality: float,
     threshold_proportion_seasonal_years: float,
     run_report_only: bool,
+    pull_scripts: bool,
 ):
     """Computes whether or not the admin unit qualifies as seasonal from a case and precipitation perspective.
 
@@ -109,6 +119,14 @@ def snt_seasonality(
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_seasonality"
     data_path = root_path / "data" / "seasonality"
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_seasonality",
+            report_scripts=["snt_seasonality_report.ipynb"],
+            code_scripts=["snt_seasonality.ipynb"],
+        )
 
     try:
         # Load configuration

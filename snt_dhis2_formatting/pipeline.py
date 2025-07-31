@@ -2,6 +2,7 @@ from pathlib import Path
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
     add_files_to_dataset,
     dataset_file_exists,
     load_configuration_snt,
@@ -20,7 +21,15 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_formatting(run_report_only: bool):
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
     """Write your pipeline orchestration here.
 
     Pipeline functions should only call tasks and should never perform IO operations or
@@ -31,6 +40,20 @@ def snt_dhis2_formatting(run_report_only: bool):
     snt_pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_formatting"
     snt_dhis2_formatted_path = snt_root_path / "data" / "dhis2" / "formatted"
     snt_dhis2_formatted_path.mkdir(parents=True, exist_ok=True)
+
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_dhis2_formatting",
+            report_scripts=["snt_dhis2_formatting_report.ipynb"],
+            code_scripts=[
+                "snt_dhis2_formatting_population.ipynb",
+                "snt_dhis2_formatting_pyramid.ipynb",
+                "snt_dhis2_formatting_reporting_rates.ipynb",
+                "snt_dhis2_formatting_routine.ipynb",
+                "snt_dhis2_formatting_shapes.ipynb",
+            ],
+        )
 
     try:
         if not run_report_only:

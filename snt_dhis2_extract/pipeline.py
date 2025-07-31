@@ -87,14 +87,12 @@ def snt_dhis2_extract(
     # snt_folders_setup(snt_root_path)
 
     # pull pipeline scripts if requested
-    # The input path list will be re-created in the local working directory structure.
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
-            script_paths=[
-                Path("pipelines") / "snt_dhis2_extract" / "reporting" / "snt_dhis2_extract_report.ipynb",
-            ],
-            root_path=snt_root_path,
+            pipeline_name="snt_dhis2_extract",
+            report_scripts=["snt_dhis2_extract_report.ipynb"],
+            code_scripts=[],
         )
 
     try:

@@ -69,8 +69,9 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
                 kernel_name="ir",
                 parameters={
                     "OUTLIER_METHOD": outlier_method,
-                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                    "ROOT_PATH": root_path.as_posix(),
                 },
+                error_label_severity_map={"[ERROR]": "error"},
             )
 
             add_files_to_dataset(

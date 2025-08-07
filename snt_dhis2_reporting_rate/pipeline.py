@@ -62,6 +62,7 @@ def orchestration_function(run_report_only: bool,
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate"
         data_path = root_path / "data" / "dhis2" / "reporting_rate"
+        data_path.mkdir(parents=True, exist_ok=True)
 
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
@@ -77,6 +78,7 @@ def orchestration_function(run_report_only: bool,
                     "DATAELEMENT_METHOD_NUMERATOR": dataelement_method_numerator,
                     "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator
                 },
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}
             )            
 
             add_files_to_dataset(

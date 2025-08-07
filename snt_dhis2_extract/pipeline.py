@@ -81,7 +81,8 @@ def snt_dhis2_extract(
     # Set paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
-    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "raw"
+    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "extracts_raw"
+    dhis2_raw_data_path.mkdir(parents=True, exist_ok=True)
 
     # Set up folders (not yet used)
     # snt_folders_setup(snt_root_path)

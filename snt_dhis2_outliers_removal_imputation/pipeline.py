@@ -14,8 +14,7 @@ from snt_lib.snt_pipeline_utils import (
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 
 
-@pipeline(name="A.5 DHIS2 Outliers Removal and Imputation",
-          code="snt-dhis2-outliers-removal-imputation") 
+@pipeline(name="snt-dhis2-outliers-removal-imputation") 
 @parameter(
     "outlier_method", 
     name="Method used for outlier detection",
@@ -41,22 +40,22 @@ def run_pipeline_task(outlier_method: str,
         # Define paths and notebook names
         notebook_name = "SNT_dhis2_outliers_removal_imputation" 
         report_notebook_name = "SNT_dhis2_outliers_removal_imputation_report"
-        pipeline_folder_name = "dhis2_outliers_removal_imputation" 
+        folder_name = "dhis2_outliers_removal_imputation" 
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / pipeline_folder_name
-        data_path = root_path / "data" / "dhis2_outliers_removal_imputation"
-        
+        pipeline_path = root_path / "pipelines" / folder_name
+        data_path = root_path / "data" / folder_name
+        current_run.log_info(f"Pipeline path: {pipeline_path}")
+        current_run.log_info(f"Data path: {data_path}")
+
         # Load configuration
         config_path = root_path / "configuration" / "SNT_config.json"
         snt_config = load_configuration_snt(config_path=config_path)
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-        # current_run.log_info(f"📄 SNT configuration loaded from : {config_path}")
 
         if not run_report_only:
             input_notebook_path = pipeline_path / "code" / f"{notebook_name}.ipynb"  
             papermill_outputs_dir = pipeline_path / "papermill_outputs"  
-            # current_run.log_info(f"⚙️ Running notebook : {input_notebook_path}")
 
             # Run the notebook  
             run_notebook(

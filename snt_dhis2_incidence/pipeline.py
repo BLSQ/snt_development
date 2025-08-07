@@ -112,7 +112,8 @@ def snt_dhis2_incidence(
         current_run.log_info("Starting SNT DHIS2 Incidence Pipeline...")
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_incidence"
-        data_path = root_path / "data" / "dhis2_incidence"
+        data_path = root_path / "data" / "dhis2" / "incidence"
+        data_path.mkdir(parents=True, exist_ok=True)
 
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")

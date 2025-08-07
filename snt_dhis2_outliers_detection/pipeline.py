@@ -142,7 +142,7 @@ def run_pipeline_task(
         current_run.log_info("Pipeline finished!")
 
     except Exception as e:
-        current_run.log_error(f"❌ Notebook execution failed: {e}")
+        current_run.log_error(f"Notebook execution failed: {e}")
         raise
 
 

@@ -52,6 +52,7 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_removal_imputation"
         data_path = root_path / "data" / "dhis2" / "outliers_removal_imputation"
+        data_path.mkdir(parents=True, exist_ok=True)  # Ensure data path exists
         current_run.log_info(f"Pipeline path: {pipeline_path}")
         current_run.log_info(f"Data path: {data_path}")
 

@@ -38,7 +38,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
     # set paths
     snt_root_path = Path(workspace.files_path)
     snt_pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_formatting"
-    snt_dhis2_formatted_path = snt_root_path / "data" / "dhis2" / "formatted"
+    snt_dhis2_formatted_path = snt_root_path / "data" / "dhis2" / "extracts_formatted"
     snt_dhis2_formatted_path.mkdir(parents=True, exist_ok=True)
 
     if pull_scripts:
@@ -107,7 +107,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_formatting_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
-            error_label_severity_map={"[DATA NOT FOUND]": "warning"},
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 
     except Exception as e:
@@ -140,6 +140,7 @@ def dhis2_analytics_formatting(
             nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_routine.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
     except Exception as e:
         raise Exception(f"Error in formatting analytics data: {e}") from e
@@ -170,6 +171,7 @@ def dhis2_population_formatting(
             nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_population.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
     except Exception as e:
         raise Exception(f"Error in formatting population data: {e}") from e
@@ -200,6 +202,7 @@ def dhis2_shapes_formatting(
             nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_shapes.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
     except Exception as e:
         raise Exception(f"Error in formatting shapes data: {e}") from e
@@ -234,6 +237,7 @@ def dhis2_pyramid_formatting(
             nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_pyramid.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
     except Exception as e:
         raise Exception(f"Error in formatting pyramid data: {e}") from e
@@ -264,6 +268,7 @@ def dhis2_reporting_rates_formatting(
             nb_path=pipeline_root_path / "code" / "snt_dhis2_formatting_reporting_rates.ipynb",
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
     except Exception as e:
         raise Exception(f"Error in formatting reporting rates data: {e}") from e

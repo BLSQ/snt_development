@@ -81,8 +81,9 @@ def snt_dhis2_extract(
     # Set paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
-    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "raw"
-
+    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "extracts_raw"
+    dhis2_raw_data_path.mkdir(parents=True, exist_ok=True)
+    current_run.log_debug(f"output directory: {dhis2_raw_data_path}")
     # Set up folders (not yet used)
     # snt_folders_setup(snt_root_path)
 
@@ -900,8 +901,8 @@ def merge_parquet_files(
         df_merged.columns = df_merged.columns.str.upper()
 
         # Ensure the output directory exists
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        output_path = Path(output_dir) / output_fname
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / output_fname
         df_merged.to_parquet(output_path, engine="pyarrow", index=False)
         current_run.log_info(f"Merged file saved at : {output_path}")
 
@@ -994,7 +995,7 @@ def download_dhis2_population(
 
         current_run.log_info(f"Downloading population for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            fp = Path(output_dir) / f"{country_code}_raw_population_{p}.parquet"
+            fp = output_dir / f"{country_code}_raw_population_{p}.parquet"
 
             if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
@@ -1107,7 +1108,7 @@ def download_dhis2_shapes(
         raise Exception(f"Error while filtering shapes data: {e}") from e
 
     try:
-        fp = Path(output_dir) / f"{country_code}_dhis2_raw_shapes.parquet"
+        fp = output_dir / f"{country_code}_dhis2_raw_shapes.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
         df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
@@ -1150,7 +1151,7 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
         raise Exception(f"An error occured while downloading the DHIS2 pyramid : {e}") from e
 
     try:
-        fp = Path(output_dir) / f"{country_code}_dhis2_raw_pyramid.parquet"
+        fp = output_dir / f"{country_code}_dhis2_raw_pyramid.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
         df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)

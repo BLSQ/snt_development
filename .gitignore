@@ -1,3 +1,45 @@
 SNT_extract_changes.txt
 SNT Process/
 .vscode/
+
+
+# Jupyter stuff -------------------------
+
+# Windows security metadata files attached to Jupyter notebooks
+# (on Linux and macOS, this pattern has no effect)
+*.ipynb:Zone.Identifier
+
+# Ignore Jupyter Notebook checkpoints
+*.ipynb_checkpoints/
+
+
+# Test and temporary stuff ------------------------
+**/old/
+**/ignore/
+**/test/
+**/to_find_better_place/
+**/WIP/
+**/tmp/
+**/test_stuff*
+**/[Tt]est*
+
+# Avoid sharing sensitive data --------------------
+*.csv
+*.CSV
+*.xlsx
+*.xls
+*.yaml
+*.yml
+
+# Config file -----------------
+# ignore .json files unless if SNT_config.json
+*.json
+!SNT_config.json
+
+# R ----------------------------------------
+*.rds
+*.RDS 
+# except any R script 
+!*.R
+!*.r 
+

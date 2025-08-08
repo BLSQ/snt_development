@@ -11,7 +11,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline(name="snt-dhis2-outliers-removal-imputation")
+@pipeline("snt-dhis2-outliers-removal-imputation")
 @parameter(
     "outlier_method",
     name="Method used for outlier detection",
@@ -71,7 +71,7 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
                     "OUTLIER_METHOD": outlier_method,
                     "ROOT_PATH": root_path.as_posix(),
                 },
-                error_label_severity_map={"[ERROR]": "error"},
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
             add_files_to_dataset(

@@ -1333,7 +1333,7 @@ def run_report_notebook(
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
     nb_output_path.mkdir(parents=True, exist_ok=True)
-
+    warning_raised = False
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
     except PapermillExecutionError as e:
@@ -1341,11 +1341,13 @@ def run_report_notebook(
             e,
             error_labels={"[WARNING]": "warning"},
         )  # for labeled R kernel errors
+        warning_raised = True
     except CellTimeoutError as e:
         raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
     except Exception as e:
         raise RuntimeError(f"Error executing the notebook ({type(e).__name__}): {e}") from e
-    generate_html_report(nb_output_full_path)
+    if not warning_raised:
+        generate_html_report(nb_output_full_path)
 
 
 def validate_yyyymm(value: int) -> None:

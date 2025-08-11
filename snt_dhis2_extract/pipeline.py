@@ -11,9 +11,11 @@ from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
+from papermill.exceptions import PapermillExecutionError
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
 from snt_lib.snt_pipeline_utils import (
+    handle_rkernel_error_with_labels,
     pull_scripts_from_repository,
     generate_html_report,
     get_new_dataset_version,
@@ -1334,10 +1336,15 @@ def run_report_notebook(
 
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
+    except PapermillExecutionError as e:
+        handle_rkernel_error_with_labels(
+            e,
+            error_labels={"[WARNING]": "warning"},
+        )  # for labeled R kernel errors
     except CellTimeoutError as e:
         raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
     except Exception as e:
-        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+        raise RuntimeError(f"Error executing the notebook ({type(e).__name__}): {e}") from e
     generate_html_report(nb_output_full_path)
 
 

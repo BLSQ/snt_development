@@ -42,7 +42,23 @@ from snt_lib.snt_pipeline_utils import (
     name="Reporting rate to use",
     help="Which Reporting rate method to use for the analysis. Note: Reporting rate was calculated"
     " previously, and is simply imported here.",
-    choices=["dhis2", "conf", "any"],
+    choices=["dataset", "dataelement"],
+    type=str,
+    required=True,
+) 
+@parameter(
+    "reprate_delement_method_numerator",
+    name="For Reporting Rate 'Data Element', select method used for Numerator",
+    help="Applicable only if using reporting rate method 'dataelement'.",
+    choices=["n1", "n2", "Not applicable"],
+    type=str,
+    required=True,
+)
+@parameter(
+    "reprate_delement_method_denominator",
+    name="For Reporting Rate 'Data Element', select method used for Denominator",
+    help="Applicable only if using reporting rate method 'dataelement'.",
+    choices=["d1", "d2", "Not applicable"],
     type=str,
     required=True,
 )
@@ -71,11 +87,13 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_incidence(
+def orchestration_function(
     n1_method: str,
     routine_data_choice: str,
     outlier_detection_method: str,
     reporting_rate_method: str,
+    reprate_delement_method_numerator: str,
+    reprate_delement_method_denominator: str,
     use_csb_data: bool,
     run_report_only: bool,
     pull_scripts: bool,
@@ -91,7 +109,11 @@ def snt_dhis2_incidence(
     outlier_detection_method : str
         Method to use for outlier detection in the routine data.
     reporting_rate_method : str
-        Reporting Rate method to use for the analysis (`dhis2`, `conf`, or `any`).
+        Reporting Rate method to use for the analysis (`dataset`, `dataelement`).
+    reprate_delement_method_numerator : str
+        Data element method used as the numerator in reporting rate calculation.
+    reprate_delement_method_denominator : str
+        Data element method used as the denominator in reporting rate calculation.
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
@@ -131,6 +153,8 @@ def snt_dhis2_incidence(
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
+                    "REPRATE_DELEMENT_METHOD_NUMERATOR": reprate_delement_method_numerator,
+                    "REPRATE_DELEMENT_METHOD_DENOMINATOR": reprate_delement_method_denominator,
                     "USE_CSB_DATA": use_csb_data,
                     "ROOT_PATH": root_path.as_posix(),
                 },
@@ -141,35 +165,32 @@ def snt_dhis2_incidence(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_INCIDENCE"],
                 country_code=country_code,
                 file_paths=[
-                    *[
-                        str(p)
-                        for p in (
+                    *[p for p in (
                             data_path.glob(
                                 f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet"
                             )
                         )
                     ],
-                    *[
-                        str(p)
-                        for p in (
-                            data_path.glob(f"{country_code}_incidence_year_routine-data-*_rr-method-*.csv")
-                        )
-                    ],
-                    *[
-                        str(p)
-                        for p in (
+                    *[p for p in (
                             data_path.glob(
-                                f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.parquet"
-                            )
+                                f"{country_code}_incidence_year_routine-data-*_rr-method-*.csv"
+                                )
                         )
-                    ],
-                    *[
-                        str(p)
-                        for p in (
-                            data_path.glob(f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.csv")
-                        )
-                    ],
-                ],
+                    ]
+                    # This is now done in the ASSEMBLY pipeline
+                    # *[p for p in (
+                    #         data_path.glob(
+                    #             f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.parquet"
+                    #             )
+                    #     )
+                    # ],
+                    # *[p for p in (
+                    #         data_path.glob(
+                    #             f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.csv"
+                    #             )
+                    #     )
+                    # ]
+                ]
             )
 
         else:
@@ -188,4 +209,4 @@ def snt_dhis2_incidence(
 
 
 if __name__ == "__main__":
-    snt_dhis2_incidence()
+    orchestration_function()

@@ -85,16 +85,8 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False) ->
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT"),
             country_code=country_code,
             file_paths=[
-                snt_root_path
-                / "data"
-                / "worldpop"
-                / "population"
-                / f"{country_code}_worldpop_population_{year}.csv",
-                snt_root_path
-                / "data"
-                / "worldpop"
-                / "population"
-                / f"{country_code}_worldpop_population_{year}.parquet",
+                data_path / "population" / f"{country_code}_worldpop_population_{year}.csv",
+                data_path / "population" / f"{country_code}_worldpop_population_{year}.parquet",
             ],
         )
 
@@ -178,7 +170,6 @@ def run_spacial_aggregations(snt_config: dict, input_dir: Path, output_dir: Path
             tif_file_path=pop_file_path,
             snt_config=snt_config,
             output_dir=output_dir,
-            year=int(year),  # just to add a year column in the output files
         )
     else:
         current_run.log_warning(f"Population file not found: {pop_file_path}. Skipping aggregation.")
@@ -188,7 +179,6 @@ def run_spacial_aggregations(snt_config: dict, input_dir: Path, output_dir: Path
             tif_file_path=pop_file_unadj_path,
             snt_config=snt_config,
             output_dir=output_dir,
-            year=int(year),  # just to add a year column in the output files
         )
     else:
         current_run.log_warning(
@@ -260,11 +250,9 @@ def run_spatial_aggregation(tif_file_path: Path, snt_config: dict, output_dir: P
 def snt_worldpop_format(snt_config: dict, year: int, input_dir: Path, output_dir: Path) -> None:
     """Format aggregated WorldPop population data for SNT."""
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    pop_file = input_dir / f"{country_code}_worldpop_ppp_{year}.parquet"
-    pop_unadj_file = input_dir / f"{country_code}_worldpop_ppp_{year}_UNadj.parquet"
-    pop_data = pd.read_parquet(pop_file)
-    pop_unadj_file = pd.read_parquet(pop_unadj_file)
-    df = pop_data.join(
+    pop_data = pd.read_parquet(input_dir / f"{country_code}_worldpop_ppp_{year}.parquet")
+    pop_unadj_file = pd.read_parquet(input_dir / f"{country_code}_worldpop_ppp_{year}_UNadj.parquet")
+    df = pop_data.merge(
         pop_unadj_file[["ADM2_ID", "POPULATION"]],
         on="ADM2_ID",
         how="left",
@@ -275,7 +263,7 @@ def snt_worldpop_format(snt_config: dict, year: int, input_dir: Path, output_dir
     df.to_csv(output_dir / f"{country_code}_worldpop_population_{year}.csv", index=False)
     df.to_parquet(output_dir / f"{country_code}_worldpop_population_{year}.parquet", index=False)
     current_run.log_info(
-        f"Formatted population data saved under: {output_dir / f'{country_code}_worldpop_population_{year}.csv'}"
+        f"Population data saved under: {output_dir / f'{country_code}_worldpop_population_{year}.csv'}"
     )
 
 

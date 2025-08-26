@@ -85,7 +85,8 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
 
         else:
             current_run.log_info(
-                "🦘 Skipping outliers removal and imputation calculations, running only the reporting notebook."
+                "🦘 Skipping outliers removal and imputation calculations,"
+                " running only the reporting notebook."
             )
 
         run_report_notebook(

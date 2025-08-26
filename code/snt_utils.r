@@ -3,7 +3,7 @@
 # Description: This script contains utility functions used for SNT computation workflow.
 # Author: Esteban Montandon
 # Created: [2024-10-01]
-# Last updated: [2025-07-16]
+# Last updated: [2025-08-26]
 # Dependencies: stringi, httr, arrow, tools, jsonlite
 # Notes:
 #   - [Optional: Any special considerations, references, or tips]
@@ -99,7 +99,7 @@ get_latest_dataset_file_in_memory <- function(dataset, filename) {
 }
 
 
-# helper function para loggear
+# helper function for OpenHEXA logging
 log_msg <- function(msg , level="info") {
     print(msg)
     if (!is.null(openhexa$current_run)) {
@@ -117,6 +117,32 @@ log_msg <- function(msg , level="info") {
 }
 
 
+# Helper function for exporting data (csv and parquet files) 
+export_data <- function(data_object, file_path) {
+    
+    # Get directory and create if it doesn't exist  
+    output_dir <- dirname(file_path)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+        log_msg(paste0("Output folder created : ", output_dir))
+    }
+    
+    # get file name extension
+    file_extension <- tools::file_ext(file_path)
+    
+    # Export the data based on file type
+    if (file_extension == "csv") {
+        write_csv(data_object, file_path)
+    } else if (file_extension == "parquet") {
+        arrow::write_parquet(data_object, file_path)
+    } else {
+        stop("Unsupported file type. Please use 'csv' or 'parquet'.")
+    }
+    
+    # Log the export
+    log_msg(paste0("Exported : ", file_path))
+}
+    
 
 # SEASONALITY -------------------------------------------------------------------
                                                  
@@ -756,13 +782,15 @@ clean_admin_names <- function(input_vector, string_to_remove='province') {
 # VACCINATION -----------------------------------------------------------------------
 
 ###################################
-make_dose_plot <- function(plot_dt, plot_colname, title_name, scale_limits = c(0, 1)) {
-  #' make, show and save vaccine coverage map (coropleth of vaccine coverage proportions
+make_dhs_map <- function(plot_dt, plot_colname, title_name, legend_title="Percentage", scale_limits = c(0, 100)) {
+  #' make, show and save coverage map (coropleth of coverage proportions
+  #' TODO in a subsequent version, it was requested these be percentages. code is changes, maybe also change the names
   #' prints the plot, saves it to a file, and returns the plot object
   #'
   #' @param plot_dt spatial df with attribute data
   #' @param plot_colname string with the name of the column that contains the coverage values
   #' @param title_name name for the title
+  #' @param legend_title scale of the indicator
   #' @param scale_limits vector for range of scale values
   #' @return ggplot object of the map
   
@@ -784,7 +812,7 @@ make_dose_plot <- function(plot_dt, plot_colname, title_name, scale_limits = c(0
     ) +
     labs(
       title = title_name,
-      fill = "Proportion"
+      fill = legend_title
     )
   
   print(plot_obj)

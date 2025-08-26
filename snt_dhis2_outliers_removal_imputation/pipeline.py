@@ -1,27 +1,24 @@
-from datetime import datetime
 from pathlib import Path
 
-# Import the specific run_notebook function from snt_pipeline_utils.py
+from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
+    pull_scripts_from_repository,
+    add_files_to_dataset,
+    load_configuration_snt,
     run_notebook,
     run_report_notebook,
-    generate_html_report,
     validate_config,
-    load_configuration_snt,
-    add_files_to_dataset
-)  
-
-from openhexa.sdk import current_run, pipeline, workspace, parameter
+)
 
 
-@pipeline(name="snt-dhis2-outliers-removal-imputation") 
+@pipeline("snt-dhis2-outliers-removal-imputation")
 @parameter(
-    "outlier_method", 
+    "outlier_method",
     name="Method used for outlier detection",
     help="Outliers have been detected in upstream pipeline 'Outliers Detection' using different methods.",
-    choices=["mean3sd", "median3mad", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"], 
+    choices=["mean3sd", "median3mad", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"],
     type=str,
-    required=True
+    required=True,
 )
 @parameter(
     "run_report_only",
@@ -31,19 +28,31 @@ from openhexa.sdk import current_run, pipeline, workspace, parameter
     default=False,
     required=False,
 )
-def run_pipeline_task(outlier_method: str,
-                      run_report_only: bool):  
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: bool):
     """Orchestration function. Calls other functions within the pipeline."""
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_dhis2_outliers_removal_imputation",
+            report_scripts=["snt_dhis2_outliers_removal_imputation_report.ipynb"],
+            code_scripts=["snt_dhis2_outliers_removal_imputation.ipynb"],
+        )
     try:
-        current_run.log_info("Starting SNT DHIS2 Outliers Removal and Imputation Pipeline...")
+        current_run.log_info("Starting SNT DHIS2 outliers removal and imputation pipeline...")
 
         # Define paths and notebook names
-        notebook_name = "SNT_dhis2_outliers_removal_imputation" 
-        report_notebook_name = "SNT_dhis2_outliers_removal_imputation_report"
-        folder_name = "dhis2_outliers_removal_imputation" 
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / folder_name
-        data_path = root_path / "data" / folder_name
+        pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_removal_imputation"
+        data_path = root_path / "data" / "dhis2" / "outliers_removal_imputation"
+        data_path.mkdir(parents=True, exist_ok=True)  # Ensure data path exists
         current_run.log_info(f"Pipeline path: {pipeline_path}")
         current_run.log_info(f"Data path: {data_path}")
 
@@ -54,43 +63,41 @@ def run_pipeline_task(outlier_method: str,
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
-            input_notebook_path = pipeline_path / "code" / f"{notebook_name}.ipynb"  
-            papermill_outputs_dir = pipeline_path / "papermill_outputs"  
-
-            # Run the notebook  
             run_notebook(
-                nb_path=input_notebook_path,
-                out_nb_path=papermill_outputs_dir,
+                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_removal_imputation.ipynb",
+                out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters={
-                "OUTLIER_METHOD": outlier_method, 
-                "ROOT_PATH": str(Path(workspace.files_path)), 
-                }
+                    "OUTLIER_METHOD": outlier_method,
+                    "ROOT_PATH": root_path.as_posix(),
+                },
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
-            # Add files to Dataset
+
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_REMOVAL_IMPUTATION"],
                 country_code=country_code,
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.parquet"))],
-                    *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.csv"))]
+                    *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.csv"))],
                 ],
             )
-            
+
         else:
             current_run.log_info(
                 "🦘 Skipping outliers removal and imputation calculations, running only the reporting notebook."
             )
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / f"{report_notebook_name}.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_removal_imputation_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
-        
+
         current_run.log_info("Pipeline finished!")
 
     except Exception as e:
-        current_run.log_error(f"❌ Notebook execution failed: {str(e)}")
+        current_run.log_error(f"Notebook execution failed: {e}")
         raise
 
 

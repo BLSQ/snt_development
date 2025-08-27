@@ -56,6 +56,14 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
+    "adjust_population",
+    name="Adjust population",
+    help="If enabled, the DHIS2 population data will be adjusted using WorldPop UN adjusted estimates.",
+    type=bool,
+    default=False,
+    required=True,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -77,6 +85,7 @@ def snt_dhis2_incidence(
     outlier_detection_method: str,
     reporting_rate_method: str,
     use_csb_data: bool,
+    adjust_population: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -95,6 +104,8 @@ def snt_dhis2_incidence(
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
+    adjust_population : bool
+        If True, adjust the population data using WorldPop UN adjusted estimates.
     run_report_only : bool
         If True, only the reporting notebook will be executed, skipping the main analysis.
     pull_scripts : bool
@@ -132,9 +143,10 @@ def snt_dhis2_incidence(
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
                     "USE_CSB_DATA": use_csb_data,
+                    "ADJUST_POPULATION": adjust_population,
                     "ROOT_PATH": root_path.as_posix(),
                 },
-                error_label_severity_map={"[ERROR]": "error"},
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
             add_files_to_dataset(
@@ -178,6 +190,7 @@ def snt_dhis2_incidence(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_incidence_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 
         current_run.log_info("Pipeline finished!")

@@ -7,7 +7,7 @@ import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
-    copy_json_file,
+    copy_file,
     get_file_from_dataset,
     load_configuration_snt,
     validate_config,
@@ -71,10 +71,10 @@ def snt_assemble_results(incidence_metric: str, map_selection: list[str]):
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
         # Get metadata file
-        copy_json_file(
+        copy_file(
             source_folder=root_path / "configuration",
             destination_folder=pipeline_path / "data",
-            json_filename="SNT_metadata.json",
+            filename="SNT_metadata.json",
         )
 
         assemble_snt_results(
@@ -260,7 +260,6 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         The updated results table with incidence indicators added.
     """
     current_run.log_info("Loading incidence data")
-
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
 
@@ -270,7 +269,7 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
             filename_pattern=f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"Error while getting incidence filename: {e}")
+        current_run.log_warning(f"Error while retrieving incidence filename: {e}")
         return table
 
     try:
@@ -1101,6 +1100,7 @@ def get_reporting_method_from_incidence_filename(snt_config: dict) -> str:
 
     match = re.search(r"rr-method-([^.]+)\.parquet", filename)
     if match:
+        current_run.log_debug(f"Reporting method found in incidence filename: {match.group(1)}")
         return match.group(1)
     return None
 

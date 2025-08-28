@@ -31,7 +31,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Pull Scripts",
+    name="Pull scripts",
     help="Pull the latest scripts from the repository",
     type=bool,
     default=False,
@@ -168,7 +168,7 @@ def dhis2_population_formatting(
 
     # set parameters for notebook
     nb_parameter = {
-        "SNT_ROOT_PATH": snt_root_path,
+        "SNT_ROOT_PATH": snt_root_path.as_posix(),
         "ADJUST_POPULATION": adjust_population,
     }
 

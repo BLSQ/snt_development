@@ -21,7 +21,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "routine_data_choice",
-    name="Routine data to use",
+    name="Routine data selection",
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
     "'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`);"
     " 'imputed' contains imputed values after outliers removal. ",
@@ -39,7 +39,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "reporting_rate_method",
-    name="Reporting rate to use",
+    name="Reporting rate method",
     help="Which Reporting rate method to use for the analysis. Note: Reporting rate was calculated"
     " previously, and is simply imported here.",
     choices=["dhis2", "conf", "any"],
@@ -48,17 +48,17 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "use_csb_data",
-    name="Use Care Seeking Data (DHS)?",
-    help="If True, the pipeline will use Care Seeking Data (DHS) for the analysis,"
+    name="Use care seeking data (DHS)",
+    help="If True, the pipeline will use care seeking data (DHS) for the analysis,"
     " and calculate incidence adjusted for care seeking.",
     type=bool,
     default=False,
     required=True,
 )
 @parameter(
-    "adjust_population",
-    name="Adjust population",
-    help="If enabled, the DHIS2 population data will be adjusted using WorldPop UN adjusted estimates.",
+    "use_adjusted_population",
+    name="Use adjusted population",
+    help="If enabled, the adjusted DHIS2 population will be used for computation",
     type=bool,
     default=False,
     required=True,
@@ -73,7 +73,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Pull Scripts",
+    name="Pull scripts",
     help="Pull the latest scripts from the repository",
     type=bool,
     default=False,
@@ -85,7 +85,7 @@ def snt_dhis2_incidence(
     outlier_detection_method: str,
     reporting_rate_method: str,
     use_csb_data: bool,
-    adjust_population: bool,
+    use_adjusted_population: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -104,8 +104,8 @@ def snt_dhis2_incidence(
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
-    adjust_population : bool
-        If True, adjust the population data using WorldPop UN adjusted estimates.
+    use_adjusted_population : bool
+        If True, the DHIS2 population adjusted will be used for computation.
     run_report_only : bool
         If True, only the reporting notebook will be executed, skipping the main analysis.
     pull_scripts : bool
@@ -143,7 +143,7 @@ def snt_dhis2_incidence(
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
                     "USE_CSB_DATA": use_csb_data,
-                    "ADJUST_POPULATION": adjust_population,
+                    "USE_ADJUSTED_POPULATION": use_adjusted_population,
                     "ROOT_PATH": root_path.as_posix(),
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},

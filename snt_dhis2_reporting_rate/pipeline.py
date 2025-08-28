@@ -11,6 +11,38 @@ from snt_lib.snt_pipeline_utils import (
 # Pipeline for calculating DHIS2 reporting rates with configurable parameters.
 @pipeline("snt_dhis2_reporting_rate")
 @parameter(
+    "dataelement_method_numerator_conf",
+    name="For method 'Data Element': use `CONF` for Numerator",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_numerator_susp",
+    name="For method 'Data Element': use `SUSP` for Numerator",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_numerator_test",
+    name="For method 'Data Element': use `TEST` for Numerator",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_denominator",
+    name="For method 'Data Element': choice of Denominator",
+    help="How to calculate the total nr of facilities expected to report.",
+    type=str,
+    choices=["DHIS2_EXPECTED_REPORTS", "ACTIVE_FACILITIES"],
+    required=True
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -26,26 +58,14 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-@parameter(
-    "dataelement_method_numerator",
-    name="Reporting Rate method 'Data Element': choice of Numerator",
-    help="Which indicator(s) to use to count the number of reporting facilities.",
-    type=str,
-    choices=["CONF", "CONF|SUSP|TEST"],
-    required=True
-)
-@parameter(
-    "dataelement_method_denominator",
-    name="Reporting Rate method 'Data Element': choice of Denominator",
-    help="How to calculate the total nr of facilities expected to report.",
-    type=str,
-    choices=["DHIS2_EXPECTED_REPORTS", "ACTIVE_FACILITIES"],
-    required=True
-)
-def orchestration_function(run_report_only: bool, 
-                           pull_scripts: bool, 
-                           dataelement_method_numerator: str, 
-                           dataelement_method_denominator: str):
+def snt_dhis2_reporting_rate(
+                           dataelement_method_numerator_conf: bool, 
+                           dataelement_method_numerator_susp: bool,
+                           dataelement_method_numerator_test: bool,
+                           dataelement_method_denominator: str,
+                           run_report_only: bool, 
+                           pull_scripts: bool
+                           ):
     """Orchestration function. Calls other functions within the pipeline."""
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
 
@@ -75,7 +95,9 @@ def orchestration_function(run_report_only: bool,
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),
-                    "DATAELEMENT_METHOD_NUMERATOR": dataelement_method_numerator,
+                    "DATAELEMENT_METHOD_NUMERATOR_CONF": dataelement_method_numerator_conf,
+                    "DATAELEMENT_METHOD_NUMERATOR_SUSP": dataelement_method_numerator_susp,
+                    "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,
                     "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}
@@ -91,7 +113,7 @@ def orchestration_function(run_report_only: bool,
             )
             
         else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
+            current_run.log_info("🦘 Skipping calculations, running only the reporting.")
 
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_report.ipynb",
@@ -107,4 +129,4 @@ def orchestration_function(run_report_only: bool,
 
 
 if __name__ == "__main__":
-    orchestration_function()
+    snt_dhis2_reporting_rate()

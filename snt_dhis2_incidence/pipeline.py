@@ -33,7 +33,7 @@ from snt_lib.snt_pipeline_utils import (
     "outlier_detection_method",
     name="Outlier detection method",
     help="Method to use for outlier detection in the routine data",
-    choices=["median3mad", "mean3sd", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"],
+    choices=["median-mad", "mean-sd", "iqr", "magic_glasses_partial", "magic_glasses_complete"],
     type=str,
     required=True,
 )

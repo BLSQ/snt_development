@@ -85,8 +85,8 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False) ->
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT"),
             country_code=country_code,
             file_paths=[
-                data_path / "population" / f"{country_code}_worldpop_population_{year}.csv",
-                data_path / "population" / f"{country_code}_worldpop_population_{year}.parquet",
+                data_path / "population" / f"{country_code}_worldpop_population.csv",
+                data_path / "population" / f"{country_code}_worldpop_population.parquet",
             ],
         )
 
@@ -260,10 +260,10 @@ def snt_worldpop_format(snt_config: dict, year: int, input_dir: Path, output_dir
     )
     df["YEAR"] = year  # Add year column (reference)
     output_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_dir / f"{country_code}_worldpop_population_{year}.csv", index=False)
-    df.to_parquet(output_dir / f"{country_code}_worldpop_population_{year}.parquet", index=False)
+    df.to_csv(output_dir / f"{country_code}_worldpop_population.csv", index=False)
+    df.to_parquet(output_dir / f"{country_code}_worldpop_population.parquet", index=False)
     current_run.log_info(
-        f"Population data saved under: {output_dir / f'{country_code}_worldpop_population_{year}.csv'}"
+        f"Population data saved under: {output_dir / f'{country_code}_worldpop_population.csv'}"
     )
 
 

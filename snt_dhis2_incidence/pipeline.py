@@ -1,3 +1,5 @@
+# This code branches off from pipeline.py pushed to OH as "fix:(param) outlier_method spelling [v19]"
+
 from pathlib import Path
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
@@ -14,7 +16,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "n1_method",
     name="Method for N1 calculations",
-    help="Calculate N1 using `PRES` or `SUSP-TEST`?",
+    help="Calculate N1 using `PRES` or `SUSP-TEST`",
     choices=["PRES", "SUSP-TEST"],
     type=str,
     required=True,
@@ -24,7 +26,7 @@ from snt_lib.snt_pipeline_utils import (
     name="Routine data to use",
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
     "'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`);"
-    " 'imputed' contains imputed values after outliers removal. ",
+    " 'imputed' contains imputed values after outliers removal",
     choices=["raw", "raw_without_outliers", "imputed"],
     type=str,
     required=True,
@@ -32,25 +34,49 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "outlier_detection_method",
     name="Outlier detection method",
-    help="Method to use for outlier detection in the routine data.",
-    choices=["median3mad", "mean3sd", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"],
+    help="Method to use for outlier detection in the routine data",
+    choices=["median-mad", "mean-sd", "iqr", "magic_glasses_partial", "magic_glasses_complete"],
     type=str,
     required=True,
 )
 @parameter(
     "reporting_rate_method",
     name="Reporting rate to use",
-    help="Which Reporting rate method to use for the analysis. Note: Reporting rate was calculated"
-    " previously, and is simply imported here.",
-    choices=["dhis2", "conf", "any"],
+    help="Which reporting rate method to use for the analysis. Note: Reporting rate was calculated"
+    " previously, and is simply imported here",
+    choices=["dataset", "dataelement"],
     type=str,
     required=True,
 )
+# @parameter(
+#     "reprate_delement_method_numerator",
+#     name="For reporting rate 'Data Element', select method used for numerator",
+#     help="Applicable only if using reporting rate method 'dataelement'",
+#     choices=["n1", "n2", "Not applicable"],
+#     type=str,
+#     required=True,
+# )
+# @parameter(
+#     "reprate_delement_method_denominator",
+#     name="For reporting rate 'Data Element', select method used for denominator",
+#     help="Applicable only if using reporting rate method 'dataelement'",
+#     choices=["d1", "d2", "Not applicable"],
+#     type=str,
+#     required=True,
+# )
 @parameter(
     "use_csb_data",
-    name="Use Care Seeking Data (DHS)?",
-    help="If True, the pipeline will use Care Seeking Data (DHS) for the analysis,"
-    " and calculate incidence adjusted for care seeking.",
+    name="Use care seeking data (DHS)",
+    help="If True, the pipeline will use care seeking data (DHS) for the analysis,"
+    " and calculate incidence adjusted for care seeking",
+    type=bool,
+    default=False,
+    required=True,
+)
+@parameter(
+    "use_adjusted_population",
+    name="Use adjusted population",
+    help="If enabled, use adjusted population data for incidence calculations",
     type=bool,
     default=False,
     required=True,
@@ -65,7 +91,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Pull Scripts",
+    name="Pull scripts",
     help="Pull the latest scripts from the repository",
     type=bool,
     default=False,
@@ -76,7 +102,10 @@ def snt_dhis2_incidence(
     routine_data_choice: str,
     outlier_detection_method: str,
     reporting_rate_method: str,
+    # reprate_delement_method_numerator: str,
+    # reprate_delement_method_denominator: str,
     use_csb_data: bool,
+    use_adjusted_population: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -91,10 +120,16 @@ def snt_dhis2_incidence(
     outlier_detection_method : str
         Method to use for outlier detection in the routine data.
     reporting_rate_method : str
-        Reporting Rate method to use for the analysis (`dhis2`, `conf`, or `any`).
+        Reporting Rate method to use for the analysis (`dataset`, `dataelement`).
+    reprate_delement_method_numerator : str
+        Data element method used as the numerator in reporting rate calculation.
+    reprate_delement_method_denominator : str
+        Data element method used as the denominator in reporting rate calculation.
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
+    use_adjusted_population : bool
+        If True, use adjusted population data for incidence calculations.
     run_report_only : bool
         If True, only the reporting notebook will be executed, skipping the main analysis.
     pull_scripts : bool
@@ -131,10 +166,13 @@ def snt_dhis2_incidence(
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
+                    # "REPRATE_DELEMENT_METHOD_NUMERATOR": reprate_delement_method_numerator,
+                    # "REPRATE_DELEMENT_METHOD_DENOMINATOR": reprate_delement_method_denominator,
                     "USE_CSB_DATA": use_csb_data,
+                    "USE_ADJUSTED_POPULATION": use_adjusted_population,
                     "ROOT_PATH": root_path.as_posix(),
                 },
-                error_label_severity_map={"[ERROR]": "error"},
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
             add_files_to_dataset(
@@ -142,7 +180,7 @@ def snt_dhis2_incidence(
                 country_code=country_code,
                 file_paths=[
                     *[
-                        str(p)
+                        p
                         for p in (
                             data_path.glob(
                                 f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet"
@@ -150,23 +188,9 @@ def snt_dhis2_incidence(
                         )
                     ],
                     *[
-                        str(p)
+                        p
                         for p in (
                             data_path.glob(f"{country_code}_incidence_year_routine-data-*_rr-method-*.csv")
-                        )
-                    ],
-                    *[
-                        str(p)
-                        for p in (
-                            data_path.glob(
-                                f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.parquet"
-                            )
-                        )
-                    ],
-                    *[
-                        str(p)
-                        for p in (
-                            data_path.glob(f"{country_code}_incidence_mean-*_routine-data-*_rr-method-*.csv")
                         )
                     ],
                 ],
@@ -178,6 +202,7 @@ def snt_dhis2_incidence(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_incidence_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 
         current_run.log_info("Pipeline finished!")

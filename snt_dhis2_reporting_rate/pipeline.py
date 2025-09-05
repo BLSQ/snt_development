@@ -11,8 +11,17 @@ from snt_lib.snt_pipeline_utils import (
 # Pipeline for calculating DHIS2 reporting rates with configurable parameters.
 @pipeline("snt_dhis2_reporting_rate")
 @parameter(
+    "reporting_rate_method",
+    name="Reporting Rate Method",
+    help="Method to calculate reporting rate. Alternative choice between 'Data Element' and 'Expected Reports'.",
+    type=str,
+    choices=["DATASET", "DATAELEMENT"],
+    default="DATAELEMENT",
+    required=True
+)
+@parameter(
     "dataelement_method_numerator_conf",
-    name="For method 'Data Element': use `CONF` for Numerator",
+    name="For method 'Data Element', calculate Numerator using: `CONF`",
     help="Use presence of data for this indicator to count the number of reporting facilities.",
     type=bool,
     default=True,
@@ -20,7 +29,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "dataelement_method_numerator_susp",
-    name="For method 'Data Element': use `SUSP` for Numerator",
+    name="For method 'Data Element', calculate Numerator using: `SUSP`",
     help="Use presence of data for this indicator to count the number of reporting facilities.",
     type=bool,
     default=True,
@@ -28,7 +37,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "dataelement_method_numerator_test",
-    name="For method 'Data Element': use `TEST` for Numerator",
+    name="For method 'Data Element', calculate Numerator using: `TEST`",
     help="Use presence of data for this indicator to count the number of reporting facilities.",
     type=bool,
     default=True,
@@ -39,7 +48,7 @@ from snt_lib.snt_pipeline_utils import (
     name="For method 'Data Element': choice of Denominator",
     help="How to calculate the total nr of facilities expected to report.",
     type=str,
-    choices=["DHIS2_EXPECTED_REPORTS", "ACTIVE_FACILITIES"],
+    choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES", "DHIS2_EXPECTED_REPORTS"],
     required=True
 )
 @parameter(
@@ -59,6 +68,7 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_reporting_rate(
+                           reporting_rate_method: str,
                            dataelement_method_numerator_conf: bool, 
                            dataelement_method_numerator_susp: bool,
                            dataelement_method_numerator_test: bool,
@@ -95,6 +105,7 @@ def snt_dhis2_reporting_rate(
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),
+                    "REPORTING_RATE_METHOD": reporting_rate_method,
                     "DATAELEMENT_METHOD_NUMERATOR_CONF": dataelement_method_numerator_conf,
                     "DATAELEMENT_METHOD_NUMERATOR_SUSP": dataelement_method_numerator_susp,
                     "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,

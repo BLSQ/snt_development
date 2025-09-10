@@ -116,7 +116,7 @@ def run_pipeline_task(
                     "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                     "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
                 },
-                error_label_severity_map={"[ERROR]": "error"},
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
             # Add files to Dataset
@@ -137,12 +137,13 @@ def run_pipeline_task(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_detection_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 
         current_run.log_info("Pipeline finished!")
 
     except Exception as e:
-        current_run.log_error(f"❌ Notebook execution failed: {e}")
+        current_run.log_error(f"Notebook execution failed: {e}")
         raise
 
 

@@ -7,7 +7,7 @@ import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
-    copy_json_file,
+    copy_file,
     get_file_from_dataset,
     load_configuration_snt,
     validate_config,
@@ -18,7 +18,16 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_assemble_results")
 @parameter(
     "incidence_metric",
-    name="Select the metric to aggregate incidence data across years.",
+    name="Metric aggregation for incidence data across years.",
+    type=str,
+    multiple=False,
+    choices=["mean", "median"],
+    default="mean",
+    required=True,
+)
+@parameter(
+    "reporting_rate_metric",
+    name="Metric aggregation for reporting rate data across years.",
     type=str,
     multiple=False,
     choices=["mean", "median"],
@@ -50,13 +59,13 @@ from snt_lib.snt_pipeline_utils import (
     ],
     required=True,
 )
-def snt_assemble_results(incidence_metric: str, map_selection: list[str]):
+def snt_assemble_results(incidence_metric: str, reporting_rate_metric: str, map_selection: list[str]):
     """Assemble SNT results by loading configuration, validating it, and preparing paths for processing.
 
     Raises
     ------
     Exception
-        If any error occurs during configuration loading or validation.
+        If any error occurs during configuration loading, processing or validation.
     """
     # paths
     root_path = Path(workspace.files_path)
@@ -71,16 +80,17 @@ def snt_assemble_results(incidence_metric: str, map_selection: list[str]):
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
         # Get metadata file
-        copy_json_file(
+        copy_file(
             source_folder=root_path / "configuration",
             destination_folder=pipeline_path / "data",
-            json_filename="SNT_metadata.json",
+            filename="SNT_metadata.json",
         )
 
         assemble_snt_results(
             snt_config=snt_config,
             output_path=results_path,
             incidence_metric=incidence_metric,
+            reporting_rate_metric=reporting_rate_metric,
             map_selection=map_selection,
         )
 
@@ -107,18 +117,15 @@ def assemble_snt_results(
     snt_config: dict,
     output_path: Path,
     incidence_metric: str,
+    reporting_rate_metric: str,
     map_selection: list[str],
 ) -> None:
     """Assembles SNT results using the provided configuration dictionary."""
     # initialize table
     results_table = build_results_table(snt_config)
-
-    # Add indicators based on source
-    # DHIS2 indicators:
-    #   -POPULATION
-    #   -REPORTING_RATE
-    #   -INCIDENCE_CRUDE
-    results_table = add_dhis2_indicators_to(results_table, snt_config, incidence_metric)
+    results_table = add_dhis2_indicators_to(
+        results_table, snt_config, incidence_metric, reporting_rate_metric
+    )
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
     results_table = add_dhs_indicators_to(results_table, snt_config)
@@ -130,7 +137,9 @@ def assemble_snt_results(
     results_table.to_csv(output_path / f"{country_code}_results_dataset.csv", index=False)
 
 
-def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_metric: str) -> pd.DataFrame:
+def add_dhis2_indicators_to(
+    table: pd.DataFrame, snt_config: dict, incidence_metric: str, reporting_rate_metric: str
+) -> pd.DataFrame:
     """Add DHIS2 indicators to the results table by sequentially applying indicator functions.
 
     Returns
@@ -139,7 +148,7 @@ def add_dhis2_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_met
         The updated results table with DHIS2 indicators added.
     """
     updated_table = add_population_to(table, snt_config)
-    updated_table = add_reporting_rate_to(table, snt_config)
+    updated_table = add_reporting_rate_to(table, snt_config, reporting_rate_metric)
     updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_metric)
     return updated_table  # noqa: RET504
 
@@ -190,7 +199,7 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     return table
 
 
-def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_metric: str) -> pd.DataFrame:
     """Add reporting data to the results table by merging with DHIS2 rates information.
 
     Selection :
@@ -203,13 +212,15 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
         The results table to which population data will be added.
     snt_config : dict
         The SNT configuration dictionary containing dataset identifiers and country code.
+    reporting_rate_metric : str
+        Reporting rate metric selection.
 
     Returns
     -------
     pd.DataFrame
         The updated results table with population data merged.
     """
-    current_run.log_info("Loading DHIS2 population data")
+    current_run.log_info("Loading DHIS2 Reporting rates data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_REPORTING_RATE")
 
@@ -225,21 +236,30 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
     try:
         dhis2_reporting = get_file_from_dataset(
             dataset_id=dataset_id,
-            filename=f"{country_code}_reporting_rate_{reporting_method}_month.parquet",
+            filename=f"{country_code}_reporting_rate_{reporting_method}.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"Error while loading population data: {e}")
+        current_run.log_warning(f"Error while loading reporting rate data: {e}")
         return table
 
     latest_period = dhis2_reporting["YEAR"].max()
     update_metadata(variable="REPORTING_RATE", attribute="PERIOD", value=str(int(float(latest_period))))
-    # Average of reporting dates per ADM2_ID across all months and years
-    dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].mean().reset_index()
-    dhis2_reporting_agg = dhis2_reporting_agg.rename(columns={"REPORTING_RATE": "AVG_REPORTING_RATE"})
 
+    # Aggregate reporting rates per ADM2_ID across all periods (months/years)
+    if reporting_rate_metric == "mean":
+        dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].mean().reset_index()
+    elif reporting_rate_metric == "median":
+        dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].median().reset_index()
+    else:
+        current_run.log_warning(
+            f"Reporting rate metric {reporting_rate_metric} not recognized. Using 'mean' as default."
+        )
+        dhis2_reporting_agg = dhis2_reporting.groupby("ADM2_ID")["REPORTING_RATE"].mean().reset_index()
+
+    dhis2_reporting_agg = dhis2_reporting_agg.rename(columns={"REPORTING_RATE": "AGG_REPORTING_RATE"})
     table_updated = table.merge(dhis2_reporting_agg, on="ADM2_ID", how="left")
-    table_updated["REPORTING_RATE"] = table_updated["AVG_REPORTING_RATE"].round(2)
-    return table_updated.drop(columns=["AVG_REPORTING_RATE"])
+    table_updated["REPORTING_RATE"] = table_updated["AGG_REPORTING_RATE"].round(2)
+    return table_updated.drop(columns=["AGG_REPORTING_RATE"])
 
 
 def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_metric: str) -> pd.DataFrame:
@@ -260,7 +280,6 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         The updated results table with incidence indicators added.
     """
     current_run.log_info("Loading incidence data")
-
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
 
@@ -270,7 +289,7 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
             filename_pattern=f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"Error while getting incidence filename: {e}")
+        current_run.log_warning(f"Error while retrieving incidence filename: {e}")
         return table
 
     try:
@@ -1101,6 +1120,7 @@ def get_reporting_method_from_incidence_filename(snt_config: dict) -> str:
 
     match = re.search(r"rr-method-([^.]+)\.parquet", filename)
     if match:
+        current_run.log_debug(f"Reporting method found in incidence filename: {match.group(1)}")
         return match.group(1)
     return None
 

@@ -11,9 +11,11 @@ from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
+from papermill.exceptions import PapermillExecutionError
 from openhexa.toolbox.dhis2.dataframe import get_organisation_units
 from openhexa.toolbox.dhis2.periods import period_from_string
 from snt_lib.snt_pipeline_utils import (
+    handle_rkernel_error_with_labels,
     pull_scripts_from_repository,
     generate_html_report,
     get_new_dataset_version,
@@ -64,8 +66,21 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
+@parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
 def snt_dhis2_extract(
-    dhis2_connection: DHIS2Connection, start: int, end: int, overwrite: bool, pull_scripts: bool
+    dhis2_connection: DHIS2Connection,
+    start: int,
+    end: int,
+    overwrite: bool,
+    run_report_only: bool,
+    pull_scripts: bool,
 ) -> None:
     """Write your pipeline code here.
 
@@ -81,8 +96,9 @@ def snt_dhis2_extract(
     # Set paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_dhis2_extract"
-    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "raw"
-
+    dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "extracts_raw"
+    dhis2_raw_data_path.mkdir(parents=True, exist_ok=True)
+    current_run.log_debug(f"output directory: {dhis2_raw_data_path}")
     # Set up folders (not yet used)
     # snt_folders_setup(snt_root_path)
 
@@ -96,89 +112,94 @@ def snt_dhis2_extract(
         )
 
     try:
-        # Load configuration
-        snt_config_dict = load_configuration_snt(
-            config_path=snt_root_path / "configuration" / "SNT_config.json"
-        )
+        if not run_report_only:
+            # Load configuration
+            snt_config_dict = load_configuration_snt(
+                config_path=snt_root_path / "configuration" / "SNT_config.json"
+            )
 
-        # Validate configuration
-        # TODO: Validate config against pyramid.
-        validate_config(snt_config_dict)
+            # Validate configuration
+            # TODO: Validate config against pyramid.
+            validate_config(snt_config_dict)
 
-        # get country identifier for file naming
-        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-        if country_code is None:
-            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+            # get country identifier for file naming
+            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+            if country_code is None:
+                current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-        # DHIS2 connection
-        dhis2_client = get_dhis2_client(
-            dhis2_connection=dhis2_connection, cache_folder=pipeline_path / ".cache"
-        )
+            # DHIS2 connection
+            dhis2_client = get_dhis2_client(
+                dhis2_connection=dhis2_connection, cache_folder=pipeline_path / ".cache"
+            )
 
-        # get the dhis2 pyramid
-        dhis2_pyramid = get_dhis2_pyramid(dhis2_client=dhis2_client, snt_config=snt_config_dict)
+            # get the dhis2 pyramid
+            dhis2_pyramid = get_dhis2_pyramid(dhis2_client=dhis2_client, snt_config=snt_config_dict)
 
-        pop_ready = download_dhis2_population(
-            start=start,
-            end=end,
-            source_pyramid=dhis2_pyramid,
-            dhis2_client=dhis2_client,
-            snt_config=snt_config_dict,
-            output_dir=dhis2_raw_data_path / "population_data",
-            overwrite=overwrite,
-        )
+            pop_ready = download_dhis2_population(
+                start=start,
+                end=end,
+                source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
+                snt_config=snt_config_dict,
+                output_dir=dhis2_raw_data_path / "population_data",
+                overwrite=overwrite,
+            )
 
-        shapes_ready = download_dhis2_shapes(
-            source_pyramid=dhis2_pyramid,
-            output_dir=dhis2_raw_data_path / "shapes_data",
-            snt_config=snt_config_dict,
-        )
+            shapes_ready = download_dhis2_shapes(
+                source_pyramid=dhis2_pyramid,
+                output_dir=dhis2_raw_data_path / "shapes_data",
+                snt_config=snt_config_dict,
+            )
 
-        pyramid_ready = download_dhis2_pyramid(
-            source_pyramid=dhis2_pyramid,
-            output_dir=dhis2_raw_data_path / "pyramid_data",
-            snt_config=snt_config_dict,
-        )
+            pyramid_ready = download_dhis2_pyramid(
+                source_pyramid=dhis2_pyramid,
+                output_dir=dhis2_raw_data_path / "pyramid_data",
+                snt_config=snt_config_dict,
+            )
 
-        analytics_ready = download_dhis2_analytics(
-            start=start,
-            end=end,
-            source_pyramid=dhis2_pyramid,
-            dhis2_client=dhis2_client,
-            snt_config=snt_config_dict,
-            output_dir=dhis2_raw_data_path / "routine_data",
-            overwrite=overwrite,
-            ready=pop_ready,
-        )
+            analytics_ready = download_dhis2_analytics(
+                start=start,
+                end=end,
+                source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
+                snt_config=snt_config_dict,
+                output_dir=dhis2_raw_data_path / "routine_data",
+                overwrite=overwrite,
+                ready=pop_ready,
+            )
 
-        reporting_ready = download_dhis2_reporting_rates(
-            start=start,
-            end=end,
-            source_pyramid=dhis2_pyramid,
-            dhis2_client=dhis2_client,
-            snt_config=snt_config_dict,
-            output_dir=dhis2_raw_data_path / "reporting_data",
-            overwrite=overwrite,
-            ready=analytics_ready,
-        )
+            reporting_ready = download_dhis2_reporting_rates(
+                start=start,
+                end=end,
+                source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
+                snt_config=snt_config_dict,
+                output_dir=dhis2_raw_data_path / "reporting_data",
+                overwrite=overwrite,
+                ready=analytics_ready,
+            )
 
-        files_ready = add_files_to_dataset(
-            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
-            country_code=country_code,
-            org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
-            file_paths=[
-                dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
-                dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
-                dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
-                dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
-                dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
-            ],
-            analytics_ready=analytics_ready,
-            pop_ready=pop_ready,
-            shapes_ready=shapes_ready,
-            pyramid_ready=pyramid_ready,
-            reporting_ready=reporting_ready,
-        )
+            files_ready = add_files_to_dataset(
+                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
+                country_code=country_code,
+                org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
+                file_paths=[
+                    dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
+                    dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
+                    dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
+                    dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
+                    dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
+                ],
+                analytics_ready=analytics_ready,
+                pop_ready=pop_ready,
+                shapes_ready=shapes_ready,
+                pyramid_ready=pyramid_ready,
+                reporting_ready=reporting_ready,
+            )
+
+        else:
+            files_ready = True
+            current_run.log_info("Skipping data extraction and running report only.")
 
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
@@ -900,8 +921,8 @@ def merge_parquet_files(
         df_merged.columns = df_merged.columns.str.upper()
 
         # Ensure the output directory exists
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        output_path = Path(output_dir) / output_fname
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / output_fname
         df_merged.to_parquet(output_path, engine="pyarrow", index=False)
         current_run.log_info(f"Merged file saved at : {output_path}")
 
@@ -994,7 +1015,7 @@ def download_dhis2_population(
 
         current_run.log_info(f"Downloading population for period : {periods[0]} to {periods[-1]}")
         for p in periods:
-            fp = Path(output_dir) / f"{country_code}_raw_population_{p}.parquet"
+            fp = output_dir / f"{country_code}_raw_population_{p}.parquet"
 
             if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
@@ -1107,7 +1128,7 @@ def download_dhis2_shapes(
         raise Exception(f"Error while filtering shapes data: {e}") from e
 
     try:
-        fp = Path(output_dir) / f"{country_code}_dhis2_raw_shapes.parquet"
+        fp = output_dir / f"{country_code}_dhis2_raw_shapes.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
         df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
@@ -1144,13 +1165,13 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
 
     try:
         df_lvl_selection = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
-            ["id", "name", "level", "opening_date", "closed_date", "geometry"]
+            ["id", "name", "level", "geometry"]
         )
     except Exception as e:
         raise Exception(f"An error occured while downloading the DHIS2 pyramid : {e}") from e
 
     try:
-        fp = Path(output_dir) / f"{country_code}_dhis2_raw_pyramid.parquet"
+        fp = output_dir / f"{country_code}_dhis2_raw_pyramid.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
         df_lvl_selection_pd.columns = df_lvl_selection_pd.columns.str.upper()  # to UPPER case
         df_lvl_selection_pd.to_parquet(fp, engine="pyarrow", index=False)
@@ -1330,14 +1351,21 @@ def run_report_notebook(
     execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
     nb_output_path.mkdir(parents=True, exist_ok=True)
-
+    warning_raised = False
     try:
         pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
+    except PapermillExecutionError as e:
+        handle_rkernel_error_with_labels(
+            e,
+            error_labels={"[WARNING]": "warning"},
+        )  # for labeled R kernel errors
+        warning_raised = True
     except CellTimeoutError as e:
         raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
     except Exception as e:
-        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
-    generate_html_report(nb_output_full_path)
+        raise RuntimeError(f"Error executing the notebook ({type(e).__name__}): {e}") from e
+    if not warning_raised:
+        generate_html_report(nb_output_full_path)
 
 
 def validate_yyyymm(value: int) -> None:

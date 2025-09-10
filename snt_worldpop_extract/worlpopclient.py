@@ -68,7 +68,7 @@ class WorldPopClient:
             raster_url = self._build_url(country_iso3, year, un_adj)
             if fname is None:
                 adj_suffix = "_UNadj" if un_adj else ""
-                fname = f"{country_iso3.upper()}_worldpop_population_{year}{adj_suffix}.tif"
+                fname = f"{country_iso3.upper()}_worldpop_ppp_{year}{adj_suffix}.tif"
             destination_path = output_dir / fname
         except Exception as e:
             raise ValueError(f"Could not determine download details for {country_iso3} {year}: {e}") from e

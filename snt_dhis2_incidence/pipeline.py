@@ -1,3 +1,5 @@
+# This code branches off from pipeline.py pushed to OH as "fix:(param) outlier_method spelling [v19]"
+
 from pathlib import Path
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
@@ -46,22 +48,22 @@ from snt_lib.snt_pipeline_utils import (
     type=str,
     required=True,
 )
-@parameter(
-    "reprate_delement_method_numerator",
-    name="For reporting rate 'Data Element', select method used for numerator",
-    help="Applicable only if using reporting rate method 'dataelement'",
-    choices=["n1", "n2", "Not applicable"],
-    type=str,
-    required=True,
-)
-@parameter(
-    "reprate_delement_method_denominator",
-    name="For reporting rate 'Data Element', select method used for denominator",
-    help="Applicable only if using reporting rate method 'dataelement'",
-    choices=["d1", "d2", "Not applicable"],
-    type=str,
-    required=True,
-)
+# @parameter(
+#     "reprate_delement_method_numerator",
+#     name="For reporting rate 'Data Element', select method used for numerator",
+#     help="Applicable only if using reporting rate method 'dataelement'",
+#     choices=["n1", "n2", "Not applicable"],
+#     type=str,
+#     required=True,
+# )
+# @parameter(
+#     "reprate_delement_method_denominator",
+#     name="For reporting rate 'Data Element', select method used for denominator",
+#     help="Applicable only if using reporting rate method 'dataelement'",
+#     choices=["d1", "d2", "Not applicable"],
+#     type=str,
+#     required=True,
+# )
 @parameter(
     "use_csb_data",
     name="Use care seeking data (DHS)",
@@ -100,8 +102,6 @@ def snt_dhis2_incidence(
     routine_data_choice: str,
     outlier_detection_method: str,
     reporting_rate_method: str,
-    reprate_delement_method_numerator: str,
-    reprate_delement_method_denominator: str,
     use_csb_data: bool,
     use_adjusted_population: bool,
     run_report_only: bool,
@@ -164,8 +164,6 @@ def snt_dhis2_incidence(
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
-                    "REPRATE_DELEMENT_METHOD_NUMERATOR": reprate_delement_method_numerator,
-                    "REPRATE_DELEMENT_METHOD_DENOMINATOR": reprate_delement_method_denominator,
                     "USE_CSB_DATA": use_csb_data,
                     "USE_ADJUSTED_POPULATION": use_adjusted_population,
                     "ROOT_PATH": root_path.as_posix(),

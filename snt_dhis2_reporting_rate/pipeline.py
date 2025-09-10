@@ -8,9 +8,49 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
 )
-
-
+# Pipeline for calculating DHIS2 reporting rates with configurable parameters.
 @pipeline("snt_dhis2_reporting_rate")
+@parameter(
+    "reporting_rate_method",
+    name="Reporting Rate Method",
+    help="Method to calculate reporting rate. Alternative choice between 'Data Element' and 'Expected Reports'.",
+    type=str,
+    choices=["DATASET", "DATAELEMENT"],
+    default="DATAELEMENT",
+    required=True
+)
+@parameter(
+    "dataelement_method_numerator_conf",
+    name="For method 'Data Element', calculate Numerator using: `CONF`",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_numerator_susp",
+    name="For method 'Data Element', calculate Numerator using: `SUSP`",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_numerator_test",
+    name="For method 'Data Element', calculate Numerator using: `TEST`",
+    help="Use presence of data for this indicator to count the number of reporting facilities.",
+    type=bool,
+    default=True,
+    required=True
+)
+@parameter(
+    "dataelement_method_denominator",
+    name="For method 'Data Element': choice of Denominator",
+    help="How to calculate the total nr of facilities expected to report.",
+    type=str,
+    choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES", "DHIS2_EXPECTED_REPORTS"],
+    required=True
+)
 @parameter(
     "run_report_only",
     name="Run reporting only",
@@ -27,8 +67,16 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def dhis2_reporting_rate(run_report_only: bool, pull_scripts: bool):
-    """Pipeline for calculating DHIS2 reporting rates with configurable parameters."""
+def snt_dhis2_reporting_rate(
+                           reporting_rate_method: str,
+                           dataelement_method_numerator_conf: bool, 
+                           dataelement_method_numerator_susp: bool,
+                           dataelement_method_numerator_test: bool,
+                           dataelement_method_denominator: str,
+                           run_report_only: bool, 
+                           pull_scripts: bool
+                           ):
+    """Orchestration function. Calls other functions within the pipeline."""
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
 
     if pull_scripts:
@@ -43,7 +91,8 @@ def dhis2_reporting_rate(run_report_only: bool, pull_scripts: bool):
         # Set paths
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate"
-        data_path = root_path / "data" / "dhis2_reporting_rate"
+        data_path = root_path / "data" / "dhis2" / "reporting_rate"
+        data_path.mkdir(parents=True, exist_ok=True)
 
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
@@ -56,23 +105,26 @@ def dhis2_reporting_rate(run_report_only: bool, pull_scripts: bool):
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "SNT_ROOT_PATH": root_path.as_posix(),
+                    "REPORTING_RATE_METHOD": reporting_rate_method,
+                    "DATAELEMENT_METHOD_NUMERATOR_CONF": dataelement_method_numerator_conf,
+                    "DATAELEMENT_METHOD_NUMERATOR_SUSP": dataelement_method_numerator_susp,
+                    "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,
+                    "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator
                 },
-            )
+                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}
+            )            
 
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
                 country_code=country_code,
                 file_paths=[
-                    data_path / f"{country_code}_reporting_rate_any_month.parquet",
-                    data_path / f"{country_code}_reporting_rate_any_month.csv",
-                    data_path / f"{country_code}_reporting_rate_conf_month.parquet",
-                    data_path / f"{country_code}_reporting_rate_conf_month.csv",
-                    data_path / f"{country_code}_reporting_rate_dhis2_month.parquet",
-                    data_path / f"{country_code}_reporting_rate_dhis2_month.csv",
+                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_*.parquet"))],
+                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_*.csv"))]
                 ],
             )
+            
         else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
+            current_run.log_info("🦘 Skipping calculations, running only the reporting.")
 
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_report.ipynb",
@@ -88,4 +140,4 @@ def dhis2_reporting_rate(run_report_only: bool, pull_scripts: bool):
 
 
 if __name__ == "__main__":
-    dhis2_reporting_rate()
+    snt_dhis2_reporting_rate()

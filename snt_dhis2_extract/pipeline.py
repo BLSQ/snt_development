@@ -1165,7 +1165,7 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
 
     try:
         df_lvl_selection = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
-            ["id", "name", "level", "geometry"]
+            ["id", "name", "level"]
         )
     except Exception as e:
         raise Exception(f"An error occured while downloading the DHIS2 pyramid : {e}") from e

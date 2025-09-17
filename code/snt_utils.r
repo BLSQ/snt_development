@@ -144,7 +144,7 @@ export_data <- function(data_object, file_path) {
 }
     
 
-# SEASONALITY -------------------------------------------------------------------
+#%% SEASONALITY -------------------------------------------------------------------
                                                  
 #############
 convert_columns <- function(dt, col_type_map) {
@@ -610,7 +610,7 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
 }
 
 
-# DHS -------------------------------------------------------------
+#%% DHS
 
 ######################################
 extract_latest_dhs_recode_filename <- function(data_folder_path, recode_name, file_type='SV'){
@@ -706,6 +706,7 @@ make_dhs_admin_df <- function(input_dhs_df, original_admin_column="V024", new_ad
   return(admin_dt)
 }
 
+###########################
 make_dhs_adm1_u5mort_dt <- function(dhs_adm1_dt){
   #' TODO see about adding column names as params (case-insensitive)
   #' use chmort from DHS.rates library, to compute smaple avg, lower/upper 95% CI for under-five (u5) mortality
@@ -739,47 +740,7 @@ make_dhs_adm1_u5mort_dt <- function(dhs_adm1_dt){
   # print(u5mort_dt)
   return(u5mort_dt)
 }
-                                           
-# MISC -------------------------------------------
-                                           
-#########################################
-aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
-  #' aggregate the geometries of sf data, at a specified level, given by id and name columns
-  #' @param sf_data the input data
-  #' @param admin_id_colname the column name which contains the id's
-  #' @param admin_name_colname the column name which contains the names
-  #' @returns the aggregated sf data
-  by_list <- list(
-    sf_data[[admin_id_colname]],
-    sf_data[[admin_name_colname]]
-  )
-  names(by_list) <- c(admin_id_colname, admin_name_colname)
-  
-  result <- aggregate(sf_data["geometry"], by = by_list, FUN = sf::st_union)
-  return(result)
-}
 
-#############################################
-clean_admin_names <- function(input_vector, string_to_remove='province') {
-  #' Clean the admin names of certain countries' pyramids, by removing the string_to_remove if present (these are usually "Province" or "Zone de santé" or "District") and then removing the prefix (some countries hav)
-  #' @param input_vector the vector of admin names to clean
-  #' @param string_to_remove the substring to delete from the admin names, if a string indicating the admin unit type is present
-  #' @returns the cleaned vector
-  sapply(input_vector, function(input_string) {
-    parts <- strsplit(input_string, " ")[[1]]
-    parts <- parts[toupper(parts) != toupper(string_to_remove)]
-    if (length(parts) > 1) {
-      parts_without_prefix <- parts[-1]
-      output_string <- paste(parts_without_prefix, collapse = " ")
-    } else {
-      output_string <- ""  # if input has <=2 words
-    }
-    return(output_string)
-  }, USE.NAMES = FALSE)
-}
-        
-                                           
-# VACCINATION -----------------------------------------------------------------------
 
 ###################################
 make_dhs_map <- function(plot_dt, plot_colname, title_name, legend_title="Percentage", scale_limits = c(0, 100)) {
@@ -855,6 +816,25 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
   print(ci_plot)
   return(ci_plot)
 }
+                                           
+#%% MISC FUNCTIONS
+                                           
+#########################################
+aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
+  #' aggregate the geometries of sf data, at a specified level, given by id and name columns
+  #' @param sf_data the input data
+  #' @param admin_id_colname the column name which contains the id's
+  #' @param admin_name_colname the column name which contains the names
+  #' @returns the aggregated sf data
+  by_list <- list(
+    sf_data[[admin_id_colname]],
+    sf_data[[admin_name_colname]]
+  )
+  names(by_list) <- c(admin_id_colname, admin_name_colname)
+  
+  result <- aggregate(sf_data["geometry"], by = by_list, FUN = sf::st_union)
+  return(result)
+}
 
 #################################
 delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
@@ -894,27 +874,6 @@ clean_admin_names <- function(input_vector, string_to_remove='province') {
   }, USE.NAMES = FALSE)
 }
 
-#################################
-make_dhs_admin_df <- function(input_dhs_df, original_admin_column="V024", new_admin_name_colname='ADM1', new_admin_code_colname='DHS_ADM1_CODE'){
-  
-  #' make a data.table with admin names and admin id columns for DHS data, for easier matching with DHIS2 data
-  #' @param input_dhs_df the DHS data
-  #' @param original_admin_column the column which contains the named vector of codes + labels for the admin units
-  #' @param new_admin_name_column how to call the admin labels column
-  #' @param new_admin_code_column how to call the admin codes column (these will be used for merging later on)
-  #' @returns a data.table with only the codes and the names of the admin units, for subsequent merging with the DHS full data
-  admin_labels <- attr(input_dhs_df[[original_admin_column]], "labels")
-  admin_dt <- data.frame(
-    names = names(admin_labels),
-    ids = as.vector(admin_labels),
-    row.names = NULL,
-    stringsAsFactors = FALSE
-  )
-  setDT(admin_dt)
-  setnames(admin_dt, c("names", "ids"), c(new_admin_name_colname, new_admin_code_colname))
-  return(admin_dt)
-}
-
 ####################
 filter_files_to_save <- function(
     target_path,
@@ -940,6 +899,381 @@ filter_files_to_save <- function(
     print("Files found:")
     print(target_files)
 }
+
+################################
+#' reproject a spatvector or spatraster to a given epsg code
+#' @param x: terra object
+#' @param epsg_value: integer epsg code to reproject to
+#' @returns: input object reprojected to the target crs if needed
+#' @imports: terra glue
+reproject_epsg <- function(x, epsg_value) {
+  current_crs <- paste0("EPSG:", crs(x, describe = TRUE)$code)
+  target_crs  <- paste0("EPSG:", epsg_value)
+  
+  if (is.na(current_crs) || current_crs != target_crs) {
+    message(glue::glue("Info: rerojecting."))
+    x <- terra::project(x, target_crs)
+  } else {
+    message(glue::glue("Info: no reprojection needed."))
+  }
+  
+  return(x)
+}
+
+########################
+#' filter points within polygon boundaries using terra
+#'
+#' @param locations_vect: vector with point geometries
+#' @param boundaries_vect: vector with polygon geometries
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#'
+#' @return vector with only the points within the boundaries
+#'
+#' @import terra
+#'
+filter_points_within_boundaries <- function(locations_vect, boundaries_vect, epsg_value_degrees) {
+
+    print("Input data 1/2 (point locations):")
+    locations_vect <- reproject_epsg(locations_vect, epsg_value_degrees)
+    print("Input data 2/2 (boundaries polygon):")
+    boundaries_vect <- reproject_epsg(boundaries_vect, epsg_value_degrees)
+
+    # spatial relation: keep only points within polygons
+    within_matrix <- relate(locations_vect, boundaries_vect, relation = "within")
+
+    # get indices of points with at least one 'within' relation
+    point_indices_within <- which(within_matrix)
+
+    point_indices_outside <- which(!within_matrix)
+
+    print(glue("There were {length(point_indices_within)} points within the boundaries, and {length(point_indices_outside)} points outside. Only those within are returned."))
+
+    # subset the points
+    filtered_locations_vect <- locations_vect[point_indices_within, ]
+
+    return(filtered_locations_vect)
+}
+
+########################
+#' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
+#'
+#' @param input_vect: sf vector of spatial points (in any CRS)
+#' @param coordinate_colnames: names of the longitude and latitude columns
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+#'
+#' @return: sf vector of the circle coverages in the degree CRS
+#'
+#' @details 
+#' 1. check that input is in the correct degree CRS (reproject if needed)
+#' 2. project it to a meter CRS for distance calculations
+#' 3. create circular buffers (coverage radii) around each point
+#' 4. reproject the buffer geometries back to the original degree CRS
+#'
+#' @import sf
+make_coverage_radii_sf <- function(
+  input_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  epsg_value_meters,
+  radius_meters
+){
+  # check CRS and reproject to degree CRS if necessary
+  current_epsg <- st_crs(input_vect)$epsg
+  target_epsg  <- epsg_value_degrees
+  
+  if (is.na(current_epsg) || current_epsg != target_epsg) {
+    message(glue::glue("Info: reprojecting to EPSG:{target_epsg}."))
+    input_vect <- st_transform(input_vect, target_epsg)
+  } else {
+    message(glue::glue("Info: no reprojection needed."))
+  }
+  
+  # reproject to a meter CRS
+  vect_meters <- st_transform(input_vect, epsg_value_meters)
+  
+  # create the circles/buffers around each point
+  coverage_radii_meters <- st_buffer(vect_meters, dist = radius_meters)
+  
+  # reproject back to degree CRS for mapping
+  coverage_radii_degrees <- st_transform(coverage_radii_meters, epsg_value_degrees)
+  
+  return(coverage_radii_degrees)
+}
+
+########################
+#' make circles of a given radius around each point (longitude/latitude) in the terra vector input data
+#'
+#' @param input_vect: terra vector of spatial points (in any CRS)
+#' @param coordinate_colnames: names of the longitude and latitude columns
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+#'
+#' @return: terra vector of the circle coverages in the degree CRS
+#'
+#' @details 
+#' 1. check that input is in the correct degree CRS (reproject if needed)
+#' 2. project it to a meter CRS for distance calculations
+#' 3. create circular buffers (coverage radii) around each point
+#' 4. reproject the buffer geometries back to the original degree CRS
+#'
+#' @import terra
+#'
+make_coverage_radii_terra <- function(
+  
+  input_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  epsg_value_meters,
+  radius_meters
+){
+  
+  # check CRS and reproject to degree CRS if necessary
+  
+  # current_crs <- crs(input_vect, describe = TRUE)$code
+  # if (is.na(current_crs) || current_crs != epsg_value_degrees) {
+  #   print(glue("Projecting the input data to EPSG {epsg_value_degrees}"))
+  #   input_vect <- project(input_vect, paste0("EPSG:", epsg_value_degrees))
+  # } else {
+  #   print(glue("Input data already projected with EPSG {epsg_value_degrees}. No reprojection needed."))
+  # }
+
+  input_vect <- reproject_epsg(input_vect, epsg_value_degrees)
+
+  # reproject to a meter CRS
+  vect_meters <- project(input_vect, paste0("EPSG:", epsg_value_meters))
+  
+  # create the circles/buffers around each point
+  coverage_radii_meters <- buffer(vect_meters, width = radius_meters)
+  
+  # reproject back to degree CRS for mapping
+  coverage_radii_degrees <- project(coverage_radii_meters, paste0("EPSG:", epsg_value_degrees))
+  
+  return(coverage_radii_degrees)
+}
+
+########################
+#' healthcare coverage plot
+#'
+#' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
+#'
+#' @param healthcare_unit_df: data frame containing coordinate columns of healthcare units
+#' @param coordinate_colnames: coordinate columns
+#' @param epsg_value_degrees: EPSG code (in degrees) for CRS
+#' @param admin_unit_vect: vector of administrative boundaries
+#' @param buffer_vect: vector of buffer zones around healthcare units
+#' @param plot_title: title of plot
+#'
+#' @return ggplot object showing the spatial overlay
+#' create a healthcare coverage plot
+#'
+#' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
+#'
+#' @param healthcare_unit_vect: terra vector with coordinate columns of healthcare units
+#' @param coordinate_colnames: coordinate columns
+#' @param epsg_value_degrees: EPSG code (in degrees) for CRS
+#' @param admin_unit_vect: terra vector of administrative boundaries
+#' @param buffer_vect: terra vector of buffer zones around healthcare units
+#' @param plot_title: title of plot
+#'
+#' @return ggplot object showing the spatial overlay
+make_healthcare_coverage_plot <- function(
+  #' plot overlaying a) location of healthcare units, b) administrative boundaries, c) buffers around each healthcare unit
+  
+  healthcare_unit_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  admin_unit_vect,
+  buffer_vect,
+  plot_title
+){
+
+  # get all 3 data objects to the same projection
+
+  # a) ensure the healthcare locations have the proper projection
+  healthcare_unit_vect <- reproject_epsg(healthcare_unit_vect, epsg_value_degrees)
+
+  # b) ensure the admin geo data has the proper projection
+  admin_unit_vect <- reproject_epsg(admin_unit_vect, epsg_value_degrees)
+
+  # c) ensure the buffer data has the proper projection
+  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
+
+  # convert to sf objects for ggplot
+  admin_unit_sf <- st_as_sf(admin_unit_vect)
+  buffer_sf <- st_as_sf(buffer_vect)
+  healthcare_unit_sf <- st_as_sf(healthcare_unit_vect)
+
+  plot <- ggplot() +
+    geom_sf(data = admin_unit_sf, fill = "gray95", color = "black") +
+    geom_sf(data = buffer_sf, fill = "dodgerblue", alpha = 0.3) +
+    geom_sf(data = healthcare_unit_sf, color = "dodgerblue4", size = 0.5) +
+    theme_minimal() +
+    ggtitle(plot_title)
+
+  print(plot)
+
+  return(plot)
+}
+make_healthcare_coverage_plot <- function(
+  #' plot overlaying a) location of healthcare units, b) administrative boundaries, c) buffers around each healthcare unit
+  
+  healthcare_unit_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  admin_unit_vect,
+  buffer_vect,
+  plot_title
+){
+
+  # get all 3 data objects to the same projection
+
+  # a) ensure the healthcare locations have the proper projection
+  healthcare_unit_vect <- reproject_epsg(healthcare_unit_vect, epsg_value_degrees)
+
+  # b) ensure the admin geo data has the proper projection
+  admin_unit_vect <- reproject_epsg(admin_unit_vect, epsg_value_degrees)
+
+  # c) ensure the buffer data has the proper projection
+  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
+
+  # convert to sf objects for ggplot
+  admin_unit_sf <- st_as_sf(admin_unit_vect)
+  buffer_sf <- st_as_sf(buffer_vect)
+  healthcare_unit_sf <- st_as_sf(healthcare_unit_vect)
+
+  plot <- ggplot() +
+    geom_sf(data = admin_unit_sf, fill = "gray95", color = "black") +
+    geom_sf(data = buffer_sf, fill = "dodgerblue", alpha = 0.3) +
+    geom_sf(data = healthcare_unit_sf, color = "dodgerblue4", size = 0.5) +
+    theme_minimal() +
+    ggtitle(plot_title)
+
+  print(plot)
+
+  return(plot)
+}
+                                           
+# make_healthcare_coverage_plot <- function(
+#   #' plot overlaying a) location of healthcare units, b) administrative boundaries, c) buffers around each healthcare unit
+  
+#   healthcare_unit_df,
+#   coordinate_colnames,
+#   epsg_value_degrees,
+#   admin_unit_vect,
+#   buffer_vect,
+#   plot_title
+# ){
+
+#   # get all 3 data objects to the same projection
+
+#   # a) convert the dataframe to SpatVector
+#   healthcare_unit_vect <- vect(
+#     healthcare_unit_df,
+#     geom = coordinate_colnames,
+#     crs = paste0("EPSG:", epsg_value_degrees),
+#     keepgeom = TRUE
+#   )
+#   print(glue("Healthcare locations projected with EPSG {crs(healthcare_unit_vect, proj=TRUE, describe=TRUE)$code}."))
+
+#   # b) ensure the admin geo data has the proper projection
+#   if(crs(admin_unit_vect) != crs(healthcare_unit_vect)){
+#     admin_unit_vect <- project(admin_unit_vect, crs(healthcare_unit_vect))
+#     print(glue("Administrative unit data projected with EPSG {crs(admin_unit_vect)}."))
+#   } else {
+#     print(glue("The EPSG of administrative units data is already {epsg_value_degrees}."))
+#   }
+
+#   # c) ensure the buffer data has the proper projection
+#   if(crs(buffer_vect) != crs(healthcare_unit_vect)){
+#     buffer_vect <- project(buffer_vect, crs(healthcare_unit_vect))
+#     print(glue("Buffer data projected with EPSG {crs(buffer_vect)}."))
+#   } else {
+#     print(glue("The EPSG of buffer data is already {epsg_value_degrees}."))
+#   }
+
+#   # convert to sf objects for ggplot
+#   admin_unit_sf <- st_as_sf(admin_unit_vect)
+#   buffer_sf <- st_as_sf(buffer_vect)
+#   healthcare_unit_sf <- st_as_sf(healthcare_unit_vect)
+
+#   plot <- ggplot() +
+#     geom_sf(data = admin_unit_sf, fill = "gray95", color = "black") +
+#     geom_sf(data = buffer_sf, fill = "dodgerblue", alpha = 0.3) +
+#     geom_sf(data = healthcare_unit_sf, color = "dodgerblue4", size = 0.5) +
+#     theme_minimal() +
+#     ggtitle(plot_title)
+
+#   print(plot)
+
+#   return(plot)
+# }
+
+########################
+#' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
+
+#' @param buffer_vect: vector with the buffer geometries to rasterize
+#' @param raster_data: raster to use as the template for resolution and extent
+#' @param epsg_value_degrees: EPSG of the target CRS in degrees
+#' @param value_inside: value to assign to raster cells that intersect any buffer
+#' @param value_outside: value to assign to raster cells that do not intersect any buffer
+
+#' @return raster with cells assigned values based on intersection with the buffer vector
+make_rasterized_inclusion_data <- function(
+  
+  buffer_vect,
+  raster_data,
+  epsg_value_degrees,
+  value_inside = 1,
+  value_outside = 0
+){
+
+  # reproject raster to desired CRS (degrees)
+  raster_data <- reproject_epsg(raster_data, epsg_value_degrees)
+  
+  # if buffer CRS differs, reproject buffer to raster CRS
+  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
+  
+  # rasterize the buffer: cells inside = value_inside, outside = value_outside
+  inclusion_data <- rasterize(
+    buffer_vect,
+    raster_data,
+    field = value_inside,
+    background = value_outside
+  )
+  
+  return(inclusion_data)
+}
+
+#   make_rasterized_inclusion_data <- function(
+  
+#   input_raster_data,
+#   epsg_value_degrees,
+#   buffer_vect,
+#   value_inside,
+#   value_outside = NA
+# ){
+
+#   # reproject raster to desired CRS (degrees)
+#   raster_data <- project(input_raster_data, paste0("EPSG:", epsg_value_degrees))
+  
+#   # if buffer CRS differs, reproject buffer to raster CRS
+#   if (crs(buffer_vect) != crs(raster_data)) {
+#     buffer_vect <- project(buffer_vect, crs(raster_data))
+#   }
+  
+#   # rasterize the buffer: cells inside = value_inside, outside = value_outside
+#   inclusion_data <- rasterize(
+#     buffer_vect,
+#     raster_data,
+#     field = value_inside,
+#     background = value_outside
+#   )
+  
+#   return(inclusion_data)
+# }
                                         
 ########################                                                 
 check_or_create_dataset <- function(

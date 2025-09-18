@@ -976,12 +976,16 @@ def download_dhis2_population(
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # default to level 2 (all countries have at least this?)
-    org_unit_level = snt_config["SNT_CONFIG"].get("POPULATION_ORG_UNITS_LEVEL", None)
+    # Extract the numeric level from a string like "level_2_name"
+    amd2_level = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
+    match = re.search(r"level_(\d+)_", amd2_level)
+    if not match:
+        raise ValueError(f"Could not extract org unit level from DHIS2_ADMINISTRATION_2 '{amd2_level}'")
+    org_unit_level = int(match.group(1))
     max_level = source_pyramid["level"].max()
     current_run.log_debug(f"Population org unit level : {org_unit_level} max level: {max_level}")
     if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
-        raise ValueError(f"Incorrect POPULATION_ORG_UNITS_LEVEL value, please set between 1 and {max_level}.")
+        raise ValueError(f"Incorrect DHIS2_ADMINISTRATION_2 value, please set between 1 and {max_level}.")
 
     org_unit_uids = source_pyramid.filter(pl.col("level") == org_unit_level)["id"].unique().to_list()
     p1 = period_from_string(str(start)[:4])

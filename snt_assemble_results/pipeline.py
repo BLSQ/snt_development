@@ -258,7 +258,7 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
 
     dhis2_reporting_agg = dhis2_reporting_agg.rename(columns={"REPORTING_RATE": "AGG_REPORTING_RATE"})
     table_updated = table.merge(dhis2_reporting_agg, on="ADM2_ID", how="left")
-    table_updated["REPORTING_RATE"] = table_updated["AGG_REPORTING_RATE"].round(2)
+    table_updated["REPORTING_RATE"] = table_updated["AGG_REPORTING_RATE"].mul(100).round(1)
     return table_updated.drop(columns=["AGG_REPORTING_RATE"])
 
 

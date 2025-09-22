@@ -5,8 +5,7 @@
 		"NA_TREATMENT": "SET_0_TO_NA",		
 		"DHIS2_ADMINISTRATION_1": "level_2_name",
 		"DHIS2_ADMINISTRATION_2": "level_3_name",
-		"ANALYTICS_ORG_UNITS_LEVEL" : 5,
-		"POPULATION_ORG_UNITS_LEVEL" : 3,
+		"ANALYTICS_ORG_UNITS_LEVEL" : 5,		
 		"REPORTING_RATE_PRODUCT_UID" : ["pMbC0FJPkcm"]
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
@@ -25,7 +24,8 @@
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {
-			"POPULATION": ["WLSKVyA8LoY"]			
+			"POPULATION": {"ids": ["WLSKVyA8LoY"], "type": "dataElement"},
+			"POPULATION_U5": {"ids": ["nGZz4qgNal7"], "type": "indicator"}			
 		},		
 		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["aZwnLALknnj"],

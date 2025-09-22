@@ -24,7 +24,7 @@
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {			
-			"POPULATION": {"ids": ["SnBgcu2eE1B"], "type": "dataElement"}
+			"POPULATION": {"ids": ["iIS0MGyL3EL"], "type": "dataElement"}
 		},
 		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["SE8vUT7xeWO"],

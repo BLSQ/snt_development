@@ -99,8 +99,6 @@ def snt_dhis2_extract(
     dhis2_raw_data_path = snt_root_path / "data" / "dhis2" / "extracts_raw"
     dhis2_raw_data_path.mkdir(parents=True, exist_ok=True)
     current_run.log_debug(f"output directory: {dhis2_raw_data_path}")
-    # Set up folders (not yet used)
-    # snt_folders_setup(snt_root_path)
 
     # pull pipeline scripts if requested
     if pull_scripts:
@@ -119,7 +117,6 @@ def snt_dhis2_extract(
             )
 
             # Validate configuration
-            # TODO: Validate config against pyramid.
             validate_config(snt_config_dict)
 
             # get country identifier for file naming
@@ -132,7 +129,7 @@ def snt_dhis2_extract(
                 dhis2_connection=dhis2_connection, cache_folder=pipeline_path / ".cache"
             )
 
-            # get the dhis2 pyramid
+            # get dhis2 pyramid
             dhis2_pyramid = get_dhis2_pyramid(dhis2_client=dhis2_client, snt_config=snt_config_dict)
 
             pop_ready = download_dhis2_population(
@@ -265,7 +262,7 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         If an error occurs while retrieving the pyramid data.
     """
     try:
-        current_run.log_info("Downloading DHIS2 pyramid data.")
+        current_run.log_info("Downloading DHIS2 organisation units data.")
         # retrieve the pyramid data
         dhis2_pyramid = get_organisation_units(dhis2_client)
 
@@ -979,95 +976,171 @@ def download_dhis2_population(
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get population data elements
-    data_elements = get_unique_data_elements(
-        snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_INDICATOR_DEFINITIONS", None)
-    )
-    if len(data_elements) == 0:
-        raise ValueError(
-            "No population data elements (POPULATION_INDICATOR_DEFINITIONS) found in the configuration."
-        )
-
-    # default to level 2 (all countries have at least this?)
-    org_unit_level = snt_config["SNT_CONFIG"].get("POPULATION_ORG_UNITS_LEVEL", None)
+    # Extract the numeric level from a string like "level_2_name"
+    amd2_level = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
+    match = re.search(r"level_(\d+)_", amd2_level)
+    if not match:
+        raise ValueError(f"Could not extract org unit level from DHIS2_ADMINISTRATION_2 '{amd2_level}'")
+    org_unit_level = int(match.group(1))
     max_level = source_pyramid["level"].max()
     current_run.log_debug(f"Population org unit level : {org_unit_level} max level: {max_level}")
     if org_unit_level is None or org_unit_level < 1 or org_unit_level > max_level:
-        raise ValueError(f"Incorrect POPULATION_ORG_UNITS_LEVEL value, please set between 1 and {max_level}.")
+        raise ValueError(f"Incorrect DHIS2_ADMINISTRATION_2 value, please set between 1 and {max_level}.")
 
+    org_unit_uids = source_pyramid.filter(pl.col("level") == org_unit_level)["id"].unique().to_list()
     p1 = period_from_string(str(start)[:4])
     p2 = period_from_string(str(end)[:4])
     periods = [p1] if p1 == p2 else p1.get_range(p2)
 
+    pop_indicators: dict = snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_INDICATOR_DEFINITIONS", {})
+    if len(pop_indicators) == 0:
+        current_run.log_warning("No population indicators defined under POPULATION_INDICATOR_DEFINITIONS.")
+        return False
+
     try:
         if overwrite:
-            delete_raw_files(output_dir, pattern=f"{country_code}_raw_population_*.parquet")
+            # clean all <country_code> raw files
+            delete_raw_files(output_dir / "indicators_raw", pattern=f"{country_code}_raw_*_*.parquet")
     except Exception as e:
         raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
-    try:
-        # Get the organisation units for the specified level
-        df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
-            ["level", "opening_date", "closed_date", "geometry"]
-        )
-        org_unit_uids = df_pyramid["id"].unique().to_list()
-        df_pyramid = df_pyramid.to_pandas()
+    current_run.log_info(f"Downloading population for period : {periods[0]} to {periods[-1]}")
 
-        current_run.log_info(f"Downloading population for period : {periods[0]} to {periods[-1]}")
-        for p in periods:
-            fp = output_dir / f"{country_code}_raw_population_{p}.parquet"
-
+    # Loop over population definitions and retrieve data depending on type
+    for indicator in pop_indicators.items():
+        name = indicator[0]
+        ids = indicator[1].get("ids", [])
+        indicator_type = indicator[1].get("type", [])
+        for period in periods:
+            fp = output_dir / "indicators_raw" / f"{country_code}_raw_{name}_{period}.parquet"
             if fp.exists():
                 current_run.log_info(f"File {fp} already exists. Skipping download.")
                 continue
 
-            try:
-                population_values = dhis2_client.analytics.get(
-                    data_elements=data_elements,
-                    periods=[p],
-                    org_units=org_unit_uids,
-                )
-
-                if len(population_values) == 0:
-                    current_run.log_warning(f"No population data found for period {p}.")
-                    continue
-
-                current_run.log_info(
-                    f"Population data downloaded for period {p}: {len(population_values)} data values"
-                )
-                population_values_df = pd.DataFrame(population_values)
-
-                # Add parent level names (left join with pyramid)
-                merging_col = f"level_{org_unit_level}_id"
-                parent_cols = [
-                    f"level_{ou}{suffix}"
-                    for ou in range(1, org_unit_level + 1)
-                    for suffix in ["_id", "_name"]
-                ]
-                merged_df = population_values_df.merge(
-                    df_pyramid[parent_cols], how="left", left_on="ou", right_on=merging_col
-                )
-                merged_df.to_parquet(fp, engine="pyarrow", index=False)
-
-            except Exception as e:
-                current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
+            if len(ids) == 0:
+                # raise ValueError(f"No ids defined for population indicator {name}.")
+                current_run.log_warning(f"No ids defined for population indicator {name}. Skipping.")
                 continue
 
-    except Exception as e:
-        raise Exception(f"Error {e}") from e
+            if indicator_type not in ("indicator", "dataElement"):
+                raise ValueError(
+                    f"Invalid population indicator type for {name}. Must be 'indicator' or 'dataElement'."
+                )
 
-    # merge all parquet files into one
+            # download based on type
+            current_run.log_info(f"Downloading {name} for period {period}")
+            if indicator_type == "dataElement":
+                download_data_elements(
+                    dhis2_client=dhis2_client,
+                    data_elements=list(set(ids)),
+                    period=period,
+                    org_units=org_unit_uids,
+                    filepath=output_dir / "indicators_raw" / f"{country_code}_raw_{name}_{period}.parquet",
+                )
+            else:  # indicators
+                download_indicators(
+                    dhis2_client=dhis2_client,
+                    indicators=list(set(ids)),
+                    period=period,
+                    org_units=org_unit_uids,
+                    filepath=output_dir / "indicators_raw" / f"{country_code}_raw_{name}_{period}.parquet",
+                )
+
     try:
+        # collect all results and merge into one file
+        current_run.log_info("Merging population files.")
         merge_parquet_files(
-            input_dir=output_dir,
+            input_dir=output_dir / "indicators_raw",
             output_dir=output_dir,
             output_fname=f"{country_code}_dhis2_raw_population.parquet",
-            file_pattern=f"{country_code}_raw_population_*.parquet",
+            file_pattern=f"{country_code}_raw_*_*.parquet",
         )
     except Exception as e:
-        raise Exception(f"Error while merging parquet files: {e}") from e
+        raise Exception(f"Error while merging population parquet files: {e}") from e
 
     return True
+
+
+def download_data_elements(
+    dhis2_client: DHIS2,
+    data_elements: list,
+    period: str,
+    org_units: list[str],
+    filepath: Path,
+) -> None:
+    """Download population data elements from DHIS2 and save them as a parquet file.
+
+    Parameters
+    ----------
+    dhis2_client : DHIS2
+        DHIS2 client instance for API interaction.
+    data_elements : list
+        List of data element IDs to download.
+    period : str
+        Period for which to download the data.
+    org_units : list[str]
+        List of organisation unit IDs.
+    filepath : Path
+        Path to save the downloaded data as a parquet file.
+    """
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    population_values = dhis2_client.analytics.get(
+        data_elements=data_elements,
+        periods=[period],
+        org_units=org_units,
+    )
+
+    if len(population_values) == 0:
+        current_run.log_warning(f"No population data found for period {period}.")
+        return
+
+    current_run.log_info(
+        f"Population data element(s) downloaded for period {period}: {len(population_values)} data values"
+    )
+    population_values_df = pl.DataFrame(population_values)
+    population_values_df.write_parquet(filepath)
+
+
+def download_indicators(
+    dhis2_client: DHIS2,
+    indicators: list,
+    period: str,
+    org_units: list[str],
+    filepath: Path,
+) -> None:
+    """Download population indicator data from DHIS2 and save it as a parquet file.
+
+    Parameters
+    ----------
+    dhis2_client : DHIS2
+        DHIS2 client instance for API interaction.
+    indicators : list
+        List of indicator IDs to download.
+    period : str
+        Period for which to download the data.
+    org_units : list[str]
+        List of organisation unit IDs.
+    filepath : Path
+        Path to save the downloaded data as a parquet file.
+    """
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    population_values = dhis2_client.analytics.get(
+        indicators=indicators,
+        periods=[period],
+        org_units=org_units,
+        include_cocs=False,
+    )
+    if len(population_values) == 0:
+        current_run.log_warning(f"No population indicator data found for period {period}.")
+        return
+
+    current_run.log_info(
+        f"Population indicator data downloaded for period {period}: {len(population_values)} data values"
+    )
+    population_values_df = pl.DataFrame(population_values)
+    # Add a CO column with None values
+    population_values_df = population_values_df.with_columns(pl.lit(None).alias("co"))
+    population_values_df.write_parquet(filepath)
 
 
 @snt_dhis2_extract.task

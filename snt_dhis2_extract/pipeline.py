@@ -125,12 +125,13 @@ def snt_dhis2_extract(
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
             # DHIS2 connection
-            dhis2_client = get_dhis2_client(
-                dhis2_connection=dhis2_connection, cache_folder=pipeline_path / ".cache"
-            )
+
+            dhis2_client = get_dhis2_client(dhis2_connection=dhis2_connection, cache_folder=None)
 
             # get dhis2 pyramid
-            dhis2_pyramid = get_dhis2_pyramid(dhis2_client=dhis2_client, snt_config=snt_config_dict)
+            dhis2_pyramid = get_dhis2_pyramid(
+                dhis2_client=dhis2_client, snt_config=snt_config_dict, pipeline_path=pipeline_path
+            )
 
             pop_ready = download_dhis2_population(
                 start=start,
@@ -232,7 +233,8 @@ def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> D
         If an error occurs while connecting to the DHIS2 server.
     """
     try:
-        cache_folder.mkdir(parents=True, exist_ok=True)
+        if cache_folder:
+            cache_folder.mkdir(parents=True, exist_ok=True)
         dhis2_client = DHIS2(dhis2_connection, cache_dir=cache_folder)  # set a default cache folder
         current_run.log_info(f"Connected to {dhis2_connection.url}")
     except Exception as e:
@@ -241,7 +243,7 @@ def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> D
     return dhis2_client
 
 
-def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
+def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path) -> pl.DataFrame:
     """Get the DHIS2 pyramid data.
 
     Parameters
@@ -250,6 +252,8 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         The DHIS2 client instance for API interaction.
     snt_config : dict
         Configuration dictionary for SNT settings.
+    pipeline_path : Path
+        Path to the pipeline directory.
 
     Returns
     -------
@@ -279,6 +283,12 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict) -> pl.DataFrame:
         if country_code == "NER":
             current_run.log_info("Filtering district names at level 3 for Niger pyramid.")
             dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_3_name").str.starts_with("DS"))
+            # run R script for ad-hoc transformations
+            dhis2_pyramid = run_transformation_notebook(
+                df=dhis2_pyramid,
+                nb_path=pipeline_path / "code" / "NER_pyramid_format.ipynb",
+                nb_output_dir=pipeline_path / "NER_transformations",
+            )
 
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
     except Exception as e:
@@ -1463,6 +1473,81 @@ def validate_period_range(start: int, end: int) -> None:
 
     if start > end:
         raise ValueError("Start period must not be after end period.")
+
+
+def run_transformation_notebook(
+    df: pl.DataFrame,
+    nb_path: Path,
+    nb_output_dir: Path,
+    parameters: dict | None = None,
+    fallback: str = "return_input",  # "raise" | "none"
+) -> pl.DataFrame | None:
+    """Apply specific transformations using an R notebook.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Input DataFrame to be transformed.
+    nb_path : Path
+        The full file path to the notebook.
+    nb_output_dir : Path
+        The path to the directory where the output notebook will be saved.
+    parameters : dict | None, optional
+        A dictionary of parameters to pass to the notebook (default is None).
+    fallback : str, optional
+        Fallback action if the notebook execution fails:
+        - "raise": raise an exception
+        - "return_input": return the input DataFrame (default)
+        - "none": return an empty DataFrame
+
+    Returns
+    -------
+    pl.DataFrame
+    """
+    current_run.log_info(f"Executing transformation notebook: {nb_path}")
+
+    if not nb_path.exists():
+        current_run.log_warning(f"Notebook not found: {nb_path}")
+        return df if fallback == "return_input" else None
+
+    if df.is_empty():
+        current_run.log_warning("Input DataFrame is empty. Skipping notebook execution.")
+        return df if fallback == "return_input" else None
+
+    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    nb_output_path = (
+        nb_output_dir / "papermill_outputs" / f"{nb_path.stem}_OUTPUT_{execution_timestamp}.ipynb"
+    )
+    (nb_output_dir / "papermill_outputs").mkdir(parents=True, exist_ok=True)
+    (nb_output_dir / "input").mkdir(parents=True, exist_ok=True)
+    (nb_output_dir / "output").mkdir(parents=True, exist_ok=True)
+
+    # prepare parquet paths
+    input_path = nb_output_dir / "input" / f"input_dataframe_{execution_timestamp}.parquet"
+    output_path = nb_output_dir / "output" / f"output_dataframe_{execution_timestamp}.parquet"
+    df.write_parquet(input_path)
+
+    # setup parameters (avoid mutating original dict)
+    params = dict(parameters or {})
+    params["INPUT_PATH"] = str(input_path)
+    params["OUTPUT_PATH"] = str(output_path)
+
+    warning_raised = False
+    try:
+        pm.execute_notebook(input_path=nb_path, output_path=nb_output_path, parameters=params)
+    except PapermillExecutionError as e:
+        handle_rkernel_error_with_labels(e, error_labels={"[WARNING]": "warning"})
+        warning_raised = True
+    except Exception as e:
+        if fallback == "raise":
+            raise type(e)(f"Error executing notebook ({type(e).__name__}): {e}") from e
+        current_run.log_warning("Notebook execution failed, skipping transformations.")
+        return df if fallback == "return_input" else None
+
+    if not warning_raised and output_path.exists():
+        return pl.read_parquet(output_path)
+
+    return df if fallback == "return_input" else None
 
 
 if __name__ == "__main__":

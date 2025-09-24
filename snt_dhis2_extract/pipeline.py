@@ -1534,7 +1534,13 @@ def run_transformation_notebook(
 
     warning_raised = False
     try:
-        pm.execute_notebook(input_path=nb_path, output_path=nb_output_path, parameters=params)
+        pm.execute_notebook(
+            input_path=nb_path,
+            output_path=nb_output_path,
+            parameters=params,
+            request_save_on_cell_execute=False,
+            progress_bar=False,
+        )
     except PapermillExecutionError as e:
         handle_rkernel_error_with_labels(e, error_labels={"[WARNING]": "warning"})
         warning_raised = True

@@ -10,7 +10,8 @@
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
+		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
+		"DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
 		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
 		"DHIS2_OUTLIERS_DETECTION" : "snt-dhis2-outliers-detection",
 		"DHIS2_OUTLIERS_REMOVAL_IMPUTATION" : "snt-dhis2-outliers-removal-imputation",
@@ -22,11 +23,20 @@
 		"SNT_MAP_EXTRACT" : "snt-map-extract",
 		"SNT_RESULTS" : "snt-results"
 	},
-	"DHIS2_DATA_DEFINITIONS" : {
-		"POPULATION_INDICATOR_DEFINITIONS": {			
-			"POPULATION": {"ids": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"], "type" : "dataElement"}
-		},		
-		"DHIS2_INDICATOR_DEFINITIONS": {			
+	"DHIS2_DATA_DEFINITIONS": {
+		"POPULATION_DEFINITIONS": {
+			"TOTAL_POPULATION_REF": null,
+			"GROWTH_FACTOR": null,
+			"REFERENCE_YEAR": null,
+			"POPULATION_INDICATORS": {
+				"POPULATION_INDICATORS": {
+					"POPULATION": {"ids": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"], "type" : "dataElement"}
+				}
+			},
+			"POPULATION_DISAGGREGATIONS": {
+			}
+		},
+		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["qkhx1DbWUFV", "OhPA8Hq1KYf","nfRYeVm4dCt","YwRi5giAozg"],
 			"TEST": ["qlwFHwrxnH9","GW43RcB9FbB", "MMekmRHBcSD","yHBQQEsP1Zi", "nhSrxeBE209","BIGNssi5RZS"],
 			"CONF": ["gPlZieTaMLy","f2fnat9bu09","OG8BQGl6Sm1"],

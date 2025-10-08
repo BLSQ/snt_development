@@ -14,14 +14,6 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_dhis2_formatting")
 @parameter(
-    "adjust_population",
-    name="Adjust population",
-    help="Use WorldPop UN adjusted estimates to adjust the DHIS2 population totals",
-    type=bool,
-    default=False,
-    required=False,
-)
-@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -37,7 +29,7 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_formatting(adjust_population: bool, run_report_only: bool, pull_scripts: bool):
+def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
     """Write your pipeline orchestration here.
 
     Pipeline functions should only call tasks and should never perform IO operations or
@@ -86,7 +78,6 @@ def snt_dhis2_formatting(adjust_population: bool, run_report_only: bool, pull_sc
                 snt_root_path=snt_root_path,
                 pipeline_root_path=snt_pipeline_path,
                 snt_config=snt_config_dict,
-                adjust_population=adjust_population,
             )
             dhis2_shapes_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
@@ -161,7 +152,6 @@ def dhis2_population_formatting(
     snt_root_path: Path,
     pipeline_root_path: Path,
     snt_config: dict,
-    adjust_population: bool = False,
 ) -> None:
     """Format DHIS2 population data for SNT."""
     current_run.log_info("Formatting DHIS2 population data.")
@@ -169,7 +159,6 @@ def dhis2_population_formatting(
     # set parameters for notebook
     nb_parameter = {
         "SNT_ROOT_PATH": snt_root_path.as_posix(),
-        "ADJUST_POPULATION": adjust_population,
     }
 
     # Check if the reporting rates data file exists

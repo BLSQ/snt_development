@@ -89,7 +89,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
 
-            _ = add_files_to_dataset(
+            add_files_to_dataset(
                 dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
                 country_code=country_code,
                 file_paths=[

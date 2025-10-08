@@ -23,9 +23,16 @@
 		"SNT_RESULTS" : "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
-		"POPULATION_INDICATOR_DEFINITIONS": {			
-			"POPULATION": {"ids": ["iIS0MGyL3EL"], "type": "dataElement"}
-		},
+		"POPULATION_DEFINITIONS": {
+			"TOTAL_POPULATION_REF":null,
+			"GROWTH_FACTOR" :null,
+			"REFERENCE_YEAR": null,
+			"POPULATION_INDICATORS": {
+				"POPULATION": {"ids": ["iIS0MGyL3EL"], "type": "dataElement"}
+			},
+			"POPULATION_DISAGGREGATIONS": {				
+			}			
+		},	
 		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["SE8vUT7xeWO"],
 			"TEST": ["Hc1bP08WsJf"],

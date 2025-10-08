@@ -9,9 +9,10 @@
 		"REPORTING_RATE_PRODUCT_UID" : ["pMbC0FJPkcm"]
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
-		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
-		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
+		"DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
+		"DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",	
+		"DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
+		"DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate",
 		"DHIS2_OUTLIERS_DETECTION" : "snt-dhis2-outliers-detection",
 		"DHIS2_OUTLIERS_REMOVAL_IMPUTATION" : "snt-dhis2-outliers-removal-imputation",
 		"DHIS2_INCIDENCE" : "snt-dhis2-incidence",
@@ -23,9 +24,22 @@
 		"SNT_RESULTS" : "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
-		"POPULATION_INDICATOR_DEFINITIONS": {
-			"POPULATION": {"ids": ["WLSKVyA8LoY"], "type": "dataElement"},
-			"POPULATION_U5": {"ids": ["nGZz4qgNal7"], "type": "indicator"}			
+		"POPULATION_DEFINITIONS": {
+			"TOTAL_POPULATION_REF":113600000,
+			"GROWTH_FACTOR" :0.03,
+			"REFERENCE_YEAR": 2024,
+			"POPULATION_INDICATORS": {
+				"POPULATION": {"ids": ["WLSKVyA8LoY"], "type": "dataElement"},
+				"POPULATION_U5": {"ids": ["nGZz4qgNal7"], "type": "indicator"}			
+			},			
+			"POPULATION_DISAGGREGATIONS": {
+				"POP_UNDER_5" : 0.189,
+				"POP_UNDER_0_1_Y" : 0.04,
+				"POP_UNDER_1_2_Y" : 0.04,    
+				"POP_5_10_Y": 0.135,
+				"POP_5_36_M": 0.038,
+				"POP_PREGNANT_WOMAN": 0.05
+			}			
 		},		
 		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["aZwnLALknnj"],

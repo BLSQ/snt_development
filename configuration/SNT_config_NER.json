@@ -11,6 +11,7 @@
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
 		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",	
+		"DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
 		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
 		"DHIS2_OUTLIERS_DETECTION" : "snt-dhis2-outliers-detection",
 		"DHIS2_OUTLIERS_REMOVAL_IMPUTATION" : "snt-dhis2-outliers-removal-imputation",

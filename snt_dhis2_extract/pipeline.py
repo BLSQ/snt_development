@@ -25,7 +25,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("snt_dhis2_extract", timeout=28800)
+@pipeline("snt_dhis2_extract", timeout=43200)  # 3600 * 12 = 43200 (12h)
 @parameter(
     "dhis2_connection",
     name="DHIS2 connection",

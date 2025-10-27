@@ -8,6 +8,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    create_outliers_db_table,
 )
 
 
@@ -37,6 +38,14 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 @parameter(
+    "push_db",
+    name="Push outliers table to DB",
+    help="Push outliers table to DB",
+    type=bool,
+    default=True,
+    required=False,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -56,6 +65,7 @@ def snt_dhis2_outliers_imputation_classic(
     deviation_mean: int,
     deviation_median: int,
     deviation_iqr: float,
+    push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -97,7 +107,6 @@ def snt_dhis2_outliers_imputation_classic(
                     "DEVIATION_MEAN": deviation_mean,
                     "DEVIATION_MEDIAN": deviation_median,
                     "DEVIATION_IQR": deviation_iqr,
-                    "PUSH_DB": False,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
@@ -110,6 +119,10 @@ def snt_dhis2_outliers_imputation_classic(
                     *[f for f in (data_path.glob(f"{country_code}_routine_outliers*.parquet"))],
                 ],
             )
+
+            # Create consolidated outliers DB table
+            if push_db:
+                create_outliers_db_table(country_code=country_code, data_path=data_path)
 
         else:
             current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")

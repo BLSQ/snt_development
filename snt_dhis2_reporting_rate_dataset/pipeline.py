@@ -144,23 +144,20 @@ def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
     """
     if outliers_method == "Routine data (Raw)":
         return "_routine.parquet"
-    if outliers_method == "Mean (Classic)":
-        if is_removed:
-            return "_routine_outliers-mean_removed.parquet"
-        return "_routine_outliers-mean_imputed.parquet"
-    if outliers_method == "Median (Classic)":
-        if is_removed:
-            return "_routine_outliers-median_removed.parquet"
-        return "_routine_outliers-median_imputed.parquet"
-    if outliers_method == "IQR (Classic)":
-        if is_removed:
-            return "_routine_outliers-iqr_removed.parquet"
-        return "_routine_outliers-iqr_imputed.parquet"
-    if outliers_method == "Trend (PATH)":
-        if is_removed:
-            return "_routine_outliers-trend_removed.parquet"
-        return "_routine_outliers-trend_imputed.parquet"
-    raise ValueError(f"Unknown outliers method: {outliers_method}")
+
+    method_suffix_map = {
+        "Mean (Classic)": "mean",
+        "Median (Classic)": "median",
+        "IQR (Classic)": "iqr",
+        "Trend (PATH)": "trend",
+    }
+
+    try:
+        suffix = method_suffix_map[outliers_method]
+    except KeyError as err:
+        raise ValueError(f"Unknown outliers method: {outliers_method}") from err
+
+    return f"_routine_outliers-{suffix}{'_removed' if is_removed else '_imputed'}.parquet"
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-# This code branches off from pipeline.py pushed to OH as "fix:(param) outlier_method spelling [v19]"
-
 from pathlib import Path
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
@@ -9,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    dataset_file_exists,
 )
 
 
@@ -27,7 +26,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
     "'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`);"
     " 'imputed' contains imputed values after outliers removal",
-    choices=["raw", "raw_without_outliers", "imputed"],
+    choices=["Routine data (Raw)", "Routine data (Outliers removed)", "Routine data (Outliers imputed)"],
     type=str,
     required=True,
 )
@@ -35,7 +34,14 @@ from snt_lib.snt_pipeline_utils import (
     "outlier_detection_method",
     name="Outlier detection method",
     help="Method to use for outlier detection in the routine data",
-    choices=["median-mad", "mean-sd", "iqr", "magic_glasses_partial", "magic_glasses_complete"],
+    choices=[
+        "Mean (Classic)",
+        "Median (Classic)",
+        "IQR (Classic)",
+        "Trend (PATH)",
+        "MG Partial",
+        "MG Complete",
+    ],
     type=str,
     required=True,
 )
@@ -48,22 +54,6 @@ from snt_lib.snt_pipeline_utils import (
     type=str,
     required=True,
 )
-# @parameter(
-#     "reprate_delement_method_numerator",
-#     name="For reporting rate 'Data Element', select method used for numerator",
-#     help="Applicable only if using reporting rate method 'dataelement'",
-#     choices=["n1", "n2", "Not applicable"],
-#     type=str,
-#     required=True,
-# )
-# @parameter(
-#     "reprate_delement_method_denominator",
-#     name="For reporting rate 'Data Element', select method used for denominator",
-#     help="Applicable only if using reporting rate method 'dataelement'",
-#     choices=["d1", "d2", "Not applicable"],
-#     type=str,
-#     required=True,
-# )
 @parameter(
     "use_csb_data",
     name="Use care seeking data (DHS)",
@@ -119,10 +109,6 @@ def snt_dhis2_incidence(
         Method to use for outlier detection in the routine data.
     reporting_rate_method : str
         Reporting Rate method to use for the analysis (`dataset`, `dataelement`).
-    reprate_delement_method_numerator : str
-        Data element method used as the numerator in reporting rate calculation.
-    reprate_delement_method_denominator : str
-        Data element method used as the denominator in reporting rate calculation.
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
@@ -154,19 +140,31 @@ def snt_dhis2_incidence(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
-            input_notebook_path = pipeline_path / "code" / "snt_dhis2_incidence.ipynb"
+            routine_file = resolve_routine_filename(outlier_detection_method, routine_data_choice)
+            routine_file = f"{country_code}{routine_file}"
+            if routine_data_choice == "raw":
+                routine_ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+            else:
+                routine_ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+
+            # Check the file exists in the dataset
+            if not dataset_file_exists(ds_id=routine_ds_id, filename=routine_file):
+                current_run.log_error(
+                    f"Routine file {routine_file} not found in the dataset {routine_ds_id}, "
+                    "perhaps the outliers imputation pipeline has not been run yet. "
+                    "Processing cannot continue."
+                )
+                return
 
             run_notebook(
-                nb_path=input_notebook_path,
+                nb_path=pipeline_path / "code" / "snt_dhis2_incidence.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "N1_METHOD": n1_method,
-                    "ROUTINE_DATA_CHOICE": routine_data_choice,
-                    "OUTLIER_DETECTION_METHOD": outlier_detection_method,
+                    "ROUTINE_DATA_CHOICE": routine_file,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
                     "USE_CSB_DATA": use_csb_data,
                     "USE_ADJUSTED_POPULATION": use_adjusted_population,
-                    "ROOT_PATH": root_path.as_posix(),
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
@@ -206,6 +204,48 @@ def snt_dhis2_incidence(
     except Exception as e:
         current_run.log_error(f"Notebook execution failed: {e}")
         raise
+
+
+def resolve_routine_filename(outliers_method: str, routine_choice: bool) -> str:
+    """Returns the routine data filename based on the selected outliers method.
+
+    Parameters
+    ----------
+    outliers_method : str
+        The method used for outlier removal.
+    routine_choice : str
+        The routine data choice.
+
+    Returns
+    -------
+    str
+        The filename corresponding to the selected outliers method.
+
+    Raises
+    ------
+    ValueError
+        If the outliers method is unknown.
+    """
+    if routine_choice == "Routine data (Raw)":
+        return "_routine.parquet"
+
+    is_removed = False
+    if routine_choice == "Routine data (Outliers removed)":
+        is_removed = True
+
+    method_suffix_map = {
+        "Mean (Classic)": "mean",
+        "Median (Classic)": "median",
+        "IQR (Classic)": "iqr",
+        "Trend (PATH)": "trend",
+    }
+
+    try:
+        suffix = method_suffix_map[outliers_method]
+    except KeyError as err:
+        raise ValueError(f"Unknown outliers method: {outliers_method}") from err
+
+    return f"_routine_outliers-{suffix}{'_removed' if is_removed else '_imputed'}.parquet"
 
 
 if __name__ == "__main__":

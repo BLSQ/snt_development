@@ -22,15 +22,6 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 @parameter(
-    "epidemic_threshold",
-    name="Epidemic threshold",
-    help="Identify outliers as possible epidemic events, "
-    "based on exceeding a max value multiplied by epidemic threshold (PATH deault: 5)",
-    type=int,
-    default=5,
-    required=False,
-)
-@parameter(
     "push_db",
     name="Push outliers table to DB",
     help="Push outliers table to DB",
@@ -56,7 +47,6 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_dhis2_outliers_imputation_path(
     deviation_mean: int,
-    epidemic_threshold: int,
     push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
@@ -97,7 +87,6 @@ def snt_dhis2_outliers_imputation_path(
                 parameters={
                     "ROOT_PATH": Path(workspace.files_path).as_posix(),
                     "DEVIATION_MEAN": deviation_mean,
-                    "EPI_THRESHOLD": epidemic_threshold,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )

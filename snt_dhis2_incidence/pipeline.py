@@ -35,7 +35,14 @@ from snt_lib.snt_pipeline_utils import (
     "outlier_detection_method",
     name="Outlier detection method",
     help="Method to use for outlier detection in the routine data",
-    choices=["median-mad", "mean-sd", "iqr", "magic_glasses_partial", "magic_glasses_complete"],
+    choices=[
+        "Mean (classic)",
+        "Median (classic)",
+        "IQR (classic)",
+        "Trend (PATH)",
+        "MG Partial",
+        "MG Complete",
+    ],
     type=str,
     required=True,
 )
@@ -48,22 +55,6 @@ from snt_lib.snt_pipeline_utils import (
     type=str,
     required=True,
 )
-# @parameter(
-#     "reprate_delement_method_numerator",
-#     name="For reporting rate 'Data Element', select method used for numerator",
-#     help="Applicable only if using reporting rate method 'dataelement'",
-#     choices=["n1", "n2", "Not applicable"],
-#     type=str,
-#     required=True,
-# )
-# @parameter(
-#     "reprate_delement_method_denominator",
-#     name="For reporting rate 'Data Element', select method used for denominator",
-#     help="Applicable only if using reporting rate method 'dataelement'",
-#     choices=["d1", "d2", "Not applicable"],
-#     type=str,
-#     required=True,
-# )
 @parameter(
     "use_csb_data",
     name="Use care seeking data (DHS)",
@@ -119,10 +110,6 @@ def snt_dhis2_incidence(
         Method to use for outlier detection in the routine data.
     reporting_rate_method : str
         Reporting Rate method to use for the analysis (`dataset`, `dataelement`).
-    reprate_delement_method_numerator : str
-        Data element method used as the numerator in reporting rate calculation.
-    reprate_delement_method_denominator : str
-        Data element method used as the denominator in reporting rate calculation.
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
@@ -162,11 +149,10 @@ def snt_dhis2_incidence(
                 parameters={
                     "N1_METHOD": n1_method,
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
-                    "OUTLIER_DETECTION_METHOD": outlier_detection_method,
+                    # "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "REPORTING_RATE_METHOD": reporting_rate_method,
                     "USE_CSB_DATA": use_csb_data,
                     "USE_ADJUSTED_POPULATION": use_adjusted_population,
-                    "ROOT_PATH": root_path.as_posix(),
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )

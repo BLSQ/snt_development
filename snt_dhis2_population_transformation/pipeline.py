@@ -15,8 +15,8 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
     "adjust_population",
-    name="Adjust using WorldPop UN estimates",
-    help="Use WorldPop UN adjusted estimates to scale the DHIS2 population totals.",
+    name="Adjust using UN totals",
+    help="Use UN totals to scale the DHIS2 population.",
     type=bool,
     default=False,
     required=False,
@@ -120,15 +120,16 @@ def dhis2_population_transformation(
     # set parameters for notebook
     nb_parameter = {
         "SNT_ROOT_PATH": str(snt_root_path),
-        "ADJUST_WITH_WORLDPOP": adjust_population,
+        "ADJUST_WITH_UNTOTALS": adjust_population,
     }
 
     # Check if the reporting rates data file exists
     country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
     ds_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
     if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_population.parquet"):
-        current_run.log_info(
-            f"File {country_code} DHIS2 population formatted not found, skipping transformation."
+        current_run.log_warning(
+            f"File {country_code} DHIS2 population formatted not found, "
+            "perhaps DHIS2 formatting pipeline has not yet been execute. Skipping transformation."
         )
         return
 

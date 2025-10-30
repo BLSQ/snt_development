@@ -26,7 +26,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
     "'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`);"
     " 'imputed' contains imputed values after outliers removal",
-    choices=["raw", "raw_without_outliers", "imputed"],
+    choices=["Routine data (Raw)", "Routine data (Outliers removed)", "Routine data (Outliers imputed)"],
     type=str,
     required=True,
 )
@@ -143,14 +143,14 @@ def snt_dhis2_incidence(
             routine_file = resolve_routine_filename(outlier_detection_method, routine_data_choice)
             routine_file = f"{country_code}{routine_file}"
             if routine_data_choice == "raw":
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+                routine_ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
             else:
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+                routine_ds_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
 
             # Check the file exists in the dataset
-            if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
+            if not dataset_file_exists(ds_id=routine_ds_id, filename=routine_file):
                 current_run.log_error(
-                    f"Routine file {routine_file} not found in the dataset {ds_outliers_id}, "
+                    f"Routine file {routine_file} not found in the dataset {routine_ds_id}, "
                     "perhaps the outliers imputation pipeline has not been run yet. "
                     "Processing cannot continue."
                 )
@@ -226,11 +226,11 @@ def resolve_routine_filename(outliers_method: str, routine_choice: bool) -> str:
     ValueError
         If the outliers method is unknown.
     """
-    if routine_choice == "raw":
+    if routine_choice == "Routine data (Raw)":
         return "_routine.parquet"
 
     is_removed = False
-    if routine_choice == "raw_without_outliers":
+    if routine_choice == "Routine data (Outliers removed)":
         is_removed = True
 
     method_suffix_map = {

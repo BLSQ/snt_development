@@ -108,7 +108,6 @@ def snt_dhis2_outliers_imputation_path(
                 country_code=country_code,
                 file_paths=[
                     *data_path.glob(f"{country_code}_routine_outliers*.parquet"),
-                    data_path / f"{country_code}_routine.parquet",
                 ],
             )
 

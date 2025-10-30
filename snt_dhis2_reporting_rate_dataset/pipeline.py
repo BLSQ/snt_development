@@ -18,8 +18,14 @@ from snt_lib.snt_pipeline_utils import (
     name="Outlier processing method",
     help="Select the routine data results from this outliers method.",
     multiple=False,
-    choices=["Routine data (Raw)", "Mean (Classic)", "Median (Classic)", "IQR (Classic)", "Trend (PATH)"],
-    # TODO: include-> "Partial (Magic glasses)", "Complete (Magic glasses)"
+    choices=[
+        "Routine data (Raw)",
+        "Mean (Classic)",
+        "Median (Classic)",
+        "IQR (Classic)",
+        "Trend (PATH)",
+        "MG PartialMG Complete",
+    ],
     type=str,
     default=None,
     required=True,
@@ -77,11 +83,15 @@ def snt_dhis2_reporting_rate_dataset(
         if not run_report_only:
             routine_file = resolve_routine_filename(outliers_method, use_removed_outliers)
             routine_file = f"{country_code}{routine_file}"
-            ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+            if outliers_method == "Routine data (Raw)":
+                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+            else:
+                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+
             # Check the file exists in the dataset
             if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
                 current_run.log_warning(
-                    f"Routine file {routine_file} not found in the dataset 'DHIS2_OUTLIERS_IMPUTATION', "
+                    f"Routine file {routine_file} not found in the dataset {ds_outliers_id}, "
                     "perhaps the outliers imputation pipeline has not been run yet. "
                     "Processing cannot continue."
                 )
@@ -150,6 +160,8 @@ def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
         "Median (Classic)": "median",
         "IQR (Classic)": "iqr",
         "Trend (PATH)": "trend",
+        "MG Partial": "mg-partial",
+        "MG Complete": "mg-complete",
     }
 
     try:

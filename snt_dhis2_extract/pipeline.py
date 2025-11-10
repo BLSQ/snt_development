@@ -320,31 +320,6 @@ def download_dhis2_reporting_rates(
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
-    # if country_code is None:
-    #     raise ValueError("COUNTRY_CODE is not specified in the configuration.")
-
-    # # Org units level selection for reporting
-    # org_unit_level_name = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2", None)
-    # if org_unit_level_name is None:
-    #     raise ValueError("DHIS2_ADMINISTRATION_2 value not configured.")
-
-    # Extract the numeric level from a string like "level_2_name"
-    # match = re.search(r"level_(\d+)_", org_unit_level_name)
-    # if not match:
-    #     raise ValueError(f"Could not extract org unit level from '{org_unit_level_name}'")
-    # administrative_lvl_2 = int(match.group(1))
-    # org_unit_level = snt_config["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None)
-    # if org_unit_level is None:
-    #     raise ValueError("ANALYTICS_ORG_UNITS_LEVEL value not configured.")
-
-    # filter pyramid at max org unit level
-    # df_pyramid = source_pyramid.filter(pl.col("level") == org_unit_level).drop(
-    #     ["level", "opening_date", "closed_date", "geometry"]
-    # )
-    # org_units_list = df_pyramid["id"].unique().to_list()
-    # org_units_list = source_pyramid.filter(pl.col("level") == org_unit_level)["id"].unique().to_list()
-
     # setup periods
     p1 = period_from_string(str(start))
     p2 = period_from_string(str(end))
@@ -359,9 +334,6 @@ def download_dhis2_reporting_rates(
         handle_reporting_datasets(
             reporting_datasets=rep_datasets,
             snt_config=snt_config,
-            # country_code=country_code,
-            # org_units_list=org_units_list,
-            # org_unit_level=org_unit_level,
             source_pyramid=source_pyramid,
             dhis2_client=dhis2_client,
             periods=periods,
@@ -372,9 +344,6 @@ def download_dhis2_reporting_rates(
         handle_reporting_indicators(
             reporting_indicators=rep_indicators,
             snt_config=snt_config,
-            # country_code=country_code,
-            # org_units_list=org_units_list,
-            # org_unit_level=org_unit_level,
             source_pyramid=source_pyramid,
             dhis2_client=dhis2_client,
             periods=periods,
@@ -421,7 +390,6 @@ def handle_reporting_datasets(
     current_run.log_info("Downloading datasets metadata from DHIS2.")
     datasets_metadata = get_datasets(dhis2_client)
     # datasets_metadata = pl.read_parquet(# output / "datasets_metadata.parquet")
-    # datasets_metadata_df = pl.DataFrame(datasets_metadata)
 
     # validate reporting_rates
     valid_reporting_rates = validate_reporting_rates(reporting_datasets, datasets_metadata)

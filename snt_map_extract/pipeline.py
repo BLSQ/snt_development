@@ -5,12 +5,10 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import requests
-from openhexa.sdk import (
-    current_run,
-    parameter,
-    pipeline,
-    workspace,
-)
+from openhexa.sdk import current_run, parameter, pipeline, workspace, File
+import rasterio
+from rasterio.warp import reproject, Resampling
+from affine import Affine
 from rasterstats import zonal_stats
 from owslib.wcs import WebCoverageService
 from snt_lib.snt_pipeline_utils import (
@@ -24,6 +22,14 @@ from snt_lib.snt_pipeline_utils import (
 
 
 @pipeline("snt_map_extract")
+@parameter(
+    code="pop_raster_selection",
+    name="Population raster selection (.tif)",
+    type=File,
+    help="Select the population raster (.tif) used for population-weighted calculations.",
+    required=False,
+    default=None,
+)
 @parameter(
     "run_report_only",
     name="Run reporting only",
@@ -39,7 +45,7 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_map_extract(run_report_only: bool, pull_scripts: bool) -> None:
+def snt_map_extract(pop_raster_selection: str, run_report_only: bool, pull_scripts: bool) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extract"
@@ -58,9 +64,7 @@ def snt_map_extract(run_report_only: bool, pull_scripts: bool) -> None:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
-
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-        dataset_shapes_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
         dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACT")
 
         # get org unit level
@@ -74,10 +78,6 @@ def snt_map_extract(run_report_only: bool, pull_scripts: bool) -> None:
                 f"Invalid DHIS2_ADMINISTRATION_2 "
                 f"format expected: 'level_NUMBER_name' received: {admin_level_2}"
             )
-
-        # Get shapes
-        shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
-        current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
         # MAP indicators
         snt_indicators = {
@@ -98,11 +98,21 @@ def snt_map_extract(run_report_only: bool, pull_scripts: bool) -> None:
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
+            if pop_raster_selection is None:
+                raster_fname = f"{country_code}_worldpop_ppp_*_UNadj.tif"
+                raster_path = root_path / "data" / "worldpop" / "raw"
+            else:
+                if not pop_raster_selection.name.lower().endswith(".tif"):
+                    raise ValueError("Population raster must be a .tif file.")
+                raster_fname = pop_raster_selection.name
+                raster_path = Path(pop_raster_selection.path).parent
+
             make_table(
                 coverage_indicators=snt_indicators,
-                country_code=country_code,
-                shapes=shapes,  # type: ignore[reportArgumentType]
+                snt_config=snt_config,
                 level=org_level,
+                raster_path=raster_path,
+                raster_fname=raster_fname,
                 output_path=output_path,
             )
 
@@ -188,7 +198,6 @@ def download_raster_data(
                 current_run.log_info(f"Raster for {layer_name} already downloaded.")
 
 
-# Example malaria raster layer (adjust this to match exact layer name)
 def build_latest_map(category: str) -> dict:
     """Retrieve the latest map coverage IDs for a given category from the malaria atlas WCS service.
 
@@ -203,7 +212,7 @@ def build_latest_map(category: str) -> dict:
         A dictionary mapping layer keys to a tuple of (coverage ID, date string).
     """
     url = f"https://data.malariaatlas.org/geoserver/{category}/wcs?service=WCS&request=GetCapabilities"
-    wcs = WebCoverageService(url, version="2.0.1")
+    wcs = WebCoverageService(url, version="2.0.1", timeout=90)
     latest_map = {}
 
     for cov_id in wcs.contents:
@@ -224,9 +233,10 @@ def build_latest_map(category: str) -> dict:
 
 def make_table(
     coverage_indicators: dict,
-    country_code: str,
-    shapes: gpd.GeoDataFrame,
+    snt_config: str,
     level: int,
+    raster_path: Path,
+    raster_fname: str,
     output_path: Path,
 ) -> pd.DataFrame:
     """Generate a table of zonal statistics for given coverage indicators and save the results.
@@ -235,12 +245,14 @@ def make_table(
     ----------
     coverage_indicators : dict
         Dictionary mapping categories to indicator layer names.
-    country_code : str
-        The country code used for naming output files.
-    shapes : gpd.GeoDataFrame
-        GeoDataFrame containing administrative boundaries.
+    snt_config : str
+        SNT configuration file.
     level : int
         Administrative level for processing.
+    raster_path : Path
+        Path to the selecte raster directory.
+    raster_fname : str
+        Filename pattern for the population raster.
     output_path : Path
         Directory where output files will be saved.
 
@@ -249,7 +261,10 @@ def make_table(
     pd.DataFrame
         DataFrame containing the processed zonal statistics.
     """
-    found_indicators = filter_available_indicators(coverage_indicators)
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_shapes_id = snt_config.get("SNT_DATASET_IDENTIFIERS", {}).get("DHIS2_DATASET_FORMATTED")
+    shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
+    current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
     invalid_shapes = shapes[shapes.geometry.isna()]
     if len(invalid_shapes) > 0:
@@ -257,36 +272,59 @@ def make_table(
             f"DHIS2 units with no geometry: {list(invalid_shapes[f'level_{level}_name'].unique())}"
         )
     shapes = shapes[shapes.geometry.notna()]
+
+    found_indicators = filter_available_indicators(coverage_indicators)
     if len(shapes) > 0:
         minx, miny, maxx, maxy = shapes.total_bounds
         rasters_path = output_path / "raster_files"
         rasters_path.mkdir(parents=True, exist_ok=True)
 
         download_raster_data(rasters_path, found_indicators, minx, maxx, miny, maxy)
+        pop_data, pop_transform, pop_crs, pop_nodata = load_raw_population_raster(
+            file_pattern=raster_fname,
+            raster_path=raster_path,
+        )
+        pop_total = compute_total_populations(
+            shapes, data=pop_data, transform=pop_transform, crs=pop_crs, nodata=pop_nodata
+        )
+
+        # Set nodata to np.nan
+        if pop_data is not None:
+            pop_data = pop_data.astype(float)
+            pop_data[pop_data == pop_nodata] = np.nan
 
         # Step 1: Load Admin Polygons
         final_df = pd.DataFrame()
         for category, layers in found_indicators.items():
-            current_run.log_info(f"Processing {category}...")
+            current_run.log_info(f"Processing {category}.")
             for indicator, layer_name in layers.items():
                 version = layer_name.split("__")[1]
+                metric_columns = ["mean"]
+
+                with rasterio.open(rasters_path / f"{layer_name}.tif") as src:
+                    metric = src.read(1)
+                    metric_transform = src.transform
+                    metric_crs = src.crs
+                    metric_nodata = src.nodata
+
+                current_run.log_info(f"Computing {layer_name} statistics...")
+                # Compute Zonal Statistics
                 zstats = zonal_stats(
-                    shapes,
-                    rasters_path / f"{layer_name}.tif",
-                    stats=["mean"],
+                    vectors=shapes,
+                    raster=metric,
+                    affine=metric_transform,
+                    stats=metric_columns,
                     geojson_out=True,
+                    nodata=metric_nodata,
                 )
 
-                # Convert to GeoDataFrame
+                # Format results
                 result_gdf = gpd.GeoDataFrame.from_features(zstats)
-
-                # Step 4: Reshape to Output Format
                 result_gdf["metric_category"] = category
                 result_gdf["metric_name"] = indicator
-                metric_columns = ["mean"]
                 ref_columns = {col for col in result_gdf.columns if col not in metric_columns}
 
-                # Melt to long format
+                # Melt to long format (could be several metrics)
                 melt_df = result_gdf.melt(
                     id_vars=list(ref_columns),
                     value_vars=metric_columns,
@@ -299,6 +337,32 @@ def make_table(
                 melt_df["MONTH"] = melt_df["period"].str[4:].astype(int)
                 melt_df["value"] = pd.to_numeric(melt_df["value"], errors="coerce")
                 melt_df = melt_df[np.isfinite(melt_df["value"])]
+                melt_df = melt_df.drop(columns=["geometry"])
+
+                # Compute population-weighted metric (extra column)
+                weighted_metric = compute_population_weighted_metric(
+                    metric_data=metric,
+                    metric_transform=metric_transform,
+                    metric_crs=metric_crs,
+                    metric_nodata=metric_nodata,
+                    pop_data=pop_data,
+                    pop_transform=pop_transform,
+                    pop_crs=pop_crs,
+                    total_population=pop_total,
+                    shapes=shapes,
+                    indicator=indicator,
+                )
+
+                if weighted_metric is None:
+                    melt_df["population_weighted"] = None  # default if not computed
+                else:
+                    melt_df = melt_df.merge(
+                        weighted_metric[["ADM2_ID", "population_weighted"]],
+                        on="ADM2_ID",
+                        how="left",
+                    )
+
+                # merge final table
                 final_df = pd.concat([final_df, melt_df], ignore_index=True)
 
         # Step 5: Save Output
@@ -315,6 +379,44 @@ def make_table(
         current_run.log_info(f"Output file saved under : {formatted_path / f'{country_code}_map_data.csv'}")
 
     return final_df
+
+
+def load_raw_population_raster(file_pattern: str, raster_path: Path) -> tuple:
+    """Load raw population raster from the specified path.
+
+    Parameters
+    ----------
+    file_pattern : str
+        Pattern to match the population raster file.
+    raster_path : Path
+        Path to the population raster file.
+
+    Returns
+    -------
+    tuple | None
+        The loaded raster dataset or None if loading fails.
+    """
+    raster_file = list(raster_path.glob(file_pattern))
+    if not raster_file:
+        current_run.log_warning(f"No population raster not found: {raster_path}.")
+        return None, None, None, None
+
+    if len(raster_file) > 1:
+        current_run.log_warning(
+            f"Expected 1 file but found {len(raster_file)}: {raster_file}. Using first match."
+        )
+
+    try:
+        with rasterio.open(raster_file[0]) as src:
+            raster = src.read(1)
+            transform = src.transform  # affine
+            crs = src.crs
+            nodata = src.nodata
+        current_run.log_info(f"Population raster loaded: {raster_file[0]}.")
+        return raster, transform, crs, nodata
+    except Exception as e:
+        current_run.log_warning(f"Could not load population raster {raster_file[0]}. Error: {e}")
+        return None, None, None, None
 
 
 def filter_available_indicators(indicators: dict) -> dict:
@@ -347,6 +449,209 @@ def filter_available_indicators(indicators: dict) -> dict:
                 )
         filtered_indicators[category] = result
     return filtered_indicators
+
+
+def compute_total_populations(
+    shapes: gpd.GeoDataFrame,
+    data: np.ndarray,
+    transform: Affine,
+    crs: str,
+    nodata: float,
+) -> pd.DataFrame:
+    """Compute total populations for given shapes using population data.
+
+    Parameters
+    ----------
+    shapes : gpd.GeoDataFrame
+        GeoDataFrame containing the shapes for zonal statistics.
+    data : np.ndarray
+        2D array of the population raster.
+    transform : Affine
+        Affine transform of the population raster.
+    crs : str
+        CRS of the population raster.
+    nodata : float
+        NoData value of the population raster.
+
+    Returns
+    -------
+    pd.Series
+        Series containing the total populations for each shape or None if data is unavailable.
+    """
+    if any(x is None for x in (shapes, data, crs)):
+        return None
+
+    # Ensure CRS matches the raster & reproject if necessary
+    if shapes.crs is None:
+        raise ValueError("Shapes GeoDataFrame must have a defined CRS.")
+    # Reproject shapes if CRS is different (consistent to wpop pipeline calculation check)
+    if shapes.crs.to_string() != crs:
+        current_run.log_info(
+            f"The CRS data differs from the provided shapes file. Reprojecting shapes with {crs}"
+        )
+        shapes = shapes.to_crs(crs)
+
+    # get statistics
+    current_run.log_info(f"Computing ADM2 spacial aggregation for {len(shapes)} shapes.")
+    pop_total = zonal_stats(
+        vectors=shapes,
+        raster=data,
+        affine=transform,
+        stats=["sum"],
+        geojson_out=True,
+        nodata=nodata,
+    )
+    result = pd.DataFrame(
+        [
+            {"ADM2_ID": f["properties"].get("ADM2_ID"), "total_population": f["properties"]["sum"]}
+            for f in pop_total
+        ]
+    )
+    result["total_population"] = result["total_population"].round(0).astype(int)
+    result["ADM2_ID"] = result["ADM2_ID"].astype(str)
+    return result
+
+
+def compute_population_weighted_metric(
+    metric_data: np.ndarray,
+    metric_transform: Affine,
+    metric_crs: str,
+    metric_nodata: float,
+    pop_data: np.ndarray,
+    pop_transform: Affine,
+    pop_crs: str,
+    total_population: pd.DataFrame,
+    shapes: gpd.GeoDataFrame,
+    indicator: str,
+) -> pd.Series:
+    """Compute weighted metric values for given shapes using population data.
+
+    Parameters
+    ----------
+    metric_data : np.ndarray
+        2D array of the metric raster, nodata values set to np.nan.
+    metric_transform : Affine
+        Affine transform of the metric raster.
+    metric_crs : str
+        CRS of the metric raster.
+    metric_resolution : tuple
+        Resolution of the metric raster.
+    metric_nodata : float
+        NoData value of the metric raster.
+    pop_data:
+        2D array of the population raster, nodata values set to np.nan.
+    pop_transform:
+        Affine transform of the population raster.
+    pop_crs:
+        CRS of the population raster.
+    total_population:
+        DataFrame containing total populations for each shape.
+    shapes : gpd.GeoDataFrame
+        GeoDataFrame containing the shapes for zonal statistics.
+    indicator : str
+        Name of the indicator being processed.
+
+    Returns
+    -------
+    pd.Series
+        Series containing the weighted metric values for each shape or None if population data is unavailable.
+    """
+    if any(
+        x is None
+        for x in (shapes, metric_data, metric_transform, metric_crs, pop_data, pop_transform, pop_crs)
+    ):
+        current_run.log_warning(f"Population-weighted computation skipped for metric: {indicator}.")
+        return None
+
+    current_run.log_info(f"Computing population-weighted for metric: {indicator}.")
+    # Align metric raster to population raster (resolution and CRS)
+    metric_aligned = align_raster_to_reference(
+        data=metric_data,
+        crs=metric_crs,
+        transform=metric_transform,
+        reference_data=pop_data,
+        reference_crs=pop_crs,
+        reference_transform=pop_transform,
+        resampling=Resampling.nearest,  # nearest repeats metric values
+    )
+
+    metric_aligned = metric_aligned.astype(float)
+    metric_aligned[metric_aligned == metric_nodata] = np.nan
+
+    # Multiply
+    weighted_raster = pop_data * metric_aligned
+    zstats_w = zonal_stats(
+        vectors=shapes,
+        raster=weighted_raster,
+        affine=pop_transform,
+        stats=["sum"],
+        geojson_out=True,
+        nodata=np.nan,
+    )
+    result_w = pd.DataFrame(
+        [
+            {"ADM2_ID": f["properties"].get("ADM2_ID"), "weighted_sum": f["properties"]["sum"]}
+            for f in zstats_w
+        ]
+    )
+    result_w["ADM2_ID"] = result_w["ADM2_ID"].astype(str)
+    result = result_w.merge(total_population, on="ADM2_ID", how="left")
+    result["population_weighted"] = result["weighted_sum"] / result["total_population"]
+    return result
+
+
+def align_raster_to_reference(
+    data: np.ndarray,
+    crs: str,
+    transform: Affine,
+    reference_data: np.ndarray,
+    reference_crs: str,
+    reference_transform: Affine,
+    resampling: Resampling = Resampling.bilinear,
+) -> np.ndarray:
+    """Align a metric raster to match a reference raster (CRS and shape).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        2D array of the metric raster.
+    crs : rasterio.crs.CRS or str
+        CRS of the metric raster.
+    transform : Affine
+        Affine transform of the metric raster.
+    reference_data : np.ndarray
+        2D array of the reference raster.
+    reference_crs : rasterio.crs.CRS or str
+        CRS of the reference raster.
+    reference_transform : Affine
+        Affine transform of the reference raster.
+    resampling : rasterio.enums.Resampling
+        Resampling method (default: bilinear).
+
+    Returns
+    -------
+    np.ndarray
+        Metric raster reprojected and resampled to reference grid.
+    """
+    reference_shape = reference_data.shape
+    aligned = np.empty(reference_shape, dtype=data.dtype)
+
+    # Only reproject if CRS or shape/transform differ
+    if (crs != reference_crs) or (data.shape != reference_shape):
+        reproject(
+            source=data,
+            destination=aligned,
+            src_transform=transform,
+            src_crs=crs,
+            dst_transform=reference_transform,
+            dst_crs=reference_crs,
+            resampling=resampling,
+        )
+    else:
+        # Already aligned
+        aligned[:] = data
+
+    return aligned
 
 
 if __name__ == "__main__":

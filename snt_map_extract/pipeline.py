@@ -20,6 +20,8 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 
+# Ticket: https://bluesquare.atlassian.net/browse/SNT25-143
+
 
 @pipeline("snt_map_extract")
 @parameter(

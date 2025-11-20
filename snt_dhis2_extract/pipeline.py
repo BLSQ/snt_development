@@ -32,14 +32,14 @@ from snt_lib.snt_pipeline_utils import (
     help="DHIS2 connection ID",
     type=DHIS2Connection,
     default=None,
-    required=False,  # True -------------------------------------------------------------------------------------------
+    required=True,
 )
 @parameter(
     "start",
     name="Period (start)",
     help="Start of DHIS2 period (YYYYMM)",
     type=int,
-    default=202401,  # None,
+    default=None,
     required=True,
 )
 @parameter(
@@ -47,7 +47,7 @@ from snt_lib.snt_pipeline_utils import (
     name="Period (end)",
     help="End of DHIS2 period (YYYYMM)",
     type=int,
-    default=202402,  # None,
+    default=None,
     required=True,
 )
 @parameter(
@@ -121,13 +121,8 @@ def snt_dhis2_extract(
 
             # get country identifier for file naming
             country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-            if country_code is None:
-                current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
             # DHIS2 connection
-            dhis2_connection = workspace.get_connection(
-                "drc-snis"
-            )  # DELETE -------------------------------------------------------------------------------------------
             dhis2_client = get_dhis2_client(dhis2_connection=dhis2_connection, cache_folder=None)
 
             # get dhis2 pyramid
@@ -135,38 +130,38 @@ def snt_dhis2_extract(
                 dhis2_client=dhis2_client, snt_config=snt_config_dict, pipeline_path=pipeline_path
             )
 
-            # pop_ready = download_dhis2_population(
-            #     start=start,
-            #     end=end,
-            #     source_pyramid=dhis2_pyramid,
-            #     dhis2_client=dhis2_client,
-            #     snt_config=snt_config_dict,
-            #     output_dir=dhis2_raw_data_path / "population_data",
-            #     overwrite=overwrite,
-            # )
+            pop_ready = download_dhis2_population(
+                start=start,
+                end=end,
+                source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
+                snt_config=snt_config_dict,
+                output_dir=dhis2_raw_data_path / "population_data",
+                overwrite=overwrite,
+            )
 
-            # shapes_ready = download_dhis2_shapes(
-            #     source_pyramid=dhis2_pyramid,
-            #     output_dir=dhis2_raw_data_path / "shapes_data",
-            #     snt_config=snt_config_dict,
-            # )
+            shapes_ready = download_dhis2_shapes(
+                source_pyramid=dhis2_pyramid,
+                output_dir=dhis2_raw_data_path / "shapes_data",
+                snt_config=snt_config_dict,
+            )
 
-            # pyramid_ready = download_dhis2_pyramid(
-            #     source_pyramid=dhis2_pyramid,
-            #     output_dir=dhis2_raw_data_path / "pyramid_data",
-            #     snt_config=snt_config_dict,
-            # )
+            pyramid_ready = download_dhis2_pyramid(
+                source_pyramid=dhis2_pyramid,
+                output_dir=dhis2_raw_data_path / "pyramid_data",
+                snt_config=snt_config_dict,
+            )
 
-            # analytics_ready = download_dhis2_analytics(
-            #     start=start,
-            #     end=end,
-            #     source_pyramid=dhis2_pyramid,
-            #     dhis2_client=dhis2_client,
-            #     snt_config=snt_config_dict,
-            #     output_dir=dhis2_raw_data_path / "routine_data",
-            #     overwrite=overwrite,
-            #     ready=pop_ready,
-            # )
+            analytics_ready = download_dhis2_analytics(
+                start=start,
+                end=end,
+                source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
+                snt_config=snt_config_dict,
+                output_dir=dhis2_raw_data_path / "routine_data",
+                overwrite=overwrite,
+                ready=pop_ready,
+            )
 
             reporting_ready = download_dhis2_reporting_rates(
                 start=start,
@@ -176,36 +171,36 @@ def snt_dhis2_extract(
                 snt_config=snt_config_dict,
                 output_dir=dhis2_raw_data_path / "reporting_data",
                 overwrite=overwrite,
-                ready=True,  # analytics_ready,
+                ready=analytics_ready,
             )
 
-            # files_ready = add_files_to_dataset(
-            #     dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
-            #     country_code=country_code,
-            #     org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
-            #     file_paths=[
-            #         dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
-            #         dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
-            #         dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
-            #         dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
-            #         dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
-            #     ],
-            #     analytics_ready=analytics_ready,
-            #     pop_ready=pop_ready,
-            #     shapes_ready=shapes_ready,
-            #     pyramid_ready=pyramid_ready,
-            #     reporting_ready=reporting_ready,
-            # )
+            files_ready = add_files_to_dataset(
+                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
+                country_code=country_code,
+                org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
+                file_paths=[
+                    dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
+                    dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
+                    dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
+                    dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
+                    dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
+                ],
+                analytics_ready=analytics_ready,
+                pop_ready=pop_ready,
+                shapes_ready=shapes_ready,
+                pyramid_ready=pyramid_ready,
+                reporting_ready=reporting_ready,
+            )
 
         else:
             files_ready = True
             current_run.log_info("Skipping data extraction and running report only.")
 
-        # run_report_notebook(
-        #     nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
-        #     nb_output_path=pipeline_path / "reporting" / "outputs",
-        #     ready=files_ready,
-        # )
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            ready=files_ready,
+        )
 
     except Exception as e:
         current_run.log_error(f"Error in pipeline execution: {e}")
@@ -299,7 +294,7 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
     return dhis2_pyramid
 
 
-# @snt_dhis2_extract.task
+@snt_dhis2_extract.task
 def download_dhis2_reporting_rates(
     start: int,
     end: int,
@@ -389,7 +384,6 @@ def handle_reporting_datasets(
     # Download datasets metadata
     current_run.log_info("Downloading datasets metadata from DHIS2.")
     datasets_metadata = get_datasets(dhis2_client)
-    # datasets_metadata = pl.read_parquet(# output / "datasets_metadata.parquet")
 
     # validate reporting_rates
     valid_reporting_rates = validate_reporting_rates(reporting_datasets, datasets_metadata)
@@ -426,12 +420,15 @@ def handle_reporting_datasets(
                 metrics = rate.get("METRICS", [])
                 reporting_des = [f"{ds}.{metric}" for ds, metric in product([dataset_uid], metrics)]
 
-                # select dataset org units
-                ds_org_units = (
-                    datasets_metadata.filter(pl.col("id") == dataset_uid)
-                    .select("organisation_units")
-                    .to_series()[0]
-                )
+                # select dataset org units from DS (optional)
+                # ds_org_units = list(
+                #     datasets_metadata.filter(pl.col("id") == dataset_uid)
+                #     .select("organisation_units")
+                #     .to_series()[0]
+                # )
+
+                # Select org units from pyramid
+                ds_org_units = pyramid_metadata["id"].unique().to_list()
 
                 # Get dataset name
                 try:

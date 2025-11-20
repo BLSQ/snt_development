@@ -338,7 +338,7 @@ def make_table(
                 melt_df["YEAR"] = melt_df["period"].str[:4].astype(int)
                 melt_df["MONTH"] = melt_df["period"].str[4:].astype(int)
                 melt_df["value"] = pd.to_numeric(melt_df["value"], errors="coerce")
-                melt_df = melt_df[np.isfinite(melt_df["value"])]
+                # melt_df = melt_df[np.isfinite(melt_df["value"])]
                 melt_df = melt_df.drop(columns=["geometry"])
 
                 # Compute population-weighted metric (extra column)

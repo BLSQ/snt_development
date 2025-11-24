@@ -144,142 +144,6 @@ export_data <- function(data_object, file_path) {
 }
     
 
-
-#%% MISC FUNCTIONS
-
-#######################################
-delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
-  #' Delete files which don't have a given extension, from a given folder
-  #' @param folder_path the directory path
-  #' @param extension_to_retain the extension with which files will be keps
-  
-  pattern_to_keep <- paste0("*", extension_to_retain)
-  non_delete_files <- dir(path = folder_path, pattern = pattern_to_keep, ignore.case=TRUE)
-  delete_files <- setdiff(dir(path = folder_path), non_delete_files)
-  if (length(delete_files) == 0){
-    print("No files to delete.")
-  } else{
-    if(length(non_delete_files) == 0){
-      print("Deleting all files from folder.")
-    }
-    unlink(file.path(folder_path, delete_files), recursive=TRUE)
-  }
-}
-
-##################################
-check_perfect_match <- function(dt_a, merge_col_a, dt_b, merge_col_b){
-  #' check if two columns have exactly the same unique values
-  #' 
-  #' @param dt_a first data frame
-  #' @param merge_col_a column name (string) in dt_a to compare
-  #' @param dt_b second data frame
-  #' @param merge_col_b column name (string) in dt_b to compare
-  #' 
-  #' @return TRUE if both columns have the same unique values, FALSE otherwise
-  values_a <- dt_a[[merge_col_a]]
-  values_b <- dt_b[[merge_col_b]]
-  values_only_a <- setdiff(values_a, values_b)
-  values_only_b <- setdiff(values_b, values_a)
-  return(
-    ((length(values_only_a) == 0) & (length(values_only_b) == 0))
-    )
-}
-
-#########################################
-aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
-  #' aggregate the geometries of sf data, at a specified level, given by id and name columns
-  #' @param sf_data the input data
-  #' @param admin_id_colname the column name which contains the id's
-  #' @param admin_name_colname the column name which contains the names
-  #' @returns the aggregated sf data
-  by_list <- list(
-    sf_data[[admin_id_colname]],
-    sf_data[[admin_name_colname]]
-  )
-  names(by_list) <- c(admin_id_colname, admin_name_colname)
-  
-  result <- aggregate(sf_data["geometry"], by = by_list, FUN = sf::st_union)
-  return(result)
-}
-
-##########################
-clean_admin_names <- function(input_vector, string_to_remove='province') {
-  #' Clean the admin names of certain countries' pyramids, by removing the string_to_remove if present (these are usually "Province" or "Zone de santé" or "District") and then removing the prefix (some countries hav)
-  #' @param input_vector the vector of admin names to clean
-  #' @param string_to_remove the substring to delete from the admin names, if a string indicating the admin unit type is present
-  #' @returns the cleaned vector
-  sapply(input_vector, function(input_string) {
-    parts <- strsplit(input_string, " ")[[1]]
-    parts <- parts[toupper(parts) != toupper(string_to_remove)]
-    if (length(parts) > 1) {
-      parts_without_prefix <- parts[-1]
-      output_string <- paste(parts_without_prefix, collapse = " ")
-    } else {
-      output_string <- ""  # if input has <=2 words
-    }
-    return(output_string)
-  }, USE.NAMES = FALSE)
-}
-
-####################
-filter_files_to_save <- function(target_path, vector_of_file_suffixes = c('wide', 'long'), vector_of_extensions = c('.csv', '.parquet'), must_contain_string = ""){
-    # build pattern to check
-    pattern <- paste0("(", paste0(vector_of_file_suffixes, collapse = "|"), ")",
-                      "(", paste0("\\", vector_of_extensions, collapse = "|"), ")$")
-
-    # list matching files
-    target_files <- list.files(path = target_path, pattern = pattern, full.names = TRUE)
-
-    # further filter by the string which must appear in the filename
-    target_files <- target_files[grepl(must_contain_string, basename(target_files))]
-
-    # check if there are any files which match the pattern
-    if (length(target_files) == 0) {
-        stop("No files found in directory: ", target_path, " matching the conditions.")
-    }
-
-    # print files which match the pattern
-    print("Files found:")
-    print(target_files)
-}
-
-####################################
-make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, title_name, x_title, y_title){
-  #' Make confidence interval plots for estimations
-  ci_plot <- ggplot(data = df_to_plot)
-  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
-  ci_plot <- ci_plot + geom_errorbar(aes(
-    x=get(admin_colname),
-    ymin=get(ci_lower_colname),
-    ymax=get(ci_upper_colname)),
-    width = 0.4, color ="#091bb8", linewidth = 1.5
-  )
-  # # Uncomment below to add value labels
-  # # text for the lower bound
-  # ci_plot <- ci_plot + geom_text(aes(
-  #   x=get(admin_colname),
-  #   y=get(ci_lower_colname),
-  #   label = round(get(ci_lower_colname),1)
-  # ),
-  # size= 2, vjust = 1
-  # )
-  # # text for the upper bound
-  # ci_plot <- ci_plot + geom_text(aes(
-  #   x=get(admin_colname),
-  #   y=get(ci_upper_colname),
-  #   label = round(get(ci_upper_colname),1)
-  # ),
-  # size= 2, vjust = 1
-  # )
-  ci_plot <- ci_plot + labs(title = title_name)
-  ci_plot <- ci_plot + labs(x= x_title, y = y_title)
-  ci_plot <- ci_plot + theme_minimal()
-  ci_plot <- ci_plot + coord_flip()
-  print(ci_plot)
-  return(ci_plot)
-}
-
-
 #%% SEASONALITY -------------------------------------------------------------------
                                                  
 #############
@@ -295,6 +159,30 @@ convert_columns <- function(dt, col_type_map) {
     convert_fun <- match.fun(paste0("as.", type))
     dt[, (cols) := lapply(.SD, convert_fun), .SDcols = cols]
   }
+}
+                                                 
+#############
+get_newest_dataset_file <- function(target_dataset, target_filename, target_country_code){
+  
+  #' Retrieve the latest version from a dataset
+  #' @param target_dataset the dataset which contains the file
+  #' @param target_filename the file to retrieve
+  #' @param target_country_code the code name of the country to retrieve
+  #' @returns the dataframe of the latest version on the dataset, for the target country
+  
+  # load file
+  output_data <- tryCatch({ get_latest_dataset_file_in_memory(target_dataset, target_filename) }, 
+                          error = function(e) {
+                            msg <- glue("Error while loading {ountry_code} {target_filename}, {conditionMessage(e)}")  # log error message
+                            cat(msg)
+                            stop(msg)
+                          })
+  data_dimensions <- paste(dim(output_data), collapse=", ")
+  
+  msg <- glue("{target_filename} loaded from dataset {target_dataset}; the dataframe has the following dimensions: {data_dimensions}")
+  log_msg(msg)
+  
+  return(output_data)
 }
                                                  
 #############
@@ -547,7 +435,7 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
 #############
 process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_seasonal_years_threshold = 0.5){
   #' compute whether or not an admin unit is "seasonal", based on WHO guidelines
-  #' TODO: passing all columns as arguments (needs resetting column names after each summarizing; to see if the data may have different column names; if not, no need to pass these as arguments and would make the code lighter)
+  #' TODO: I'm passing all columns as arguments (needs resetting column names after each summarizing; to see if the data may have different column names; if not, no need to pass these as arguments and would make the code lighter)
   #' @param input_dt the input data table/frame
   #' @param indicator the type of indicator
   #' @param vector_of_durations the block sizes to check
@@ -758,6 +646,44 @@ check_dhs_same_version <- function(dhs_filename_a, dhs_filename_b) {
   
   return(as.integer(a_number) == as.integer(b_number))
 }
+
+##################################
+check_perfect_match <- function(dt_a, merge_col_a, dt_b, merge_col_b){
+  #' check if two columns have exactly the same unique values
+  #' 
+  #' @param dt_a first data frame
+  #' @param merge_col_a column name (string) in dt_a to compare
+  #' @param dt_b second data frame
+  #' @param merge_col_b column name (string) in dt_b to compare
+  #' 
+  #' @return TRUE if both columns have the same unique values, FALSE otherwise
+  values_a <- dt_a[[merge_col_a]]
+  values_b <- dt_b[[merge_col_b]]
+  values_only_a <- setdiff(values_a, values_b)
+  values_only_b <- setdiff(values_b, values_a)
+  return(
+    ((length(values_only_a) == 0) & (length(values_only_b) == 0))
+    )
+}
+                                           
+#######################################
+delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
+  #' Delete files which don't have a given extension, from a given folder
+  #' @param folder_path the directory path
+  #' @param extension_to_retain the extension with which files will be keps
+  
+  pattern_to_keep <- paste0("*", extension_to_retain)
+  non_delete_files <- dir(path = folder_path, pattern = pattern_to_keep, ignore.case=TRUE)
+  delete_files <- setdiff(dir(path = folder_path), non_delete_files)
+  if (length(delete_files) == 0){
+    print("No files to delete.")
+  } else{
+    if(length(non_delete_files) == 0){
+      print("Deleting all files from folder.")
+    }
+    unlink(file.path(folder_path, delete_files), recursive=TRUE)
+  }
+}
                                            
 ############################################
 make_dhs_admin_df <- function(input_dhs_df, original_admin_column="V024", new_admin_name_colname='DHS_ADM1_NAME', new_admin_code_colname='DHS_ADM1_CODE'){
@@ -815,6 +741,7 @@ make_dhs_adm1_u5mort_dt <- function(dhs_adm1_dt){
   return(u5mort_dt)
 }
 
+
 ###################################
 make_dhs_map <- function(plot_dt, plot_colname, title_name, legend_title="Percentage", scale_limits = c(0, 100)) {
   #' make, show and save coverage map (coropleth of coverage proportions
@@ -853,12 +780,136 @@ make_dhs_map <- function(plot_dt, plot_colname, title_name, legend_title="Percen
   
   return(plot_obj)
 }
-   
+                                           
+####################################
+make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, title_name, x_title, y_title){
+  #' Make confidence interval plots for DHS data
+  ci_plot <- ggplot(data = df_to_plot)
+  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
+  ci_plot <- ci_plot + geom_errorbar(aes(
+    x=get(admin_colname),
+    ymin=get(ci_lower_colname),
+    ymax=get(ci_upper_colname)),
+    width = 0.4, color ="#091bb8", linewidth = 1.5
+  )
+  # # Uncomment below to add value labels
+  # # text for the lower bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_lower_colname),
+  #   label = round(get(ci_lower_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  # # text for the upper bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_upper_colname),
+  #   label = round(get(ci_upper_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  ci_plot <- ci_plot + labs(title = title_name)
+  ci_plot <- ci_plot + labs(x= x_title, y = y_title)
+  ci_plot <- ci_plot + theme_minimal()
+  ci_plot <- ci_plot + coord_flip()
+  print(ci_plot)
+  return(ci_plot)
+}
+                                           
+#%% MISC FUNCTIONS
+                                           
+#########################################
+aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
+  #' aggregate the geometries of sf data, at a specified level, given by id and name columns
+  #' @param sf_data the input data
+  #' @param admin_id_colname the column name which contains the id's
+  #' @param admin_name_colname the column name which contains the names
+  #' @returns the aggregated sf data
+  by_list <- list(
+    sf_data[[admin_id_colname]],
+    sf_data[[admin_name_colname]]
+  )
+  names(by_list) <- c(admin_id_colname, admin_name_colname)
+  
+  result <- aggregate(sf_data["geometry"], by = by_list, FUN = sf::st_union)
+  return(result)
+}
 
-#%% HEALTHCARE ACCESS FUNCTIONS
+#################################
+delete_otherextension_files <- function(folder_path, extension_to_retain=".zip"){
+  #' Delete files which don't have a given extension, from a given folder
+  #' @param folder_path the directory path
+  #' @param extension_to_retain the extension with which files will be keps
+  
+  pattern_to_keep <- paste0("*", extension_to_retain)
+  non_delete_files <- dir(path = folder_path, pattern = pattern_to_keep, ignore.case=TRUE)
+  delete_files <- setdiff(dir(path = folder_path), non_delete_files)
+  if (length(delete_files) == 0){
+    print("No files to delete.")
+  } else{
+    if(length(non_delete_files) == 0){
+      print("Deleting all files from folder.")
+    }
+    unlink(file.path(folder_path, delete_files), recursive=TRUE)
+  }
+}
+
+##########################
+clean_admin_names <- function(input_vector, string_to_remove='province') {
+  #' Clean the admin names of certain countries' pyramids, by removing the string_to_remove if present (these are usually "Province" or "Zone de santé" or "District") and then removing the prefix (some countries hav)
+  #' @param input_vector the vector of admin names to clean
+  #' @param string_to_remove the substring to delete from the admin names, if a string indicating the admin unit type is present
+  #' @returns the cleaned vector
+  sapply(input_vector, function(input_string) {
+    parts <- strsplit(input_string, " ")[[1]]
+    parts <- parts[toupper(parts) != toupper(string_to_remove)]
+    if (length(parts) > 1) {
+      parts_without_prefix <- parts[-1]
+      output_string <- paste(parts_without_prefix, collapse = " ")
+    } else {
+      output_string <- ""  # if input has <=2 words
+    }
+    return(output_string)
+  }, USE.NAMES = FALSE)
+}
+
+####################
+filter_files_to_save <- function(
+    target_path,
+    vector_of_file_suffixes = c('wide', 'long'),
+    vector_of_extensions = c('.csv', '.parquet'),
+    must_contain_string = ""){
+    # build pattern to check
+    pattern <- paste0("(", paste0(vector_of_file_suffixes, collapse = "|"), ")",
+                      "(", paste0("\\", vector_of_extensions, collapse = "|"), ")$")
+
+    # list matching files
+    target_files <- list.files(path = target_path, pattern = pattern, full.names = TRUE)
+
+    # further filter by the string which must appear in the filename
+    target_files <- target_files[grepl(must_contain_string, basename(target_files))]
+
+    # check if there are any files which match the pattern
+    if (length(target_files) == 0) {
+        stop("No files found in directory: ", target_path, " matching the conditions.")
+    }
+
+    # print files which match the pattern
+    print("Files found:")
+    print(target_files)
+}
+
+#%% Healthcare access -------------------------
 
 ################################
-import_fosa_data <- function(input_file_path, pipeline_dhis2_dataset, pipeline_country_code, latitude_colname="LATITUDE", longitude_colname="LONGITUDE"){
+import_fosa_data <- function(
+    input_file_path,
+    pipeline_dhis2_dataset,
+    pipeline_country_code,
+    latitude_colname="LATITUDE",
+    longitude_colname="LONGITUDE"
+){
     # helper to load fallback dataset
     load_default_dataset <- function(helper_dhis2_dataset, helper_country_code, reason) {
         log_msg(glue::glue("{reason}: using default DHIS2 FOSA dataset. To use input data, please input a different file and rerun pipeline."))
@@ -926,14 +977,59 @@ import_fosa_data <- function(input_file_path, pipeline_dhis2_dataset, pipeline_c
         
     log_msg("Input FOSA data validated and loaded successfully.")
     return(input_df)
-}                                        
+}
+                                           
+################################           
+# check_fosa_input_file <- function(input_file_path, latitude_colname="LATITUDE", longitude_colname="LONGITUDE"){
+
+#     # Does the file exist?
+#     condition_existence <- !is.null(input_file_path) && file.exists(input_file_path)
+
+#     if(condition_existence){
+#         # Is the file of .csv type?
+#         condition_extension <- grepl("\\.csv$", input_file_path, ignore.case = TRUE)
+#     } else {
+#         log_msg(glue("No valid input FOSA data supplied. Using default dataset FOSA data."))
+#         return(FALSE)
+#     }
+
+#     if(condition_extension){
+#         # Is the file healthy?
+#         input_data <- tryCatch(
+#             data.table::fread(input_file_path),
+#             error = function(e) return(NULL)
+#           )
+#         if (is.null(input_data)){
+#             log_msg(glue("The input FOSA data is not a valid .csv file. Using dataset version of the data. To use input data, please input a different file and rerun pipeline."))
+#             return(FALSE)
+#             }
+        
+#         # Does the file contain the necessary column names?
+#         input_latitude_cols <- grep(glue::glue("^{latitude_colname}$"), names(input_data), ignore.case = TRUE, value = TRUE)
+#         input_longitude_cols <- grep(glue::glue("^{longitude_colname}$"), names(input_data), ignore.case = TRUE, value = TRUE)
+#         condition_latitude_name <- length(input_latitude_cols) == 1
+#         condition_longitude_name <- length(input_longitude_cols) == 1
+#         condition_latitude_type <- class(input_data[[input_latitude_cols]]) == "numeric"
+#         condition_longitude_type <- class(input_data[[input_longitude_cols]]) == "numeric"
+        
+#         all_conditions_fulfilled <- condition_latitude_name && condition_longitude_name && condition_latitude_type && condition_longitude_type
+        
+#     } else {
+#         log_msg(glue("The input FOSA data does not contain the 'LATITUDE' and 'LONGITUDE' columns. Using dataset version of the data. To use input data, please input a different file and rerun pipeline."))
+#         return(FALSE)
+#         }
+
+#     return(all_conditions_fulfilled)    
+# }
+
 
 ################################
+#' reproject a sf or terra vector to a given epsg code
+#' @param x: object
+#' @param epsg_value: integer epsg code to reproject to
+#' @returns: input object reprojected to the target crs if needed
 reproject_epsg <- function(x, epsg_value) {
-  #' reproject a sf or terra vector to a given epsg code
-  #' @param x: object
-  #' @param epsg_value: integer epsg code to reproject to
-  #' @returns: input object reprojected to the target crs if needed
+  
   # check if input is sf
   if (inherits(x, "sf") || inherits(x, "sfc")) {
     current_epsg <- sf::st_crs(x)$epsg
@@ -966,17 +1062,18 @@ reproject_epsg <- function(x, epsg_value) {
 }
 
 ########################
+#' filter points within polygon boundaries using terra
+#'
+#' @param locations_vect: vector with point geometries
+#' @param boundaries_vect: vector with polygon geometries
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#'
+#' @return vector with only the points within the boundaries
+#'
+#' @import terra
+#'
 filter_points_within_boundaries <- function(locations_vect, boundaries_vect, epsg_value_degrees) {
-  #' filter points within polygon boundaries using terra
-  #'
-  #' @param locations_vect: vector with point geometries
-  #' @param boundaries_vect: vector with polygon geometries
-  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-  #'
-  #' @return vector with only the points within the boundaries
-  #'
-  #' @import terra
-  #'
+
     print("Input data 1/2 (point locations):")
     locations_vect <- reproject_epsg(locations_vect, epsg_value_degrees)
     print("Input data 2/2 (boundaries polygon):")
@@ -1000,25 +1097,31 @@ filter_points_within_boundaries <- function(locations_vect, boundaries_vect, eps
 }
 
 ########################
-make_coverage_radii_sf <- function(input_vect, coordinate_colnames, epsg_value_degrees, epsg_value_meters, radius_meters){
-  #' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
-  #'
-  #' @param input_vect: sf vector of spatial points (in any CRS)
-  #' @param coordinate_colnames: names of the longitude and latitude columns
-  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-  #' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
-  #' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
-  #'
-  #' @return: sf vector of the circle coverages in the degree CRS
-  #'
-  #' @details 
-  #' 1. check that input is in the correct degree CRS (reproject if needed)
-  #' 2. project it to a meter CRS for distance calculations
-  #' 3. create circular buffers (coverage radii) around each point
-  #' 4. reproject the buffer geometries back to the original degree CRS
-  #'
-  #' @import sf
-  #'
+#' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
+#'
+#' @param input_vect: sf vector of spatial points (in any CRS)
+#' @param coordinate_colnames: names of the longitude and latitude columns
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+#'
+#' @return: sf vector of the circle coverages in the degree CRS
+#'
+#' @details 
+#' 1. check that input is in the correct degree CRS (reproject if needed)
+#' 2. project it to a meter CRS for distance calculations
+#' 3. create circular buffers (coverage radii) around each point
+#' 4. reproject the buffer geometries back to the original degree CRS
+#'
+#' @import sf
+#'
+make_coverage_radii_sf <- function(
+  input_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  epsg_value_meters,
+  radius_meters
+){
   # check CRS and reproject to degree CRS if necessary
   input_vect <- reproject_epsg(input_vect, epsg_value_degrees)
   
@@ -1035,25 +1138,33 @@ make_coverage_radii_sf <- function(input_vect, coordinate_colnames, epsg_value_d
 }
 
 ########################
-make_coverage_radii_terra <- function(input_vect, coordinate_colnames, epsg_value_degrees, epsg_value_meters, radius_meters){
-  #' make circles of a given radius around each point (longitude/latitude) in the spatial input data
-  #'
-  #' @param input_vect: terra vector of spatial points (in any CRS)
-  #' @param coordinate_colnames: names of the longitude and latitude columns
-  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-  #' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
-  #' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
-  #'
-  #' @return: terra vector of the circle coverages in the degree CRS
-  #'
-  #' @details 
-  #' 1. check that input is in the correct degree CRS (reproject if needed)
-  #' 2. project it to a meter CRS for distance calculations
-  #' 3. create circular buffers (coverage radii) around each point
-  #' 4. reproject the buffer geometries back to the original degree CRS
-  #'
-  #' @import terra
-  #'
+#' make circles of a given radius around each point (longitude/latitude) in the spatial input data
+#'
+#' @param input_vect: terra vector of spatial points (in any CRS)
+#' @param coordinate_colnames: names of the longitude and latitude columns
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+#'
+#' @return: terra vector of the circle coverages in the degree CRS
+#'
+#' @details 
+#' 1. check that input is in the correct degree CRS (reproject if needed)
+#' 2. project it to a meter CRS for distance calculations
+#' 3. create circular buffers (coverage radii) around each point
+#' 4. reproject the buffer geometries back to the original degree CRS
+#'
+#' @import terra
+#'
+make_coverage_radii_terra <- function(
+  
+  input_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  epsg_value_meters,
+  radius_meters
+){
+  
   # check CRS and reproject to degree CRS if necessary
 
   input_vect <- reproject_epsg(input_vect, epsg_value_degrees)
@@ -1071,16 +1182,25 @@ make_coverage_radii_terra <- function(input_vect, coordinate_colnames, epsg_valu
 }
 
 ########################
-make_overlaid_sf_plot <- function(admin_unit_vect, points_sf_vect, buffer_vect, epsg_value_degrees, plot_title){
-  #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
-  #'
-  #' @param admin_unit_vect: sf vector of administrative boundaries
-  #' @param points_sf_vect: sf vector with coordinate columns of healthcare units
-  #' @param buffer_vect: sf vector of buffer zones around healthcare units
-  #' @param epsg_value_degrees: EPSG code (in degrees) for CRS
-  #' @param plot_title: title of plot
-  #'
-  #' @return ggplot object showing the spatial overlay
+#' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
+#'
+#' @param admin_unit_vect: sf vector of administrative boundaries
+#' @param points_sf_vect: sf vector with coordinate columns of healthcare units
+#' @param buffer_vect: sf vector of buffer zones around healthcare units
+#' @param epsg_value_degrees: EPSG code (in degrees) for CRS
+#' @param plot_title: title of plot
+#'
+#' @return ggplot object showing the spatial overlay
+make_overlaid_sf_plot <- function(
+  #' plot overlaying a) administrative boundaries, b) location of healthcare units, c) buffers around each healthcare unit
+  
+  admin_unit_vect,
+  points_sf_vect,
+  buffer_vect,
+  epsg_value_degrees,
+  plot_title
+){
+
   # get all 3 data objects to the same projection
 
   # a) ensure the healthcare locations have the proper projection
@@ -1103,19 +1223,25 @@ make_overlaid_sf_plot <- function(admin_unit_vect, points_sf_vect, buffer_vect, 
 
   return(plot)
 }
+           
 
 ########################
-make_rasterized_inclusion_data <- function(buffer_vect, raster_data, epsg_value_degrees, value_inside = 1, value_outside = 0 ){
-  #' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
+#' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
 
-  #' @param buffer_vect: vector with the buffer geometries to rasterize
-  #' @param raster_data: raster to use as the template for resolution and extent
-  #' @param epsg_value_degrees: EPSG of the target CRS in degrees
-  #' @param value_inside: value to assign to raster cells that intersect any buffer
-  #' @param value_outside: value to assign to raster cells that do not intersect any buffer
+#' @param buffer_vect: vector with the buffer geometries to rasterize
+#' @param raster_data: raster to use as the template for resolution and extent
+#' @param epsg_value_degrees: EPSG of the target CRS in degrees
+#' @param value_inside: value to assign to raster cells that intersect any buffer
+#' @param value_outside: value to assign to raster cells that do not intersect any buffer
 
-  #' @return raster with cells assigned values based on intersection with the buffer vector
-
+#' @return raster with cells assigned values based on intersection with the buffer vector
+make_rasterized_inclusion_data <- function(
+  buffer_vect, 
+  raster_data,
+  epsg_value_degrees,
+  value_inside = 1,
+  value_outside = 0
+){
   # reproject raster to the correct CRS (degrees)
   raster_data <- project(raster_data, glue("epsg:{epsg_value_degrees}"))
   
@@ -1135,12 +1261,13 @@ make_rasterized_inclusion_data <- function(buffer_vect, raster_data, epsg_value_
   
   return(inclusion_data)
 }
-
-
-#%% DATASET FUNCTIONS
-
+                                        
 ########################                                                 
-check_or_create_dataset <- function(target_workspace, target_dataset_slug, target_dataset_name, target_dataset_description) {
+check_or_create_dataset <- function(
+    target_workspace, 
+    target_dataset_slug, 
+    target_dataset_name, 
+    target_dataset_description) {
   
   #' Check if a dataset with the given slug exists in the given workspace
   #' If not, create it; if yes, retrieve it
@@ -1180,30 +1307,6 @@ check_or_create_dataset <- function(target_workspace, target_dataset_slug, targe
   
   return(output_dataset)
   
-}
-
-#############
-get_newest_dataset_file <- function(target_dataset, target_filename, target_country_code){
-  
-  #' Retrieve the latest version from a dataset
-  #' @param target_dataset the dataset which contains the file
-  #' @param target_filename the file to retrieve
-  #' @param target_country_code the code name of the country to retrieve
-  #' @returns the dataframe of the latest version on the dataset, for the target country
-  
-  # load file
-  output_data <- tryCatch({ get_latest_dataset_file_in_memory(target_dataset, target_filename) }, 
-                          error = function(e) {
-                            msg <- glue("Error while loading {ountry_code} {target_filename}, {conditionMessage(e)}")  # log error message
-                            cat(msg)
-                            stop(msg)
-                          })
-  data_dimensions <- paste(dim(output_data), collapse=", ")
-  
-  msg <- glue("{target_filename} loaded from dataset {target_dataset}; the dataframe has the following dimensions: {data_dimensions}")
-  log_msg(msg)
-  
-  return(output_data)
 }
 
 ######################                             

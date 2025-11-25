@@ -16,6 +16,7 @@ from snt_lib.snt_pipeline_utils import (
     name="FOSA location file (.csv)",
     type=File,
     required=False,
+    default=None,
     help="If not provided, the DHIS2 pyramid metadata file will be used.",
 )
 @parameter(
@@ -30,6 +31,7 @@ from snt_lib.snt_pipeline_utils import (
     name="Population raster file (.tif)",
     type=File,
     required=False,
+    default=None,
     help="If not provided, the default WorldPop raster will be used.",
 )
 @parameter(
@@ -70,8 +72,11 @@ def snt_healthcare_access(
     data_output_path.mkdir(parents=True, exist_ok=True)
 
     num_km = input_radius_meters / 1000
+    if input_fosa_file is not None:
+        current_run.log_info(f"Coordinates file: {input_fosa_file.path}")
     current_run.log_info(f"Using radii of {num_km} km around each FOSA.")
-    current_run.log_info(f"File input location: {input_fosa_file}")
+    if input_pop_file is not None:
+        current_run.log_info(f"Population raster: {input_pop_file.path}")
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")

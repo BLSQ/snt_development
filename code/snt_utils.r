@@ -902,6 +902,26 @@ filter_files_to_save <- function(
 
 #%% Healthcare access -------------------------
 
+                                               # helper to load fallback dataset
+    load_default_dataset <- function(helper_dhis2_dataset, helper_country_code, reason) {
+        log_msg(glue::glue("{reason}: using default DHIS2 FOSA dataset. To use input data, please input a different file and rerun pipeline."))
+        dhis2_data <- tryCatch(
+            {
+                get_latest_dataset_file_in_memory(
+                    helper_dhis2_dataset,
+                    glue::glue("{helper_country_code}_pyramid.parquet")
+                )
+                # setDT(dhis2_data)
+            },
+            error = function(e) {
+                msg <- paste("Error loading DHIS2 FOSA default data:", conditionMessage(e))
+                stop(msg)
+            }
+        )
+        return(dhis2_data)
+    }
+
+                                           
 ################################
 import_fosa_data <- function(
     input_file_path,
@@ -1219,7 +1239,7 @@ make_overlaid_sf_plot <- function(
     theme_minimal() +
     ggtitle(plot_title)
 
-  print(plot)
+  # print(plot)  # do not print
 
   return(plot)
 }

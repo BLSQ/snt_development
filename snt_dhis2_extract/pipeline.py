@@ -12,7 +12,11 @@ from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
 from papermill.exceptions import PapermillExecutionError
-from openhexa.toolbox.dhis2.dataframe import get_organisation_units, get_datasets
+from openhexa.toolbox.dhis2.dataframe import (
+    get_organisation_units,
+    get_datasets,
+    get_organisation_unit_groups,
+)
 from openhexa.toolbox.dhis2.periods import period_from_string
 from snt_lib.snt_pipeline_utils import (
     handle_rkernel_error_with_labels,
@@ -286,6 +290,8 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
                 nb_path=pipeline_path / "code" / "NER_pyramid_format.ipynb",
                 nb_output_dir=pipeline_path / "NER_transformations",
             )
+            # retrieve orgunits groups ref: https://bluesquare.atlassian.net/browse/SNT25-241
+            retrieve_org_units_groups_for_ner(dhis2_client)
 
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
     except Exception as e:
@@ -758,10 +764,6 @@ def download_dhis2_analytics(
         Configuration dictionary for SNT settings.
     output_dir : str
         Directory to save the downloaded analytics data.
-    snt_root_path : str
-        Root path for SNT processing.
-    pipeline_root_path : str
-        Root path for the pipeline.
     overwrite : bool, optional
         Whether to overwrite existing files (default is True).
     ready : bool, optional
@@ -961,8 +963,6 @@ def download_dhis2_population(
         Directory to save the downloaded population data.
     overwrite : bool, optional
         Whether to overwrite existing files (default is True).
-    ready : bool, optional
-        Whether the task is ready to run (default is True).
 
     Returns
     -------
@@ -1167,8 +1167,6 @@ def download_dhis2_shapes(
         Directory to save the downloaded shapes data.
     snt_config : dict
         Configuration dictionary for SNT settings.
-    ready : bool
-        Whether the task is ready to run.
 
     Returns
     -------
@@ -1232,8 +1230,6 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
         Directory to save the downloaded pyramid data.
     snt_config : dict
         Configuration dictionary for SNT settings.
-    ready : bool
-        Whether the task is ready to run.
     """
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
@@ -1390,7 +1386,7 @@ def snt_folders_setup(root_path: Path) -> None:
 
     This function creates a predefined set of folders under the specified root path
     to ensure the necessary directory structure for the SNT pipeline.
-    NOTE : The option is to use the snt_config.json file(!).
+        NOTE : The option is to use the snt_config.json file(!).
     """
     folders_to_create = [
         "configuration",
@@ -1552,6 +1548,43 @@ def run_transformation_notebook(
         return pl.read_parquet(output_path)
 
     return df if fallback == "return_input" else None
+
+
+def retrieve_org_units_groups_for_ner(dhis2_client: DHIS2) -> None:
+    """Retrieve organisation unit groups from DHIS2 for Niger.
+
+    Parameters
+    ----------
+    dhis2_client : DHIS2
+        DHIS2 client instance for API interaction.
+    """
+    org_unit_groups = get_organisation_unit_groups(dhis2_client)
+    df_filtered = org_unit_groups.filter(
+        pl.col("name")
+        .str.to_lowercase()
+        .is_in(
+            [
+                "proprietaire",
+                "public",
+                "privé",
+                "ong",
+                "confessionnel",
+                "militaire",
+                "structures clôturées",
+            ]
+        )
+    )
+    ougs_tocsv = df_filtered.with_columns(
+        pl.col("organisation_units").list.join(", ").alias("organisation_units")
+    )
+
+    # hardcoded path for NER case
+    output_path = Path(workspace.files_path) / "data" / "dhis2" / "extracts_raw" / "organisation_unit_groups"
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # save both versions: parquet and csv
+    df_filtered.write_parquet(output_path / "NER_organisation_unit_groups.parquet")
+    ougs_tocsv.write_csv(output_path / "NER_organisation_unit_groups.csv")
 
 
 if __name__ == "__main__":

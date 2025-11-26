@@ -922,7 +922,7 @@ filter_files_to_save <- function(
 
 #%% Healthcare access -------------------------
 
-                                               # helper to load fallback dataset
+# helper to load fallback dataset
     load_default_dataset <- function(helper_dhis2_dataset, helper_country_code, reason) {
         log_msg(glue::glue("{reason}: using default DHIS2 FOSA dataset. To use input data, please input a different file and rerun pipeline."))
         dhis2_data <- tryCatch(
@@ -1018,49 +1018,25 @@ import_fosa_data <- function(
     log_msg("Input FOSA data validated and loaded successfully.")
     return(input_df)
 }
-                                           
-################################           
-# check_fosa_input_file <- function(input_file_path, latitude_colname="LATITUDE", longitude_colname="LONGITUDE"){
 
-#     # Does the file exist?
-#     condition_existence <- !is.null(input_file_path) && file.exists(input_file_path)
 
-#     if(condition_existence){
-#         # Is the file of .csv type?
-#         condition_extension <- grepl("\\.csv$", input_file_path, ignore.case = TRUE)
-#     } else {
-#         log_msg(glue("No valid input FOSA data supplied. Using default dataset FOSA data."))
-#         return(FALSE)
-#     }
-
-#     if(condition_extension){
-#         # Is the file healthy?
-#         input_data <- tryCatch(
-#             data.table::fread(input_file_path),
-#             error = function(e) return(NULL)
-#           )
-#         if (is.null(input_data)){
-#             log_msg(glue("The input FOSA data is not a valid .csv file. Using dataset version of the data. To use input data, please input a different file and rerun pipeline."))
-#             return(FALSE)
-#             }
-        
-#         # Does the file contain the necessary column names?
-#         input_latitude_cols <- grep(glue::glue("^{latitude_colname}$"), names(input_data), ignore.case = TRUE, value = TRUE)
-#         input_longitude_cols <- grep(glue::glue("^{longitude_colname}$"), names(input_data), ignore.case = TRUE, value = TRUE)
-#         condition_latitude_name <- length(input_latitude_cols) == 1
-#         condition_longitude_name <- length(input_longitude_cols) == 1
-#         condition_latitude_type <- class(input_data[[input_latitude_cols]]) == "numeric"
-#         condition_longitude_type <- class(input_data[[input_longitude_cols]]) == "numeric"
-        
-#         all_conditions_fulfilled <- condition_latitude_name && condition_longitude_name && condition_latitude_type && condition_longitude_type
-        
-#     } else {
-#         log_msg(glue("The input FOSA data does not contain the 'LATITUDE' and 'LONGITUDE' columns. Using dataset version of the data. To use input data, please input a different file and rerun pipeline."))
-#         return(FALSE)
-#         }
-
-#     return(all_conditions_fulfilled)    
-# }
+################################
+filter_open_fosas <- function(input_fosa_dt, closing_date_colname=NULL, closed_yes_colname=NULL, closed_yes_value=NULL){  dt <- copy(as.data.table(input_fosa_dt))
+  initial_rows <- nrow(dt)  # if there are both closing dates and "closed" columns
+  if(!is.null(closing_date_colname) & !is.null(closed_yes_colname)){
+    # check if the columns exist in the data
+    if(
+      !(any(tolower(names(dt)) == tolower(closing_date_colname))) | !(any(tolower(names(dt)) == tolower(closed_yes_colname)))    ){
+      output_dt <- dt[is.na(get(closing_date_colname)),]
+      filtered_rows <- nrow(output_dt)
+      removed_rows <- initial_rows - filtered_rows}
+  }  # if there is only closing date
+  if(!is.null(closing_date_colname) & is.null(closed_yes_colname)){  }  # if there is only "closed" column
+  if(!is.null(closing_date_colname) & !is.null(closed_yes_colname)){  }  # if there is neither closing date nor "closed" column
+  if((is.null(closing_date_colname)) & (is.null(closed_yes_colname))){
+    output_dt <- dt
+  }  return(output_dt)
+}
 
 
 ################################

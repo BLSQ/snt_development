@@ -393,7 +393,16 @@ fill_missing_cases_ts <- function(district_data, original_values_colname, estima
 }
 
 #############
-compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_threshold = 0.6) {
+compute_month_seasonality <- function(
+  input_dt,
+  indicator,
+  values_colname,
+  vector_of_durations,
+  admin_colname = 'ADM2_ID',
+  year_colname = 'YEAR',
+  month_colname = 'MONTH',
+  proportion_threshold = 0.6
+) {
   #' create forward-looking month blocks summing values based on the WHO month-block reasoning for seasonality computation - allows for different block sizes
   #' @param input_dt an input data table (or data frame)
   #' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
@@ -404,32 +413,43 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
   #' @param montn_colname month grouping column
   #' @param proportion_threshold the proportion of indicator which needs to occur in a block, to qualify for seasonality
   #' @return an output data table with the additional column
-  
+
   indicator <- toupper(indicator)
+  dt <- copy(as.data.table(input_dt))
   
-  output_dt <- copy(as.data.table(input_dt))
+  # ensure correct order
+  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
   
-  output_dt <- output_dt[order(get(admin_colname), get(year_colname), get(month_colname))]  # Sort by location and time
+  # denominator: 12-month forward-looking sliding sum (left-aligned)
+  denominator_colname <- paste(indicator, "SUM", 12, "MTH", "FW", sep = "_")
+  dt[, (denominator_colname) := frollsum(get(values_colname),
+                                n = 12,
+                                align = "left",
+                                na.rm = TRUE),
+     by = admin_colname]
   
-  # compute common denominator (block of 12 months - annual values)
-  denominator_colname <- paste(toupper(indicator), 'SUM', 12, 'MTH', 'FW', sep = '_')
-  output_dt[, (denominator_colname) := Reduce(`+`, shift(get(values_colname), 0:(12 - 1), type = "lead"), init = 0), by = get(admin_colname)]
-  
-  # compute numerators, proportions and dichotomous seasonality variables
-  for (num_months in vector_of_durations) {
+  # numerators for each of the durations (forward-looking)
+  for (n in vector_of_durations) {
+    numerator_colname  <- paste(indicator, "SUM", n, "MTH", "FW", sep = "_")
+    prop_name <- paste(indicator, n, "MTH", "ROW", "PROP", sep = "_")
+    seasonality_colname <- paste(indicator, n, "MTH", "ROW", "SEASONALITY", sep = "_")
     
-    # compute the block of durations (3/4/5 months for example) to serve as numerator in the algorithm
-    numerator_colname <- paste(toupper(indicator), 'SUM', num_months, 'MTH', 'FW', sep = '_')
-    output_dt[, (numerator_colname) := Reduce(`+`, shift(get(values_colname), 0:(num_months - 1), type = "lead"), init = 0), by = get(admin_colname)]
+    dt[, (numerator_colname) := frollsum(get(values_colname),
+                                n = n,
+                                align = "left",
+                                na.rm = TRUE),
+       by = admin_colname]
     
-    # compute proportion of the indicator which happens in the numerator block
-    proportion_colname = paste(toupper(indicator), num_months, 'MTH', 'ROW', 'PROP', sep = '_')
-    seasonality_colname = paste(toupper(indicator), num_months, 'MTH', 'ROW', 'SEASONALITY', sep = '_')
-    output_dt[, (proportion_colname) := get(numerator_colname) / get(denominator_colname)]
-    output_dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 & get(proportion_colname) >= proportion_threshold)]
+    dt[, (prop_name) := 
+          # make NA's where it would be division by zero
+          fifelse(get(denominator_colname) > 0, get(numerator_colname) / get(denominator_colname), NA_real_)]
+    
+    dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
+                                   get(prop_name) >= proportion_threshold)]
   }
   
-  return(output_dt)
+  # return the data
+  dt[]
 }
 
 #############

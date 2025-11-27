@@ -1021,25 +1021,6 @@ import_fosa_data <- function(
 
 
 ################################
-filter_open_fosas <- function(input_fosa_dt, closing_date_colname=NULL, closed_yes_colname=NULL, closed_yes_value=NULL){  dt <- copy(as.data.table(input_fosa_dt))
-  initial_rows <- nrow(dt)  # if there are both closing dates and "closed" columns
-  if(!is.null(closing_date_colname) & !is.null(closed_yes_colname)){
-    # check if the columns exist in the data
-    if(
-      !(any(tolower(names(dt)) == tolower(closing_date_colname))) | !(any(tolower(names(dt)) == tolower(closed_yes_colname)))    ){
-      output_dt <- dt[is.na(get(closing_date_colname)),]
-      filtered_rows <- nrow(output_dt)
-      removed_rows <- initial_rows - filtered_rows}
-  }  # if there is only closing date
-  if(!is.null(closing_date_colname) & is.null(closed_yes_colname)){  }  # if there is only "closed" column
-  if(!is.null(closing_date_colname) & !is.null(closed_yes_colname)){  }  # if there is neither closing date nor "closed" column
-  if((is.null(closing_date_colname)) & (is.null(closed_yes_colname))){
-    output_dt <- dt
-  }  return(output_dt)
-}
-
-
-################################
 #' reproject a sf or terra vector to a given epsg code
 #' @param x: object
 #' @param epsg_value: integer epsg code to reproject to

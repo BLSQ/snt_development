@@ -531,42 +531,38 @@ process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_
 }
 
 #############
-compute_min_seasonality_block <- function(input_dt, seasonality_column_pattern, vector_of_possible_month_block_sizes, indicator, seasonal_blocksize_colname, valid_value = 1){
+compute_min_seasonality_block <- function(
+  input_dt,
+  seasonality_column_pattern,
+  seasonal_blocksize_colname,
+  valid_value = 1
+){
   #' retrieve the minimum number of months which constitute a seasonality block
   #' @param input_dt input data.table
   #' @param seasonality_column_pattern in the names of the columns which represent the seasonality status (0/1)
-  #' @param vector_of_possible_month_block_sizes possible sizes of the month blocks (as a vector of integers)
-  #' @param indicator name of the new column
+  #' @param seasonal_blocksize_colname name of the new column
   #' @param valid_value value which indicates there is seasonality
-  #' @return an output data table which has the extra column; it will be Inf (infinite) if there is no seasonality, and the number of months in a block, if there is seasonality
+  #' @return an output data table which has the extra column; it will be NA if there is no seasonality, and the minimum number of months in a block, if there is seasonality
     
-  indicator <- toupper(indicator)
-  
-  # Extract column names matching the pattern
-  seasonality_cols <- grep(toupper(seasonality_column_pattern), names(input_dt), value = TRUE)
-  
-  # compute the new column
-  # seasonal_blocksize_colname <- paste(indicator, 'SEASONALITY_DURATION', sep = '_')
-  # output_dt <- input_dt[, (seasonal_blocksize_colname) := apply(.SD, 1, function(row) {
-  #   min(vector_of_possible_month_block_sizes[which(row == 1)], na.rm = TRUE)
-  # }), .SDcols = seasonality_cols]
+  # get column names that match the pattern (case-insensitive)
+  seasonality_cols <- grep(seasonality_column_pattern, names(input_dt),
+                           ignore.case = TRUE, value = TRUE)
 
-  # compute the new column  
-  # muffle the warnings for the admin units where the seasonality block duration is infinity (no seasonality)
-  output_dt <- input_dt[, (seasonal_blocksize_colname) := apply(.SD, 1, function(row) {
-    withCallingHandlers(
-      min(vector_of_possible_month_block_sizes[which(row == valid_value)], na.rm = TRUE),
-      warning = function(w) {
-        if (grepl("no non-missing arguments to min; returning Inf", conditionMessage(w))) {
-          invokeRestart("muffleWarning")
-        }
-      }
-    )
-  }), .SDcols = seasonality_cols]
-  
-  # change the infinite values (no seasonality) to missing
-  output_dt[is.infinite(get(seasonal_blocksize_colname)), (seasonal_blocksize_colname) := NA]
-  
+  # get month-block sizes (3/4/5)
+  block_sizes <- as.integer(sub(".*?(\\d+).*", "\\1", seasonality_cols))
+
+  output_dt <- copy(as.data.table(input_dt))
+
+  # compute output column
+  output_dt[, (seasonal_blocksize_colname) :=
+    apply(.SD, 1, function(row) {
+      valid_blocks <- block_sizes[row == valid_value]
+      if (length(valid_blocks) == 0) return(NA_integer_)
+      return(min(valid_blocks))
+    }),
+    .SDcols = seasonality_cols
+  ]
+
   return(output_dt)
 }
 

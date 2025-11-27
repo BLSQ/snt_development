@@ -117,10 +117,9 @@ def snt_seasonality_cases(
             )
 
             add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY_cases"],
+                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY_CASES"],
                 country_code=country_code,
                 file_paths=[
-                    data_path / f"{country_code}_cases_seasonality.parquet",
                     data_path / f"{country_code}_cases_seasonality.parquet",
                     data_path / f"{country_code}_cases_seasonality.csv",
                 ],

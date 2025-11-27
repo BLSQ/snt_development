@@ -1022,7 +1022,8 @@ def _update_table_from_file(
             table[col].update(user_data[col])
         else:
             current_run.log_warning(
-                f"Column name: {col} not found in user-provided file {level}: {file_path.name}"
+                f"Column name: {col} from file: {file_path.name} does not "
+                "match the names defined in metadata."
             )
 
     return table.reset_index()

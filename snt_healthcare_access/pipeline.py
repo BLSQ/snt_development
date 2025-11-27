@@ -82,7 +82,7 @@ def snt_healthcare_access(
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
             pipeline_name="snt_healthcare_access",
-            report_scripts=["snt_healthcare_accessreport.ipynb"],
+            report_scripts=["snt_healthcare_access_report.ipynb"],
             code_scripts=["snt_healthcare_access.ipynb"],
         )
 
@@ -121,7 +121,7 @@ def snt_healthcare_access(
             )
 
         else:
-            current_run.log_info("Skipping incidence calculations, running only the reporting.")
+            current_run.log_info("Skipping calculations, running only the reporting.")
 
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_healthcare_access_report.ipynb",

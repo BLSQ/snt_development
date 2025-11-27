@@ -492,13 +492,17 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
     pd.DataFrame
         The updated results table with precipitation seasonality indicators added.
     """
+    if "SEASONALITY_RAINFALL" not in table.columns:
+        current_run.log_info("SEASONALITY_RAINFALL column not in table, skipping.")
+        return table
+
     current_run.log_info("Loading precipitation seasonality data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY_RAINFALL")
     try:
         seasonality_precipitation = get_file_from_dataset(
             dataset_id=dataset_id,
-            filename=f"{country_code}_precipitation_seasonality.parquet",
+            filename=f"{country_code}_rainfall_seasonality.parquet",
         )
     except Exception as e:
         current_run.log_warning(f"No precipitation seasonality data available. Warning details: {e}")
@@ -506,9 +510,10 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
 
     columns_selection = [
         "ADM2_ID",
-        "SEASONALITY_PRECIPITATION",
-        "SEASONAL_BLOCK_DURATION_PRECIPITATION",
+        "SEASONALITY_RAINFALL",
+        "SEASONAL_BLOCK_DURATION_RAINFALL",
     ]
+
     table.update(
         table.merge(
             seasonality_precipitation[columns_selection],
@@ -517,11 +522,8 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
             suffixes=("_old", ""),
         )[columns_selection[1:]]
     )
-
-    table["SEASONALITY_PRECIPITATION"] = pd.to_numeric(table["SEASONALITY_PRECIPITATION"], errors="coerce")
-    table["SEASONALITY_PRECIPITATION"] = table["SEASONALITY_PRECIPITATION"].replace(
-        {0: "not-seasonal", 1: "seasonal"}
-    )
+    table["SEASONALITY_RAINFALL"] = pd.to_numeric(table["SEASONALITY_RAINFALL"], errors="coerce")
+    table["SEASONALITY_RAINFALL"] = table["SEASONALITY_RAINFALL"].replace({0: "not-seasonal", 1: "seasonal"})
     current_run.log_info("Precipitation seasonality data loaded successfully.")
     return table
 

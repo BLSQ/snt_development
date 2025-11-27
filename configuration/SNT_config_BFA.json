@@ -9,21 +9,20 @@
 		"REPORTING_RATE_PRODUCT_UID" : ["Ae9s1MsUEYq", "R5UJwkTo2HV"]
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
-		"DHIS2_DATASET_EXTRACTS" : "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED" : "snt-dhis2-formatted",
+		"DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
+		"DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",	
 		"DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
-		"DHIS2_REPORTING_RATE" : "snt-dhis2-reporting-rate",
+		"DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate", 
 		"DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
-		"DHIS2_INCIDENCE" : "snt-dhis2-incidence",
-		"DHS_INDICATORS" : "snt-dhs-indicators",
-		"WORLDPOP_DATASET_EXTRACT" : "snt-worldpop-extract",
-		"SNT_HEALTHCARE_ACCESS" : "snt-healthcare-access",
-		"ERA5_DATASET_CLIMATE" : "snt-era5-climate",
-		"SNT_SEASONALITY" : "snt-seasonality",
-        "SNT_SEASONALITY_RAINFALL" : "snt-seasonality-rainfall",
-        "SNT_SEASONALITY_CASES" : "snt-seasonality-cases",
-		"SNT_MAP_EXTRACT" : "snt-map-extract",
-		"SNT_RESULTS" : "snt-results"
+		"DHIS2_INCIDENCE": "snt-dhis2-incidence",
+		"DHS_INDICATORS": "snt-dhs-indicators",
+		"WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
+		"SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",
+		"ERA5_DATASET_CLIMATE": "snt-era5-climate",		
+        "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
+        "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+		"SNT_MAP_EXTRACT": "snt-map-extract",
+		"SNT_RESULTS": "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS": {
 		"POPULATION_DEFINITIONS": {

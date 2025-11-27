@@ -69,9 +69,9 @@ def snt_seasonality_rainfall(
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Retriev rainfall data by ADM2 level from ERA5 dataset.
+    """Retrieve rainfall data by ADM2 level from ERA5 dataset.
 
-    Compute whether or not the admin unit qualifies as seasonal from a case and rainfall perspective
+    Compute whether or not the admin unit qualifies as seasonal from a rainfall perspective
     Compute the minimal duration of the seasonal block (in months) for each district
     Plot maps and save the output table to dataset
     """

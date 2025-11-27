@@ -78,13 +78,15 @@ def snt_seasonality_rainfall(
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_seasonality_rainfall"
     data_path = root_path / "data" / "seasonality_rainfall"
+    pipeline_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
-            pipeline_name="snt_rainfall_seasonality",
-            report_scripts=["snt_rainfall_seasonality_report.ipynb"],
-            code_scripts=["snt_rainfall_seasonality.ipynb"],
+            pipeline_name="snt_seasonality_rainfall",
+            report_scripts=["snt_seasonality_rainfall_report.ipynb"],
+            code_scripts=["snt_seasonality_rainfall.ipynb"],
         )
 
     if not run_report_only:
@@ -103,7 +105,7 @@ def snt_seasonality_rainfall(
             validate_parameters(input_params)
 
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_rainfall_seasonality.ipynb",
+                nb_path=pipeline_path / "code" / "snt_seasonality_rainfall.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters={
                     "minimum_month_block_size": get_minimum_month_block_size,
@@ -131,7 +133,7 @@ def snt_seasonality_rainfall(
         current_run.log_info("Skipping calculations, running only the reporting.")
 
     run_report_notebook(
-        nb_file=pipeline_path / "reporting" / "snt_rainfall_seasonality_report.ipynb",
+        nb_file=pipeline_path / "reporting" / "snt_seasonality_rainfall_report.ipynb",
         nb_output_path=pipeline_path / "reporting" / "outputs",
         error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
     )

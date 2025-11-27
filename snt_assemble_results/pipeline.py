@@ -4,7 +4,7 @@ from typing import Any
 import re
 
 import pandas as pd
-from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.sdk import current_run, parameter, pipeline, workspace, File
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     copy_file,
@@ -59,7 +59,29 @@ from snt_lib.snt_pipeline_utils import (
     ],
     required=True,
 )
-def snt_assemble_results(incidence_metric: str, reporting_rate_metric: str, map_selection: list[str]):
+@parameter(
+    "adm1_layers_file",
+    name="Additional ADM 1 layers (.csv)",
+    type=File,
+    required=False,
+    default=None,
+    help="Select user-uploaded files with additional layers at level ADM 1.",
+)
+@parameter(
+    "adm2_layers_file",
+    name="Additional ADM 2 layers (.csv)",
+    type=File,
+    required=False,
+    default=None,
+    help="Select user-uploaded files with additional layers at level ADM 2.",
+)
+def snt_assemble_results(
+    incidence_metric: str,
+    reporting_rate_metric: str,
+    map_selection: list[str],
+    adm1_layers_file: File,
+    adm2_layers_file: File,
+) -> None:
     """Assemble SNT results by loading configuration, validating it, and preparing paths for processing.
 
     Raises
@@ -75,7 +97,6 @@ def snt_assemble_results(incidence_metric: str, reporting_rate_metric: str, map_
     try:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
-        current_run.log_debug("config loaded")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
@@ -92,6 +113,10 @@ def snt_assemble_results(incidence_metric: str, reporting_rate_metric: str, map_
             incidence_metric=incidence_metric,
             reporting_rate_metric=reporting_rate_metric,
             map_selection=map_selection,
+            additional_layer_files={
+                "ADM1": adm1_layers_file.path if adm1_layers_file else None,
+                "ADM2": adm2_layers_file.path if adm2_layers_file else None,
+            },
         )
 
         build_metadata_table(output_path=results_path, country_code=country_code)
@@ -119,16 +144,22 @@ def assemble_snt_results(
     incidence_metric: str,
     reporting_rate_metric: str,
     map_selection: list[str],
+    additional_layer_files: dict[str, Any],
 ) -> None:
     """Assembles SNT results using the provided configuration dictionary."""
     # initialize table
     results_table = build_results_table(snt_config)
+
+    # add indicators
     results_table = add_dhis2_indicators_to(
         results_table, snt_config, incidence_metric, reporting_rate_metric
     )
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
     results_table = add_dhs_indicators_to(results_table, snt_config)
+
+    # add user uploaded indicators
+    results_table = add_user_uploaded_indicators_to(results_table, additional_layer_files)
 
     # Save files
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
@@ -461,13 +492,17 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
     pd.DataFrame
         The updated results table with precipitation seasonality indicators added.
     """
+    if "SEASONALITY_RAINFALL" not in table.columns:
+        current_run.log_info("SEASONALITY_RAINFALL column not in table, skipping.")
+        return table
+
     current_run.log_info("Loading precipitation seasonality data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY_RAINFALL")
     try:
         seasonality_precipitation = get_file_from_dataset(
             dataset_id=dataset_id,
-            filename=f"{country_code}_precipitation_seasonality.parquet",
+            filename=f"{country_code}_rainfall_seasonality.parquet",
         )
     except Exception as e:
         current_run.log_warning(f"No precipitation seasonality data available. Warning details: {e}")
@@ -475,9 +510,10 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
 
     columns_selection = [
         "ADM2_ID",
-        "SEASONALITY_PRECIPITATION",
-        "SEASONAL_BLOCK_DURATION_PRECIPITATION",
+        "SEASONALITY_RAINFALL",
+        "SEASONAL_BLOCK_DURATION_RAINFALL",
     ]
+
     table.update(
         table.merge(
             seasonality_precipitation[columns_selection],
@@ -486,11 +522,8 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
             suffixes=("_old", ""),
         )[columns_selection[1:]]
     )
-
-    table["SEASONALITY_PRECIPITATION"] = pd.to_numeric(table["SEASONALITY_PRECIPITATION"], errors="coerce")
-    table["SEASONALITY_PRECIPITATION"] = table["SEASONALITY_PRECIPITATION"].replace(
-        {0: "not-seasonal", 1: "seasonal"}
-    )
+    table["SEASONALITY_RAINFALL"] = pd.to_numeric(table["SEASONALITY_RAINFALL"], errors="coerce")
+    table["SEASONALITY_RAINFALL"] = table["SEASONALITY_RAINFALL"].replace({0: "not-seasonal", 1: "seasonal"})
     current_run.log_info("Precipitation seasonality data loaded successfully.")
     return table
 
@@ -893,6 +926,106 @@ def add_itn_use_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         column_data="PCT_ITN_USE_SAMPLE_AVERAGE",
         msg_text="DHS ITN use",
     )
+
+
+def add_user_uploaded_indicators_to(table: pd.DataFrame, additional_layer_files: dict) -> pd.DataFrame:
+    """Add user-uploaded indicators to the results table using the provided configuration.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to which user-uploaded indicators will be added.
+    additional_layer_files : dict
+        A dictionary containing user-uploaded layer files.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with user-uploaded indicators added.
+    """
+    adm1_path = additional_layer_files.get("ADM1")
+    if adm1_path:
+        table = _update_table_from_file(
+            table=table,
+            file_path=Path(adm1_path),
+            level="ADM1",
+            id_col="ADM1_ID",
+            cols_to_drop=["ADM1_NAME"],
+            invalid_cols={"ADM2_ID", "ADM2_NAME"},
+        )
+
+    adm2_path = additional_layer_files.get("ADM2")
+    if adm2_path:
+        table = _update_table_from_file(
+            table=table,
+            file_path=Path(adm2_path),
+            level="ADM2",
+            id_col="ADM2_ID",
+            cols_to_drop=["ADM1_ID", "ADM1_NAME", "ADM2_NAME"],  # avoid replacing values in these columns
+            invalid_cols=set(),
+        )
+
+    return table
+
+
+def _update_table_from_file(
+    table: pd.DataFrame,
+    file_path: Path,
+    level: str,
+    id_col: str,
+    cols_to_drop: list[str],
+    invalid_cols: set[str],
+) -> pd.DataFrame:
+    """Update the given table DataFrame by merging it with a user-uploaded file on a specified column.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The DataFrame to update.
+    file_path : Path
+        The path to the user-uploaded file.
+    level : str
+        The administrative level (e.g., "ADM1", "ADM2").
+    id_col : str
+        The column name to join on.
+    cols_to_drop : str
+        The names of columns to drop from the user-uploaded data.
+    invalid_cols : set
+        A set of invalid columns that should not be present in the user-uploaded data.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame after merging and updating the specified column.
+    """
+    if not file_path.exists():
+        current_run.log_info(f"User provided file at level {level} not found: {file_path}.")
+        return table
+
+    current_run.log_info(f"Adding {level} user uploaded data: {file_path.name}")
+    user_data = pd.read_csv(file_path)
+    user_data.columns = user_data.columns.str.upper()
+    user_data = user_data.drop(columns=cols_to_drop, errors="ignore")
+    present_invalid_cols = invalid_cols & set(user_data.columns)
+    if present_invalid_cols:
+        current_run.log_warning(
+            f"{level} user uploaded file: {file_path.name} "
+            f" contains {', '.join(present_invalid_cols)} columns. This file will be ignored."
+        )
+        return table
+
+    table = table.set_index(id_col)
+    user_data = user_data.set_index(id_col)
+    for col in user_data.columns:
+        if col in table.columns:
+            # update only matching column
+            table[col].update(user_data[col])
+        else:
+            current_run.log_warning(
+                f"Column name: {col} not found in user-provided file {level}: {file_path.name}"
+            )
+
+    return table.reset_index()
 
 
 def update_table_with(

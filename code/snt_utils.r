@@ -534,35 +534,49 @@ process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_
 compute_min_seasonality_block <- function(
   input_dt,
   seasonality_column_pattern,
+  vector_of_possible_month_block_sizes,
   seasonal_blocksize_colname,
   valid_value = 1
 ){
   #' retrieve the minimum number of months which constitute a seasonality block
   #' @param input_dt input data.table
-  #' @param seasonality_column_pattern in the names of the columns which represent the seasonality status (0/1)
-  #' @param seasonal_blocksize_colname name of the new column
-  #' @param valid_value value which indicates there is seasonality
-  #' @return an output data table which has the extra column; it will be NA if there is no seasonality, and the minimum number of months in a block, if there is seasonality
-    
-  # get column names that match the pattern (case-insensitive)
-  seasonality_cols <- grep(seasonality_column_pattern, names(input_dt),
-                           ignore.case = TRUE, value = TRUE)
-
-  # get month-block sizes (3/4/5)
-  block_sizes <- as.integer(sub(".*?(\\d+).*", "\\1", seasonality_cols))
-
-  output_dt <- copy(as.data.table(input_dt))
-
-  # compute output column
-  output_dt[, (seasonal_blocksize_colname) :=
+  #' @param seasonality_column_pattern pattern for seasonality columns
+  #' @param vector_of_possible_month_block_sizes numeric vector of block sizes
+  #' @param seasonal_blocksize_colname name of output column
+  #' @param valid_value value indicating seasonality
+  #' @return data.table with added blocksize column (NA if none)
+  
+  # column names which match pattern
+  seasonality_cols <- grep(
+    seasonality_column_pattern,
+    names(input_dt),
+    ignore.case = TRUE,
+    value = TRUE
+  )
+  
+  # validate block sizes with columns
+  if (length(vector_of_possible_month_block_sizes) != length(seasonality_cols)) {
+    stop("Input possible month block sizes should correspond to number of relevant columns.")
+  }
+  
+  block_sizes <- as.integer(vector_of_possible_month_block_sizes)
+  
+  # rowwise compute the new column
+  output_dt <- input_dt[, (seasonal_blocksize_colname) :=
     apply(.SD, 1, function(row) {
+
+      # find block sizes corresponding to the target value
       valid_blocks <- block_sizes[row == valid_value]
+
+      # change to NA if no seasonality
       if (length(valid_blocks) == 0) return(NA_integer_)
+
+      # minimum block size
       return(min(valid_blocks))
     }),
     .SDcols = seasonality_cols
   ]
-
+  
   return(output_dt)
 }
 

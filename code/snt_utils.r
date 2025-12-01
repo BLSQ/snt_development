@@ -606,7 +606,7 @@ make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, t
 }
 
 #############
-make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, palette_name = 'BrBG'){
+make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, palette_name = 'BrBG', none_label="No seasonality"){
   #' map the duration of seasonality (in how many months x% of annual rain falls)
   #'
   #' @param spatial_seasonality_df sf data with spatial and seasonality columns
@@ -622,15 +622,16 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
     # scale_fill_discrete(
     #   # values = sort(unique(as.character(plot_df[['seasonality_duration_colname']]))),  # custom colors
     #   labels = function(x) {
-    #     ifelse(x == "Inf", "No seasonality", x) # custom labels
+    #     ifelse(x == "Inf", none_label, x) # custom labels
     #     }
     #   )    +
     # 
     scale_fill_brewer(palette = palette_name, labels = function(x) {
-      ifelse(is.na(x), "No seasonality", x) # custom labels
+      ifelse(is.na(x), none_label, x) # custom labels
     }
     ) +
-    guides(fill=guide_legend(title= paste0("Number of months (", title_label, ")" ), nrow = 2)) +
+    # guides(fill=guide_legend(title= paste0("Number of months (", title_label, ")" ), nrow = 2)) +
+    guides(fill=guide_legend(title=title_label, nrow = 2)) +
     theme_classic() +
     theme(plot.title = element_text(face = "bold", hjust = 0.5),
           legend.position = "bottom", legend.key.width = unit(2,"cm"), legend.text=element_text(size=10))

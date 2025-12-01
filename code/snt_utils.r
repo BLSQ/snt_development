@@ -393,16 +393,7 @@ fill_missing_cases_ts <- function(district_data, original_values_colname, estima
 }
 
 #############
-compute_month_seasonality <- function(
-  input_dt,
-  indicator,
-  values_colname,
-  vector_of_durations,
-  admin_colname = 'ADM2_ID',
-  year_colname = 'YEAR',
-  month_colname = 'MONTH',
-  proportion_threshold = 0.6
-) {
+compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_threshold = 0.6) {
   #' create forward-looking month blocks summing values based on the WHO month-block reasoning for seasonality computation - allows for different block sizes
   #' @param input_dt an input data table (or data frame)
   #' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
@@ -613,7 +604,8 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
   #' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
   #' @param title_label string for the legend title
   #' @param palette_name colorbrewer palette (default is 'BrBG')
-  #'
+  #' @param none_label legend label when there is no seasonality (defaults to "Not seasonal")
+  #' 
   #' @return ggplot object
   #' 
   duration_plot <- ggplot(spatial_seasonality_df) +
@@ -934,23 +926,23 @@ filter_files_to_save <- function(
 #%% Healthcare access -------------------------
 
 # helper to load fallback dataset
-    load_default_dataset <- function(helper_dhis2_dataset, helper_country_code, reason) {
-        log_msg(glue::glue("{reason}: using default DHIS2 FOSA dataset. To use input data, please input a different file and rerun pipeline."))
-        dhis2_data <- tryCatch(
-            {
-                get_latest_dataset_file_in_memory(
-                    helper_dhis2_dataset,
-                    glue::glue("{helper_country_code}_pyramid.parquet")
-                )
-                # setDT(dhis2_data)
-            },
-            error = function(e) {
-                msg <- paste("Error loading DHIS2 FOSA default data:", conditionMessage(e))
-                stop(msg)
-            }
-        )
-        return(dhis2_data)
-    }
+load_default_dataset <- function(helper_dhis2_dataset, helper_country_code, reason) {
+    log_msg(glue::glue("{reason}: using default DHIS2 FOSA dataset. To use input data, please input a different file and rerun pipeline."))
+    dhis2_data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(
+                helper_dhis2_dataset,
+                glue::glue("{helper_country_code}_pyramid.parquet")
+            )
+            # setDT(dhis2_data)
+        },
+        error = function(e) {
+            msg <- paste("Error loading DHIS2 FOSA default data:", conditionMessage(e))
+            stop(msg)
+        }
+    )
+    return(dhis2_data)
+}
 
                                            
 ################################
@@ -1032,11 +1024,11 @@ import_fosa_data <- function(
 
 
 ################################
-#' reproject a sf or terra vector to a given epsg code
-#' @param x: object
-#' @param epsg_value: integer epsg code to reproject to
-#' @returns: input object reprojected to the target crs if needed
 reproject_epsg <- function(x, epsg_value) {
+  #' reproject a sf or terra vector to a given epsg code
+  #' @param x: object
+  #' @param epsg_value: integer epsg code to reproject to
+  #' @returns: input object reprojected to the target crs if needed
   
   # check if input is sf
   if (inherits(x, "sf") || inherits(x, "sfc")) {
@@ -1070,59 +1062,41 @@ reproject_epsg <- function(x, epsg_value) {
 }
 
 ########################
-#' filter points within polygon boundaries using terra
-#'
-#' @param locations_vect: vector with point geometries
-#' @param boundaries_vect: vector with polygon geometries
-#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-#'
-#' @return vector with only the points within the boundaries
-#'
-#' @import terra
-#'
 filter_points_within_boundaries <- function(locations_vect, boundaries_vect, epsg_value_degrees) {
 
-    print("Input data 1/2 (point locations):")
-    locations_vect <- reproject_epsg(locations_vect, epsg_value_degrees)
-    print("Input data 2/2 (boundaries polygon):")
-    boundaries_vect <- reproject_epsg(boundaries_vect, epsg_value_degrees)
+  #' filter points within polygon boundaries using terra
+  #'
+  #' @param locations_vect: vector with point geometries
+  #' @param boundaries_vect: vector with polygon geometries
+  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+  #'
+  #' @return vector with only the points within the boundaries
+  #'
+  #' @import terra
+  #'
+  print("Input data 1/2 (point locations):")
+  locations_vect <- reproject_epsg(locations_vect, epsg_value_degrees)
+  print("Input data 2/2 (boundaries polygon):")
+  boundaries_vect <- reproject_epsg(boundaries_vect, epsg_value_degrees)
 
-    # spatial relation: keep only points within polygons
-    within_matrix <- relate(locations_vect, boundaries_vect, relation = "within")
+  # spatial relation: keep only points within polygons
+  within_matrix <- relate(locations_vect, boundaries_vect, relation = "within")
 
-    # get indices of points with at least one 'within' relation
-    # point_indices_within <- which(lengths(within_matrix) > 0)
-    point_indices_within <- which(within_matrix)
+  # get indices of points with at least one 'within' relation
+  # point_indices_within <- which(lengths(within_matrix) > 0)
+  point_indices_within <- which(within_matrix)
 
-    point_indices_outside <- which(!within_matrix)
+  point_indices_outside <- which(!within_matrix)
 
-    print(glue("There were {length(point_indices_within)} points within the boundaries, and {length(point_indices_outside)} points outside. Only those within are returned."))
+  print(glue("There were {length(point_indices_within)} points within the boundaries, and {length(point_indices_outside)} points outside. Only those within are returned."))
 
-    # subset the points
-    filtered_locations_vect <- locations_vect[point_indices_within, ]
+  # subset the points
+  filtered_locations_vect <- locations_vect[point_indices_within, ]
 
-    return(filtered_locations_vect)
+  return(filtered_locations_vect)
 }
 
 ########################
-#' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
-#'
-#' @param input_vect: sf vector of spatial points (in any CRS)
-#' @param coordinate_colnames: names of the longitude and latitude columns
-#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
-#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
-#'
-#' @return: sf vector of the circle coverages in the degree CRS
-#'
-#' @details 
-#' 1. check that input is in the correct degree CRS (reproject if needed)
-#' 2. project it to a meter CRS for distance calculations
-#' 3. create circular buffers (coverage radii) around each point
-#' 4. reproject the buffer geometries back to the original degree CRS
-#'
-#' @import sf
-#'
 make_coverage_radii_sf <- function(
   input_vect,
   coordinate_colnames,
@@ -1130,6 +1104,25 @@ make_coverage_radii_sf <- function(
   epsg_value_meters,
   radius_meters
 ){
+
+  #' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
+  #'
+  #' @param input_vect: sf vector of spatial points (in any CRS)
+  #' @param coordinate_colnames: names of the longitude and latitude columns
+  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+  #' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+  #' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+  #'
+  #' @return: sf vector of the circle coverages in the degree CRS
+  #'
+  #' @details 
+  #' 1. check that input is in the correct degree CRS (reproject if needed)
+  #' 2. project it to a meter CRS for distance calculations
+  #' 3. create circular buffers (coverage radii) around each point
+  #' 4. reproject the buffer geometries back to the original degree CRS
+  #'
+  #' @import sf
+
   # check CRS and reproject to degree CRS if necessary
   input_vect <- reproject_epsg(input_vect, epsg_value_degrees)
   
@@ -1146,24 +1139,6 @@ make_coverage_radii_sf <- function(
 }
 
 ########################
-#' make circles of a given radius around each point (longitude/latitude) in the spatial input data
-#'
-#' @param input_vect: terra vector of spatial points (in any CRS)
-#' @param coordinate_colnames: names of the longitude and latitude columns
-#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
-#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
-#' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
-#'
-#' @return: terra vector of the circle coverages in the degree CRS
-#'
-#' @details 
-#' 1. check that input is in the correct degree CRS (reproject if needed)
-#' 2. project it to a meter CRS for distance calculations
-#' 3. create circular buffers (coverage radii) around each point
-#' 4. reproject the buffer geometries back to the original degree CRS
-#'
-#' @import terra
-#'
 make_coverage_radii_terra <- function(
   
   input_vect,
@@ -1172,6 +1147,25 @@ make_coverage_radii_terra <- function(
   epsg_value_meters,
   radius_meters
 ){
+
+  #' make circles of a given radius around each point (longitude/latitude) in the spatial input data
+  #'
+  #' @param input_vect: terra vector of spatial points (in any CRS)
+  #' @param coordinate_colnames: names of the longitude and latitude columns
+  #' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+  #' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+  #' @param radius_meters: Integer of the radius (in meters) of the  coverage area to create around each point
+  #'
+  #' @return: terra vector of the circle coverages in the degree CRS
+  #'
+  #' @details 
+  #' 1. check that input is in the correct degree CRS (reproject if needed)
+  #' 2. project it to a meter CRS for distance calculations
+  #' 3. create circular buffers (coverage radii) around each point
+  #' 4. reproject the buffer geometries back to the original degree CRS
+  #'
+  #' @import terra
+  #'
   
   # check CRS and reproject to degree CRS if necessary
 
@@ -1190,15 +1184,6 @@ make_coverage_radii_terra <- function(
 }
 
 ########################
-#' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
-#'
-#' @param admin_unit_vect: sf vector of administrative boundaries
-#' @param points_sf_vect: sf vector with coordinate columns of healthcare units
-#' @param buffer_vect: sf vector of buffer zones around healthcare units
-#' @param epsg_value_degrees: EPSG code (in degrees) for CRS
-#' @param plot_title: title of plot
-#'
-#' @return ggplot object showing the spatial overlay
 make_overlaid_sf_plot <- function(
   #' plot overlaying a) administrative boundaries, b) location of healthcare units, c) buffers around each healthcare unit
   
@@ -1208,6 +1193,16 @@ make_overlaid_sf_plot <- function(
   epsg_value_degrees,
   plot_title
 ){
+
+  #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
+  #'
+  #' @param admin_unit_vect: sf vector of administrative boundaries
+  #' @param points_sf_vect: sf vector with coordinate columns of healthcare units
+  #' @param buffer_vect: sf vector of buffer zones around healthcare units
+  #' @param epsg_value_degrees: EPSG code (in degrees) for CRS
+  #' @param plot_title: title of plot
+  #'
+  #' @return ggplot object showing the spatial overlay
 
   # get all 3 data objects to the same projection
 
@@ -1234,15 +1229,6 @@ make_overlaid_sf_plot <- function(
            
 
 ########################
-#' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
-
-#' @param buffer_vect: vector with the buffer geometries to rasterize
-#' @param raster_data: raster to use as the template for resolution and extent
-#' @param epsg_value_degrees: EPSG of the target CRS in degrees
-#' @param value_inside: value to assign to raster cells that intersect any buffer
-#' @param value_outside: value to assign to raster cells that do not intersect any buffer
-
-#' @return raster with cells assigned values based on intersection with the buffer vector
 make_rasterized_inclusion_data <- function(
   buffer_vect, 
   raster_data,
@@ -1250,6 +1236,17 @@ make_rasterized_inclusion_data <- function(
   value_inside = 1,
   value_outside = 0
 ){
+
+  #' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
+
+  #' @param buffer_vect: vector with the buffer geometries to rasterize
+  #' @param raster_data: raster to use as the template for resolution and extent
+  #' @param epsg_value_degrees: EPSG of the target CRS in degrees
+  #' @param value_inside: value to assign to raster cells that intersect any buffer
+  #' @param value_outside: value to assign to raster cells that do not intersect any buffer
+
+  #' @return raster with cells assigned values based on intersection with the buffer vector
+  
   # reproject raster to the correct CRS (degrees)
   raster_data <- project(raster_data, glue("epsg:{epsg_value_degrees}"))
   

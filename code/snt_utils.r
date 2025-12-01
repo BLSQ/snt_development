@@ -586,7 +586,8 @@ make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, t
     scale_fill_manual(values = c("1" = "chartreuse2", "0" = "#1E2044"),
                       labels = c("1" = "Seasonal", "0" = "Not seasonal")) +  # Custom labels
     coord_sf() + # map projection
-    guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
+    # guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
+    guides(fill=guide_legend(title=title_label, nrow = 2)) +
     theme_classic() +
     theme(plot.title = element_text(face = "bold", hjust = 0.5),
           legend.position = "bottom", legend.key.width = unit(2,"cm"), legend.text=element_text(size=10))

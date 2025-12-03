@@ -43,7 +43,7 @@ from snt_lib.snt_pipeline_utils import (
     "availability_indicators",
     name="Availability indicators",
     help="Indicators selection to determine availability.",
-    multiple=False,
+    multiple=True,
     choices=["CONF", "SUSP", "TEST", "PRES"],
     type=str,
     default=["CONF", "PRES"],

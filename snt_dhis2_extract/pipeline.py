@@ -282,17 +282,17 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
 
         # NOTE: Filtering for Niger due to mixed levels in the pyramid (district: "DS")
         if country_code == "NER":
-            current_run.log_info("Filtering district names at level 3 for Niger pyramid.")
-            dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_3_name").str.starts_with("DS"))
+            # retrieve orgunits groups ref: https://bluesquare.atlassian.net/browse/SNT25-241
+            retrieve_org_units_groups_for_ner(dhis2_client)
+
+            current_run.log_info("Re-arranging pyramid organisation units for Niger pyramid.")
             # run R script for ad-hoc transformations
+            # ticket ref: https://bluesquare.atlassian.net/browse/SNT25-253
             dhis2_pyramid = run_transformation_notebook(
                 df=dhis2_pyramid,
                 nb_path=pipeline_path / "code" / "NER_pyramid_format.ipynb",
                 nb_output_dir=pipeline_path / "NER_transformations",
             )
-            # retrieve orgunits groups ref: https://bluesquare.atlassian.net/browse/SNT25-241
-            retrieve_org_units_groups_for_ner(dhis2_client)
-
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
     except Exception as e:
         raise Exception(f"An error occurred while retrieving the DHIS2 pyramid data: {e}") from e
@@ -1517,8 +1517,8 @@ def run_transformation_notebook(
     (nb_output_dir / "output").mkdir(parents=True, exist_ok=True)
 
     # prepare parquet paths
-    input_path = nb_output_dir / "input" / f"input_dataframe_{execution_timestamp}.parquet"
-    output_path = nb_output_dir / "output" / f"output_dataframe_{execution_timestamp}.parquet"
+    input_path = nb_output_dir / "input" / "input_pyramid.parquet"
+    output_path = nb_output_dir / "output" / "output_pyramid.parquet"
     df.write_parquet(input_path)
 
     # setup parameters (avoid mutating original dict)
@@ -1581,6 +1581,9 @@ def retrieve_org_units_groups_for_ner(dhis2_client: DHIS2) -> None:
     # hardcoded path for NER case
     output_path = Path(workspace.files_path) / "data" / "dhis2" / "extracts_raw" / "organisation_unit_groups"
     output_path.mkdir(parents=True, exist_ok=True)
+
+    # Save raw full data
+    org_unit_groups.write_parquet(output_path / "NER_organisation_unit_groups_raw.parquet")
 
     # save both versions: parquet and csv
     df_filtered.write_parquet(output_path / "NER_organisation_unit_groups.parquet")

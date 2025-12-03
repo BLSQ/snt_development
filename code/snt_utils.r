@@ -1331,3 +1331,53 @@ make_new_dataset_version <- function(target_dataset){
 
     return(new_version)
 }
+
+
+## helper function for NER child-parent updates
+# Function to update child facilities dynamically for any level -> move "level" to "target_level" updating parents
+get_updated_children <- function(new_level_table, group_table, level, target_level, parent_level) {
+
+    if (level < 2) stop(glue("level must be greater than 2, received: {level}"))
+
+    # Determine column names dynamically
+    level_id_col <- paste0("level_", level, "_id")
+    level_name_col <- paste0("level_", level, "_name")     
+    target_level_id <- glue("level_{target_level}_id")
+    target_level_name <- glue("level_{target_level}_name")
+    parent_level_id <- glue("level_{parent_level}_id")
+    parent_level_name <- glue("level_{parent_level}_name")
+    
+    parent_level_ids <- unique(group_table[[parent_level_id]])
+    child_updated <- group_table[0, ]
+    
+    for (parent_id in parent_level_ids) {
+        # Find the old parent in level 6 (the target_level_id in new_level_table corresponds to the old parent level)
+        old_parent <- head(new_level_table[new_level_table[[target_level_id]] == parent_id, ], 1)
+
+        if (nrow(old_parent) > 0) {
+            # Select child facilities from the table
+            child_selection <- group_table[group_table[[parent_level_id]] == parent_id, ]
+            
+            if (nrow(child_selection) > 0) {
+                print(glue("Fixing child facilities under: {old_parent$name}"))
+                
+                # Update columns dynamically
+                child_selection$level <- target_level
+                child_selection[[target_level_id]] <- child_selection[[level_id_col]]
+                child_selection[[target_level_name]] <- child_selection[[level_name_col]]
+                
+                # Update parent references
+                child_selection[[parent_level_id]] <- old_parent[[parent_level_id]]
+                child_selection[[parent_level_name]] <- old_parent[[parent_level_name]] 
+                
+                # Reset child level columns
+                child_selection[[level_id_col]] <- NA
+                child_selection[[level_name_col]] <- NA
+                
+                # Append
+                child_updated <- rbind(child_updated, child_selection)
+            }
+        }
+    }
+    return(child_updated)
+}

@@ -18,7 +18,7 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_assemble_results")
 @parameter(
     "incidence_metric",
-    name="Metric aggregation for incidence data across years.",
+    name="Incidence aggregation across years.",
     type=str,
     multiple=False,
     choices=["mean", "median"],
@@ -26,8 +26,20 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
+    "incidence_years_to_include",
+    name="Incidence calculation period (years back)",
+    help=(
+        "Select how many years to go back in the incidence mean calculation. "
+        "(0 = all available years (default), -1 = most recent year, "
+        "-2 or less = that many years including the most recent year)."
+    ),
+    type=int,
+    default=0,
+    required=True,
+)
+@parameter(
     "reporting_rate_metric",
-    name="Metric aggregation for reporting rate data across years.",
+    name="Reporting rate  aggregation across years.",
     type=str,
     multiple=False,
     choices=["mean", "median"],
@@ -77,6 +89,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_assemble_results(
     incidence_metric: str,
+    incidence_years_to_include: int,
     reporting_rate_metric: str,
     map_selection: list[str],
     adm1_layers_file: File,
@@ -93,6 +106,11 @@ def snt_assemble_results(
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_assemble_results"
     results_path = root_path / "results"
+
+    if incidence_years_to_include > 0:
+        message = "Number of incidence years must be 0 or negative (0 = all available years)."
+        current_run.log_error(f"Invalid number of incidence years: {incidence_years_to_include}. {message}")
+        raise ValueError(message)
 
     try:
         # Load configuration
@@ -111,6 +129,7 @@ def snt_assemble_results(
             snt_config=snt_config,
             output_path=results_path,
             incidence_metric=incidence_metric,
+            incidence_years_to_include=incidence_years_to_include,
             reporting_rate_metric=reporting_rate_metric,
             map_selection=map_selection,
             additional_layer_files={
@@ -142,6 +161,7 @@ def assemble_snt_results(
     snt_config: dict,
     output_path: Path,
     incidence_metric: str,
+    incidence_years_to_include: int,
     reporting_rate_metric: str,
     map_selection: list[str],
     additional_layer_files: dict[str, Any],
@@ -152,7 +172,7 @@ def assemble_snt_results(
 
     # add indicators
     results_table = add_dhis2_indicators_to(
-        results_table, snt_config, incidence_metric, reporting_rate_metric
+        results_table, snt_config, incidence_metric, incidence_years_to_include, reporting_rate_metric
     )
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
@@ -169,7 +189,11 @@ def assemble_snt_results(
 
 
 def add_dhis2_indicators_to(
-    table: pd.DataFrame, snt_config: dict, incidence_metric: str, reporting_rate_metric: str
+    table: pd.DataFrame,
+    snt_config: dict,
+    incidence_metric: str,
+    incidence_years_to_include: int,
+    reporting_rate_metric: str,
 ) -> pd.DataFrame:
     """Add DHIS2 indicators to the results table by sequentially applying indicator functions.
 
@@ -180,7 +204,9 @@ def add_dhis2_indicators_to(
     """
     updated_table = add_population_to(table, snt_config)
     updated_table = add_reporting_rate_to(table, snt_config, reporting_rate_metric)
-    updated_table = add_incidence_indicators_to(updated_table, snt_config, incidence_metric)
+    updated_table = add_incidence_indicators_to(
+        updated_table, snt_config, incidence_metric, incidence_years_to_include
+    )
     return updated_table  # noqa: RET504
 
 
@@ -205,29 +231,88 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     """
     current_run.log_info("Loading DHIS2 population data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")  # fall back
+    dataset_transform_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_POPULATION_TRANSFORMATION")
+    transform_reference_year = (
+        snt_config.get("DHIS2_DATA_DEFINITIONS", {}).get("POPULATION_DEFINITIONS", {}).get("REFERENCE_YEAR")
+    )
+
     try:
         dhis2_population = get_file_from_dataset(
-            dataset_id=dataset_id,
+            dataset_id=dataset_transform_id,
             filename=f"{country_code}_population.parquet",
         )
+        selected_year = transform_reference_year or select_reference_year_from(dhis2_population["YEAR"])
+        current_run.log_info(
+            "Population data loaded from transformed dataset (DHIS2_POPULATION_TRANSFORMATION)."
+        )
     except Exception as e:
-        current_run.log_warning(f"Error while loading population data: {e}")
+        current_run.log_warning(
+            "No transformed population file found, falling back to dhis2 formatted population."
+        )
+        current_run.log_debug(f"Error loading population from DHIS2_POPULATION_TRANSFORMATION.{e}")
+        try:
+            dhis2_population = get_file_from_dataset(
+                dataset_id=dataset_id,
+                filename=f"{country_code}_population.parquet",
+            )
+            selected_year = dhis2_population["YEAR"].max()
+            current_run.log_info(
+                "Population data loaded from DHIS2 formatted dataset (DHIS2_DATASET_FORMATTED)."
+            )
+        except Exception as e:
+            current_run.log_warning("Formatted population file not found, population layer skipped.")
+            current_run.log_debug(f"Error loading population from DHIS2_DATASET_FORMATTED.{e}")
+            return table
+
+    if selected_year is None:
         return table
 
-    latest_period = dhis2_population["YEAR"].max()
+    current_run.log_info(f"Selected population reference year: {selected_year}")
     table.update(
         table.merge(
-            dhis2_population[dhis2_population["YEAR"] == latest_period][["ADM2_ID", "POPULATION"]],
+            dhis2_population[dhis2_population["YEAR"] == selected_year][["ADM2_ID", "POPULATION"]],
             how="left",
             on="ADM2_ID",
             suffixes=("_old", ""),
         )["POPULATION"]
     )
 
-    update_metadata(variable="POPULATION", attribute="PERIOD", value=str(int(float(latest_period))))
+    update_metadata(variable="POPULATION", attribute="PERIOD", value=str(int(float(selected_year))))
 
     return table
+
+
+def select_reference_year_from(
+    years_series: pd.Series, years_to_past: int = 6, years_to_future: int = 6
+) -> int:
+    """Select the reference year from a series of years.
+
+    Parameters
+    ----------
+    years_series : pd.Series
+        Series containing year values.
+    years_to_past : int, optional
+        Number of years to look back from the reference year, by default 6.
+    years_to_future : int, optional
+        Number of years to look forward from the reference year, by default 6.
+
+    Returns
+    -------
+    int
+        The selected reference year.
+    """
+    current_run.log_info(
+        "Automatic selection of reference year from year "
+        f"series (-{years_to_past} to +{years_to_future} around reference year)."
+    )
+
+    unique_years = sorted(years_series.unique())
+    if len(unique_years) < (years_to_past + years_to_future + 1):
+        current_run.log_warning("Not enough years in the series to select a proper reference year.")
+        return None
+
+    return int(unique_years[years_to_past])
 
 
 def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_metric: str) -> pd.DataFrame:
@@ -270,7 +355,8 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
             filename=f"{country_code}_reporting_rate_{reporting_method}.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"Error while loading reporting rate data: {e}")
+        current_run.log_warning("Error while loading reporting rate data, data not added.")
+        current_run.log_debug(f"Error while loading reporting rate data: {e}")
         return table
 
     latest_period = dhis2_reporting["YEAR"].max()
@@ -293,7 +379,9 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
     return table_updated.drop(columns=["AGG_REPORTING_RATE"])
 
 
-def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence_metric: str) -> pd.DataFrame:
+def add_incidence_indicators_to(
+    table: pd.DataFrame, snt_config: dict, incidence_metric: str, incidence_years_to_include: int
+) -> pd.DataFrame:
     """Add incidence indicators to the results table using DHIS2 incidence data.
 
     Parameters
@@ -304,6 +392,8 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         The SNT configuration dictionary containing dataset identifiers and country code.
     incidence_metric : str
         Incidence metric selection.
+    incidence_years_to_include : int
+        Number of years to include for incidence calculation.
 
     Returns
     -------
@@ -327,10 +417,8 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name)
         current_run.log_debug(f"Incidence file selection: {f_name}")
     except Exception as e:
-        current_run.log_warning(f"Error while loading incidence data: {e}")
-        current_run.log_warning(
-            f"Please make sure the incidence file {f_name} exists or re-run the pipeline."
-        )
+        current_run.log_warning("Error while loading incidence data, data not added.")
+        current_run.log_debug(f"Error while loading incidence data: {e}")
         return table
 
     columns_selection = [
@@ -339,10 +427,24 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         "INCIDENCE_ADJ_REPORTING",
         "INCIDENCE_ADJ_CARESEEKING",
     ]
-
-    period_start = int(float(dhis2_incidence["YEAR"].min()))
-    period_end = int(float(dhis2_incidence["YEAR"].max()))
     dhis2_incidence.columns = dhis2_incidence.columns.str.upper()  # This should be already formatted
+    min_year = int(float(dhis2_incidence["YEAR"].min()))
+    period_end = int(float(dhis2_incidence["YEAR"].max()))
+
+    # Select periods
+    if incidence_years_to_include == 0:
+        period_start = min_year
+    else:
+        period_start = period_end + int(incidence_years_to_include) + 1
+        if period_start < min_year:
+            period_start = min_year
+
+    # Filter by periods
+    current_run.log_info(f"Incidence years included: from {period_start} to {period_end}")
+    dhis2_incidence = dhis2_incidence[
+        (dhis2_incidence["YEAR"] >= period_start) & (dhis2_incidence["YEAR"] <= period_end)
+    ]
+
     matched_columns = [col for col in columns_selection if col in dhis2_incidence.columns]
     current_run.log_debug(f"Found incidence cols: {matched_columns}")
     if not matched_columns:
@@ -366,10 +468,15 @@ def add_incidence_indicators_to(table: pd.DataFrame, snt_config: dict, incidence
         suffixes=("", "_new"),
     )
 
+    if period_start == period_end:
+        period_str = str(period_end)
+    else:
+        period_str = f"{period_start}-{period_end}"
+
     # Update each column if it is available in dhis2_incidence
     for col in matched_columns:
         table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
-        update_metadata(variable=col, attribute="PERIOD", value=f"{period_start}-{period_end}")
+        update_metadata(variable=col, attribute="PERIOD", value=period_str)
 
     return table
 
@@ -505,7 +612,8 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
             filename=f"{country_code}_rainfall_seasonality.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"No precipitation seasonality data available. Warning details: {e}")
+        current_run.log_warning("No precipitation seasonality data available.")
+        current_run.log_debug(f"Error while loading precipitation seasonality data: {e}")
         return table
 
     columns_selection = [
@@ -552,7 +660,8 @@ def add_cases_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
             filename=f"{country_code}_cases_seasonality.parquet",
         )
     except Exception as e:
-        current_run.log_warning(f"No cases seasonality data available. Warning details: {e}")
+        current_run.log_warning("No cases seasonality data available.")
+        current_run.log_debug(f"Error while loading seasonality cases data: {e}")
         return table
 
     table.update(
@@ -621,7 +730,8 @@ def add_careseeking_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         )
         current_run.log_debug(f"Columns: {dhs_careseeking.columns}")
     except Exception as e:
-        current_run.log_warning(f"Error while loading dhs careseeking data: {e}")
+        current_run.log_warning("Error while loading dhs careseeking data, data not added")
+        current_run.log_debug(f"Error while loading dhs careseeking data: {e}")
         return table
 
     columns_selection = [
@@ -679,7 +789,8 @@ def add_dropout_dtp_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         )
         current_run.log_debug(f"Columns: {dhs_dropout.columns}")
     except Exception as e:
-        current_run.log_warning(f"Error while loading dropout Ddtp data: {e}")
+        current_run.log_warning("Error while loading dropout Ddtp data. Data not added.")
+        current_run.log_debug(f"Error while loading dropout Ddtp data: {e}")
         return table
 
     columns_selection = [
@@ -1068,7 +1179,8 @@ def update_table_with(
             filename=filename,
         )
     except Exception as e:
-        current_run.log_warning(f"Error while loading {msg_text} data: {e}")
+        current_run.log_warning(f"Error while loading {msg_text} data, data not added")
+        current_run.log_debug(f"Error {msg_text} details: {e}")
         return table_df
 
     dataset_file.columns = [col.upper() for col in dataset_file.columns]

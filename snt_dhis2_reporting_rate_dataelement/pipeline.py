@@ -40,6 +40,26 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 @parameter(
+    "availability_indicators",
+    name="Availability indicators",
+    help="Indicators selection to determine availability.",
+    multiple=True,
+    choices=["CONF", "SUSP", "TEST", "PRES"],
+    type=str,
+    default=["CONF", "PRES"],
+    required=True,
+)
+@parameter(
+    "volume_activity_indicators",
+    name="Volume activity indicators",
+    help="Indicators selection to determine the volume of activity.",
+    multiple=True,
+    choices=["CONF", "SUSP", "TEST", "PRES"],
+    type=str,
+    default=["CONF", "PRES"],
+    required=True,
+)
+@parameter(
     "dataelement_method_denominator",
     name="Denominator method",
     help="How to calculate the total nr of facilities expected to report.",
@@ -66,6 +86,8 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_reporting_rate_dataelement(
     outliers_method: str,
     use_removed_outliers: bool,
+    availability_indicators: str,
+    volume_activity_indicators: str,
     dataelement_method_denominator: str,
     run_report_only: bool,
     pull_scripts: bool,
@@ -117,6 +139,8 @@ def snt_dhis2_reporting_rate_dataelement(
                     "SNT_ROOT_PATH": root_path.as_posix(),
                     "ROUTINE_FILE": routine_file,
                     "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
+                    "AVAILABILITY_INDICATORS": availability_indicators,
+                    "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )

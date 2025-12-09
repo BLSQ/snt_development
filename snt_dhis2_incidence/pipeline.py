@@ -104,6 +104,8 @@ def snt_dhis2_incidence(
         calculate incidence adjusted for care seeking.
     use_adjusted_population : bool
         If True, use adjusted population data for incidence calculations.
+    dissagregation_selection : str
+        Select the disaggregation for incidence computation (available only for Niger).
     run_report_only : bool
         If True, only the reporting notebook will be executed, skipping the main analysis.
     pull_scripts : bool

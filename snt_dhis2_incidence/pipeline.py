@@ -59,7 +59,7 @@ from snt_lib.snt_pipeline_utils import (
     name="Disaggregation selection (NER only)",
     help="Select the disaggregation for indicence computation, available only for Niger.",
     multiple=False,
-    choices=["total", "pregnant", "under5"],
+    choices=["pregnant", "under5"],
     type=str,
     default=None,
     required=False,

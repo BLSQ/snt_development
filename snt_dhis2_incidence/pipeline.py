@@ -55,13 +55,14 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
-    "dissagregation_selection",
-    name="Dissagregation selection (NER only)",
+    "disaggregation_selection",
+    name="Disaggregation selection (NER only)",
     help="Select the disaggregation for indicence computation, available only for Niger.",
     multiple=False,
     choices=["total", "pregnant", "under5"],
     type=str,
-    required=True,
+    default=None,
+    required=False,
 )
 @parameter(
     "run_report_only",
@@ -85,7 +86,7 @@ def snt_dhis2_incidence(
     outlier_detection_method: str,
     use_csb_data: bool,
     use_adjusted_population: bool,
-    dissagregation_selection: str,
+    disaggregation_selection: str,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -104,7 +105,7 @@ def snt_dhis2_incidence(
         calculate incidence adjusted for care seeking.
     use_adjusted_population : bool
         If True, use adjusted population data for incidence calculations.
-    dissagregation_selection : str
+    disaggregation_selection : str
         Select the disaggregation for incidence computation (available only for Niger).
     run_report_only : bool
         If True, only the reporting notebook will be executed, skipping the main analysis.
@@ -142,7 +143,9 @@ def snt_dhis2_incidence(
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
                     "USE_CSB_DATA": use_csb_data,
                     "USE_ADJUSTED_POPULATION": use_adjusted_population,
-                    "DISSAGREGATION_SELECTION": dissagregation_selection,
+                    "DISAGGREGATION_SELECTION": (
+                        disaggregation_selection.upper() if disaggregation_selection else None
+                    ),
                     "ROOT_PATH": root_path.as_posix(),
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},

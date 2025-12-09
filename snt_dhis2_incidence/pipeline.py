@@ -38,15 +38,6 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
-    "reporting_rate_method",
-    name="Reporting rate to use",
-    help="Which reporting rate method to use for the analysis. Note: Reporting rate was calculated"
-    " previously, and is simply imported here",
-    choices=["dataset", "dataelement"],
-    type=str,
-    required=True,
-)
-@parameter(
     "use_csb_data",
     name="Use care seeking data (DHS)",
     help="If True, the pipeline will use care seeking data (DHS) for the analysis,"
@@ -61,6 +52,15 @@ from snt_lib.snt_pipeline_utils import (
     help="If enabled, use adjusted population data for incidence calculations",
     type=bool,
     default=False,
+    required=True,
+)
+@parameter(
+    "dissagregation_selection",
+    name="Dissagregation selection (NER only)",
+    help="Select the disaggregation for indicence computation, available only for Niger.",
+    multiple=False,
+    choices=["total", "pregnant", "under5"],
+    type=str,
     required=True,
 )
 @parameter(
@@ -83,9 +83,9 @@ def snt_dhis2_incidence(
     n1_method: str,
     routine_data_choice: str,
     outlier_detection_method: str,
-    reporting_rate_method: str,
     use_csb_data: bool,
     use_adjusted_population: bool,
+    dissagregation_selection: str,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -99,8 +99,6 @@ def snt_dhis2_incidence(
         Which routine data to use for the analysis (`raw`, `raw_without_outliers`, or `imputed`).
     outlier_detection_method : str
         Method to use for outlier detection in the routine data.
-    reporting_rate_method : str
-        Reporting Rate method to use for the analysis (`dataset`, `dataelement`).
     use_csb_data : bool
         If True, use Care Seeking Data (DHS) for the analysis and
         calculate incidence adjusted for care seeking.
@@ -140,9 +138,9 @@ def snt_dhis2_incidence(
                     "N1_METHOD": n1_method,
                     "ROUTINE_DATA_CHOICE": routine_data_choice,
                     "OUTLIER_DETECTION_METHOD": outlier_detection_method,
-                    "REPORTING_RATE_METHOD": reporting_rate_method,
                     "USE_CSB_DATA": use_csb_data,
                     "USE_ADJUSTED_POPULATION": use_adjusted_population,
+                    "DISSAGREGATION_SELECTION": dissagregation_selection,
                     "ROOT_PATH": root_path.as_posix(),
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},

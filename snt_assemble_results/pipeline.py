@@ -210,6 +210,25 @@ def add_dhis2_indicators_to(
     return updated_table  # noqa: RET504
 
 
+def any_columns_present(table: pd.DataFrame, required_columns: list[str]) -> bool:
+    """Check if the table contains any of the required columns.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table to check.
+    required_columns : list[str]
+        List of required column names.
+
+    Returns
+    -------
+    bool
+        True if any of the required columns are present, False otherwise.
+    """
+    present_columns = [col for col in required_columns if col in table.columns]
+    return bool(present_columns)
+
+
 def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     """Add population data to the results table by merging with DHIS2 population information.
 
@@ -230,6 +249,9 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         The updated results table with population data merged.
     """
     current_run.log_info("Loading DHIS2 population data")
+    if not any_columns_present(table=table, required_columns=["POPULATION"]):
+        current_run.log_info("No population columns present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")  # fall back
     dataset_transform_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_POPULATION_TRANSFORMATION")
@@ -337,6 +359,9 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
         The updated results table with population data merged.
     """
     current_run.log_info("Loading DHIS2 Reporting rates data")
+    if not any_columns_present(table=table, required_columns=["REPORTING_RATE"]):
+        current_run.log_info("No reporting rate columns present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_REPORTING_RATE")
 
@@ -401,6 +426,15 @@ def add_incidence_indicators_to(
         The updated results table with incidence indicators added.
     """
     current_run.log_info("Loading incidence data")
+    columns_selection = [
+        "INCIDENCE_CRUDE",
+        "INCIDENCE_ADJ_TESTING",
+        "INCIDENCE_ADJ_REPORTING",
+        "INCIDENCE_ADJ_CARESEEKING",
+    ]
+    if not any_columns_present(table=table, required_columns=columns_selection):
+        current_run.log_info("No incidence columns present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE")
 
@@ -421,12 +455,6 @@ def add_incidence_indicators_to(
         current_run.log_debug(f"Error while loading incidence data: {e}")
         return table
 
-    columns_selection = [
-        "INCIDENCE_CRUDE",
-        "INCIDENCE_ADJ_TESTING",
-        "INCIDENCE_ADJ_REPORTING",
-        "INCIDENCE_ADJ_CARESEEKING",
-    ]
     dhis2_incidence.columns = dhis2_incidence.columns.str.upper()  # This should be already formatted
     min_year = int(float(dhis2_incidence["YEAR"].min()))
     period_end = int(float(dhis2_incidence["YEAR"].max()))
@@ -439,14 +467,7 @@ def add_incidence_indicators_to(
         if period_start < min_year:
             period_start = min_year
 
-    # Filter by periods
-    current_run.log_info(f"Incidence years included: from {period_start} to {period_end}")
-    dhis2_incidence = dhis2_incidence[
-        (dhis2_incidence["YEAR"] >= period_start) & (dhis2_incidence["YEAR"] <= period_end)
-    ]
-
     matched_columns = [col for col in columns_selection if col in dhis2_incidence.columns]
-    current_run.log_debug(f"Found incidence cols: {matched_columns}")
     if not matched_columns:
         current_run.log_warning("No matching incidence columns found for aggregation.")
         return table
@@ -455,14 +476,26 @@ def add_incidence_indicators_to(
     if missing_columns:
         current_run.log_warning(f"Missing columns in incidence data: {missing_columns}")
 
+    # select only the columns present in the assembly table
+    table_match_cols = [m for m in matched_columns if m in table.columns]
+    if table_match_cols == []:
+        current_run.log_warning("No matching incidence columns found in assembly table, skipping.")
+        return table
+
+    # Filter by periods
+    current_run.log_info(f"Incidence years included: from {period_start} to {period_end}")
+    dhis2_incidence = dhis2_incidence[
+        (dhis2_incidence["YEAR"] >= period_start) & (dhis2_incidence["YEAR"] <= period_end)
+    ]
+
     # Compute incidence metric
     dhis2_incidence_agg = dhis2_incidence.groupby("ADM2_ID", as_index=False).agg(
-        {col: incidence_metric for col in matched_columns}
+        {col: incidence_metric for col in table_match_cols}
     )
 
     # merge
     merged = table.merge(
-        dhis2_incidence_agg[["ADM2_ID"] + matched_columns],
+        dhis2_incidence_agg[["ADM2_ID"] + table_match_cols],
         how="left",
         on="ADM2_ID",
         suffixes=("", "_new"),
@@ -474,7 +507,7 @@ def add_incidence_indicators_to(
         period_str = f"{period_start}-{period_end}"
 
     # Update each column if it is available in dhis2_incidence
-    for col in matched_columns:
+    for col in table_match_cols:
         table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
         update_metadata(variable=col, attribute="PERIOD", value=period_str)
 
@@ -499,6 +532,20 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
         The updated results table with MAP indicators added.
     """
     current_run.log_info("Loading MAP data")
+    if not any_columns_present(
+        table=table,
+        required_columns=[
+            "PF_PR_RATE",
+            "PF_MORTALITY_RATE",
+            "PF_INCIDENCE_RATE",
+            "ITN_ACCESS_RATE",
+            "ITN_USE_RATE_RATE",
+            "IRS_COVERAGE_RATE",
+            "ANTIMALARIAL_EFT_RATE",
+        ],
+    ):
+        current_run.log_info("No MAP columns present in the assembly table, skipping.")
+        return table
     current_run.log_debug(f"map selection: {map_selection}")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACT")
@@ -530,30 +577,34 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
         "IRS_COVERAGE_RATE": 100,
         "ANTIMALARIAL_EFT_RATE": 100,
     }
+    columns_mapped = []
     for metric in map_selection:
+        if col_mappings[metric] not in table.columns:
+            current_run.log_info(f"Metric {metric} not found in assembly table, skipping.")
+            continue
+
+        indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric]
+        if indicator_data.empty:
+            current_run.log_warning(f"No metric {metric} data found in MAP dataset, skipping.")
+            continue
+
         try:
-            indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric]
+            indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric].copy()
             latest_period = indicator_data["YEAR"].max()
-
+            indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
             update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))
-
             current_run.log_debug(f"Latest period for {metric.upper()}: {latest_period}")
-
-            pivot_df = indicator_data.pivot_table(index="ADM2_ID", columns="YEAR", values="VALUE")
-            if isinstance(pivot_df.columns[0], str):
-                latest_period = str(latest_period)
-            else:
-                latest_period = int(latest_period)
-            latest_df = pivot_df[[latest_period]].rename(columns={latest_period: col_mappings[metric]})
-            latest_df = latest_df.reset_index()
-            merged = table.merge(latest_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
+            indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
+            indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
+            merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
             table.update(merged[[col_mappings[metric]]])
+            columns_mapped.append(col_mappings[metric])
         except Exception as e:
             current_run.log_warning(f"Error while updating MAP data for metric {metric}: {e}")
             continue
 
     # convertions
-    for col in col_mappings.values():
+    for col in columns_mapped:
         if col in table.columns:
             table[col] = pd.to_numeric(table[col], errors="coerce")
             table[col] = table[col] * convertions[col]
@@ -590,20 +641,23 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
     Parameters
     ----------
     table : pd.DataFrame
-        The results table to which precipitation seasonality indicators will be added.
+        The results table to which rainfall seasonality indicators will be added.
     snt_config : dict
         The SNT configuration dictionary.
 
     Returns
     -------
     pd.DataFrame
-        The updated results table with precipitation seasonality indicators added.
+        The updated results table with rainfall seasonality indicators added.
     """
-    if "SEASONALITY_RAINFALL" not in table.columns:
-        current_run.log_info("SEASONALITY_RAINFALL column not in table, skipping.")
+    current_run.log_info("Loading rainfall seasonality data")
+    columns_selection = [
+        "SEASONALITY_RAINFALL",
+        "SEASONAL_BLOCK_DURATION_RAINFALL",
+    ]
+    if not any_columns_present(table=table, required_columns=columns_selection):
+        current_run.log_info("No rainfall seasonality columns present in the assembly table, skipping.")
         return table
-
-    current_run.log_info("Loading precipitation seasonality data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY_RAINFALL")
     try:
@@ -612,27 +666,35 @@ def add_precipitation_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.D
             filename=f"{country_code}_rainfall_seasonality.parquet",
         )
     except Exception as e:
-        current_run.log_warning("No precipitation seasonality data available.")
-        current_run.log_debug(f"Error while loading precipitation seasonality data: {e}")
+        current_run.log_warning("No rainfall seasonality data available.")
+        current_run.log_debug(f"Error while loading rainfall seasonality data: {e}")
         return table
 
-    columns_selection = [
-        "ADM2_ID",
-        "SEASONALITY_RAINFALL",
-        "SEASONAL_BLOCK_DURATION_RAINFALL",
-    ]
+    # skip if no columns present in the assembly table
+    columns_present = [col for col in columns_selection if col in table.columns]
+    if columns_present == []:
+        current_run.log_warning("No rainfall seasonality columns found in assembly table, skipping.")
+        return table
 
     table.update(
         table.merge(
-            seasonality_precipitation[columns_selection],
+            seasonality_precipitation[["ADM2_ID"] + columns_present],
             how="left",
             on="ADM2_ID",
             suffixes=("_old", ""),
-        )[columns_selection[1:]]
+        )[["ADM2_ID"] + columns_present]
     )
-    table["SEASONALITY_RAINFALL"] = pd.to_numeric(table["SEASONALITY_RAINFALL"], errors="coerce")
-    table["SEASONALITY_RAINFALL"] = table["SEASONALITY_RAINFALL"].replace({0: "not-seasonal", 1: "seasonal"})
-    current_run.log_info("Precipitation seasonality data loaded successfully.")
+
+    if "SEASONALITY_RAINFALL" in table.columns:
+        table["SEASONALITY_RAINFALL"] = pd.to_numeric(table["SEASONALITY_RAINFALL"], errors="coerce")
+        table["SEASONALITY_RAINFALL"] = table["SEASONALITY_RAINFALL"].replace(
+            {0: "not-seasonal", 1: "seasonal"}
+        )
+    if "SEASONAL_BLOCK_DURATION_RAINFALL" in table.columns:
+        table["SEASONAL_BLOCK_DURATION_RAINFALL"] = pd.to_numeric(
+            table["SEASONAL_BLOCK_DURATION_RAINFALL"], errors="coerce"
+        )
+    current_run.log_info("Rainfall seasonality data loaded successfully.")
     return table
 
 
@@ -652,8 +714,12 @@ def add_cases_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
         The updated results table with cases seasonality indicators added.
     """
     current_run.log_info("Loading cases seasonality data")
+    columns_selection = ["SEASONALITY_CASES", "SEASONAL_BLOCK_DURATION_CASES"]
+    if not any_columns_present(table=table, required_columns=columns_selection):
+        current_run.log_info("No cases seasonality columns present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_SEASONALITY_CASES")
     try:
         seasonality_cases = get_file_from_dataset(
             dataset_id=dataset_id,
@@ -664,17 +730,28 @@ def add_cases_seasonality(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame
         current_run.log_debug(f"Error while loading seasonality cases data: {e}")
         return table
 
+    # skip if no columns present in the assembly table
+    columns_present = [col for col in columns_selection if col in table.columns]
+    if columns_present == []:
+        current_run.log_warning("No cases seasonality columns found in assembly table, skipping.")
+        return table
+
     table.update(
         table.merge(
-            seasonality_cases[["ADM2_ID", "SEASONALITY_CASES"]],
+            seasonality_cases[["ADM2_ID"] + columns_present],
             how="left",
             on="ADM2_ID",
             suffixes=("_old", ""),
-        )["SEASONALITY_CASES"]
+        )[["ADM2_ID"] + columns_present]
     )
 
-    table["SEASONALITY_PRECIPITATION"] = pd.to_numeric(table["SEASONALITY_PRECIPITATION"], errors="coerce")
-    table["SEASONALITY_CASES"] = table["SEASONALITY_CASES"].replace({0: "not-seasonal", 1: "seasonal"})
+    if "SEASONALITY_CASES" in table.columns:
+        table["SEASONALITY_CASES"] = pd.to_numeric(table["SEASONALITY_CASES"], errors="coerce")
+        table["SEASONALITY_CASES"] = table["SEASONALITY_CASES"].replace({0: "not-seasonal", 1: "seasonal"})
+    if "SEASONAL_BLOCK_DURATION_CASES" in table.columns:
+        table["SEASONAL_BLOCK_DURATION_CASES"] = pd.to_numeric(
+            table["SEASONAL_BLOCK_DURATION_CASES"], errors="coerce"
+        )
     current_run.log_info("Cases seasonality data loaded successfully.")
     return table
 
@@ -720,6 +797,14 @@ def add_careseeking_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         The updated results table with care seeking data added.
     """
     current_run.log_info("Loading DHS care seeking data")
+    columns_selection = [
+        "PCT_PUBLIC_CARE",
+        "PCT_PRIVATE_CARE",
+        "PCT_NO_CARE",
+    ]
+    if not any_columns_present(table=table, required_columns=columns_selection):
+        current_run.log_info("DHS care seeking columns not present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
@@ -734,27 +819,27 @@ def add_careseeking_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         current_run.log_debug(f"Error while loading dhs careseeking data: {e}")
         return table
 
-    columns_selection = [
-        "PCT_PUBLIC_CARE",
-        "PCT_PRIVATE_CARE",
-        "PCT_NO_CARE",
-    ]
-
     matched_columns = [col for col in columns_selection if col in dhs_careseeking.columns]
-    current_run.log_debug(f"Found care seeking cols: {matched_columns}")
+    if matched_columns == []:
+        current_run.log_warning("No care seeking columns found in DHS dataset, skipping.")
+        return table
     missing_columns = [col for col in columns_selection if col not in dhs_careseeking.columns]
     if missing_columns:
-        current_run.log_warning(f"Missing columns in care seeking data: {missing_columns}")
+        current_run.log_warning(f"Missing columns in care seeking dataset: {missing_columns}")
+    present_columns = [col for col in matched_columns if col in table.columns]
+    if present_columns == []:
+        current_run.log_info("No care seeking columns found in assembly table, skipping.")
+        return table
 
     merged = table.merge(
-        dhs_careseeking[["ADM1_ID"] + matched_columns],  # NOTE: only ADM1_ID level
+        dhs_careseeking[["ADM1_ID"] + present_columns],  # NOTE: only ADM1_ID level
         how="left",
         on="ADM1_ID",
         suffixes=("", "_new"),
     )
 
     # Update each column if it is available in dhs_careseeking
-    for col in matched_columns:
+    for col in present_columns:
         table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
         # NOTE: Theres no period available in the file (!)
         # update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
@@ -779,6 +864,14 @@ def add_dropout_dtp_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         The updated results table with dropout DTP data added.
     """
     current_run.log_info("Loading DHS dropout dtp data")
+    columns_selection = [
+        "PCT_DROPOUT_DTP_1_2",
+        "PCT_DROPOUT_DTP_2_3",
+        "PCT_DROPOUT_DTP_1_3",
+    ]
+    if not any_columns_present(table=table, required_columns=columns_selection):
+        current_run.log_info("DHS dropout columns not present in the assembly table, skipping.")
+        return table
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
     try:
@@ -793,25 +886,24 @@ def add_dropout_dtp_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
         current_run.log_debug(f"Error while loading dropout Ddtp data: {e}")
         return table
 
-    columns_selection = [
-        "PCT_DROPOUT_DTP_1_2",
-        "PCT_DROPOUT_DTP_2_3",
-        "PCT_DROPOUT_DTP_1_3",
-    ]
     matched_columns = [col for col in columns_selection if col in dhs_dropout.columns]
-    current_run.log_debug(f"Found care seeking cols: {matched_columns}")
     missing_columns = [col for col in columns_selection if col not in dhs_dropout.columns]
     if missing_columns:
-        current_run.log_warning(f"Missing columns in care seeking data: {missing_columns}")
+        current_run.log_warning(f"Missing columns in dropout data: {missing_columns}")
+    present_columns = [col for col in matched_columns if col in table.columns]
+    if present_columns == []:
+        current_run.log_warning("No dropout data columns found in assembly table, skipping.")
+        return table
+
     merged = table.merge(
-        dhs_dropout[["ADM1_ID"] + matched_columns],  # NOTE: only ADM1_ID level
+        dhs_dropout[["ADM1_ID"] + present_columns],  # NOTE: only ADM1_ID level
         how="left",
         on="ADM1_ID",
         suffixes=("", "_new"),
     )
 
     # Update each column if it is available in dhs_dropout
-    for col in matched_columns:
+    for col in present_columns:
         table[col] = pd.to_numeric(merged[f"{col}_new"], errors="coerce").round(2)
         # NOTE: Theres no period available in the file (!)
         # update_metadata(variable=col, attribute="PERIOD", value=str(latest_period))
@@ -859,6 +951,9 @@ def add_proportion_dtp_1_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     current_run.log_info("Loading DHS proportion dtp 1 data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_DTP1_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS proportion dtp 1 column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -887,6 +982,9 @@ def add_proportion_dtp_2_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     current_run.log_info("Loading DHS proportion dtp 2 data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_DTP2_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS proportion dtp 2 column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -915,6 +1013,9 @@ def add_proportion_dtp_3_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     current_run.log_info("Loading DHS proportion dtp 3 data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_DTP3_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS proportion dtp 3 column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -944,6 +1045,9 @@ def add_under5_mortality_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     current_run.log_info(f"Loading {indicator_msg} data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "U5MR_PERMIL_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS under 5 mortality column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -973,6 +1077,9 @@ def add_under5_prevalence_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFr
     current_run.log_info(f"Loading {indicator_msg} data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_U5_PREV_RDT_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS under 5 prevalence column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -1001,6 +1108,9 @@ def add_itn_access_sample_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFr
     current_run.log_info("Loading DHS ITN access data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_ITN_ACCESS_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS ITN access column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,
@@ -1029,6 +1139,9 @@ def add_itn_use_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     current_run.log_info("Loading DHS ITN use data")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS")
+    if "PCT_ITN_USE_SAMPLE_AVERAGE" not in table.columns:
+        current_run.log_info("DHS ITN use column not present in assembly table, skipping.")
+        return table
     return update_table_with(
         table_df=table,
         dataset_id=dataset_id,

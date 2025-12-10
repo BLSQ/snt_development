@@ -179,7 +179,7 @@
         "UNIT_SYMBOL": null,
         "PERIOD": null
     },
-    "SEASONALITY_PRECIPITATION": {
+    "SEASONALITY_RAINFALL": {
         "LABEL": "Saisonnalité des précipitations (ERA5)",
         "DESCRIPTION": "Classification de la transmission saisonnière du paludisme sur base des précipitations, pour identifier les régions éligibles pour des interventions saisonnières.",
         "SOURCE": "ERA5",
@@ -191,7 +191,7 @@
         "UNIT_SYMBOL": null,
         "PERIOD": null
     },
-    "SEASONAL_BLOCK_DURATION_PRECIPITATION": {
+    "SEASONAL_BLOCK_DURATION_RAINFALL": {
         "LABEL": "Durée de la période saisonnière de transmission (ERA5)",
         "DESCRIPTION": "Nombre de mois consécutifs avec une quantité élevée de précipitations.",
         "SOURCE": "ERA5",

@@ -88,18 +88,26 @@ def snt_map_extract(pop_raster_selection: str, run_report_only: bool, pull_scrip
                 "Pf_Mortality_Rate",
                 "Pf_Incidence_Rate",
             },
-            "Interventions": {
-                "Insecticide_Treated_Net_Access",
-                "Insecticide_Treated_Net_Use_Rate",
-                "IRS_Coverage",
-                "Antimalarial_Effective_Treatment",
-            },
+            # "Interventions": {
+            #     "Insecticide_Treated_Net_Access",
+            #     "Insecticide_Treated_Net_Use_Rate",
+            #     "IRS_Coverage",
+            #     "Antimalarial_Effective_Treatment",
+            # },
         }
 
         if not run_report_only:
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
+            # Population raster selection #
+            path_fl = Path(
+                r"C:\Users\blues\Desktop\Bluesquare\Repositories\snt_development\snt_map_extract\workspace\uploads\ner_pop_2025_CN_100m_R2025A_v1.tif"
+            )
+            pop_raster_selection = File(
+                name=path_fl.name, path=path_fl, size=path_fl.stat().st_size, type="application/geotiff"
+            )
+            #############
             if pop_raster_selection is None:
                 raster_fname = f"{country_code}_worldpop_ppp_*_UNadj.tif"
                 raster_path = root_path / "data" / "worldpop" / "raw"
@@ -231,6 +239,35 @@ def build_latest_map(category: str) -> dict:
             latest_map[key] = (cov_id, date_str)
 
     return latest_map
+
+
+def build_available_maps(category: str) -> dict:
+    """Retrieve the latest map coverage IDs for a given category from the malaria atlas WCS service.
+
+    Parameters
+    ----------
+    category : str
+        The category of the map layers (e.g., "Malaria" or "Interventions").
+
+    Returns
+    -------
+    dict
+        A dictionary mapping layer keys to a tuple of (coverage ID, date string).
+    """
+    url = f"https://data.malariaatlas.org/geoserver/{category}/wcs?service=WCS&request=GetCapabilities"
+    wcs = WebCoverageService(url, version="2.0.1", timeout=90)
+    available_maps = {}
+
+    for cov_id in wcs.contents:
+        parts = cov_id.split("__", 2)
+        prefix = parts[0]
+        date_str, suffix = parts[1].split("_", 1)
+        key = f"{prefix}__{suffix}".replace("Global_", "").replace("Africa_", "")
+        if key not in available_maps:
+            available_maps[key] = []
+        available_maps[key].append((cov_id, date_str))
+
+    return available_maps
 
 
 def make_table(
@@ -421,6 +458,19 @@ def load_raw_population_raster(file_pattern: str, raster_path: Path) -> tuple:
         return None, None, None, None
 
 
+def select_indicators_per_year(available_category: dict, target_year: str) -> dict:  # noqa: D103
+    selection_per_year = {}
+
+    def select_version(versions: list, target_year: str):  # noqa: ANN202
+        year_versions = [v for v in versions if v[1].startswith(target_year)]
+        return max(year_versions or versions, key=lambda x: x[1])
+
+    for key, versions in available_category.items():
+        selection_per_year[key] = select_version(versions, target_year)
+
+    return selection_per_year
+
+
 def filter_available_indicators(indicators: dict) -> dict:
     """Filter and retrieve available indicator coverage IDs for specified categories.
 
@@ -436,15 +486,37 @@ def filter_available_indicators(indicators: dict) -> dict:
     """
     filtered_indicators = {}
     available_indicators = {}
+    # selected_indicators = {}
     for category in indicators:
-        available_indicators[category] = build_latest_map(category)
+        # available_indicators[category] = build_latest_map(category)
+        available_indicators[category] = build_available_maps(category)
+        # selected_indicators[category] = select_indicators_per_year(build_available_maps(category), "2022")
+        # [v[0][1] for v in available_indicators[category].items()]
+        sorted_years = sorted(
+            {date_str[:4] for versions in available_indicators[category].values() for _, date_str in versions}
+        )
+        current_run.log_info(f"Category data '{category}' available for years: {', '.join(sorted_years)}")
 
+    target_year = "2022"
     for category, keys in indicators.items():
         result = {}
         for key in keys:
             full_key = f"{category}__{key}"
             if full_key in available_indicators[category]:
-                result[key] = available_indicators[category][full_key][0]
+                versions = available_indicators[category][full_key]
+                found_version = [v for v in versions if v[1].startswith(target_year)]
+
+                if found_version:
+                    indicator_key = max(found_version, key=lambda x: x[1])[0]
+                    current_run.log_info(f"Selected indicator version: {indicator_key}.")
+                else:
+                    latest_version = max(versions, key=lambda x: x[1])  # select latest available
+                    indicator_key = latest_version[0]
+                    current_run.log_warning(
+                        f"Target year {target_year} not available for indicator: {full_key}. "
+                        f"Selecting latest available version: {indicator_key}"
+                    )
+                result[key] = indicator_key
             else:
                 current_run.log_warning(
                     f"Coverage indicator {full_key} not found in available indicators for {category}."
@@ -536,8 +608,6 @@ def compute_population_weighted_metric(
         Affine transform of the metric raster.
     metric_crs : str
         CRS of the metric raster.
-    metric_resolution : tuple
-        Resolution of the metric raster.
     metric_nodata : float
         NoData value of the metric raster.
     pop_data:

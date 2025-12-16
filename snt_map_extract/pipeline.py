@@ -20,7 +20,9 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 
-# Ticket: https://bluesquare.atlassian.net/browse/SNT25-143
+# Ticket:
+# https://bluesquare.atlassian.net/browse/SNT25-143
+# https://bluesquare.atlassian.net/browse/SNT25-259
 
 
 @pipeline("snt_map_extract")
@@ -31,6 +33,16 @@ from snt_lib.snt_pipeline_utils import (
     help="Select the population raster (.tif) used for population-weighted calculations.",
     required=False,
     default=None,
+)
+@parameter(
+    code="target_year",
+    name="Target Year",
+    help=(
+        "Target year for indicator selection (e.g. 2022). Defaults to latest if unavailable or not specified."
+    ),
+    type=str,
+    default=None,
+    required=False,
 )
 @parameter(
     "run_report_only",
@@ -47,7 +59,9 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_map_extract(pop_raster_selection: str, run_report_only: bool, pull_scripts: bool) -> None:
+def snt_map_extract(
+    pop_raster_selection: str, target_year: str, run_report_only: bool, pull_scripts: bool
+) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extract"
@@ -115,6 +129,7 @@ def snt_map_extract(pop_raster_selection: str, run_report_only: bool, pull_scrip
                 level=org_level,
                 raster_path=raster_path,
                 raster_fname=raster_fname,
+                target_year=target_year,
                 output_path=output_path,
             )
 
@@ -200,7 +215,7 @@ def download_raster_data(
                 current_run.log_info(f"Raster for {layer_name} already downloaded.")
 
 
-def build_latest_map(category: str) -> dict:
+def build_available_maps(category: str) -> dict:
     """Retrieve the latest map coverage IDs for a given category from the malaria atlas WCS service.
 
     Parameters
@@ -215,22 +230,18 @@ def build_latest_map(category: str) -> dict:
     """
     url = f"https://data.malariaatlas.org/geoserver/{category}/wcs?service=WCS&request=GetCapabilities"
     wcs = WebCoverageService(url, version="2.0.1", timeout=90)
-    latest_map = {}
+    available_maps = {}
 
     for cov_id in wcs.contents:
         parts = cov_id.split("__", 2)
         prefix = parts[0]
         date_str, suffix = parts[1].split("_", 1)
         key = f"{prefix}__{suffix}".replace("Global_", "").replace("Africa_", "")
-        # if we already have one, check which date is newer
-        if key in latest_map:
-            _, existing_date = latest_map[key]
-            if date_str > existing_date:
-                latest_map[key] = (cov_id, date_str)
-        else:
-            latest_map[key] = (cov_id, date_str)
+        if key not in available_maps:
+            available_maps[key] = []
+        available_maps[key].append((cov_id, date_str))
 
-    return latest_map
+    return available_maps
 
 
 def make_table(
@@ -239,6 +250,7 @@ def make_table(
     level: int,
     raster_path: Path,
     raster_fname: str,
+    target_year: str,
     output_path: Path,
 ) -> pd.DataFrame:
     """Generate a table of zonal statistics for given coverage indicators and save the results.
@@ -255,6 +267,8 @@ def make_table(
         Path to the selecte raster directory.
     raster_fname : str
         Filename pattern for the population raster.
+    target_year : str
+        Target year for selecting indicator versions.
     output_path : Path
         Directory where output files will be saved.
 
@@ -275,7 +289,7 @@ def make_table(
         )
     shapes = shapes[shapes.geometry.notna()]
 
-    found_indicators = filter_available_indicators(coverage_indicators)
+    found_indicators = filter_available_indicators(coverage_indicators, target_year=target_year)
     if len(shapes) > 0:
         minx, miny, maxx, maxy = shapes.total_bounds
         rasters_path = output_path / "raster_files"
@@ -421,13 +435,28 @@ def load_raw_population_raster(file_pattern: str, raster_path: Path) -> tuple:
         return None, None, None, None
 
 
-def filter_available_indicators(indicators: dict) -> dict:
+def select_indicators_per_year(available_category: dict, target_year: str) -> dict:  # noqa: D103
+    selection_per_year = {}
+
+    def select_version(versions: list, target_year: str):  # noqa: ANN202
+        year_versions = [v for v in versions if v[1].startswith(target_year)]
+        return max(year_versions or versions, key=lambda x: x[1])
+
+    for key, versions in available_category.items():
+        selection_per_year[key] = select_version(versions, target_year)
+
+    return selection_per_year
+
+
+def filter_available_indicators(indicators: dict, target_year: str) -> dict:
     """Filter and retrieve available indicator coverage IDs for specified categories.
 
     Parameters
     ----------
     indicators : dict
         Dictionary mapping categories to lists of indicator names.
+    target_year : str
+        Target year for selecting indicator versions.
 
     Returns
     -------
@@ -437,20 +466,59 @@ def filter_available_indicators(indicators: dict) -> dict:
     filtered_indicators = {}
     available_indicators = {}
     for category in indicators:
-        available_indicators[category] = build_latest_map(category)
+        available_indicators[category] = build_available_maps(category)
+
+    log_matching_available_layers(indicators, available_indicators)  # just logging
 
     for category, keys in indicators.items():
         result = {}
         for key in keys:
             full_key = f"{category}__{key}"
             if full_key in available_indicators[category]:
-                result[key] = available_indicators[category][full_key][0]
+                versions = available_indicators[category][full_key]
+                if target_year:
+                    found_versions = [v for v in versions if v[1].startswith(target_year)]
+                else:
+                    found_versions = versions
+
+                if found_versions:
+                    indicator_key = max(found_versions, key=lambda x: x[1])[0]
+                    current_run.log_info(f"Selected indicator version: {indicator_key}.")
+                else:
+                    latest_version = max(versions, key=lambda x: x[1])  # select latest available
+                    indicator_key = latest_version[0]
+                    current_run.log_warning(
+                        f"Target year {target_year} not available for indicator: {full_key}. "
+                        f"Selecting latest available version: {indicator_key}"
+                    )
+                result[key] = indicator_key
             else:
                 current_run.log_warning(
                     f"Coverage indicator {full_key} not found in available indicators for {category}."
                 )
         filtered_indicators[category] = result
+
     return filtered_indicators
+
+
+def log_matching_available_layers(indicators_selection: dict, available_indicators: dict):  # noqa: D103
+    for category, _ in indicators_selection.items():
+        if category not in available_indicators:
+            continue
+        allowed_indicators = set(indicators_selection[category])
+        sorted_layers = sorted(
+            {
+                layer_name
+                for versions in available_indicators[category].values()
+                for layer_name, _ in versions
+                if any(found in layer_name for found in allowed_indicators)
+            }
+        )
+
+        if sorted_layers:
+            current_run.log_info(f"Matching available layers for category '{category}': ")
+            for layer in sorted_layers:
+                current_run.log_info(f"{layer}")
 
 
 def compute_total_populations(
@@ -509,7 +577,12 @@ def compute_total_populations(
             for f in pop_total
         ]
     )
-    result["total_population"] = result["total_population"].round(0).astype(int)
+    try:
+        result["total_population"] = result["total_population"].round(0).astype(int)
+    except Exception:
+        current_run.log_warning(
+            "Could not convert total_population to int, is possible that all results are None."
+        )
     result["ADM2_ID"] = result["ADM2_ID"].astype(str)
     return result
 
@@ -536,8 +609,6 @@ def compute_population_weighted_metric(
         Affine transform of the metric raster.
     metric_crs : str
         CRS of the metric raster.
-    metric_resolution : tuple
-        Resolution of the metric raster.
     metric_nodata : float
         NoData value of the metric raster.
     pop_data:
@@ -592,7 +663,10 @@ def compute_population_weighted_metric(
     )
     result_w = pd.DataFrame(
         [
-            {"ADM2_ID": f["properties"].get("ADM2_ID"), "weighted_sum": f["properties"]["sum"]}
+            {
+                "ADM2_ID": f["properties"].get("ADM2_ID"),
+                "weighted_sum": f["properties"]["sum"],
+            }
             for f in zstats_w
         ]
     )

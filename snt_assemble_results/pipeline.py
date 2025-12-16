@@ -583,13 +583,13 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             current_run.log_info(f"Metric {metric} not found in assembly table, skipping.")
             continue
 
-        indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric]
+        indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric].copy()
+        indicator_data = indicator_data[indicator_data["STATISTIC"] == "mean"].copy()
         if indicator_data.empty:
             current_run.log_warning(f"No metric {metric} data found in MAP dataset, skipping.")
             continue
 
         try:
-            indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric].copy()
             latest_period = indicator_data["YEAR"].max()
             indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
             update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))

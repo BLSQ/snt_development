@@ -90,28 +90,8 @@ def snt_dhis2_incidence(
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Pipeline entry point for running the SNT DHIS2 incidence notebook with specified parameters.
-
-    Parameters
-    ----------
-    n1_method : str
-        Method for N1 calculations (`PRES` or `SUSP-TEST`).
-    routine_data_choice : str
-        Which routine data to use for the analysis (`raw`, `raw_without_outliers`, or `imputed`).
-    outlier_detection_method : str
-        Method to use for outlier detection in the routine data.
-    use_csb_data : bool
-        If True, use Care Seeking Data (DHS) for the analysis and
-        calculate incidence adjusted for care seeking.
-    use_adjusted_population : bool
-        If True, use adjusted population data for incidence calculations.
-    disaggregation_selection : str
-        Select the disaggregation for incidence computation (available only for Niger).
-    run_report_only : bool
-        If True, only the reporting notebook will be executed, skipping the main analysis.
-    pull_scripts : bool
-        If True, pull the latest scripts from the repository.
-    """
+    """Pipeline entry point for running the SNT DHIS2 incidence notebook with specified parameters."""
+    
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
@@ -133,21 +113,24 @@ def snt_dhis2_incidence(
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
+        # Helper to format the parameters for injection
+        notebook_params = {
+            "N1_METHOD": n1_method,
+            "ROUTINE_DATA_CHOICE": routine_data_choice,
+            "OUTLIER_DETECTION_METHOD": outlier_detection_method,
+            "USE_CSB_DATA": use_csb_data,
+            "USE_ADJUSTED_POPULATION": use_adjusted_population,
+            "DISAGGREGATION_SELECTION": (
+                disaggregation_selection.upper() if disaggregation_selection else None
+            ),
+            "ROOT_PATH": root_path.as_posix(),
+        }
+
         if not run_report_only:
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_incidence.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "N1_METHOD": n1_method,
-                    "ROUTINE_DATA_CHOICE": routine_data_choice,
-                    "OUTLIER_DETECTION_METHOD": outlier_detection_method,
-                    "USE_CSB_DATA": use_csb_data,
-                    "USE_ADJUSTED_POPULATION": use_adjusted_population,
-                    "DISAGGREGATION_SELECTION": (
-                        disaggregation_selection.upper() if disaggregation_selection else None
-                    ),
-                    "ROOT_PATH": root_path.as_posix(),
-                },
+                parameters=notebook_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -175,9 +158,11 @@ def snt_dhis2_incidence(
         else:
             current_run.log_info("Skipping incidence calculations, running only the reporting.")
 
+        # GP MODIFIED: parameters are now injected also into the report notebook nb
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_incidence_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            nb_parameters=notebook_params,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 

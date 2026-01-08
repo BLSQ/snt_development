@@ -32,16 +32,16 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "outlier_detection_method",
     name="Outlier detection method",
-    help="Method to use for outlier detection in the routine data",
+    help="Method used to detect outliers in the routine data",
     choices=["mean", "median", "iqr", "trend", "mg_partial", "mg_complete"],
     type=str,
     required=True,
 )
 @parameter(
     "use_csb_data",
-    name="Use care seeking data (DHS)",
-    help="If True, the pipeline will use care seeking data (DHS) for the analysis,"
-    " and calculate incidence adjusted for care seeking",
+    name="Use care seeking behaviour (CSB) data (source: DHS)",
+    help="If True, the pipeline will use care seeking behaviour data (source: DHS) for the analysis,"
+    " and calculate incidence adjusted for care seeking behaviour ('INCIDENCE_ADJ_CARESEEKING')",
     type=bool,
     default=False,
     required=True,
@@ -66,7 +66,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "run_report_only",
-    name="Run reporting only",
+    name="Run Report only",
     help="This will only execute the reporting notebook",
     type=bool,
     default=False,
@@ -74,8 +74,9 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Pull scripts",
-    help="Pull the latest scripts from the repository",
+    name="Pull notebooks from repository",
+    help="Pull the latest notebooks from the GitHub repository."
+    " Note: this will overwrite any local changes to the notebooks!",
     type=bool,
     default=False,
     required=False,

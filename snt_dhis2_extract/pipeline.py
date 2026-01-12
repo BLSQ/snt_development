@@ -290,7 +290,7 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
             # ticket ref: https://bluesquare.atlassian.net/browse/SNT25-253
             dhis2_pyramid = run_transformation_notebook(
                 df=dhis2_pyramid,
-                nb_path=pipeline_path / "code" / "NER_pyramid_format.ipynb",
+                nb_path=pipeline_path / "NER_transformations" / "NER_pyramid_format.ipynb",
                 nb_output_dir=pipeline_path / "NER_transformations",
             )
         current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")

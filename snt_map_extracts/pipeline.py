@@ -139,7 +139,7 @@ def snt_map_extracts(
             log_message(logger, "Skipping calculations, running only the reporting.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_map_extract_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
         )

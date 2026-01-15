@@ -21,7 +21,7 @@
 		"ERA5_DATASET_CLIMATE": "snt-era5-climate",		
         "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
         "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
-		"SNT_MAP_EXTRACT": "snt-map-extract",
+		"SNT_MAP_EXTRACTS": "snt-map-extracts",
 		"SNT_RESULTS": "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {

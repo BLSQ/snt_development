@@ -561,7 +561,7 @@ def load_raw_population_raster(file_pattern: str, raster_path: Path, logger: log
     """
     raster_file = list(raster_path.glob(file_pattern))
     if not raster_file:
-        log_message(logger, f"No population raster not found: {raster_path}.", level="warning")
+        log_message(logger, f"Population raster not found: {raster_path}.", level="warning")
         return None, None, None, None
 
     if len(raster_file) > 1:
@@ -630,7 +630,7 @@ def compute_total_populations(
         shapes = shapes.to_crs(crs)
 
     # get statistics
-    log_message(logger, f"Computing ADM2 spacial aggregation for {len(shapes)} shapes.")
+    log_message(logger, f"Computing ADM2 spatial aggregation for {len(shapes)} shapes.")
     pop_total = zonal_stats(
         vectors=shapes,
         raster=data,

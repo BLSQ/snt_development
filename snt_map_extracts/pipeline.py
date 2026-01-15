@@ -352,9 +352,17 @@ def run_aggregations(
                 stats_results.append(melt_df)
 
         # Log missing bands
-        # NOTE: This is not an error, just info about the available layers per coverage
-        missing = [s for s in bands_for_statistics if s not in bands]
-        if missing:
+        # NOTE: This is not an error, just info about the available layers per coverage,
+        # some of them only have a GRAY_INDEX band
+        missing = [s for s in ["Data", "LCI", "UCI"] if s not in bands]
+        if bands == ["GRAY_INDEX"]:
+            log_message(
+                logger,
+                f"{file_vars['indicator']} contains only the 'GRAY_INDEX' band; "
+                f"no main indicator bands found.",
+                level="warning",
+            )
+        elif missing:
             log_message(
                 logger,
                 f"{file_vars['indicator']} is missing bands: {missing}. Using available band(s): {bands}.",

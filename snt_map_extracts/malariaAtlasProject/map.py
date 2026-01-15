@@ -29,7 +29,6 @@ class MAPRasterExtractor:
         if category not in self.SUPPORTED_CATEGORIES:
             raise ValueError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
         self.logger = logger
-        self._log_message(f"Initializing MAPRasterExtractor with category: '{category}'")
         self.base_url = base_url
         self.category = category
         self.coverage_ids: list[str] = self._list_coverage_ids_for_category()

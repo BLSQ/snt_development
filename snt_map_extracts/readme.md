@@ -8,7 +8,7 @@ The `snt_map_extracts` pipeline accepts the following parameters:
 
 *   **`pop_raster_selection`** (File, optional):
     *   **Name:** Population raster selection (.tif)
-    *   **Description:** Select the population raster (.tif) file to be used for population-weighted calculations.
+    *   **Description:** Select the population raster (.tif) file to be used for population-weighted calculations. Population rasters can be manually downloaded from: [WorldPop population dataset](https://hub.worldpop.org/geodata/listing?id=135)
     *   **Default:** `None`
 
 *   **`target_year`** (String, required):

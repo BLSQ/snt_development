@@ -265,6 +265,7 @@ def run_aggregations(
     # 1. Load population raster (if available)
     if not pop_raster_path:
         log_message(logger, "Population raster file not provided.", level="warning")
+        pop_data = None
     else:
         pop_data, pop_transform, pop_crs, pop_nodata = load_raw_population_raster(
             file_pattern=pop_raster_path.name,

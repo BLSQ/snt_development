@@ -27,8 +27,9 @@ from malariaAtlasProject.map_utils import (
 )
 
 # Ticket:
-# https://bluesquare.atlassian.net/browse/SNT25-143
-# https://bluesquare.atlassian.net/browse/SNT25-259
+# https://bluesquare.atlassian.net/browse/SNT25-143 (old pipeline)
+# https://bluesquare.atlassian.net/browse/SNT25-259 (old pipeline)
+# https://bluesquare.atlassian.net/browse/SNT25-284
 
 
 @pipeline("snt_map_extracts")
@@ -47,7 +48,7 @@ from malariaAtlasProject.map_utils import (
         "Target year for indicator selection (e.g. 2022). Defaults to latest if unavailable or not specified."
     ),
     type=str,
-    default="2020",  # None -------------------------------------------------------------------------------------------------------------------
+    default=None,
     required=True,
 )
 @parameter(
@@ -66,13 +67,28 @@ from malariaAtlasProject.map_utils import (
     required=False,
 )
 def snt_map_extracts(
-    pop_raster_selection: str, target_year: str, run_report_only: bool, pull_scripts: bool
+    pop_raster_selection: File, target_year: str, run_report_only: bool, pull_scripts: bool
 ) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extracts"
     pipeline_path.mkdir(parents=True, exist_ok=True)
     logger = create_file_logger(log_path=pipeline_path / "logs")
+
+    # Define indicators to download
+    snt_indicators = {
+        "Malaria": {
+            "Pf_Parasite_Rate",
+            "Pf_Mortality_Rate",
+            "Pf_Incidence_Rate",
+        },
+        "Interventions": {
+            "Insecticide_Treated_Net_Access",
+            "Insecticide_Treated_Net_Use_Rate",
+            "IRS_Coverage",
+            "Antimalarial_Effective_Treatment",
+        },
+    }
 
     if pull_scripts:
         log_message(logger, "Pulling pipeline scripts from repository.")
@@ -82,56 +98,29 @@ def snt_map_extracts(
             code_scripts=[],
         )
 
-    # NOTE: ZIP both names and code into a single named list (labels, indicator)
     try:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get(
-            "SNT_MAP_EXTRACT"
-        )  # UPDATE THIS TO "SNT_MAP_EXTRACTS" ----------------------------------------------
-
-        # MAP indicators
-        # snt_indicators = {
-        #     "Malaria": {
-        #         "Pf_Parasite_Rate",
-        #         "Pf_Mortality_Rate",
-        #     }
-        # }
-
-        snt_indicators = {
-            "Malaria": {
-                "Pf_Parasite_Rate",
-                "Pf_Mortality_Rate",
-                "Pf_Incidence_Rate",
-            },
-            "Interventions": {
-                "Insecticide_Treated_Net_Access",
-                "Insecticide_Treated_Net_Use_Rate",
-                "IRS_Coverage",
-                "Antimalarial_Effective_Treatment",
-            },
-        }
+        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
 
         if not run_report_only:
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
-            # pop_raster_full_path = pop_raster_selection.path
-            pop_raster_full_path = Path(
-                r"C:\Users\blues\Desktop\Bluesquare\Repositories\snt_development\snt_map_extracts\workspace\data\worldpop\ner_pop_2025_CN_100m_R2025A_v1.tif"
-            )
-            log_message(logger, f"Population raster selected: {pop_raster_full_path}")
-            if not pop_raster_full_path.exists():
-                raise FileNotFoundError(f"Population raster file not found: {pop_raster_full_path}")
-            if pop_raster_full_path.suffix.lower() != ".tif":
-                raise ValueError("Population raster must be a .tif file.")
+            # Validate population raster (optional)
+            if pop_raster_selection:
+                log_message(logger, f"Population raster selected: {pop_raster_selection.path}")
+                if not Path(pop_raster_selection.path).exists():
+                    raise FileNotFoundError(f"Population raster file not found: {pop_raster_selection.path}")
+                if Path(pop_raster_selection.path).suffix.lower() != ".tif":
+                    raise ValueError("Population raster must be a '.tif' file.")
 
             make_table(
                 coverage_categories=snt_indicators,
                 snt_config=snt_config,
-                pop_raster_path=pop_raster_full_path,
+                pop_raster_path=Path(pop_raster_selection.path) if pop_raster_selection else None,
                 target_year=target_year,
                 output_path=output_path,
                 logger=logger,
@@ -149,11 +138,11 @@ def snt_map_extracts(
         else:
             log_message(logger, "Skipping calculations, running only the reporting.")
 
-        # run_report_notebook(
-        #     nb_file=pipeline_path / "reporting" / "snt_map_extract_report.ipynb",
-        #     nb_output_path=pipeline_path / "reporting" / "outputs",
-        #     nb_parameters=None,
-        # )
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_map_extract_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            nb_parameters=None,
+        )
 
         log_message(logger, "Pipeline completed successfully!")
 
@@ -308,12 +297,12 @@ def run_aggregations(
 
         log_message(logger, f"Computing {raster_file.name} statistics...")
         ref_columns = ["ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID"]
-        band_selection = ["Data", "LCI", "UCI"]
+        bands_for_statistics = ["Data", "LCI", "UCI", "GRAY_INDEX"]
         stats_results = []
 
         # Compute Zonal Statistics per layer
         for band in bands:
-            if band in band_selection:
+            if band in bands_for_statistics:
                 log_message(logger, f"Processing {file_vars['indicator']} band: {band}.")
                 zstats = zonal_stats(
                     vectors=shapes,
@@ -324,7 +313,7 @@ def run_aggregations(
                     nodata=raster_nodata,
                 )
                 result_gdf = gpd.GeoDataFrame.from_features(zstats).drop(columns=["geometry"])
-                metric_var = "MEAN" if band == "Data" else band
+                metric_var = "MEAN" if band in ["Data", "GRAY_INDEX"] else band
                 result_gdf = result_gdf.rename(columns={"mean": metric_var})
                 melt_df = result_gdf.melt(
                     id_vars=ref_columns,
@@ -362,11 +351,13 @@ def run_aggregations(
 
                 stats_results.append(melt_df)
 
-        if not all([s in bands for s in band_selection]):
+        # Log missing bands
+        # NOTE: This is not an error, just info about the available layers per coverage
+        missing = [s for s in bands_for_statistics if s not in bands]
+        if missing:
             log_message(
                 logger,
-                f"One or more required bands missing in {file_vars['indicator']}. "
-                f"Expected bands: {band_selection}, found bands: {bands}.",
+                f"{file_vars['indicator']} is missing bands: {missing}. Using available band(s): {bands}.",
                 level="warning",
             )
 

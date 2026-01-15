@@ -68,6 +68,14 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
+    "use_weighted_reporting_rates",
+    name="Use weighted reporting rates",
+    help="Weighted reporting rates are calculated using the volume of activity. If TRUE, these values will populate the REPORTING_RATE column of the exported data. If FALSE, unweighted reporting rates will be used.",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -89,6 +97,7 @@ def snt_dhis2_reporting_rate_dataelement(
     availability_indicators: str,
     volume_activity_indicators: str,
     dataelement_method_denominator: str,
+    use_weighted_reporting_rates: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -141,6 +150,7 @@ def snt_dhis2_reporting_rate_dataelement(
                     "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
                     "AVAILABILITY_INDICATORS": availability_indicators,
                     "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
+                    "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )

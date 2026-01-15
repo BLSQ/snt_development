@@ -20,7 +20,7 @@ from snt_lib.snt_pipeline_utils import (
     get_file_from_dataset,
     validate_config,
 )
-from malariaAtlasProject.map import MAPRasterExtractor
+from malariaAtlasProject.map import MAPRasterExtractor, MAPExtractorError
 from malariaAtlasProject.map_utils import (
     load_tiff_bands,
     parse_raster_filename_vars,
@@ -93,26 +93,26 @@ def snt_map_extracts(
         )  # UPDATE THIS TO "SNT_MAP_EXTRACTS" ----------------------------------------------
 
         # MAP indicators
-        snt_indicators = {
-            "Malaria": {
-                "Pf_Parasite_Rate",
-                "Pf_Mortality_Rate",
-            }
-        }
-
         # snt_indicators = {
         #     "Malaria": {
         #         "Pf_Parasite_Rate",
         #         "Pf_Mortality_Rate",
-        #         "Pf_Incidence_Rate",
-        #     },
-        #     "Interventions": {
-        #         "Insecticide_Treated_Net_Access",
-        #         "Insecticide_Treated_Net_Use_Rate",
-        #         "IRS_Coverage",
-        #         "Antimalarial_Effective_Treatment",
-        #     },
+        #     }
         # }
+
+        snt_indicators = {
+            "Malaria": {
+                "Pf_Parasite_Rate",
+                "Pf_Mortality_Rate",
+                "Pf_Incidence_Rate",
+            },
+            "Interventions": {
+                "Insecticide_Treated_Net_Access",
+                "Insecticide_Treated_Net_Use_Rate",
+                "IRS_Coverage",
+                "Antimalarial_Effective_Treatment",
+            },
+        }
 
         if not run_report_only:
             output_path = root_path / "data" / "map"
@@ -137,14 +137,14 @@ def snt_map_extracts(
                 logger=logger,
             )
 
-            # add_files_to_dataset(
-            #     dataset_id=dataset_id,
-            #     country_code=country_code,
-            #     file_paths=[
-            #         output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
-            #         output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
-            #     ],
-            # )
+            add_files_to_dataset(
+                dataset_id=dataset_id,
+                country_code=country_code,
+                file_paths=[
+                    output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
+                    output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
+                ],
+            )
 
         else:
             log_message(logger, "Skipping calculations, running only the reporting.")
@@ -158,7 +158,7 @@ def snt_map_extracts(
         log_message(logger, "Pipeline completed successfully!")
 
     except Exception as e:
-        log_message(logger, f"Pipeline error: {e}")
+        log_message(logger, f"Pipeline error: {e}", level="error")
         raise e
 
 
@@ -255,10 +255,8 @@ def retrieve_rasters(
                     replace_file=False,
                 )
                 downloaded_rasters.append(raster_path)
-            except Exception as e:
-                msg = f"Error downloading raster for {indicator}."
-                log_message(logger, msg, level="error")
-                logger.error(f"{msg} Error: {e}")
+            except MAPExtractorError as e:
+                log_message(logger, f"Error downloading raster for {indicator}.", level="error", exc=e)
                 continue
 
     return downloaded_rasters
@@ -583,8 +581,7 @@ def load_raw_population_raster(file_pattern: str, raster_path: Path, logger: log
         log_message(logger, f"Population raster loaded: {raster_file[0]}.")
         return raster, transform, crs, nodata
     except Exception as e:
-        log_message(logger, f"Could not load population raster {raster_file[0]}", level="error")
-        logger.error(f"Could not load population raster {raster_file[0]}. Error: {e}")
+        log_message(logger, f"Could not load population raster {raster_file[0]}", level="error", exc=e)
         return None, None, None, None
 
 
@@ -627,7 +624,9 @@ def compute_total_populations(
     # Reproject shapes if CRS is different (consistent to wpop pipeline calculation check)
     if shapes.crs.to_string() != crs:
         log_message(
-            logger, f"The CRS data differs from the provided shapes file. Reprojecting shapes with {crs}"
+            logger,
+            f"The CRS data differs from the provided shapes file. Reprojecting shapes with {crs}",
+            level="warning",
         )
         shapes = shapes.to_crs(crs)
 
@@ -701,9 +700,11 @@ def create_file_logger(log_path: Path, level: int = logging.INFO) -> logging.Log
     return logger
 
 
-def log_message(logger: logging.Logger, message: str, level: str = "info") -> None:
-    """Log a message using self.logger and/or current_run."""
-    if not level or not message:
+def log_message(
+    logger: logging.Logger, message: str, level: str = "info", exc: Exception | None = None
+) -> None:
+    """Log a message to both a standard logger and OpenHexa current_run logger."""
+    if not message:
         return
 
     level = level.lower()
@@ -721,15 +722,25 @@ def log_message(logger: logging.Logger, message: str, level: str = "info") -> No
     }
 
     if level not in logger_methods:
-        raise ValueError(f"Unsupported logging level: {level}")
+        raise ValueError(
+            f"Unsupported logging level: {level}. Supported levels: {list(logger_methods.keys())}"
+        )
 
-    # Log to standard logger
-    if logger and hasattr(logger, logger_methods[level]):
-        getattr(logger, logger_methods[level])(message)
+    # File logger
+    if logger:
+        if exc:
+            logger.error(message, exc_info=exc)
+        else:
+            getattr(logger, logger_methods[level])(message)
 
-    # Log to OpenHexa current_run
-    if "current_run" in globals() and hasattr(current_run, run_methods[level]):
-        getattr(current_run, run_methods[level])(message)
+    # ---- OpenHexa UI logger (NO exception details)
+    try:
+        run_fn = getattr(current_run, run_methods[level], None)
+        if run_fn:
+            run_fn(message)
+    except Exception:
+        # Never let UI logging break the pipeline
+        pass
 
 
 if __name__ == "__main__":

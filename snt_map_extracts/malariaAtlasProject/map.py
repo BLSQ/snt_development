@@ -14,30 +14,6 @@ class MAPExtractorError(RuntimeError):
     pass
 
 
-# def get_logger(logger: logging.Logger | None = None, level: int = logging.INFO) -> logging.Logger:
-#     """Return a logger. If `logger` is None, create one with a default StreamHandler and set default name.
-
-#     Args:
-#         logger: Optional logger instance.
-#         level: Logging level to set if creating a new logger.
-
-#     Returns:
-#         logging.Logger: Logger instance.
-#     """
-#     if logger:
-#         return logger
-
-#     # default logger
-#     logger = logging.getLogger("mapExtractorLogger")
-#     if not logger.handlers:
-#         logger.setLevel(level)
-#         ch = logging.StreamHandler()
-#         ch.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-#         logger.addHandler(ch)
-
-#     return logger
-
-
 class MAPRasterExtractor:
     """Raster extractor for Malaria Atlas Project (MAP) datasets via WCS."""
 
@@ -50,8 +26,6 @@ class MAPRasterExtractor:
         logger: logging.Logger | None = None,
     ):
         """Initialize the MAPRasterExtractor."""
-        # self.logger = get_logger(logger)
-
         if category not in self.SUPPORTED_CATEGORIES:
             raise ValueError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
         self.logger = logger
@@ -73,7 +47,7 @@ class MAPRasterExtractor:
         return list(wcs.contents.keys())
 
     def list_coverage_ids_for_category(self, category: str | None = None) -> list[str]:
-        """Public: List all available coverage IDs for a category.
+        """Log a user-safe message to OpenHexa UI and full details to the file logger.
 
         Args:
             category: Category to fetch ('Malaria' or 'Interventions').
@@ -86,7 +60,7 @@ class MAPRasterExtractor:
             category = self.category
         return self._list_coverage_ids_for_category(category)
 
-    def _log_message(self, message: str, level: str = "info") -> None:
+    def _log_message(self, message: str, level: str = "info", exc: Exception | None = None) -> None:
         """Log a message using self.logger and/or current_run."""
         if not level or not message:
             return
@@ -109,12 +83,20 @@ class MAPRasterExtractor:
             raise ValueError(f"Unsupported logging level: {level}")
 
         # Log to standard logger
-        if self.logger and hasattr(self.logger, logger_methods[level]):
-            getattr(self.logger, logger_methods[level])(message)
+        if self.logger:
+            if exc:
+                self.logger.error(message, exc_info=exc)
+            else:
+                getattr(self.logger, logger_methods[level])(message)
 
-        # Log to OpenHexa current_run
-        if "current_run" in globals() and hasattr(current_run, run_methods[level]):
-            getattr(current_run, run_methods[level])(message)
+        # current_run to avoid exception details
+        try:
+            run_fn = getattr(current_run, run_methods[level], None)
+            if run_fn:
+                run_fn(message)
+        except Exception:
+            # Never let UI logging break the pipeline
+            pass
 
     def _get_time_positions_for_coverage(self, coverage_id: str, timeout: int = 10) -> dict[str, str]:
         """Parse the WCS DescribeCoverage XML to extract available time positions for a coverage.
@@ -135,14 +117,14 @@ class MAPRasterExtractor:
             resp.raise_for_status()
         except requests.RequestException as e:
             msg = f"Failed to fetch coverage '{coverage_id}' from {url}"
-            self.logger.error(f"{msg} : Error {e}")
+            self._log_message(msg, level="error", exc=e)
             raise MAPExtractorError(msg) from e
 
         try:
             root = ET.fromstring(resp.content)
         except ET.ParseError as e:
             msg = f"Failed to parse XML for coverage '{coverage_id}'"
-            self.logger.error(f"{msg} : Error {e}")
+            self._log_message(msg, level="error", exc=e)
             raise MAPExtractorError(msg) from e
 
         # Namespace declarations commonly found in DescribeCoverage responses
@@ -268,11 +250,11 @@ class MAPRasterExtractor:
                         f.write(chunk)
         except requests.RequestException as e:
             msg = f"Failed to download raster '{coverage_id}' for year {year}"
-            self._log_message(f"{msg}: {e}", level="error")
+            self.logger.error(f"{msg} : Error {e}")
             raise MAPExtractorError(msg) from e
         except OSError as e:
             msg = f"Failed to write raster to '{output_fname}'"
-            self._log_message(f"{msg}: {e}", level="error")
+            self.logger.error(f"{msg} : Error {e}")
             raise MAPExtractorError(msg) from e
 
         return output_fname
@@ -353,7 +335,9 @@ class MAPRasterExtractor:
             if raster_fname.exists():
                 if replace_file:
                     raster_fname.unlink()  # delete existing file
-                    self._log_message(f"Raster exists, deleting and re-downloading: {raster_fname.name}")
+                    self._log_message(
+                        f"Raster exists, deleting and re-downloading: {raster_fname.name}", level="warning"
+                    )
                 else:
                     self._log_message(f"Raster already exists: {raster_fname.name}, skipping download.")
                     return raster_fname
@@ -366,27 +350,12 @@ class MAPRasterExtractor:
             )
             self._log_message(f"Raster downloaded successfully: {raster_path.name}")
         except MAPExtractorError as e:
-            msg = f"Download failed: {raster_path}"
-            self._log_message(msg, level="warning")
-            self.logger.error(f"{msg} Error: {e}", level="error")
+            msg = f"Download failed: {raster_fname.name}"
+            self._log_message(msg, level="error", exc=e)
+            raise MAPExtractorError(msg) from e
         except Exception as e:
-            msg = f"An unexpected error occurred while downloading raster: {raster_path}"
-            self._log_message(msg, level="warning")
-            self.logger.error(f"{msg} Error: {e}", level="error")
+            msg = f"An unexpected error occurred while downloading raster: {raster_fname.name}"
+            self._log_message(msg, level="error", exc=e)
+            raise MAPExtractorError(msg) from e
 
         return raster_path
-
-
-if __name__ == "__main__":
-    extractor = MAPRasterExtractor()
-
-    # output_dir = Path("./snt_map_extracts/workspace/map_rasters")
-    # raster_path = extractor.download_indicator_raster(
-    #     indicator="Pf_Parasite_Rate",
-    #     target_year="2020",
-    #     category="Malaria",
-    #     shapes=gpd.read_file(Path(r"./snt_map_extracts/workspace/NER_shapes.geojson")),
-    #     output_path=output_dir,
-    # )
-    bands = extractor.get_band_names(coverage_id="Malaria__202508_Global_Pf_Incidence_Rate")
-    print("Bands:", bands)

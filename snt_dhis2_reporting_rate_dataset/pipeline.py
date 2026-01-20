@@ -16,7 +16,8 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "outliers_method",
     name="Outlier processing method",
-    help="Select the routine data results from this outliers method.",
+    help="Specify which method was used to detect outliers in routine data. "
+    "Chose 'Routine data (Raw)' to use raw routine data.",
     multiple=False,
     choices=[
         "Routine data (Raw)",
@@ -24,8 +25,8 @@ from snt_lib.snt_pipeline_utils import (
         "Median (Classic)",
         "IQR (Classic)",
         "Trend (PATH)",
-        "MG Partial",
-        "MG Complete",
+        "MG Partial (MagicGlasses2)",
+        "MG Complete (MagicGlasses2)",
     ],
     type=str,
     default=None,
@@ -33,24 +34,32 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "use_removed_outliers",
-    name="Use routine with outliers removed",
-    help="Select this option to use the version of the routine data where outlier have been removed.",
+    name="Use routine data with outliers removed (else: uses imputed)",
+    help="Enable this option to use routine data after outliers have been removed, "
+    "based on the outlier detection method you selected above. "
+    " If you leave this off, the pipeline will instead use either:"
+    " A) the imputed routine data (where outlier values have been replaced), or"
+    " B) the raw routine data, if you chose 'Routine data (Raw)' as your outlier processing method.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "run_report_only",
-    name="Run reporting only",
-    help="This will only execute the reporting notebook",
+    name="Run reporting notebook only",
+    help="This will execute only the reporting notebook. Important: "
+    "this uses the outputs of the latest run of the full pipeline! Therefore, be aware that:"
+    " if you have not run the full pipeline yet, or if the inputs have changed since the last run, "
+    "the report may be outdated or incorrect.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "pull_scripts",
-    name="Pull scripts",
-    help="Pull the latest scripts from the repository",
+    name="Pull notebooks from repository",
+    help="Pull the latest notebooks from the GitHub repository. "
+    "Note: this will overwrite any local changes to the notebooks!",
     type=bool,
     default=False,
     required=False,
@@ -62,7 +71,7 @@ def snt_dhis2_reporting_rate_dataset(
     current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
 
     if pull_scripts:
-        current_run.log_info("Pulling pipeline scripts from repository.")
+        current_run.log_info("Pulling pipeline notebooks from repository.")
         pull_scripts_from_repository(
             pipeline_name="snt_dhis2_reporting_rate_dataset",
             report_scripts=["snt_dhis2_reporting_rate_dataset_report.ipynb"],
@@ -161,8 +170,8 @@ def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
         "Median (Classic)": "median",
         "IQR (Classic)": "iqr",
         "Trend (PATH)": "trend",
-        "MG Partial": "mg-partial",
-        "MG Complete": "mg-complete",
+        "MG Partial (MagicGlasses2)": "mg-partial",
+        "MG Complete (MagicGlasses2)": "mg-complete",
     }
 
     try:

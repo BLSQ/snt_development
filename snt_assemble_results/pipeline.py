@@ -1446,7 +1446,11 @@ def build_metadata_table(output_path: Path, country_code: str, filename: str = "
     metadata_path = Path(workspace.files_path) / "pipelines" / "snt_assemble_results" / "data" / filename
     output_path.mkdir(parents=True, exist_ok=True)
     metadata_json = read_json(metadata_path)
-
+    # Ensure PERIOD values are strings
+    for node in metadata_json.values():
+        period = node.get("PERIOD")
+        if period is not None:
+            node["PERIOD"] = str(period)
     # Convert to a pandas DataFrame
     metadata_table = pd.DataFrame.from_dict(metadata_json, orient="index")
     metadata_table = metadata_table.reset_index().rename(columns={"index": "VARIABLE"})

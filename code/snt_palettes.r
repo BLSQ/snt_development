@@ -1,11 +1,13 @@
 
 # List of palettes to match the default colors used in WebApp 
-# (courtesy of Benjamin Wilfart)
+# (courtesy to Benjamin Wilfart)
 
 # Use: source() this script to import palettes in any R notebook/script (i.e., mostly report nbs)
 
 
-# Palettes --------------------------------------
+# Palettes ----------------------------------------------------------------------
+
+## OpenHEXA WebApp SNT default color palettes -----------------------------------
 
 FOUR_SHADES = c(
   "#A2CAEA",
@@ -77,13 +79,15 @@ TEN_SHADES = c(
   "#A93A42"
   )
 
+
+### OpenHEXA WebApp SNT default risk level colors ----------------------------
+
 RISK_LOW = "#A5D6A7"
 RISK_MEDIUM = "#FFECB3"
 RISK_HIGH = "#FECDD2"
 RISK_VERY_HIGH = "#FFAB91"
 
-
-# TBD if needed and how to use it in R ... ----------------------------
+# TBD if needed and how to use it in R ... 
 # ORDINAL = {
 #   2: [RISK_LOW, RISK_VERY_HIGH],
 #   3: [RISK_LOW, RISK_MEDIUM, RISK_VERY_HIGH],
@@ -91,26 +95,20 @@ RISK_VERY_HIGH = "#FFAB91"
 # }
 
 
-# Logic ------------------------------------
+### Custom palettes ---------------------------------------------------
 
-# Convert the following code into R:
-# def get_range_from_count(count):
-#   # Note, we always want one additional color, to cover latest value of the scale (> 500 000)
-#   if count == 3:
-#   return list(FOUR_SHADES)
-# if count == 4:
-#   return list(FIVE_SHADES)
-# if count == 5:
-#   return list(SIX_SHADES)
-# if count == 6:
-#   return list(SEVEN_SHADES)
-# if count == 7:
-#   return list(EIGHT_SHADES)
-# if count == 8:
-#   return list(NINE_SHADES)
-# if count == 9:
-#   return list(TEN_SHADES)
-# return list(SEVEN_SHADES)
+palette_pfpr_map_mis <- c(
+  "#EEF3F3",
+  "#F6B7B2",
+  "#DB675E",
+  "#C10534",
+  "#851B2E",
+  "#611924"
+)
+
+
+# Functions (related to palettes) ------------------------------------------------------
+# I would keep palette definitions and functions in the same file (no need to move to snt_utils.r)
 
 get_range_from_count <- function(count) {
   if (count == 3) {

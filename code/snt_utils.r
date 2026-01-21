@@ -142,6 +142,13 @@ export_data <- function(data_object, file_path) {
     # Log the export
     log_msg(paste0("Exported : ", file_path))
 }
+
+
+# Helper for quick data table summary
+printdim <- function(df, name = deparse(substitute(df))) {
+  cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
+}
+
     
 
 #%% SEASONALITY -------------------------------------------------------------------

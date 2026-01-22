@@ -864,6 +864,7 @@ def download_dhis2_analytics(
                 )
 
                 # save raw data file
+                df_orgunits["value"] = pd.to_numeric(df_orgunits["value"], errors="coerce")
                 df_orgunits.to_parquet(fp, engine="pyarrow", index=False)
             except Exception as e:
                 current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
@@ -1106,6 +1107,7 @@ def download_data_elements(
         f"Population data element(s) downloaded for period {period}: {len(population_values)} data values"
     )
     population_values_df = pl.DataFrame(population_values)
+    population_values_df["value"] = pd.to_numeric(population_values_df["value"], errors="coerce")
     population_values_df.write_parquet(filepath)
 
 
@@ -1148,6 +1150,7 @@ def download_indicators(
     population_values_df = pl.DataFrame(population_values)
     # Add a CO column with None values
     population_values_df = population_values_df.with_columns(pl.lit(None).alias("co"))
+    population_values_df["value"] = pd.to_numeric(population_values_df["value"], errors="coerce")
     population_values_df.write_parquet(filepath)
 
 

@@ -4,32 +4,32 @@ This pipeline estimates **routine health facility reporting rates** using HMIS d
 
 ## **Parameters**
 
-* **`outliers\_method`** (String, required):  
+* **`outliers_method`** (String, required):  
   * **Name:** Outliers detection method  
   * **Description:** Specifies which method was used to detect outliers in the input routine data. Select "Routine data (Raw)" to use raw data without outlier processing.  
   * **Choices:** Routine data (Raw), Mean (Classic), Median (Classic), IQR (Classic), Trend (PATH), MG Partial (MagicGlasses2), MG Complete (MagicGlasses2).  
   * **Default:** None  
-* **`use\_removed\_outliers`** (Boolean, optional):  
+* **`use_removed_outliers`** (Boolean, optional):  
   * **Name:** Use routine data with outliers removed  
   * **Description:** If enabled, the pipeline uses routine data where detected outliers have been removed (set to null). If disabled (default), it uses data where outliers have been imputed (replaced), or raw data if "Routine data (Raw)" was selected.  
   * **Default:** False  
-* **`activity\_indicators`** (List of Strings, required):  
+* **`activity_indicators`** (List of Strings, required):  
   * **Name:** Facility Activity indicators  
   * **Description:** Defines the set of data elements used to determine if a facility is "active". A facility is considered active in a given period if at least one of these indicators has a non-missing value greater than or equal to zero.  
   * **Choices:** CONF, SUSP, TEST, PRES.  
   * **Default:** \['CONF', 'PRES'\]  
-* **`volume\_activity\_indicators`** (List of Strings, required):  
+* **`volume_activity_indicators`** (List of Strings, required):  
   * **Name:** Volume activity indicators  
   * **Description:** Defines the set of data elements used to determine the volume of activity (workload). These indicators are used to calculate weights for the "Weighted Reporting Rates" calculation.  
   * **Choices:** CONF, SUSP, TEST, PRES.  
   * **Default:** \['CONF', 'PRES'\]  
-* **`dataelement\_method\_denominator`** (String, required):  
+* **`dataelement_method_denominator`** (String, required):  
   * **Name:** Denominator method  
   * **Description:** Determines how the total number of expected facilities (denominator) is calculated.  
     * ROUTINE\_ACTIVE\_FACILITIES: Denominator is the number of facilities active (reported at least once) during the entire current year.  
     * PYRAMID\_OPEN\_FACILITIES: Denominator is the number of facilities considered structurally "Open" (operational) during the specific period.  
   * **Default:** None  
-* **`use\_weighted\_reporting\_rates`** (Boolean, optional):  
+* **`use_weighted_reporting_rates`** (Boolean, optional):  
   * **Name:** Use weighted reporting rates  
   * **Description:** If enabled, reporting rates are weighted based on the facility's volume of activity (derived from volume\_activity\_indicators). High-volume facilities will have a greater impact on the final aggregated rate.  
   * **Default:** False

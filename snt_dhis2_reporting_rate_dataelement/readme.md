@@ -2,6 +2,16 @@
 
 This pipeline estimates **routine health facility reporting rates** using HMIS data and facility metadata. It calculates reporting rates by analyzing facility activity (reporting of specific malaria-related indicators) against operational status or annual activity, with options for outlier handling and volume-based weighting.
 
+First, facility **activity** is assessed **monthly** using a small set of key **Facility Activity Indicators**. A facility is considered active in a month if at least one of these indicators has a non-missing value (zero values are counted as valid reports). These monthly activity signals are then used to determine whether a facility is active during the year, meaning it reported at least once in that year.
+
+Separately, facility operational status is derived from the facility master (pyramid) dataset using opening and closing dates and explicit closure markers in facility names.
+Reporting rates are computed by comparing monthly activity (**numerator** \= number of facilities active in the month) against one of **two denominators**:
+
+* **Operational facilities**: facilities that are declared open in the month (based on opening/closing dates and excluding facilities marked as closed)
+* **Annual active facilities**: facilities that reported at least once during the year
+
+In addition to unweighted reporting rates, the pipeline also computes **weighted reporting rates**, where each facility is weighted by its average reported malaria workload based on the selected **Volume Activity Indicators**, so that high-volume facilities contribute more to the overall reporting rate.
+
 ## **Parameters**
 
 * **`outliers_method`** (String, required):  
@@ -52,11 +62,11 @@ The pipeline performs the following key operations:
 
 The pipeline requires the following inputs from the data lake:
 
-* **DHIS2 Routine Data:** A parquet file containing routine health data. The specific file depends on the outliers\_method parameter:  
+* **DHIS2 Routine Data:** A parquet file containing routine health data. The specific file depends on the `outliers_method` parameter:  
   * Raw: \[COUNTRY\_CODE\]\_routine.parquet  
   * Processed: \[COUNTRY\_CODE\]\_routine\_outliers-\[method\]\_\[imputed|removed\].parquet  
-* **DHIS2 Pyramid Data:** A file named \[COUNTRY\_CODE\]\_pyramid.parquet from the DHIS2\_DATASET\_FORMATTED dataset, containing facility metadata (opening dates, hierarchy).  
-* **Configuration:** The SNT\_config.json file containing country codes and dataset identifiers.
+* **DHIS2 Pyramid Data:** A file named "\[COUNTRY\_CODE\]\_pyramid.parquet" from the "SNT\_DHIS2\_FORMATTED" dataset, containing facility metadata (opening dates, hierarchy).  
+* **Configuration:** The "SNT\_config.json" file containing country codes and dataset identifiers.
 
 ## **Outputs**
 

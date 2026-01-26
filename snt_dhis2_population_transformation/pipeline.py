@@ -2,7 +2,8 @@ from pathlib import Path
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
-    pull_scripts_from_repository,
+    load_scripts_for_pipeline,
+    get_repository,
     add_files_to_dataset,
     dataset_file_exists,
     load_configuration_snt,
@@ -10,6 +11,91 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
 )
+
+
+# Quick & dirty: Override pull_scripts_from_repository with modified version
+# This includes automatic snt_utils.r download (SNT25-279)
+def pull_scripts_from_repository(
+    pipeline_name: str,
+    report_scripts: list[str],
+    code_scripts: list[str],
+    repo_path: Path = Path("/tmp"),
+    repo_name: str = "snt_development",
+    pipeline_parent_folder: Path = Path(workspace.files_path, "pipelines"),
+) -> None:
+    """Pull the latest pipeline scripts from the SNT repository and update the local workspace.
+
+    Parameters
+    ----------
+    pipeline_name : str
+        The name of the pipeline for which scripts are being updated.
+    report_scripts : list[str]
+        List of reporting script names to be updated.
+    code_scripts : list[str]
+        List of code script names to be updated.
+    repo_path : Path, optional
+        The path to the repository where the scripts are stored (default is "/tmp").
+    repo_name : str, optional
+        The name of the repository from which to pull the scripts (default is "snt_development").
+        It also corresponds to the folder where the repo is stored.
+    pipeline_parent_folder : Path, optional
+        The path to the pipeline location (not the full path!) in the workspace where
+        the scripts will be replaced (default is "pipelines" in the SNT workspaces files path).
+
+    This function attempts to update reporting scripts and logs errors or warnings if the update fails.
+    
+    Also automatically pulls snt_utils.r from the snt_utils repository.
+    """
+    # Pull snt_utils.r from the snt_utils repository
+    # The file is located at code/snt_utils.R in the repo and will be saved to code/snt_utils.r in the workspace
+    try:
+        current_run.log_info("Pulling snt_utils.r from repository (SNT25-279)")
+        snt_root_path = Path(workspace.files_path)
+        code_path = snt_root_path / "code"
+        code_path.mkdir(parents=True, exist_ok=True)
+        # Source: code/snt_utils.R in the snt_utils repository
+        # Destination: code/snt_utils.r in the workspace
+        script_paths = {Path("code/snt_utils.R"): code_path / "snt_utils.r"}
+        load_scripts_for_pipeline(
+            snt_script_paths=script_paths,
+            repository_path=Path("/tmp"),
+            repository_name="snt_utils",
+        )
+        current_run.log_info(f"Successfully updated {code_path / 'snt_utils.r'} from repository")
+    except Exception as e:
+        current_run.log_warning(
+            f"Failed to update snt_utils.r from repository: {e}. "
+            "Using existing version if available."
+        )
+
+    # Paths Repository -> Workspace
+    repository_source = repo_path / repo_name / "pipelines" / pipeline_name
+    pipeline_target = pipeline_parent_folder / pipeline_name
+
+    # Create the mapping of script paths
+    reporting_paths = {
+        (repository_source / "reporting" / r): (pipeline_target / "reporting" / r)
+        for r in report_scripts
+    }
+    code_paths = {
+        (repository_source / "code" / c): (pipeline_target / "code" / c)
+        for c in code_scripts
+    }
+
+    current_run.log_info(
+        f"Updating scripts {', '.join(report_scripts + code_scripts)} from repository '{repo_name}'"
+    )
+
+    try:
+        # Pull scripts from the SNT repository (replace local)
+        load_scripts_for_pipeline(
+            snt_script_paths=reporting_paths | code_paths,
+            repository_path=repo_path,
+            repository_name=repo_name,
+        )
+    except Exception as e:
+        current_run.log_error(f"Error: {e}")
+        current_run.log_warning("Continuing without scripts update.")
 
 
 @pipeline("snt_dhis2_population_transformation")

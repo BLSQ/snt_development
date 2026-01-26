@@ -1,6 +1,8 @@
 SNT_extract_changes.txt
 SNT Process/
 .vscode/
+.venv/
+venv/
 
 
 # Jupyter stuff -------------------------

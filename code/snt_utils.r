@@ -842,7 +842,33 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
 }
                                            
 #%% MISC FUNCTIONS
-                                           
+                            
+
+#########################################
+compare_values <- function(df1, df1_colname, df2, df2_colname) {
+  #' Compare unique values of a column between two df and return those in the first, but not in the second
+  #'
+  #' @param df1 first df/dt
+  #' @param df1_colname string with the column name in df1
+  #' @param df2 second df/dt
+  #' @param df2_colname string with the column name in df2
+  #'
+  #' @return unique values found only in the first df/dt
+  
+  # make both be dta tables
+  df1 <- as.data.table(df1)
+  df2 <- as.data.table(df2)
+  
+  # sort the unique values from the respective columns
+  df1_values <- sort(unique(df1[[df1_colname]]))
+  df2_values <- sort(unique(df2[[df2_colname]]))
+  
+  # values only in df1
+  values_only_df1 <- df1_values[!df1_values %in% df2_values]
+  
+  return(values_only_df1)
+}
+
 #########################################
 aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
   #' aggregate the geometries of sf data, at a specified level, given by id and name columns

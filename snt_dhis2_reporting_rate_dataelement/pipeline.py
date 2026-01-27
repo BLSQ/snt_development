@@ -15,8 +15,9 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_dhis2_reporting_rate_dataelement")
 @parameter(
     "outliers_method",
-    name="Outlier processing method",
-    help="Select the routine data results from this outliers method.",
+    name="Outliers detection method",
+    help="Specify which method was used to detect outliers in routine data. "
+    "Chose 'Routine data (Raw)' to use raw routine data.",
     multiple=False,
     choices=[
         "Routine data (Raw)",
@@ -24,8 +25,8 @@ from snt_lib.snt_pipeline_utils import (
         "Median (Classic)",
         "IQR (Classic)",
         "Trend (PATH)",
-        "MG Partial",
-        "MG Complete",
+        "MG Partial (MagicGlasses2)",
+        "MG Complete (MagicGlasses2)",
     ],
     type=str,
     default=None,
@@ -33,16 +34,21 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "use_removed_outliers",
-    name="Use routine with outliers removed",
-    help="Select this option to use the version of the routine data where outlier have been removed.",
+    name="Use routine data with outliers removed (else: uses imputed)",
+    help="Enable this option to use routine data after outliers have been removed, "
+    "based on the outlier detection method you selected above. "
+    " If you leave this off, the pipeline will instead use either:"
+    " A) the imputed routine data (where outlier values have been replaced), or"
+    " B) the raw routine data, if you chose 'Routine data (Raw)' as your outlier processing method.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
-    "availability_indicators",
-    name="Availability indicators",
-    help="Indicators selection to determine availability.",
+    "activity_indicators",
+    name="Facility Activity indicators",
+    help="Define which data elements will be used to determine the activity of a facility."
+    " A facility is considered “active” if at least one of these indicators has a non-missing value greater than zero.",
     multiple=True,
     choices=["CONF", "SUSP", "TEST", "PRES"],
     type=str,
@@ -52,7 +58,8 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "volume_activity_indicators",
     name="Volume activity indicators",
-    help="Indicators selection to determine the volume of activity.",
+    help="Define which data elements will be used to determine the volume of activity at a facility."
+    " Volume of activity is used to calculate WEIGHTED reporting rates.",
     multiple=True,
     choices=["CONF", "SUSP", "TEST", "PRES"],
     type=str,
@@ -68,6 +75,16 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
+    "use_weighted_reporting_rates",
+    name="Use weighted reporting rates",
+    help="Weighted reporting rates are calculated using the volume of activity. "
+    "If TRUE, these values will populate the REPORTING_RATE column of the exported data. "
+    "If FALSE, unweighted reporting rates will be used instead.",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -77,8 +94,9 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Pull scripts",
-    help="Pull the latest scripts from the repository",
+    name="Pull notebooks from repository",
+    help="Pull the latest notebooks from the GitHub repository. "
+    "Note: this will overwrite any local changes to the notebooks!",
     type=bool,
     default=False,
     required=False,
@@ -86,9 +104,10 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_reporting_rate_dataelement(
     outliers_method: str,
     use_removed_outliers: bool,
-    availability_indicators: str,
+    activity_indicators: str,
     volume_activity_indicators: str,
     dataelement_method_denominator: str,
+    use_weighted_reporting_rates: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -139,8 +158,9 @@ def snt_dhis2_reporting_rate_dataelement(
                     "SNT_ROOT_PATH": root_path.as_posix(),
                     "ROUTINE_FILE": routine_file,
                     "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
-                    "AVAILABILITY_INDICATORS": availability_indicators,
+                    "ACTIVITY_INDICATORS": activity_indicators,
                     "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
+                    "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
@@ -198,8 +218,8 @@ def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
         "Median (Classic)": "median",
         "IQR (Classic)": "iqr",
         "Trend (PATH)": "trend",
-        "MG Partial": "mg-partial",
-        "MG Complete": "mg-complete",
+        "MG Partial (MagicGlasses2)": "mg-partial",
+        "MG Complete (MagicGlasses2)": "mg-complete",
     }
 
     try:

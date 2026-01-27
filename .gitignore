@@ -2,7 +2,7 @@ SNT_extract_changes.txt
 SNT Process/
 .vscode/
 venv
-
+configuration/SNT_config.json
 # Jupyter stuff -------------------------
 
 # Windows security metadata files attached to Jupyter notebooks

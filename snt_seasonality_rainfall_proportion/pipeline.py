@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
 )
 
+
 # 4 is default value but we are open to change it to any number of months
 @pipeline("snt_seasonality_rainfall_proportion")
 @parameter(

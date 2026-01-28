@@ -1,12 +1,12 @@
 {
 	"SNT_CONFIG": {
-		"COUNTRY_CODE": "NER",
-		"COUNTRY_NAME": "NIGER",
-		"NA_TREATMENT": "SET_0_TO_NA",
+		"COUNTRY_CODE": "COD",	
+		"COUNTRY_NAME": "DEMOCRATIC REPUBLIC OF CONGO",	
+		"NA_TREATMENT": "SET_0_TO_NA",		
 		"DHIS2_ADMINISTRATION_1": "level_2_name",
 		"DHIS2_ADMINISTRATION_2": "level_3_name",
-		"ANALYTICS_ORG_UNITS_LEVEL" : 6,		
-		"REPORTING_RATE_PRODUCT_UID" : []
+		"ANALYTICS_ORG_UNITS_LEVEL" : 5,		
+		"REPORTING_RATE_PRODUCT_UID" : ["pMbC0FJPkcm"]
 	},
 	"SNT_DATASET_IDENTIFIERS" : {
 		"DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
@@ -27,31 +27,52 @@
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_DEFINITIONS": {
-			"TOTAL_POPULATION_REF":null,
-			"GROWTH_FACTOR" :null,
-			"REFERENCE_YEAR": null,
+			"TOTAL_POPULATION_REF":113600000,
+			"GROWTH_FACTOR" :0.033,
+			"REFERENCE_YEAR": 2024,
 			"POPULATION_INDICATORS": {
-				"POPULATION": {"ids": ["iIS0MGyL3EL"], "type": "dataElement"}
-			},
-			"POPULATION_DISAGGREGATIONS": {				
+				"POPULATION": {"ids": ["WLSKVyA8LoY"], "type": "dataElement"},
+				"POPULATION_U5": {"ids": ["nGZz4qgNal7"], "type": "indicator"}			
+			},			
+			"POPULATION_DISAGGREGATIONS": {
+				"POP_UNDER_5" : 0.189,
+				"POP_0_1_Y" : 0.04,
+				"POP_1_2_Y" : 0.04,    
+				"POP_5_10_Y": 0.135,
+				"POP_5_36_M": 0.038,
+				"POP_PREGNANT_WOMAN": 0.05
 			}			
-		},	
+		},		
 		"DHIS2_INDICATOR_DEFINITIONS": {
-			"SUSP": ["SE8vUT7xeWO"],
-			"TEST": ["Hc1bP08WsJf"],
-			"CONF": ["S4S3iPZMvPb"],
-			"PRES": ["Dq6jCpvgXjN"],
+			"SUSP": ["aZwnLALknnj"],
+			"TEST": ["CIzQAR8IWH1", "sRbXNrdKvyl"],
+			"CONF": ["SpmQSLRPMl4", "e6qMP9fVtG9"],
+			"PRES": ["aK0QXqm8Zxn"],
 			"PRESSEV": [],
-			"MALTREAT": ["DLrfnBPUmH2"],
-			"MALADM": ["VJN9TulWOl7"],
-			"MALDTH": ["dl7lZ8HoO1K"],
-			"CASRECU" : [],
-			"CPN1" : []
+			"MALTREAT": ["nRm30I4w9En"],
+			"MALADM": ["AxJhIi7tUam"],
+			"MALDTH": ["wfmDVt6RVm2"],
+			"CASRECU" : ["UxD03qX5O0t"],
+			"CPN1" : ["kGmdIbd3mbn"]
 		},
 		"DHIS2_REPORTING_RATES" : {
 			"REPORTING_DATASETS": [
 				{
-					"DATASET" : "",
+					"DATASET" : "pMbC0FJPkcm",				
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				},
+				{
+					"DATASET" : "maDtHIFrSHx",				
+					"METRICS": {
+						"ACTUAL_REPORTS": "float",
+						"EXPECTED_REPORTS": "float"
+					}
+				},
+				{
+					"DATASET" : "OeWrFwkFMvf",				
 					"METRICS": {
 						"ACTUAL_REPORTS": "float",
 						"EXPECTED_REPORTS": "float"

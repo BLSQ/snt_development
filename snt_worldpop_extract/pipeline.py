@@ -33,13 +33,21 @@ from worlpopclient import WorldPopClient
     default=False,
     required=False,
 )
-def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False) -> None:
+@parameter(
+    "year",
+    name="Year",
+    help="Year of population data to extract from WorldPop",
+    type=int,
+    default=2020,
+    required=False,
+)
+def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, year: int = 2020) -> None:
     """Write your pipeline orchestration here."""
     # set paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_worldpop_extract"
     data_path = snt_root_path / "data" / "worldpop"
-    year = "2020"  # Latest available data in WorldPop
+    year_str = str(year)  # Convert to string for file naming
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -63,7 +71,7 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False) ->
         retrieve_population_data(
             country_code=country_code,
             output_path=data_path / "raw",
-            year=year,
+            year=year_str,
             overwrite=overwrite,
         )
 
@@ -71,12 +79,12 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False) ->
             snt_config=snt_config_dict,
             input_dir=data_path / "raw",
             output_dir=data_path / "aggregations",
-            year=year,  # just to add a year column in the output files
+            year=year_str,  # just to add a year column in the output files
         )
 
         snt_worldpop_format(
             snt_config=snt_config_dict,
-            year=int(year),
+            year=year,
             input_dir=data_path / "aggregations",
             output_dir=data_path / "population",
         )

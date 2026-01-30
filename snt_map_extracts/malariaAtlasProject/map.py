@@ -21,7 +21,7 @@ class MAPRasterExtractor:
 
     def __init__(
         self,
-        base_url: str = "https://data.malariaatlas.org/geoserver/",
+        base_url: str = "https://data.malariaatlas.org/geoserver",
         category: str = "Malaria",
         logger: logging.Logger | None = None,
     ):

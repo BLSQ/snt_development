@@ -1,5 +1,5 @@
-openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@main
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
 cfgrib
 xarray
 epiweeks
-snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@v2.9.0

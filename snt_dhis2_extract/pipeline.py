@@ -1107,7 +1107,7 @@ def download_data_elements(
         f"Population data element(s) downloaded for period {period}: {len(population_values)} data values"
     )
     population_values_df = pl.DataFrame(population_values)
-    population_values_df["value"] = pd.to_numeric(population_values_df["value"], errors="coerce")
+    population_values_df = population_values_df.with_columns(pl.col("value").cast(pl.Float64, strict=False))
     population_values_df.write_parquet(filepath)
 
 
@@ -1150,7 +1150,7 @@ def download_indicators(
     population_values_df = pl.DataFrame(population_values)
     # Add a CO column with None values
     population_values_df = population_values_df.with_columns(pl.lit(None).alias("co"))
-    population_values_df["value"] = pd.to_numeric(population_values_df["value"], errors="coerce")
+    population_values_df = population_values_df.with_columns(pl.col("value").cast(pl.Float64, strict=False))
     population_values_df.write_parquet(filepath)
 
 

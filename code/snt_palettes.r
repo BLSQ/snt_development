@@ -106,12 +106,16 @@ palette_pfpr_map_mis <- c(
   "#611924"
 )
 
-palette_ihme_mortality_u5 <- c(
-  "#FFF0C5",
-  "#FEE08A",
-  "#FDAE63",
-  "#B3172C"
+
+# From "221216_NER_Stratification.pptx" (NER GC7 WHO)
+palette_incidence_ner_cg7 <- c(
+  "#ADD8E6",
+  "#82C0E9",
+  "#008BBC",
+  "#FF8080",
+  "#C10534"
 )
+
 
 
 # Functions (related to palettes) ------------------------------------------------------

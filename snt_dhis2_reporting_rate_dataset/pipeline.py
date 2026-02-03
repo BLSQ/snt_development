@@ -1,15 +1,63 @@
+import json
+from datetime import datetime, timezone
 from pathlib import Path
-from openhexa.sdk import current_run, pipeline, workspace, parameter
+from typing import Any
 
+import pandas as pd
+from openhexa.sdk import current_run, pipeline, workspace, parameter
 from snt_lib.snt_pipeline_utils import (
-    pull_scripts_from_repository,
     add_files_to_dataset,
+    dataset_file_exists,
     load_configuration_snt,
+    pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,
     validate_config,
-    dataset_file_exists,
 )
+
+
+# --- Quick & dirty: local copy to test new save_pipeline_parameters (JSON + CSV, list return)
+# Remove this block and add save_pipeline_parameters to the import above once snt_utils is pushed ---
+def save_pipeline_parameters(
+    pipeline_name: str,
+    parameters: dict[str, Any],
+    output_path: Path,
+    country_code: str,
+    extra_metadata: dict[str, Any] | None = None,
+) -> list[Path]:
+    """Local copy for testing: saves parameters to JSON + CSV (EXECUTION_TIMESTAMP as column)."""
+    output_path.mkdir(parents=True, exist_ok=True)
+    execution_timestamp = datetime.now(timezone.utc).isoformat()
+
+    parameters_log = {
+        "pipeline_name": pipeline_name,
+        "execution_timestamp": execution_timestamp,
+        "country_code": country_code,
+        "parameters": parameters,
+    }
+    if extra_metadata:
+        parameters_log["metadata"] = extra_metadata
+
+    json_path = output_path / f"{country_code}_parameters.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(parameters_log, f, indent=2, default=str)
+
+    row: dict[str, Any] = {
+        "EXECUTION_TIMESTAMP": execution_timestamp,
+        "pipeline_name": pipeline_name,
+        "country_code": country_code,
+        **{k: v for k, v in parameters.items()},
+    }
+    if extra_metadata:
+        row.update(extra_metadata)
+
+    csv_path = output_path / f"{country_code}_parameters.csv"
+    pd.DataFrame([row]).to_csv(csv_path, index=False)
+    current_run.log_info(f"Pipeline parameters saved to {json_path.name} and {csv_path.name}")
+    return [json_path, csv_path]
+
+
+# -----------------------------------------------------------------------------------------------
 
 
 @pipeline("snt_dhis2_reporting_rate_dataset")
@@ -117,10 +165,26 @@ def snt_dhis2_reporting_rate_dataset(
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
+            # Save pipeline parameters for provenance (JSON + CSV with EXECUTION_TIMESTAMP column)
+            params_files = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_reporting_rate_dataset",
+                parameters={
+                    "outliers_method": outliers_method,
+                    "use_removed_outliers": use_removed_outliers,
+                },
+                output_path=data_path,
+                country_code=country_code,
+                extra_metadata={
+                    "input_routine_file": routine_file,
+                    "source_dataset": ds_outliers_id,
+                },
+            )
+
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
                 country_code=country_code,
                 file_paths=[
+                    *params_files,
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataset.parquet"))],
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataset.csv"))],
                 ],

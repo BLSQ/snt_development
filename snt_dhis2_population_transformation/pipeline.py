@@ -16,7 +16,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "adjust_population",
     name="Adjust using UN totals",
-    help="Use UN totals to scale the DHIS2 population.",
+    help="Adjust the DHIS2 population using the UN total (TOTAL_POPULATION_REF) specified in the config file",
     type=bool,
     default=False,
     required=False,

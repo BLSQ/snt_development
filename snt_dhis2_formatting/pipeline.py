@@ -110,6 +110,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
     except Exception as e:
@@ -143,6 +144,7 @@ def dhis2_analytics_formatting(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting analytics data: {e}") from e
@@ -174,6 +176,7 @@ def dhis2_population_formatting(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting population data: {e}") from e
@@ -205,6 +208,7 @@ def dhis2_shapes_formatting(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting shapes data: {e}") from e
@@ -240,6 +244,7 @@ def dhis2_pyramid_formatting(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting pyramid data: {e}") from e
@@ -271,6 +276,7 @@ def dhis2_reporting_rates_formatting(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting reporting rates data: {e}") from e

@@ -338,8 +338,8 @@ def add_access_to_health_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
             filename=f"{country_code}_population_covered_health.parquet",
         )
         current_run.log_info("Access to health care data loaded from dataset (SNT_HEALTHCARE_ACCESS).")
-    except Exception as e:
-        current_run.log_warning("Access to health care file not found, layer skipped.")
+    except Exception:
+        current_run.log_warning("Unable to load access to health care file, layer skipped.")
         return table
 
     table.update(

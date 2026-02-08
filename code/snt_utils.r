@@ -1030,7 +1030,7 @@ import_fosa_data <- function(
 
     # check if the file is fully readable
     input_df <- tryCatch(
-        read.csv(input_file_path, header = TRUE),
+        read.csv(input_file_path, header = TRUE, na.strings = c("NA", "")),
         error = function(e){return(NULL)}
     )
     if(is.null(input_df)){

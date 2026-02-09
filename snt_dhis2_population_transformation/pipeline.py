@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -77,6 +78,14 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
             if country_code is None:
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
+            params_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_population_transformation",
+                parameters={"ADJUST_WITH_UNTOTALS": adjust_population},
+                output_path=snt_dhis2_pop_transform_path,
+                country_code=country_code,
+            )
+            current_run.log_info(f"Saved pipeline parameters to {params_file}")
+
             # Apply transformation to population data
             dhis2_population_transformation(
                 snt_root_path=snt_root_path,
@@ -93,13 +102,13 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
                 file_paths=[
                     snt_dhis2_pop_transform_path / f"{country_code}_population.parquet",
                     snt_dhis2_pop_transform_path / f"{country_code}_population.csv",
+                    params_file,
                 ],
             )
 
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 

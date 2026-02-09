@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     dataset_file_exists,
+    save_pipeline_parameters,
 )
 
 
@@ -68,8 +69,6 @@ def snt_dhis2_reporting_rate_dataset(
     outliers_method: list, use_removed_outliers: bool, run_report_only: bool, pull_scripts: bool
 ):
     """Orchestration function. Calls other functions within the pipeline."""
-    current_run.log_debug("🚀 STARTING DEBUG OUTPUT")
-
     if pull_scripts:
         current_run.log_info("Pulling pipeline notebooks from repository.")
         pull_scripts_from_repository(
@@ -107,13 +106,23 @@ def snt_dhis2_reporting_rate_dataset(
                 )
                 return
 
+            nb_parameters = {
+                "SNT_ROOT_PATH": root_path.as_posix(),
+                "ROUTINE_FILE": routine_file,
+            }
+
+            params_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_reporting_rate_dataelement",
+                parameters=nb_parameters,
+                output_path=data_path,
+                country_code=country_code,
+            )
+            current_run.log_info(f"Saved pipeline parameters to {params_file}")
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate_dataset.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "SNT_ROOT_PATH": root_path.as_posix(),
-                    "ROUTINE_FILE": routine_file,
-                },
+                parameters=nb_parameters,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -123,6 +132,7 @@ def snt_dhis2_reporting_rate_dataset(
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataset.parquet"))],
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataset.csv"))],
+                    params_file,
                 ],
             )
 
@@ -132,7 +142,6 @@ def snt_dhis2_reporting_rate_dataset(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_dataset_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
         current_run.log_info("Pipeline completed successfully!")

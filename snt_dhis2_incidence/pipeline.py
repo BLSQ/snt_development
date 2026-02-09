@@ -132,7 +132,7 @@ def snt_dhis2_incidence(
                 pipeline_name="snt_dhis2_incidence",
                 parameters=notebook_params,
                 output_path=data_path,
-                country_code="COD",
+                country_code=country_code,
             )
             current_run.log_info(f"Saved pipeline parameters to {params_file}")
 

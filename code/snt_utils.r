@@ -79,17 +79,24 @@ get_latest_dataset_file_in_memory <- function(dataset, filename) {
     # Convert the raw content to a raw vector (the content of the file)
     raw_content <- httr::content(response, as = "raw")
     temp_file <- rawConnection(raw_content, "r")
-    file_extension <- tools::file_ext(filename)
+    file_extension <- tolower(tools::file_ext(filename))
     
     if (file_extension == "parquet") {
         df <- arrow::read_parquet(temp_file)
-    } else if (file_extension == "csv") {        
+    } 
+    else if (file_extension == "csv") {        
         df <- utils::read.csv(temp_file, stringsAsFactors = FALSE)
-    } else if (file_extension == "geojson") {
+    } 
+    else if (file_extension == "geojson") {
         tmp_geojson <- tempfile(fileext = ".geojson")
         writeBin(raw_content, tmp_geojson)
         df <- sf::st_read(tmp_geojson, quiet = TRUE)        
     }
+    else if (file_extension == "json") {
+        # Read JSON from raw content
+        json_txt <- rawToChar(raw_content)
+        df <- jsonlite::fromJSON(json_txt, flatten = TRUE)
+    } 
     else {
       stop(paste("Unsupported file type:", file_extension))
     }

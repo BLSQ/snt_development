@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import geopandas as gpd
+import numpy as np
 import polars as pl
 import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
@@ -27,6 +28,23 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 from openhexa.toolbox.era5.cds import VARIABLES
+
+
+def _has_valid_geometry(geom) -> bool:
+    """Check if a geometry is valid and non-empty.
+    
+    Handles GeometryCollection with empty geometries recursively.
+    """
+    try:
+        if geom is None:
+            return False
+        if hasattr(geom, 'geom_type') and geom.geom_type == "GeometryCollection":
+            if len(geom.geoms) == 0:
+                return False
+            return any(_has_valid_geometry(g) for g in geom.geoms if g is not None)
+        return not geom.is_empty
+    except (AttributeError, TypeError):
+        return False
 
 
 @pipeline("snt_era5_aggregate")
@@ -227,9 +245,33 @@ def read_boundaries(boundaries_id: str, filename: str | None = None) -> gpd.GeoD
         raise FileNotFoundError(msg)
 
     if ds_file.filename.endswith(".parquet"):
-        return gpd.read_parquet(BytesIO(ds_file.read()))
-
-    return gpd.read_file(BytesIO(ds_file.read()))
+        boundaries = gpd.read_parquet(BytesIO(ds_file.read()))
+    else:
+        boundaries = gpd.read_file(BytesIO(ds_file.read()))
+    
+    # Filter out invalid/empty geometries (handles GeometryCollection with empty geometries)
+    initial_count = len(boundaries)
+    
+    valid_mask = (
+        boundaries.geometry.notna() 
+        & ~boundaries.geometry.is_empty 
+        & boundaries.geometry.is_valid
+        & boundaries.geometry.apply(_has_valid_geometry)
+    )
+    
+    boundaries_cleaned = boundaries[valid_mask].copy()
+    filtered_count = initial_count - len(boundaries_cleaned)
+    
+    if filtered_count > 0:
+        current_run.log_warning(
+            f"Filtered out {filtered_count} boundaries with invalid/empty geometries "
+            f"({initial_count} -> {len(boundaries_cleaned)})"
+        )
+    
+    if len(boundaries_cleaned) == 0:
+        raise ValueError("No valid boundaries found after filtering invalid geometries")
+    
+    return boundaries_cleaned
 
 
 def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, column_uid: str) -> pl.DataFrame:
@@ -271,12 +313,37 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
         nrows = len(ds.latitude)
         transform = get_transform(ds)
 
-        # build binary raster masks for each boundary geometry for spatial aggregation
+        # Build binary raster masks for each boundary geometry for spatial aggregation
         masks = build_masks(boundaries, nrows, ncols, transform)
-
+        
+        # Check for empty masks (boundaries that don't overlap with the raster extent)
+        # Vectorized check: sum each mask and keep only non-zero ones
+        mask_sums = masks.sum(axis=(1, 2))
+        valid_mask_indices = np.where(mask_sums > 0)[0]
+        empty_mask_indices = np.where(mask_sums == 0)[0]
+        
+        if len(empty_mask_indices) > 0:
+            empty_boundary_ids = boundaries.iloc[empty_mask_indices][column_uid].tolist()
+            current_run.log_warning(
+                f"Skipping {len(empty_mask_indices)} boundaries with no overlap with raster: "
+                f"{empty_boundary_ids}"
+            )
+        
+        if len(valid_mask_indices) == 0:
+            raise ValueError("No boundaries overlap with the raster data")
+        
+        # Filter masks and boundaries to only include valid ones
+        masks_valid = masks[valid_mask_indices, :, :]
+        boundaries_valid = boundaries.iloc[valid_mask_indices]
+        
         var = VARIABLES[variable]["shortname"]
 
-        daily = aggregate(ds=ds, var=var, masks=masks, boundaries_id=boundaries[column_uid])
+        daily = aggregate(
+            ds=ds, 
+            var=var, 
+            masks=masks_valid, 
+            boundaries_id=boundaries_valid[column_uid]
+        )
 
     # kelvin to celsius
     if variable == "2m_temperature":

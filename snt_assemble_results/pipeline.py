@@ -441,7 +441,7 @@ def add_incidence_indicators_to(
     try:
         f_name = get_matching_filename_from_dataset_last_version(
             dataset_id=dataset_id,
-            filename_pattern=f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet",
+            filename_pattern=f"{country_code}_incidence.parquet",
         )
     except Exception as e:
         current_run.log_warning(f"Error while retrieving incidence filename: {e}")

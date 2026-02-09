@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -92,7 +93,6 @@ def snt_dhis2_incidence(
     pull_scripts: bool,
 ):
     """Pipeline entry point for running the SNT DHIS2 incidence notebook with specified parameters."""
-    
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
@@ -128,43 +128,40 @@ def snt_dhis2_incidence(
         }
 
         if not run_report_only:
+            params_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_incidence",
+                parameters=notebook_params,
+                output_path=data_path,
+                country_code="COD",
+            )
+            current_run.log_info(f"Saved pipeline parameters to {params_file}")
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_incidence.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=notebook_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_INCIDENCE"],
                 country_code=country_code,
                 file_paths=[
-                    *[
-                        p
-                        for p in (
-                            data_path.glob(
-                                f"{country_code}_incidence_year_routine-data-*_rr-method-*.parquet"
-                            )
-                        )
-                    ],
-                    *[
-                        p
-                        for p in (
-                            data_path.glob(f"{country_code}_incidence_year_routine-data-*_rr-method-*.csv")
-                        )
-                    ],
+                    *[p for p in (data_path.glob(f"{country_code}_incidence.parquet"))],
+                    *[p for p in (data_path.glob(f"{country_code}_incidence.csv"))],
+                    params_file,
                 ],
             )
 
         else:
             current_run.log_info("Skipping incidence calculations, running only the reporting.")
 
-        # GP MODIFIED: parameters are now injected also into the report notebook nb
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_incidence_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=notebook_params,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished!")

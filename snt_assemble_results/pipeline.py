@@ -365,19 +365,22 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_REPORTING_RATE")
 
-    # Determine which RR method was used based on Incidence filename (dataset)
-    reporting_method = get_reporting_method_from_incidence_filename(snt_config)
-    if not reporting_method:
-        current_run.log_warning(
-            "No reporting method found in incidence filename. Reporting rate data not added."
+    # Determine RR filename available in the dataset
+    try:
+        reporting_filename = get_matching_filename_from_dataset_last_version(
+            dataset_id=dataset_id,
+            filename_pattern=f"{country_code}_reporting_rate_*.parquet",
+        )
+    except Exception:
+        current_run.log_error(
+            f"File: {country_code}_reporting_rate_*.parquet not found in dataset {dataset_id}."
         )
         return table
-    current_run.log_debug(f"Using reporting method: {reporting_method}")
 
     try:
         dhis2_reporting = get_file_from_dataset(
             dataset_id=dataset_id,
-            filename=f"{country_code}_reporting_rate_{reporting_method}.parquet",
+            filename=reporting_filename,
         )
     except Exception as e:
         current_run.log_warning("Error while loading reporting rate data, data not added.")
@@ -548,7 +551,7 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
         return table
     current_run.log_debug(f"map selection: {map_selection}")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACT")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
     try:
         map_indicators = get_file_from_dataset(
             dataset_id=dataset_id,
@@ -584,7 +587,7 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             continue
 
         indicator_data = map_indicators[map_indicators["METRIC_NAME"] == metric].copy()
-        indicator_data = indicator_data[indicator_data["STATISTIC"] == "mean"].copy()
+        indicator_data = indicator_data[indicator_data["STATISTIC"] == "MEAN"].copy()
         if indicator_data.empty:
             current_run.log_warning(f"No metric {metric} data found in MAP dataset, skipping.")
             continue
@@ -593,7 +596,7 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             latest_period = indicator_data["YEAR"].max()
             indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
             update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))
-            current_run.log_debug(f"Latest period for {metric.upper()}: {latest_period}")
+            current_run.log_info(f"{metric.upper()} latest period : {latest_period}")
             indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
             indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
             merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))

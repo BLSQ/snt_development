@@ -193,7 +193,6 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_era5_aggregate_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
     except Exception as e:

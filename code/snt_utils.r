@@ -63,9 +63,34 @@ install_and_load <- function(packages) {
 # # Load a file from the last version of a dataset (last version of the dataset)            
 get_latest_dataset_file_in_memory <- function(dataset, filename) {
     # Get the dataset file object
+    tryCatch({
+        dataset_obj <- openhexa$workspace$get_dataset(dataset)
+    }, error = function(e) {
+        stop(paste("Dataset not found:", dataset, "-", conditionMessage(e)))
+    })
     
-    dataset_last_version <- openhexa$workspace$get_dataset(dataset)$latest_version  
-    dataset_file <- dataset_last_version$get_file(filename)
+    # Get latest version (may be NULL if no versions exist)
+    dataset_last_version <- dataset_obj$latest_version
+    
+    # Check if latest_version exists
+    if (is.null(dataset_last_version)) {
+        stop(paste("No version available in dataset:", dataset, ". Please ensure the dataset has at least one version with the file:", filename))
+    }
+    
+    # Find the file by iterating through files
+    dataset_file <- NULL
+    files_list <- reticulate::iterate(dataset_last_version$files)
+    for (file in files_list) {
+        if (file$filename == filename) {
+            dataset_file <- file
+            break
+        }
+    }
+    
+    # Check if file was found
+    if (is.null(dataset_file)) {
+        stop(paste("File", filename, "not found in dataset version:", dataset_last_version$name))
+    }
     
     # Perform the GET request and keep the content in memory
     response <- httr::GET(dataset_file$download_url)

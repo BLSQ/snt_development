@@ -302,6 +302,25 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
 
     update_metadata(variable="POPULATION", attribute="PERIOD", value=str(int(float(selected_year))))
 
+    # NOTE: Additional population columns handler:
+    # Check if the table and the population file contains
+    # other population-related columns starting by "POPULATION_"
+    exclude = {"POPULATION", "ADM2_ID", "ADM1_ID", "ADM1_NAME", "ADM2_NAME", "YEAR"}
+    matching_cols = sorted((set(table.columns) & set(dhis2_population.columns)) - exclude)
+
+    if matching_cols:
+        current_run.log_info(
+            f"Updating additional population columns found in assembly table: {matching_cols}"
+        )
+        table.update(
+            table.merge(
+                dhis2_population[dhis2_population["YEAR"] == selected_year][["ADM2_ID", *matching_cols]],
+                how="left",
+                on="ADM2_ID",
+                suffixes=("_old", ""),
+            )[matching_cols]
+        )
+
     return table
 
 

@@ -132,16 +132,9 @@ def snt_seasonality_rainfall(
     else:
         current_run.log_info("Skipping calculations, running only the reporting.")
 
-    report_params = {
-        "minimum_month_block_size": get_minimum_month_block_size,
-        "maximum_month_block_size": get_maximum_month_block_size,
-        "threshold_for_seasonality": get_threshold_for_seasonality,
-        "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
-    }
     run_report_notebook(
         nb_file=pipeline_path / "reporting" / "snt_seasonality_rainfall_report.ipynb",
         nb_output_path=pipeline_path / "reporting" / "outputs",
-        nb_parameters=report_params,
         error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
     )
 

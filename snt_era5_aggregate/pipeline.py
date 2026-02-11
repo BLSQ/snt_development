@@ -175,7 +175,6 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_era5_aggregate_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
     except Exception as e:
@@ -251,6 +250,25 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
     pl.DataFrame
         Polars DataFrame with daily aggregated values for each boundary.
     """
+    # Filter out invalid/empty geometries before aggregation
+    # Check for valid geometries (not empty, not null, has area > 0)
+    valid_mask = (
+        boundaries.geometry.notna() 
+        & ~boundaries.geometry.is_empty 
+        & (boundaries.geometry.area > 0)
+    )
+    
+    valid_boundaries = boundaries[valid_mask].copy()
+    invalid_ids = boundaries[~valid_mask][column_uid].tolist()
+    
+    if len(invalid_ids) > 0:
+        current_run.log_warning(
+            f"Skipping {len(invalid_ids)} invalid/empty geometries: {invalid_ids[:10]}{'...' if len(invalid_ids) > 10 else ''}"
+        )
+    
+    if len(valid_boundaries) == 0:
+        raise ValueError("No valid geometries found in boundaries. Cannot perform aggregation.")
+    
     # build xarray dataset by merging all available grib files across the time dimension
     with tempfile.TemporaryDirectory() as tmpdir:
         for file in input_dir.glob("*.grib"):
@@ -272,11 +290,12 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
         transform = get_transform(ds)
 
         # build binary raster masks for each boundary geometry for spatial aggregation
-        masks = build_masks(boundaries, nrows, ncols, transform)
+        masks = build_masks(valid_boundaries, nrows, ncols, transform)
 
         var = VARIABLES[variable]["shortname"]
 
-        daily = aggregate(ds=ds, var=var, masks=masks, boundaries_id=boundaries[column_uid])
+        # Aggregate only for valid boundaries
+        daily = aggregate(ds=ds, var=var, masks=masks, boundaries_id=valid_boundaries[column_uid])
 
     # kelvin to celsius
     if variable == "2m_temperature":
@@ -297,7 +316,11 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
                 pl.col("max") * 1000,
             ]
         )
-
+    
+    # Note: Invalid geometries are excluded from aggregation to avoid errors
+    # They will not appear in the output. If needed, they can be added back with NA values
+    # after formatting, but for now we skip them to prevent crashes.
+    
     return daily
 
 

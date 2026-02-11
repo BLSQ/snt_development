@@ -108,12 +108,7 @@ def snt_seasonality_rainfall(
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_seasonality_rainfall.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "minimum_month_block_size": get_minimum_month_block_size,
-                    "maximum_month_block_size": get_maximum_month_block_size,
-                    "threshold_for_seasonality": get_threshold_for_seasonality,
-                    "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 

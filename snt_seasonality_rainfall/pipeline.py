@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     run_notebook,
     pull_scripts_from_repository,
+    save_pipeline_parameters,
 )
 
 
@@ -107,13 +108,16 @@ def snt_seasonality_rainfall(
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_seasonality_rainfall.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "minimum_month_block_size": get_minimum_month_block_size,
-                    "maximum_month_block_size": get_maximum_month_block_size,
-                    "threshold_for_seasonality": get_threshold_for_seasonality,
-                    "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            )
+
+            # Save parameters to JSON file for reporting notebook
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_seasonality_rainfall",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
             )
 
             add_files_to_dataset(
@@ -122,6 +126,7 @@ def snt_seasonality_rainfall(
                 file_paths=[
                     data_path / f"{country_code}_rainfall_seasonality.parquet",
                     data_path / f"{country_code}_rainfall_seasonality.csv",
+                    parameters_file,
                 ],
             )
 

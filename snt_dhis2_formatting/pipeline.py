@@ -108,7 +108,6 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_formatting_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )

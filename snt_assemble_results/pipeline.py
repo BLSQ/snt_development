@@ -329,8 +329,8 @@ def add_access_to_health_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFra
     """Add Health care access data to the results table.
 
     Selection :
-        matching: ADM2_ID
-        values : HEALTH_ACCESS
+        matching : ADM2_ID
+        values : PCT_HEALTH_ACCESS (<country_code>_population_covered_health.*)
 
     Parameters
     ----------

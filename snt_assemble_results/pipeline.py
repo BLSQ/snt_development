@@ -177,6 +177,7 @@ def assemble_snt_results(
     results_table = add_map_indicators_to(results_table, snt_config, map_selection)
     results_table = add_seasonality_indicators_to(results_table, snt_config)
     results_table = add_dhs_indicators_to(results_table, snt_config)
+    results_table = add_access_to_health_to(results_table, snt_config)
 
     # add user uploaded indicators
     results_table = add_user_uploaded_indicators_to(results_table, additional_layer_files)
@@ -320,6 +321,56 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
                 suffixes=("_old", ""),
             )[matching_cols]
         )
+
+    return table
+
+
+def add_access_to_health_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
+    """Add Health care access data to the results table.
+
+    Selection :
+        matching : ADM2_ID
+        values : PCT_HEALTH_ACCESS (<country_code>_population_covered_health.*)
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The results table.
+    snt_config : dict
+        The SNT configuration dictionary containing dataset identifiers and country code.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results table with population data merged.
+    """
+    current_run.log_info("Loading access to health care data.")
+    if not any_columns_present(table=table, required_columns=["PCT_HEALTH_ACCESS"]):
+        current_run.log_info("No access to health care columns present in the assembly table, skipping.")
+        return table
+
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS")
+    try:
+        dhis2_access_health = get_file_from_dataset(
+            dataset_id=dataset_id,
+            filename=f"{country_code}_population_covered_health.parquet",
+        )
+        current_run.log_info("Access to health care data loaded from dataset (SNT_HEALTHCARE_ACCESS).")
+    except Exception:
+        current_run.log_warning("Unable to load access to health care file, layer skipped.")
+        return table
+
+    table.update(
+        table.merge(
+            dhis2_access_health[["ADM2_ID", "PCT_HEALTH_ACCESS"]],
+            how="left",
+            on="ADM2_ID",
+            suffixes=("_old", ""),
+        )["PCT_HEALTH_ACCESS"]
+    )
+
+    # update_metadata(variable="PCT_HEALTH_ACCESS", attribute="PERIOD", value=str(int(float(selected_year))))
 
     return table
 

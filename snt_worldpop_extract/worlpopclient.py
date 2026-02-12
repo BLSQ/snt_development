@@ -9,10 +9,8 @@ class WorldPopClient:
     Source: https://data.worldpop.org/GIS/Population
     """
 
-    def __init__(self, url: str = "https://data.worldpop.org/GIS/Population/Global_2000_2020"):
-        """Initialize the client with a specific project alias and subproject.
-
-        NOTE: For the moment we only point to population data /pop.
+    def __init__(self, url: str = "https://data.worldpop.org/GIS/Population"):
+        """Initialize the client.
 
         Parameters
         ----------
@@ -65,7 +63,7 @@ class WorldPopClient:
 
         country_iso3 = country_iso3.upper()
         try:
-            raster_url = self._build_url(country_iso3, year, un_adj)
+            candidate_urls = self._build_urls(country_iso3, year, un_adj)
             if fname is None:
                 adj_suffix = "_UNadj" if un_adj else ""
                 fname = f"{country_iso3.upper()}_worldpop_ppp_{year}{adj_suffix}.tif"
@@ -73,30 +71,62 @@ class WorldPopClient:
         except Exception as e:
             raise ValueError(f"Could not determine download details for {country_iso3} {year}: {e}") from e
 
-        self._atomic_download(raster_url, destination_path)
+        self._download_with_fallbacks(candidate_urls, destination_path)
         return destination_path
 
-    def _build_url(self, country_iso3: str, year: str = 2020, un_adj: bool = False) -> str:
-        """Build download URL.
+    def _build_urls(self, country_iso3: str, year: str = "2020", un_adj: bool = False) -> list[str]:
+        """Build download URL candidates.
 
         Parameters
         ----------
         country_iso3 : str
             Country ISO A3 code.
-        year : int, optional
-            Year of interest (2000--2020). Default=2020.
+        year : str, optional
+            Year of interest.
         un_adj : bool, optional
             Use UN adjusted population counts. Default=False.
 
         Returns
         -------
-        url : str
-            Download URL.
+        list[str]
+            Ordered download URL candidates.
         """
-        return (
-            f"{self.base_url}/{year}/{country_iso3.upper()}/"
-            f"{country_iso3.lower()}_ppp_{year}{'_UNadj' if un_adj else ''}.tif"
-        )
+        year_int = int(year)
+
+        # Legacy WorldPop (2000-2020) uses the Global_2000_2020 structure.
+        if year_int <= 2020:
+            return [
+                (
+                    f"{self.base_url}/Global_2000_2020/{year}/{country_iso3.upper()}/"
+                    f"{country_iso3.lower()}_ppp_{year}{'_UNadj' if un_adj else ''}.tif"
+                )
+            ]
+
+        # New releases (2015-2030, 100m constrained) do not expose UN-adjusted rasters.
+        if un_adj:
+            raise ValueError("UN-adjusted WorldPop rasters are not available for years > 2020.")
+
+        releases = ["R2025A", "R2024B"]
+        return [
+            (
+                f"{self.base_url}/Global_2015_2030/{release}/{year}/{country_iso3.upper()}/"
+                f"v1/100m/constrained/{country_iso3.lower()}_pop_{year}_CN_100m_{release}_v1.tif"
+            )
+            for release in releases
+        ]
+
+    def _download_with_fallbacks(self, urls: list[str], destination_path: Path) -> None:
+        """Try multiple WorldPop URLs until one succeeds."""
+        errors = []
+        for url in urls:
+            try:
+                self._atomic_download(url, destination_path)
+                return
+            except OSError as err:
+                errors.append(f"{url} -> {err}")
+
+        joined_errors = "; ".join(errors)
+        raise OSError(f"All candidate WorldPop URLs failed: {joined_errors}")
 
     @staticmethod
     def _atomic_download(url: str, destination_path: Path, session: requests.Session | None = None) -> None:

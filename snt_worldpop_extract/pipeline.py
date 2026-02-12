@@ -89,13 +89,19 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
             output_dir=data_path / "population",
         )
 
+        files_to_publish = [
+            data_path / "population" / f"{country_code}_worldpop_population.csv",
+            data_path / "population" / f"{country_code}_worldpop_population.parquet",
+            data_path / "raw" / f"{country_code}_worldpop_ppp_{year}.tif",
+        ]
+        pop_unadj_tif = data_path / "raw" / f"{country_code}_worldpop_ppp_{year}_UNadj.tif"
+        if pop_unadj_tif.exists():
+            files_to_publish.append(pop_unadj_tif)
+
         add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT"),
             country_code=country_code,
-            file_paths=[
-                data_path / "population" / f"{country_code}_worldpop_population.csv",
-                data_path / "population" / f"{country_code}_worldpop_population.parquet",
-            ],
+            file_paths=files_to_publish,
         )
 
         # Run report notebook
@@ -134,6 +140,7 @@ def retrieve_population_data(
     country = country_code.upper()
     pop_filename = f"{country}_worldpop_ppp_{year}.tif"
     pop_unadj_filename = f"{country}_worldpop_ppp_{year}_UNadj.tif"
+    supports_unadj = int(year) <= 2020
     current_run.log_info(f"Retrieving data for country: {country} - year: {year}")
 
     try:
@@ -149,18 +156,23 @@ def retrieve_population_data(
             )
             current_run.log_info(f"Population data successfully downloaded under : {pop_file_path}.")
 
-        if not overwrite and (output_path / pop_unadj_filename).exists():
-            current_run.log_info(f"File {pop_unadj_filename} already exists. Skipping download")
+        if supports_unadj:
+            if not overwrite and (output_path / pop_unadj_filename).exists():
+                current_run.log_info(f"File {pop_unadj_filename} already exists. Skipping download")
+            else:
+                pop_file_un_adj_path = wpop_client.download_data_for_country(
+                    country_iso3=country,
+                    year=year,
+                    un_adj=True,
+                    output_dir=output_path,
+                    fname=pop_unadj_filename,
+                )
+                current_run.log_info(
+                    f"UN adjusted population data successfully downloaded under : {pop_file_un_adj_path}."
+                )
         else:
-            pop_file_un_adj_path = wpop_client.download_data_for_country(
-                country_iso3=country,
-                year=year,
-                un_adj=True,
-                output_dir=output_path,
-                fname=pop_unadj_filename,
-            )
-            current_run.log_info(
-                f"UN adjusted population data successfully downloaded under : {pop_file_un_adj_path}."
+            current_run.log_warning(
+                f"UN adjusted WorldPop is not available for year {year}. Continuing with constrained raster only."
             )
 
     except Exception as e:
@@ -259,13 +271,22 @@ def snt_worldpop_format(snt_config: dict, year: int, input_dir: Path, output_dir
     """Format aggregated WorldPop population data for SNT."""
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     pop_data = pd.read_parquet(input_dir / f"{country_code}_worldpop_ppp_{year}.parquet")
-    pop_unadj_file = pd.read_parquet(input_dir / f"{country_code}_worldpop_ppp_{year}_UNadj.parquet")
-    df = pop_data.merge(
-        pop_unadj_file[["ADM2_ID", "POPULATION"]],
-        on="ADM2_ID",
-        how="left",
-        suffixes=("", "_UNADJ"),
-    )
+    pop_unadj_path = input_dir / f"{country_code}_worldpop_ppp_{year}_UNadj.parquet"
+
+    if pop_unadj_path.exists():
+        pop_unadj_file = pd.read_parquet(pop_unadj_path)
+        df = pop_data.merge(
+            pop_unadj_file[["ADM2_ID", "POPULATION"]],
+            on="ADM2_ID",
+            how="left",
+            suffixes=("", "_UNADJ"),
+        )
+    else:
+        current_run.log_warning(
+            f"UN adjusted aggregation file missing for {country_code} {year}; POPULATION_UNADJ will be left empty."
+        )
+        df = pop_data.copy()
+        df["POPULATION_UNADJ"] = pd.NA
     df["YEAR"] = year  # Add year column (reference)
     output_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_dir / f"{country_code}_worldpop_population.csv", index=False)

@@ -108,7 +108,6 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
     except Exception as e:
         current_run.log_error(f"An error occurred in the pipeline: {e}")
@@ -136,7 +135,7 @@ def retrieve_population_data(
     current_run.log_info(f"Downloading data from : {wpop_client.base_url}")
 
     # Create output directory if it doesn't exist
-    Path.mkdir(output_path, exist_ok=True)
+    output_path.mkdir(parents=True, exist_ok=True)
     country = country_code.upper()
     pop_filename = f"{country}_worldpop_ppp_{year}.tif"
     pop_unadj_filename = f"{country}_worldpop_ppp_{year}_UNadj.tif"
@@ -223,6 +222,22 @@ def run_spatial_aggregation(tif_file_path: Path, snt_config: dict, output_dir: P
     # Ensure CRS matches the raster & reproject if necessary
     if shapes.crs is None:
         raise ValueError("Shapes GeoDataFrame must have a defined CRS.")
+    
+    # Filter out invalid geometries before zonal_stats.
+    initial_count = len(shapes)
+    shapes = shapes[shapes.geometry.notna()]
+    shapes = shapes[~shapes.geometry.is_empty]
+    shapes = shapes[shapes.geometry.is_valid]
+    filtered_count = len(shapes)
+    if initial_count != filtered_count:
+        current_run.log_warning(
+            f"Filtered out {initial_count - filtered_count} shapes with invalid geometries. "
+            f"Processing {filtered_count} valid shapes."
+        )
+    
+    if len(shapes) == 0:
+        raise ValueError("No valid geometries found in shapes file. Cannot compute zonal statistics.")
+    
     with rasterio.open(tif_file_path) as src:
         # Reproject shapes if CRS is different
         if shapes.crs != src.crs:

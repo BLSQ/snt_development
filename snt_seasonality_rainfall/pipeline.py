@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
@@ -91,6 +92,26 @@ def snt_seasonality_rainfall(
         )
 
     if not run_report_only:
+        # When running the full pipeline (not report only), validate that required parameters are provided.
+        missing = []
+        if get_minimum_month_block_size is None:
+            missing.append("Minimum number of months per block (get_minimum_month_block_size)")
+        if get_maximum_month_block_size is None:
+            missing.append("Maximum number of months per block (get_maximum_month_block_size)")
+        if get_threshold_for_seasonality is None:
+            missing.append("Minimal proportion of cases/rainfall for seasonality (get_threshold_for_seasonality)")
+        if missing:
+            msg = (
+                "When not running in report-only mode, the following parameters are required: "
+                f"{', '.join(missing)}. Either provide them or run with 'Run reporting only' enabled."
+            )
+            current_run.log_error(msg)
+            raise ValueError(msg)
+
+        assert get_minimum_month_block_size is not None
+        assert get_maximum_month_block_size is not None
+        assert get_threshold_for_seasonality is not None
+
         try:
             # config input
             snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")

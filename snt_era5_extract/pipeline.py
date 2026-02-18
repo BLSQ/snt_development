@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+import shutil
+import time
+from datetime import date, datetime, timezone, timedelta
 from dateutil.relativedelta import relativedelta
 from io import BytesIO
 from math import ceil
 from pathlib import Path
 
 import geopandas as gpd
+from ecmwf.datastores.client import Client
 from openhexa.sdk import (
     CustomConnection,
     current_run,
@@ -19,7 +22,43 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 from openhexa.sdk.datasets import DatasetFile
-from openhexa.toolbox.era5.cds import CDS, VARIABLES
+from openhexa.toolbox.era5.extract import prepare_requests, retrieve_requests, grib_to_zarr
+from openhexa.toolbox.era5.utils import get_variables
+
+CDS_API_URL = "https://cds.climate.copernicus.eu/api"
+DATASET_ID = "reanalysis-era5-land"
+
+
+def _safe_cleanup_era5_store(zarr_store: Path, dst_dir: Path) -> None:
+    """Remove Zarr store and all content under dst_dir, then recreate dst_dir.
+
+    Used when duplicate time values are detected so we can retry with a full download.
+    Logs actions and catches errors so cleanup failures do not hide the original error.
+    """
+    if zarr_store.exists():
+        try:
+            shutil.rmtree(zarr_store)
+            current_run.log_info(f"Deleted Zarr store: {zarr_store}")
+        except Exception as exc:
+            current_run.log_warning(f"Failed to delete Zarr store {zarr_store}: {exc}")
+
+    removed_count = 0
+    if dst_dir.exists():
+        for entry in dst_dir.iterdir():
+            try:
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+                removed_count += 1
+            except Exception as exc:
+                current_run.log_warning(f"Could not remove {entry}: {exc}")
+
+    if removed_count:
+        current_run.log_info(f"Removed {removed_count} item(s) under {dst_dir}")
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    time.sleep(1)
 
 
 @pipeline("snt_era5_extract")
@@ -50,12 +89,13 @@ def era5_extract(
     end_date: str,
     cds_connection: CustomConnection,
 ) -> None:
-    """Download ERA5 products from the Climate Data Store."""
+    """Download ERA5 products from the Climate Data Store (ecmwf-datastores-client)."""
     root_path = Path(workspace.files_path)
 
-    cds = CDS(key=cds_connection.key)
+    client = Client(key=cds_connection.key, url=CDS_API_URL)
     current_run.log_info("Successfully connected to the Climate Data Store")
-    variable = "Total precipitation"
+
+    variable = "total_precipitation"
     current_run.log_info(f"Downloading ERA5 data for variable: {variable}")
 
     try:
@@ -64,62 +104,89 @@ def era5_extract(
         if not is_valid_ymd(end_date):
             raise ValueError(f"Invalid end date format: {end_date}. Expected format: YYYY-MM-DD")
 
+        variables = get_variables()
+        if variable not in variables:
+            raise ValueError(
+                f"Variable {variable} not supported. Available: {list(variables.keys())}"
+            )
+
         snt_config_dict = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config_dict)
         dhis2_formatted_dataset = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
-        # get boundaries geometries from formatted dataset
         boundaries = read_boundaries(dhis2_formatted_dataset, filename=f"{country_code}_shapes.geojson")
         bounds = get_bounds(boundaries)
-        current_run.log_info(f"Using area of interest: {bounds}")
+        area = [int(b) for b in bounds]
+        current_run.log_info(f"Using area of interest: {area}")
 
         if start_date:
-            # Ensure start date is the first of the month
             start_date = start_date[0:8] + "01"
         current_run.log_info(f"Start date set to {start_date}")
 
         if not end_date:
-            # end_date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%d")
             end_date = (
                 datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
             ).strftime("%Y-%m-%d")
             current_run.log_info(f"End date set to last day of previous month {end_date}")
         else:
-            # Push the end date to the last day of the previous month
             end_date = to_last_day_previous_month(end_date)
             current_run.log_info(f"End date set to last day of month {end_date}")
 
         output_dir = Path(workspace.files_path) / "data" / "era5" / "raw"
         output_dir.mkdir(parents=True, exist_ok=True)
+        dst_dir = output_dir / variable
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        zarr_store = dst_dir / "data.zarr"
+        start_d = date.fromisoformat(start_date)
+        end_d = date.fromisoformat(end_date)
+        data_var = variables[variable]["short_name"]
 
-        # find variable code and shortname from fullname provided in parameters
-        var_code = None
-        var_shortname = None
-        for code, meta in VARIABLES.items():
-            if meta["name"] == variable:
-                var_code = code
-                var_shortname = meta["shortname"]
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            requests = prepare_requests(
+                client=client,
+                dataset_id=DATASET_ID,
+                start_date=start_d,
+                end_date=end_d,
+                variable=variable,
+                area=area,
+                zarr_store=zarr_store,
+            )
+
+            if not requests:
+                current_run.log_info("No missing dates to download; data already up to date.")
                 break
-        if var_code is None or var_shortname is None:
-            raise ValueError(f"Variable {variable} not supported")
 
-        # default hours to download depending on climate variable
-        time = {
-            "2m_temperature": [0, 6, 12, 18],
-            "total_precipitation": [23],
-            "volumetric_soil_water_layer_1": [0, 6, 12, 18],
-        }
-
-        download(
-            client=cds,
-            variable=var_code,
-            start=start_date,
-            end=end_date,
-            output_dir=output_dir,
-            area=bounds,
-            time=time.get(var_code, [0, 6, 12, 18]),
-        )
+            current_run.log_info(f"Submitting {len(requests)} request(s) to CDS.")
+            retrieve_requests(
+                client=client,
+                dataset_id=DATASET_ID,
+                requests=requests,
+                dst_dir=dst_dir,
+                wait=30,
+            )
+            try:
+                grib_to_zarr(src_dir=dst_dir, zarr_store=zarr_store, data_var=data_var)
+            except RuntimeError as e:
+                if "Duplicate time values" not in str(e):
+                    raise
+                if attempt < max_attempts - 1:
+                    current_run.log_warning(
+                        "Duplicate time values in store detected. Performing safe cleanup and retry."
+                    )
+                    _safe_cleanup_era5_store(zarr_store, dst_dir)
+                    continue
+                # Last attempt failed: raise with clear message and state for debugging
+                dst_files = list(dst_dir.iterdir()) if dst_dir.exists() else []
+                zarr_exists = zarr_store.exists()
+                raise RuntimeError(
+                    f"Duplicate time values still present after {max_attempts} attempt(s). "
+                    f"Zarr exists={zarr_exists}, files in dst_dir={len(dst_files)}. "
+                    f"Delete data/era5/raw/{variable}/data.zarr and re-run."
+                ) from e
+            current_run.log_info(f"Downloaded and stored raw data for variable `{variable}`")
+            break
     except Exception as e:
         current_run.log_error(f"An error occurred during the ERA5 extraction: {e}")
         raise
@@ -193,56 +260,6 @@ def get_bounds(boundaries: gpd.GeoDataFrame) -> tuple[int]:
     xmax = ceil(xmax + 0.5)
     ymax = ceil(ymax + 0.5)
     return ymax, xmin, ymin, xmax
-
-
-def download(
-    client: CDS,
-    variable: str,
-    start: str,
-    end: str,
-    output_dir: Path,
-    area: tuple[float],
-    time: list[int] | None = None,
-) -> None:
-    """Download ERA5 products from the Climate Data Store.
-
-    Parameters
-    ----------
-    client : CDS
-        CDS client object
-    variable : str
-        ERA5 product variable (ex: "2m_temperature", "total_precipitation")
-    start : str
-        Start date of extraction period (YYYY-MM-DD)
-    end : str
-        End date of extraction period (YYYY-MM-DD)
-    output_dir : Path
-        Output directory for the extracted data (a subfolder named after the variable will be
-        created)
-    area : tuple[float]
-        Bounding box coordinates in the order (ymax, xmin, ymin, xmax)
-    time : list[int] | None, optional
-        Hours of interest as integers (between 0 and 23). Set to all hours if None.
-
-    Raise
-    -----
-    ValueError
-        If the variable is not supported
-    """
-    if variable not in VARIABLES:
-        msg = f"Variable {variable} not supported"
-        current_run.log_error(msg)
-        raise ValueError(msg)
-
-    start = datetime.strptime(start, "%Y-%m-%d").astimezone(timezone.utc)  # noqa: UP017
-    end = datetime.strptime(end, "%Y-%m-%d").astimezone(timezone.utc)  # noqa: UP017
-
-    dst_dir = output_dir / variable
-    dst_dir.mkdir(parents=True, exist_ok=True)
-
-    client.download_between(variable=variable, start=start, end=end, dst_dir=dst_dir, area=area, time=time)
-
-    current_run.log_info(f"Downloaded raw data for variable `{variable}`")
 
 
 def is_valid_ymd(date_str: str) -> bool:

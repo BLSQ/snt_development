@@ -49,6 +49,7 @@ from snt_lib.snt_pipeline_utils import (
     help="How to calculate the total nr of facilities expected to report.",
     type=str,
     choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES", "DHIS2_EXPECTED_REPORTS"],
+    default="ROUTINE_ACTIVE_FACILITIES",
     required=True
 )
 @parameter(

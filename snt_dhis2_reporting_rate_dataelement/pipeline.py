@@ -30,7 +30,7 @@ from snt_lib.snt_pipeline_utils import (
         "MG Complete (MagicGlasses2)",
     ],
     type=str,
-    default=None,
+    default="Routine data (Raw)",
     required=True,
 )
 @parameter(
@@ -73,6 +73,7 @@ from snt_lib.snt_pipeline_utils import (
     help="How to calculate the total nr of facilities expected to report.",
     type=str,
     choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES"],
+    default="ROUTINE_ACTIVE_FACILITIES",
     required=True,
 )
 @parameter(

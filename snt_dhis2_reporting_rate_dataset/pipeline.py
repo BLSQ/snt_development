@@ -30,7 +30,7 @@ from snt_lib.snt_pipeline_utils import (
         "MG Complete (MagicGlasses2)",
     ],
     type=str,
-    default=None,
+    default="Routine data (Raw)",
     required=True,
 )
 @parameter(

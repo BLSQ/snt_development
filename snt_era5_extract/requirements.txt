@@ -1,5 +1,4 @@
-# Toolbox without [era5] to avoid pulling pyarrow (binary conflict with base image pandas).
-# ERA5 deps added manually (no pyarrow: use base image version).
+# Upgrade toolbox to v2.10.0 to update the client
 openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@v2.10.0
 snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
 ecmwf-datastores-client>=0.4.0

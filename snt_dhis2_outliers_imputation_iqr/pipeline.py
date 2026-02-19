@@ -12,23 +12,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("snt_dhis2_outliers_imputation_classic")
-@parameter(
-    "deviation_mean",
-    name="Number of SD around the mean",
-    help="Number of standard deviations around the mean (deault is 3)",
-    type=int,
-    default=3,
-    required=False,
-)
-@parameter(
-    "deviation_median",
-    name="Number of MAD around the median",
-    help="Number of MAD around the median (default is 3)",
-    type=int,
-    default=3,
-    required=False,
-)
+@pipeline("snt_dhis2_outliers_imputation_iqr")
 @parameter(
     "deviation_iqr",
     name="IQR multiplier",
@@ -61,43 +45,33 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_outliers_imputation_classic(
-    deviation_mean: int,
-    deviation_median: int,
+def snt_dhis2_outliers_imputation_iqr(
     deviation_iqr: float,
     push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Outliers imputation pipeline Classic methods for SNT DHIS2 data.
-
-    DEPRECATED: Use the dedicated pipelines instead:
-    - snt_dhis2_outliers_imputation_mean
-    - snt_dhis2_outliers_imputation_median
-    - snt_dhis2_outliers_imputation_iqr
-    """
+    """Outliers imputation pipeline IQR method for SNT DHIS2 data."""
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
-            pipeline_name="snt_dhis2_outliers_imputation_classic",
-            report_scripts=["snt_dhis2_outliers_imputation_classic_report.ipynb"],
-            code_scripts=["snt_dhis2_outliers_imputation_classic.ipynb"],
+            pipeline_name="snt_dhis2_outliers_imputation_iqr",
+            report_scripts=["snt_dhis2_outliers_imputation_iqr_report.ipynb"],
+            code_scripts=["snt_dhis2_outliers_imputation_iqr.ipynb"],
         )
 
     try:
-        current_run.log_info("Starting SNT DHIS2 outliers imputation classic method pipeline...")
+        current_run.log_info("Starting SNT DHIS2 outliers imputation IQR method pipeline...")
 
-        # Define paths
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_classic"
+        pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_iqr"
         data_path = root_path / "data" / "dhis2" / "outliers_imputation"
 
-        pipeline_path.mkdir(parents=True, exist_ok=True)  # Ensure pipeline path exists
-        data_path.mkdir(parents=True, exist_ok=True)  # Ensure data path exists
+        pipeline_path.mkdir(parents=True, exist_ok=True)
+        data_path.mkdir(parents=True, exist_ok=True)
         current_run.log_info(f"Pipeline path: {pipeline_path}")
         current_run.log_info(f"Data path: {data_path}")
 
-        # Load configuration
         config_path = root_path / "configuration" / "SNT_config.json"
         snt_config = load_configuration_snt(config_path=config_path)
         validate_config(snt_config)
@@ -105,28 +79,24 @@ def snt_dhis2_outliers_imputation_classic(
 
         if not run_report_only:
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_classic.ipynb",
+                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_iqr.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters={
                     "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                    "DEVIATION_MEAN": deviation_mean,
-                    "DEVIATION_MEDIAN": deviation_median,
                     "DEVIATION_IQR": deviation_iqr,
                 },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
-            # Add files to Dataset
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
-                country_code=country_code,
-                file_paths=[
-                    *data_path.glob(f"{country_code}_routine_outliers*.parquet"),
-                ],
-            )
+            iqr_files = list(data_path.glob(f"{country_code}_routine_outliers-iqr*.parquet"))
+            if iqr_files:
+                add_files_to_dataset(
+                    dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
+                    country_code=country_code,
+                    file_paths=iqr_files,
+                )
 
-            # Create consolidated outliers DB table
             if push_db:
                 create_outliers_db_table(country_code=country_code, data_path=data_path)
 
@@ -134,13 +104,11 @@ def snt_dhis2_outliers_imputation_classic(
             current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_classic_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_iqr_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
         )
 
-        # TODO: For the shiny app, we can think in a procedure to collect all
-        # outlier tables and push all available results to a DB table
         current_run.log_info("Pipeline finished successfully.")
 
     except Exception as e:
@@ -149,4 +117,4 @@ def snt_dhis2_outliers_imputation_classic(
 
 
 if __name__ == "__main__":
-    snt_dhis2_outliers_imputation_classic()
+    snt_dhis2_outliers_imputation_iqr()

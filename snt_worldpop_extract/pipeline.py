@@ -108,7 +108,6 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
     except Exception as e:
         current_run.log_error(f"An error occurred in the pipeline: {e}")

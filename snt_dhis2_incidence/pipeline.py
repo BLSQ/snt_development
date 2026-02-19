@@ -18,6 +18,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Calculate N1 using `PRES` or `SUSP-TEST`",
     choices=["PRES", "SUSP-TEST"],
     type=str,
+    default="PRES",
     required=True,
 )
 @parameter(
@@ -28,6 +29,7 @@ from snt_lib.snt_pipeline_utils import (
     " 'imputed' contains imputed values after outliers removal",
     choices=["raw", "raw_without_outliers", "imputed"],
     type=str,
+    default="imputed",
     required=True,
 )
 @parameter(
@@ -36,6 +38,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Method used to detect outliers in the routine data",
     choices=["mean", "median", "iqr", "trend", "mg_partial", "mg_complete"],
     type=str,
+    default="mean",
     required=True,
 )
 @parameter(

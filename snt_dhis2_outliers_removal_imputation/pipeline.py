@@ -18,6 +18,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Outliers have been detected in upstream pipeline 'Outliers Detection' using different methods.",
     choices=["mean3sd", "median3mad", "iqr1-5", "magic_glasses_partial", "magic_glasses_complete"],
     type=str,
+    default="mean3sd",
     required=True,
 )
 @parameter(

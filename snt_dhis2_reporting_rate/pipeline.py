@@ -49,6 +49,7 @@ from snt_lib.snt_pipeline_utils import (
     help="How to calculate the total nr of facilities expected to report.",
     type=str,
     choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES", "DHIS2_EXPECTED_REPORTS"],
+    default="ROUTINE_ACTIVE_FACILITIES",
     required=True
 )
 @parameter(
@@ -129,7 +130,6 @@ def snt_dhis2_reporting_rate(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
         current_run.log_info("Pipeline completed successfully!")

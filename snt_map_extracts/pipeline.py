@@ -141,7 +141,6 @@ def snt_map_extracts(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
         log_message(logger, "Pipeline completed successfully!")

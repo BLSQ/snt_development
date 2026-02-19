@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
@@ -15,7 +16,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_minimum_month_block_size",
     name="Minimum number of months per block",
-    help="",
+    help="Used only when running the full pipeline (ignored in report-only mode).",
     type=int,
     choices=[3, 4, 5],
     default=4,
@@ -24,16 +25,16 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_maximum_month_block_size",
     name="Maximum number of months per block",
-    help="",
+    help="Used only when running the full pipeline (ignored in report-only mode).",
     type=int,
-    default=4,
     choices=[3, 4, 5],
+    default=4,
     required=True,
 )
 @parameter(
     "get_threshold_for_seasonality",
     name="Minimal proportion of cases/rainfall for seasonality",
-    help="",
+    help="Used only when running the full pipeline (ignored in report-only mode).",
     type=float,
     default=0.6,
     required=True,
@@ -41,7 +42,6 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_threshold_proportion_seasonal_years",
     name="Minimal proportion of seasonal years",
-    help="",
     type=float,
     default=0.5,
     required=False,
@@ -52,7 +52,6 @@ from snt_lib.snt_pipeline_utils import (
     help="This will only execute the reporting notebook",
     type=bool,
     default=False,
-    required=False,
 )
 @parameter(
     "pull_scripts",
@@ -60,7 +59,6 @@ from snt_lib.snt_pipeline_utils import (
     help="Pull the latest scripts from the repository",
     type=bool,
     default=False,
-    required=False,
 )
 def snt_seasonality_rainfall(
     get_minimum_month_block_size: int,
@@ -70,12 +68,8 @@ def snt_seasonality_rainfall(
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Retrieve rainfall data by ADM2 level from ERA5 dataset.
+    """Retrieve rainfall data by ADM2 level from ERA5 dataset."""
 
-    Compute whether or not the admin unit qualifies as seasonal from a rainfall perspective
-    Compute the minimal duration of the seasonal block (in months) for each district
-    Plot maps and save the output table to dataset
-    """
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_seasonality_rainfall"
     data_path = root_path / "data" / "seasonality_rainfall"
@@ -90,10 +84,16 @@ def snt_seasonality_rainfall(
             code_scripts=["snt_seasonality_rainfall.ipynb"],
         )
 
+    # ------------------------------------------------------------------
+    # FULL PIPELINE EXECUTION
+    # ------------------------------------------------------------------
     if not run_report_only:
+
         try:
-            # config input
-            snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+            # Load configuration
+            snt_config = load_configuration_snt(
+                config_path=root_path / "configuration" / "SNT_config.json"
+            )
             validate_config(snt_config)
             country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
@@ -103,6 +103,7 @@ def snt_seasonality_rainfall(
                 "threshold_for_seasonality": get_threshold_for_seasonality,
                 "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
             }
+
             validate_parameters(input_params)
 
             run_notebook(
@@ -113,7 +114,6 @@ def snt_seasonality_rainfall(
                 country_code=country_code,
             )
 
-            # Save parameters to JSON file for reporting notebook
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_seasonality_rainfall",
                 parameters=input_params,
@@ -135,9 +135,14 @@ def snt_seasonality_rainfall(
             current_run.log_error(f"Pipeline failed: {e!s}")
             raise
 
+    # ------------------------------------------------------------------
+    # REPORTING ONLY MODE
+    # ------------------------------------------------------------------
     else:
         current_run.log_info("Skipping calculations, running only the reporting.")
-        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        snt_config = load_configuration_snt(
+            config_path=root_path / "configuration" / "SNT_config.json"
+        )
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
     run_report_notebook(
@@ -149,28 +154,31 @@ def snt_seasonality_rainfall(
 
 
 def validate_parameters(parameters: dict):
-    """Seasonality param validation.
+    """Seasonality parameter validation."""
 
-    Args:
-        parameters (dict): Dictionary of parameter names and their values.
-
-    Raises:
-    ValueError: if param value is negative or a proportion is not between 0 and 1
-    ValueError: if smaller value is larger than larger value (min block > max block)
-    TypeError: if integer parameter is not an integer
-    """
     for current_parameter, current_value in parameters.items():
+
         if current_value < 0:
             raise ValueError("Please supply only positive values.")
-        if current_parameter in ["minimum_periods", "minimum_month_block_size", "maximum_month_block_size"]:
+
+        if current_parameter in [
+            "minimum_month_block_size",
+            "maximum_month_block_size",
+        ]:
             if not isinstance(current_value, int):
-                raise TypeError("Please supply integer values for number of months/periods.")
+                raise TypeError(
+                    "Please supply integer values for number of months."
+                )
         else:
             if current_value > 1:
-                raise ValueError("Proportions values should be between 0 and 1.")
+                raise ValueError(
+                    "Proportion values should be between 0 and 1."
+                )
 
     if parameters["minimum_month_block_size"] > parameters["maximum_month_block_size"]:
-        raise ValueError("The minimum value should not be larger than the maximum one.")
+        raise ValueError(
+            "The minimum value should not be larger than the maximum one."
+        )
 
 
 if __name__ == "__main__":

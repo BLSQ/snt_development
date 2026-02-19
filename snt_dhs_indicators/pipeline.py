@@ -226,7 +226,6 @@ def run_dhs_indicator_notebooks(
         run_report_notebook(
             nb_file=reporting_folder_path / reporting_notebook_name,
             nb_output_path=reporting_folder_path / "outputs",
-            nb_parameters=None,
         )
     except Exception as e:
         raise Exception(f"Error running reporting notebook '{reporting_notebook_name}': {e}") from e

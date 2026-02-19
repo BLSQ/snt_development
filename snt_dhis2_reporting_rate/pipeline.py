@@ -130,7 +130,6 @@ def snt_dhis2_reporting_rate(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
-            nb_parameters=None,
         )
 
         current_run.log_info("Pipeline completed successfully!")

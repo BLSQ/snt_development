@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -70,6 +71,13 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             if country_code is None:
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_formatting",
+                parameters={"run_report_only": run_report_only, "pull_scripts": pull_scripts},
+                output_path=snt_dhis2_formatted_path,
+                country_code=country_code,
+            )
+
             # format data for SNT
             dhis2_analytics_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
@@ -102,6 +110,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                     snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
                     snt_dhis2_formatted_path / f"{country_code}_reporting.parquet",
                     snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
+                    parameters_file,
                 ],
             )
 

@@ -8,6 +8,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -142,11 +143,19 @@ def snt_seasonality(
             "maximum_month_block_size": maximum_month_block_size,
             "threshold_for_seasonality": threshold_for_seasonality,
             "threshold_proportion_seasonal_years": threshold_proportion_seasonal_years,
+            "run_precipitation": run_precipitation,
+            "run_cases": run_cases,
         }
         validate_parameters(params)
 
         if not run_report_only:
-            files_to_ds = []
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_seasonality",
+                parameters=params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+            files_to_ds = [parameters_file]
             error_messages = ["ERROR 1", "ERROR 2", "ERROR 3"]
             seasonality_nb = pipeline_path / "code" / "snt_seasonality.ipynb"
 
@@ -154,12 +163,12 @@ def snt_seasonality(
             if run_precipitation:
                 current_run.log_info(f"Running precipitation analysis with notebook : {seasonality_nb}")
                 try:
-                    params["type_of_seasonality"] = "precipitation"
+                    nb_params = {**params, "type_of_seasonality": "precipitation"}
                     run_notebook_for_type(
                         nb_path=seasonality_nb,
                         seasonality_type="precipitation",
                         out_nb_path=pipeline_path / "papermill_outputs",
-                        parameters=params,
+                        parameters=nb_params,
                     )
                     files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.parquet")
                     files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.csv")
@@ -179,12 +188,12 @@ def snt_seasonality(
             if run_cases:
                 current_run.log_info(f"Running cases analysis with notebook : {seasonality_nb}")
                 try:
-                    params["type_of_seasonality"] = "cases"
+                    nb_params = {**params, "type_of_seasonality": "cases"}
                     run_notebook_for_type(
                         nb_path=seasonality_nb,
                         seasonality_type="cases",
                         out_nb_path=pipeline_path / "papermill_outputs",
-                        parameters=params,
+                        parameters=nb_params,
                     )
                     files_to_ds.append(data_path / f"{country_code}_cases_seasonality.parquet")
                     files_to_ds.append(data_path / f"{country_code}_cases_seasonality.csv")

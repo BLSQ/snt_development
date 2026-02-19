@@ -8,6 +8,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -104,18 +105,26 @@ def run_pipeline_task(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            input_params = {
+                "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                "DEVIATION_MEAN": deviation_mean,
+                "DEVIATION_MEDIAN": deviation_median,
+                "DEVIATION_IQR": deviation_iqr,
+                "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
+                "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_detection",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_detection.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
-                parameters={
-                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                    "DEVIATION_MEAN": deviation_mean,
-                    "DEVIATION_MEDIAN": deviation_median,
-                    "DEVIATION_IQR": deviation_iqr,
-                    "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
-                    "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -126,6 +135,7 @@ def run_pipeline_task(
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_flagged_outliers_allmethods.parquet"))],
                     *[p for p in (data_path.glob(f"{country_code}_outlier_*.parquet"))],
+                    parameters_file,
                 ],
             )
 

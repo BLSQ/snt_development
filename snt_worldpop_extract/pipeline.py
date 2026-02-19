@@ -12,6 +12,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 from worlpopclient import WorldPopClient
 
@@ -67,6 +68,13 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
         # get country identifier for file naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
+        parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_worldpop_extract",
+            parameters={"overwrite": overwrite, "year": year, "pull_scripts": pull_scripts},
+            output_path=data_path,
+            country_code=country_code,
+        )
+
         # Set output directory
         retrieve_population_data(
             country_code=country_code,
@@ -93,6 +101,7 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
             data_path / "population" / f"{country_code}_worldpop_population.csv",
             data_path / "population" / f"{country_code}_worldpop_population.parquet",
             data_path / "raw" / f"{country_code}_worldpop_ppp_{year}.tif",
+            parameters_file,
         ]
         pop_unadj_tif = data_path / "raw" / f"{country_code}_worldpop_ppp_{year}_UNadj.tif"
         if pop_unadj_tif.exists():

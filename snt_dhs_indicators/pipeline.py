@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -69,6 +70,13 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
         # get country identifier for naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
+        parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_dhs_indicators",
+            parameters={"run_reports_only": run_reports_only, "pull_scripts": pull_scripts},
+            output_path=data_output_path,
+            country_code=country_code,
+        )
+
         run_dhs_indicator_notebooks(
             pipeline_root_path=pipeline_path,
             computation_notebook_name="snt_dhs_bednets_computation.ipynb",
@@ -109,6 +117,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS", None),
             country_code=country_code,
             file_paths=[
+                parameters_file,
                 # bednet access files
                 data_output_path
                 / "bednets"

@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     create_outliers_db_table,
+    save_pipeline_parameters,
 )
 
 
@@ -78,14 +79,22 @@ def snt_dhis2_outliers_imputation_mean(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            input_params = {
+                "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                "DEVIATION_MEAN": deviation_mean,
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_imputation_mean",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_mean.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
-                parameters={
-                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                    "DEVIATION_MEAN": deviation_mean,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -94,7 +103,7 @@ def snt_dhis2_outliers_imputation_mean(
                 add_files_to_dataset(
                     dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
                     country_code=country_code,
-                    file_paths=mean_files,
+                    file_paths=[*mean_files, parameters_file],
                 )
 
             if push_db:

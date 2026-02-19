@@ -25,6 +25,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 from openhexa.toolbox.era5.cds import VARIABLES
 
@@ -81,6 +82,13 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
                 "DHIS2_DATASET_FORMATTED"
             )
             era5_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("ERA5_DATASET_CLIMATE")
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_era5_aggregate",
+                parameters={"run_report_only": run_report_only, "pull_scripts": pull_scripts},
+                output_path=output_dir,
+                country_code=country_code,
+            )
 
             # get boundaries geometries from formatted dataset
             boundaries = read_boundaries(
@@ -169,7 +177,7 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
             add_files_to_dataset(
                 dataset_id=era5_dataset_id,
                 country_code=country_code,
-                file_paths=filename_list,
+                file_paths=[*filename_list, parameters_file],
             )
 
         run_report_notebook(

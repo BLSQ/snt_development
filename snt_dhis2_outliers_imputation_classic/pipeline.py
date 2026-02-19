@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     create_outliers_db_table,
+    save_pipeline_parameters,
 )
 
 
@@ -104,16 +105,24 @@ def snt_dhis2_outliers_imputation_classic(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            input_params = {
+                "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                "DEVIATION_MEAN": deviation_mean,
+                "DEVIATION_MEDIAN": deviation_median,
+                "DEVIATION_IQR": deviation_iqr,
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_imputation_classic",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_classic.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
-                parameters={
-                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                    "DEVIATION_MEAN": deviation_mean,
-                    "DEVIATION_MEDIAN": deviation_median,
-                    "DEVIATION_IQR": deviation_iqr,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -123,6 +132,7 @@ def snt_dhis2_outliers_imputation_classic(
                 country_code=country_code,
                 file_paths=[
                     *data_path.glob(f"{country_code}_routine_outliers*.parquet"),
+                    parameters_file,
                 ],
             )
 

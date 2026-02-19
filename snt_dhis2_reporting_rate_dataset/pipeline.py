@@ -112,7 +112,7 @@ def snt_dhis2_reporting_rate_dataset(
             }
 
             params_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_reporting_rate_dataelement",
+                pipeline_name="snt_dhis2_reporting_rate_dataset",
                 parameters=nb_parameters,
                 output_path=data_path,
                 country_code=country_code,

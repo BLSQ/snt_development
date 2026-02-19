@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 # Pipeline for calculating DHIS2 reporting rates with configurable parameters.
 @pipeline("snt_dhis2_reporting_rate")
@@ -101,26 +102,35 @@ def snt_dhis2_reporting_rate(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            input_params = {
+                "SNT_ROOT_PATH": root_path.as_posix(),
+                "REPORTING_RATE_METHOD": reporting_rate_method,
+                "DATAELEMENT_METHOD_NUMERATOR_CONF": dataelement_method_numerator_conf,
+                "DATAELEMENT_METHOD_NUMERATOR_SUSP": dataelement_method_numerator_susp,
+                "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,
+                "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_reporting_rate",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "SNT_ROOT_PATH": root_path.as_posix(),
-                    "REPORTING_RATE_METHOD": reporting_rate_method,
-                    "DATAELEMENT_METHOD_NUMERATOR_CONF": dataelement_method_numerator_conf,
-                    "DATAELEMENT_METHOD_NUMERATOR_SUSP": dataelement_method_numerator_susp,
-                    "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,
-                    "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}
-            )            
+            )
 
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
                 country_code=country_code,
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_*.parquet"))],
-                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_*.csv"))]
+                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_*.csv"))],
+                    parameters_file,
                 ],
             )
             

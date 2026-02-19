@@ -19,6 +19,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     get_file_from_dataset,
     validate_config,
+    save_pipeline_parameters,
 )
 from malariaAtlasProject.map import MAPRasterExtractor, MAPExtractorError
 from malariaAtlasProject.map_utils import (
@@ -109,6 +110,19 @@ def snt_map_extracts(
             output_path = root_path / "data" / "map"
             output_path.mkdir(parents=True, exist_ok=True)
 
+            input_params = {
+                "pop_raster_selection": pop_raster_selection.path if pop_raster_selection else None,
+                "target_year": target_year,
+                "run_report_only": run_report_only,
+                "pull_scripts": pull_scripts,
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_map_extracts",
+                parameters=input_params,
+                output_path=output_path,
+                country_code=country_code,
+            )
+
             # Validate population raster (optional)
             if pop_raster_selection:
                 log_message(logger, f"Population raster selected: {pop_raster_selection.path}")
@@ -132,6 +146,7 @@ def snt_map_extracts(
                 file_paths=[
                     output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
                     output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
+                    parameters_file,
                 ],
             )
 

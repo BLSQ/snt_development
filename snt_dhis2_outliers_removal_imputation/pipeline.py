@@ -8,6 +8,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -64,14 +65,22 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            input_params = {
+                "OUTLIER_METHOD": outlier_method,
+                "ROOT_PATH": root_path.as_posix(),
+            }
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_removal_imputation",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_removal_imputation.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
-                parameters={
-                    "OUTLIER_METHOD": outlier_method,
-                    "ROOT_PATH": root_path.as_posix(),
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             )
 
@@ -81,6 +90,7 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.parquet"))],
                     *[p for p in (data_path.glob(f"{country_code}_routine_outliers-*_*.csv"))],
+                    parameters_file,
                 ],
             )
 

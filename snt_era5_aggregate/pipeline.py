@@ -25,6 +25,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 from openhexa.toolbox.era5.cds import VARIABLES
 
@@ -70,13 +71,13 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
         )
 
     try:
-        if not run_report_only:
-            snt_config_dict = load_configuration_snt(
-                config_path=root_path / "configuration" / "SNT_config.json"
-            )
-            validate_config(snt_config_dict)
+        snt_config_dict = load_configuration_snt(
+            config_path=root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
-            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
+        if not run_report_only:
             dhis2_formatted_dataset_id = snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
                 "DHIS2_DATASET_FORMATTED"
             )
@@ -166,6 +167,14 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
                     monthly_fname,
                 )
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_era5_aggregate",
+                parameters={"run_report_only": run_report_only, "pull_scripts": pull_scripts},
+                output_path=output_dir,
+                country_code=country_code,
+            )
+            filename_list.append(parameters_file)
+
             add_files_to_dataset(
                 dataset_id=era5_dataset_id,
                 country_code=country_code,
@@ -175,6 +184,7 @@ def era5_aggregate(run_report_only: bool, pull_scripts: bool):
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_era5_aggregate_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
 
     except Exception as e:

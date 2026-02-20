@@ -124,6 +124,7 @@ def snt_dhis2_reporting_rate_dataset(
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=nb_parameters,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             add_files_to_dataset(
@@ -142,6 +143,7 @@ def snt_dhis2_reporting_rate_dataset(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_dataset_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline completed successfully!")

@@ -8,6 +8,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -146,6 +147,7 @@ def snt_seasonality(
         validate_parameters(params)
 
         if not run_report_only:
+            params["country_code"] = country_code
             files_to_ds = []
             error_messages = ["ERROR 1", "ERROR 2", "ERROR 3"]
             seasonality_nb = pipeline_path / "code" / "snt_seasonality.ipynb"
@@ -200,6 +202,14 @@ def snt_seasonality(
                             f"Unexpected error occurred during the cases seasonality execution: {e}."
                         ) from e
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_seasonality",
+                parameters=params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+            files_to_ds.append(parameters_file)
+
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY"],
                 country_code=country_code,
@@ -211,6 +221,7 @@ def snt_seasonality(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_seasonality_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline completed successfully!")

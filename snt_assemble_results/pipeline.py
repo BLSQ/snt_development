@@ -12,6 +12,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     validate_config,
     get_matching_filename_from_dataset_last_version,
+    save_pipeline_parameters,
 )
 
 
@@ -140,6 +141,20 @@ def snt_assemble_results(
 
         build_metadata_table(output_path=results_path, country_code=country_code)
 
+        parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_assemble_results",
+            parameters={
+                "incidence_metric": incidence_metric,
+                "incidence_years_to_include": incidence_years_to_include,
+                "reporting_rate_metric": reporting_rate_metric,
+                "map_selection": map_selection,
+                "adm1_layers_file": adm1_layers_file.path if adm1_layers_file else None,
+                "adm2_layers_file": adm2_layers_file.path if adm2_layers_file else None,
+            },
+            output_path=results_path,
+            country_code=country_code,
+        )
+
         add_files_to_dataset(
             dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_RESULTS"),
             country_code=country_code,
@@ -148,6 +163,7 @@ def snt_assemble_results(
                 results_path / f"{country_code}_results_dataset.parquet",
                 results_path / f"{country_code}_metadata.csv",
                 results_path / f"{country_code}_metadata.parquet",
+                parameters_file,
             ],
         )
         current_run.log_info("Pipeline completed successfully.")

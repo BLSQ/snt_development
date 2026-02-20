@@ -12,6 +12,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 from worlpopclient import WorldPopClient
 
@@ -89,6 +90,13 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
             output_dir=data_path / "population",
         )
 
+        parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_worldpop_extract",
+            parameters={"overwrite": overwrite, "year": year, "pull_scripts": pull_scripts},
+            output_path=data_path,
+            country_code=country_code,
+        )
+
         files_to_publish = [
             data_path / "population" / f"{country_code}_worldpop_population.csv",
             data_path / "population" / f"{country_code}_worldpop_population.parquet",
@@ -97,6 +105,7 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
         pop_unadj_tif = data_path / "raw" / f"{country_code}_worldpop_ppp_{year}_UNadj.tif"
         if pop_unadj_tif.exists():
             files_to_publish.append(pop_unadj_tif)
+        files_to_publish.append(parameters_file)
 
         add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT"),
@@ -108,6 +117,7 @@ def snt_worldpop_extract(overwrite: bool = False, pull_scripts: bool = False, ye
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
     except Exception as e:
         current_run.log_error(f"An error occurred in the pipeline: {e}")

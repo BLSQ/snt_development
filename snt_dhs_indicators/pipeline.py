@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -74,6 +75,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             computation_notebook_name="snt_dhs_bednets_computation.ipynb",
             reporting_notebook_name="snt_dhs_bednets_report.ipynb",
             run_report_only=run_reports_only,
+            country_code=country_code,
         )
 
         run_dhs_indicator_notebooks(
@@ -81,6 +83,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             computation_notebook_name="snt_dhs_careseeking_computation.ipynb",
             reporting_notebook_name="snt_dhs_careseeking_report.ipynb",
             run_report_only=run_reports_only,
+            country_code=country_code,
         )
 
         run_dhs_indicator_notebooks(
@@ -88,6 +91,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             computation_notebook_name="snt_dhs_mortality_computation.ipynb",
             reporting_notebook_name="snt_dhs_mortality_report.ipynb",
             run_report_only=run_reports_only,
+            country_code=country_code,
         )
 
         run_dhs_indicator_notebooks(
@@ -95,6 +99,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             computation_notebook_name="snt_dhs_prevalence_computation.ipynb",
             reporting_notebook_name="snt_dhs_prevalence_report.ipynb",
             run_report_only=run_reports_only,
+            country_code=country_code,
         )
 
         run_dhs_indicator_notebooks(
@@ -102,13 +107,10 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
             computation_notebook_name="snt_dhs_vaccination_computation.ipynb",
             reporting_notebook_name="snt_dhs_vaccination_report.ipynb",
             run_report_only=run_reports_only,
+            country_code=country_code,
         )
 
-        # add files to a new dataset version
-        add_files_to_dataset(
-            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS", None),
-            country_code=country_code,
-            file_paths=[
+        file_paths = [
                 # bednet access files
                 data_output_path
                 / "bednets"
@@ -185,7 +187,21 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
                 data_output_path
                 / "vaccination"
                 / f"{country_code}_{data_source}_{admin_level}_PCT_DROPOUT_DTP.csv",
-            ],
+        ]
+        if not run_reports_only:
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhs_indicators",
+                parameters={"run_reports_only": run_reports_only, "pull_scripts": pull_scripts},
+                output_path=data_output_path,
+                country_code=country_code,
+            )
+            file_paths.append(parameters_file)
+
+        # add files to a new dataset version
+        add_files_to_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHS_INDICATORS", None),
+            country_code=country_code,
+            file_paths=file_paths,
         )
 
     except Exception as e:
@@ -198,6 +214,7 @@ def run_dhs_indicator_notebooks(
     computation_notebook_name: str,
     reporting_notebook_name: str,
     run_report_only: bool = False,
+    country_code: str | None = None,
 ) -> None:
     """Execute the computation notebook and generate a report using the reporting notebook.
 
@@ -217,7 +234,8 @@ def run_dhs_indicator_notebooks(
             run_notebook(
                 nb_path=computation_notebook_path,
                 out_nb_path=papermill_folder_path,
-                parameters=None,
+                parameters={},
+                country_code=country_code,
             )
         except Exception as e:
             raise Exception(f"Error running computation notebook '{computation_notebook_name}': {e}") from e
@@ -226,6 +244,7 @@ def run_dhs_indicator_notebooks(
         run_report_notebook(
             nb_file=reporting_folder_path / reporting_notebook_name,
             nb_output_path=reporting_folder_path / "outputs",
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error running reporting notebook '{reporting_notebook_name}': {e}") from e

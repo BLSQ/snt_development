@@ -19,6 +19,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     get_file_from_dataset,
     validate_config,
+    save_pipeline_parameters,
 )
 from malariaAtlasProject.map import MAPRasterExtractor, MAPExtractorError
 from malariaAtlasProject.map_utils import (
@@ -126,12 +127,25 @@ def snt_map_extracts(
                 logger=logger,
             )
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_map_extracts",
+                parameters={
+                    "pop_raster_selection": pop_raster_selection.path if pop_raster_selection else None,
+                    "target_year": target_year,
+                    "run_report_only": run_report_only,
+                    "pull_scripts": pull_scripts,
+                },
+                output_path=output_path,
+                country_code=country_code,
+            )
+
             add_files_to_dataset(
                 dataset_id=dataset_id,
                 country_code=country_code,
                 file_paths=[
                     output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
                     output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
+                    parameters_file,
                 ],
             )
 
@@ -141,6 +155,7 @@ def snt_map_extracts(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
 
         log_message(logger, "Pipeline completed successfully!")

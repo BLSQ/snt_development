@@ -26,6 +26,7 @@ from snt_lib.snt_pipeline_utils import (
     load_configuration_snt,
     validate_config,
     delete_raw_files,
+    save_pipeline_parameters,
 )
 
 
@@ -178,6 +179,19 @@ def snt_dhis2_extract(
                 ready=analytics_ready,
             )
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_extract",
+                parameters={
+                    "start": start,
+                    "end": end,
+                    "overwrite": overwrite,
+                    "pull_scripts": pull_scripts,
+                    "run_report_only": run_report_only,
+                },
+                output_path=dhis2_raw_data_path,
+                country_code=country_code,
+            )
+
             files_ready = add_files_to_dataset(
                 dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
                 country_code=country_code,
@@ -188,6 +202,7 @@ def snt_dhis2_extract(
                     dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
                     dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
                     dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
+                    parameters_file,
                 ],
                 analytics_ready=analytics_ready,
                 pop_ready=pop_ready,

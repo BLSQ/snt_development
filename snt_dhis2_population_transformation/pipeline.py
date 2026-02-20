@@ -64,20 +64,16 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
         )
 
     try:
+        # Load configuration (needed for report and for main run)
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        if country_code is None:
+            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+
         if not run_report_only:
-            # Load configuration
-            snt_config_dict = load_configuration_snt(
-                config_path=snt_root_path / "configuration" / "SNT_config.json"
-            )
-
-            # Validate configuration
-            validate_config(snt_config_dict)
-
-            # get country identifier for naming
-            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-            if country_code is None:
-                current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
-
             params_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_population_transformation",
                 parameters={"ADJUST_WITH_UNTOTALS": adjust_population},
@@ -110,6 +106,7 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
     except Exception as e:
@@ -148,6 +145,7 @@ def dhis2_population_transformation(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting analytics data: {e}") from e

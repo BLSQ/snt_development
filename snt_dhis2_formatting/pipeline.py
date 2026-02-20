@@ -9,6 +9,7 @@ from snt_lib.snt_pipeline_utils import (
     run_notebook,
     run_report_notebook,
     validate_config,
+    save_pipeline_parameters,
 )
 
 
@@ -56,20 +57,16 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
         )
 
     try:
+        # Load configuration (needed for report and for main run)
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        if country_code is None:
+            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+
         if not run_report_only:
-            # Load configuration
-            snt_config_dict = load_configuration_snt(
-                config_path=snt_root_path / "configuration" / "SNT_config.json"
-            )
-
-            # Validate configuration
-            validate_config(snt_config_dict)
-
-            # get country identifier for naming
-            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-            if country_code is None:
-                current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
-
             dhis2_pyramid_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
@@ -90,6 +87,13 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
 
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_formatting",
+                parameters={"run_report_only": run_report_only, "pull_scripts": pull_scripts},
+                output_path=snt_dhis2_formatted_path,
+                country_code=country_code,
+            )
+
             add_files_to_dataset(
                 dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
                 country_code=country_code,
@@ -103,6 +107,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                     snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
                     snt_dhis2_formatted_path / f"{country_code}_reporting.parquet",
                     snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
+                    parameters_file,
                 ],
             )
 

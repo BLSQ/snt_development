@@ -7,6 +7,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     pull_scripts_from_repository,
+    save_pipeline_parameters,
 )
 
 
@@ -99,15 +100,24 @@ def snt_healthcare_access(
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
         if not run_report_only:
+            input_params = {
+                "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
+                "RADIUS_METERS": input_radius_meters,
+                "POP_FILE": input_pop_file.path if input_pop_file is not None else None,
+            }
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
-                parameters={
-                    "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
-                    "RADIUS_METERS": input_radius_meters,
-                    "POP_FILE": input_pop_file.path if input_pop_file is not None else None,
-                },
+                parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_healthcare_access",
+                parameters=input_params,
+                output_path=data_output_path,
+                country_code=country_code,
             )
 
             # add files to a new dataset version
@@ -117,6 +127,7 @@ def snt_healthcare_access(
                 file_paths=[
                     data_output_path / f"{country_code}_population_covered_health.parquet",
                     data_output_path / f"{country_code}_population_covered_health.csv",
+                    parameters_file,
                 ],
             )
 
@@ -127,6 +138,7 @@ def snt_healthcare_access(
             nb_file=pipeline_path / "reporting" / "snt_healthcare_access_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished!")

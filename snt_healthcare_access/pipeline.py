@@ -117,6 +117,7 @@ def snt_healthcare_access(
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             # add files to a new dataset version
@@ -137,6 +138,7 @@ def snt_healthcare_access(
             nb_file=pipeline_path / "reporting" / "snt_healthcare_access_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished!")

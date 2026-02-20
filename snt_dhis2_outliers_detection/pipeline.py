@@ -126,6 +126,7 @@ def run_pipeline_task(
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             # Add files to Dataset
@@ -148,6 +149,7 @@ def run_pipeline_task(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_detection_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished!")

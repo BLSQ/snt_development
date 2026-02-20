@@ -220,6 +220,7 @@ def snt_seasonality(
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_seasonality_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline completed successfully!")

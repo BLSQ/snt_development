@@ -82,6 +82,7 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             add_files_to_dataset(
@@ -104,6 +105,7 @@ def run_pipeline_task(outlier_method: str, run_report_only: bool, pull_scripts: 
             nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_removal_imputation_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished!")

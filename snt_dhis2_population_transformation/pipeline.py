@@ -110,6 +110,7 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
     except Exception as e:
@@ -148,6 +149,7 @@ def dhis2_population_transformation(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
     except Exception as e:
         raise Exception(f"Error in formatting analytics data: {e}") from e

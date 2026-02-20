@@ -116,6 +116,7 @@ def snt_dhis2_outliers_imputation_mean(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_mean_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline finished successfully.")

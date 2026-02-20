@@ -98,6 +98,7 @@ def snt_dhis2_outliers_imputation_path(
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             # Add files to Dataset
@@ -121,6 +122,7 @@ def snt_dhis2_outliers_imputation_path(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_path_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
         )
 
         # TODO: For the shiny app, we can think in a procedure to collect all

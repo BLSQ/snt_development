@@ -70,7 +70,10 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             if country_code is None:
                 current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
-            # format data for SNT
+            dhis2_pyramid_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
+
             dhis2_analytics_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
@@ -82,9 +85,7 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             dhis2_shapes_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
-            dhis2_pyramid_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
+
             dhis2_reporting_rates_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )

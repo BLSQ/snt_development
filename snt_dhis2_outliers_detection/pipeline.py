@@ -105,26 +105,32 @@ def run_pipeline_task(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
-            input_params = {
-                "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                "DEVIATION_MEAN": deviation_mean,
-                "DEVIATION_MEDIAN": deviation_median,
-                "DEVIATION_IQR": deviation_iqr,
-                "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
-                "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
-            }
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_detection.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
-                parameters=input_params,
+                parameters={
+                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                    "DEVIATION_MEAN": deviation_mean,
+                    "DEVIATION_MEDIAN": deviation_median,
+                    "DEVIATION_IQR": deviation_iqr,
+                    "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
+                    "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
+                },
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
                 country_code=country_code,
             )
 
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_outliers_detection",
-                parameters=input_params,
+                parameters={
+                    "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                    "DEVIATION_MEAN": deviation_mean,
+                    "DEVIATION_MEDIAN": deviation_median,
+                    "DEVIATION_IQR": deviation_iqr,
+                    "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
+                    "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
+                },
                 output_path=data_path,
                 country_code=country_code,
             )

@@ -110,6 +110,7 @@ def snt_seasonality_cases(
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
             )
 
             parameters_file = save_pipeline_parameters(
@@ -135,11 +136,16 @@ def snt_seasonality_cases(
 
     else:
         current_run.log_info("Skipping calculations, running only the reporting.")
+        snt_config = load_configuration_snt(
+            config_path=root_path / "configuration" / "SNT_config.json"
+        )
+        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
     run_report_notebook(
         nb_file=pipeline_path / "reporting" / "snt_seasonality_cases_report.ipynb",
         nb_output_path=pipeline_path / "reporting" / "outputs",
         error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+        country_code=country_code,
     )
 
 

@@ -79,6 +79,9 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             )
 
             # format data for SNT
+            dhis2_pyramid_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
             dhis2_analytics_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
@@ -88,9 +91,6 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                 snt_config=snt_config_dict,
             )
             dhis2_shapes_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
-            dhis2_pyramid_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
             dhis2_reporting_rates_formatting(

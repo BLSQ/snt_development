@@ -1,11 +1,11 @@
-from datetime import datetime
 from pathlib import Path
-import papermill as pm
+
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     add_files_to_dataset,
     load_configuration_snt,
+    run_notebook,
     run_report_notebook,
     validate_config,
     save_pipeline_parameters,
@@ -169,6 +169,7 @@ def snt_seasonality(
                         seasonality_type="precipitation",
                         out_nb_path=pipeline_path / "papermill_outputs",
                         parameters=nb_params,
+                        country_code=country_code,
                     )
                     files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.parquet")
                     files_to_ds.append(data_path / f"{country_code}_precipitation_seasonality.csv")
@@ -194,6 +195,7 @@ def snt_seasonality(
                         seasonality_type="cases",
                         out_nb_path=pipeline_path / "papermill_outputs",
                         parameters=nb_params,
+                        country_code=country_code,
                     )
                     files_to_ds.append(data_path / f"{country_code}_cases_seasonality.parquet")
                     files_to_ds.append(data_path / f"{country_code}_cases_seasonality.csv")
@@ -257,42 +259,23 @@ def validate_parameters(parameters: dict):
 
 
 def run_notebook_for_type(
-    nb_path: Path, seasonality_type: str, out_nb_path: Path, parameters: dict, kernel_name: str = "ir"
+    nb_path: Path,
+    seasonality_type: str,
+    out_nb_path: Path,
+    parameters: dict,
+    country_code: str,
+    kernel_name: str = "ir",
 ):
-    """Execute a Jupyter notebook using Papermill.
-
-    Parameters
-    ----------
-    nb_name : str
-        The name of the notebook to execute (without the .ipynb extension).
-    nb_path : Path
-        The path to the directory containing the notebook.
-    seasonality_type : str
-        Type of analysis to be added in the output notebook name.
-    out_nb_path : Path
-        The path to the directory where the output notebook will be saved.
-    parameters : dict
-        A dictionary of parameters to pass to the notebook.
-    kernel_name : str, optional
-        The name of the kernel to use for execution (default is "ir" for R, python3 for Python).
-    """
-    current_run.log_info(f"Executing notebook: {nb_path}")
-    file_stem = nb_path.stem
-    extension = nb_path.suffix
-    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-    out_nb_full_path = out_nb_path / f"{file_stem}_{seasonality_type}_OUTPUT_{execution_timestamp}{extension}"
-    out_nb_path.mkdir(parents=True, exist_ok=True)
-
-    try:
-        pm.execute_notebook(
-            input_path=nb_path,
-            output_path=out_nb_full_path,
-            parameters=parameters,
-            kernel_name=kernel_name,
-            request_save_on_cell_execute=False,
-        )
-    except Exception as e:
-        raise Exception(f"Error executing the notebook {type(e)}: {e}") from e
+    """Execute a Jupyter notebook via snt_lib (supports notebook_<country_code>.ipynb)."""
+    current_run.log_info(f"Executing notebook: {nb_path} (type={seasonality_type})")
+    run_notebook(
+        nb_path=nb_path,
+        out_nb_path=out_nb_path,
+        parameters=parameters,
+        kernel_name=kernel_name,
+        error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+        country_code=country_code,
+    )
 
 
 if __name__ == "__main__":

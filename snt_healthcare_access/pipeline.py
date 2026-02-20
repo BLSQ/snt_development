@@ -105,18 +105,18 @@ def snt_healthcare_access(
                 "RADIUS_METERS": input_radius_meters,
                 "POP_FILE": input_pop_file.path if input_pop_file is not None else None,
             }
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_healthcare_access",
-                parameters=input_params,
-                output_path=data_output_path,
-                country_code=country_code,
-            )
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_healthcare_access",
+                parameters=input_params,
+                output_path=data_output_path,
                 country_code=country_code,
             )
 

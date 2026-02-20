@@ -149,6 +149,7 @@ def snt_map_extract(
             nb_file=pipeline_path / "reporting" / "snt_map_extract_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             nb_parameters=None,
+            country_code=country_code,
         )
 
         current_run.log_info("Pipeline completed successfully!")

@@ -111,19 +111,19 @@ def snt_dhis2_outliers_imputation_classic(
                 "DEVIATION_MEDIAN": deviation_median,
                 "DEVIATION_IQR": deviation_iqr,
             }
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_outliers_imputation_classic",
-                parameters=input_params,
-                output_path=data_path,
-                country_code=country_code,
-            )
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_classic.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_imputation_classic",
+                parameters=input_params,
+                output_path=data_path,
                 country_code=country_code,
             )
 

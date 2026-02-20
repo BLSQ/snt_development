@@ -110,18 +110,18 @@ def snt_dhis2_reporting_rate(
                 "DATAELEMENT_METHOD_NUMERATOR_TEST": dataelement_method_numerator_test,
                 "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
             }
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_reporting_rate",
-                parameters=input_params,
-                output_path=data_path,
-                country_code=country_code,
-            )
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_reporting_rate",
+                parameters=input_params,
+                output_path=data_path,
                 country_code=country_code,
             )
 

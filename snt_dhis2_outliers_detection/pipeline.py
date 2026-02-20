@@ -113,19 +113,19 @@ def run_pipeline_task(
                 "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                 "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
             }
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_outliers_detection",
-                parameters=input_params,
-                output_path=data_path,
-                country_code=country_code,
-            )
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_detection.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_detection",
+                parameters=input_params,
+                output_path=data_path,
                 country_code=country_code,
             )
 

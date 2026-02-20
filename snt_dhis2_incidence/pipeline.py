@@ -131,14 +131,6 @@ def snt_dhis2_incidence(
         }
 
         if not run_report_only:
-            params_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_incidence",
-                parameters=notebook_params,
-                output_path=data_path,
-                country_code=country_code,
-            )
-            current_run.log_info(f"Saved pipeline parameters to {params_file}")
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_incidence.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -146,6 +138,14 @@ def snt_dhis2_incidence(
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
                 country_code=country_code,
             )
+
+            params_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_incidence",
+                parameters=notebook_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+            current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_INCIDENCE"],

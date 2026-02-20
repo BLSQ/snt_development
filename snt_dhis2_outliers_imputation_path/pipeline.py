@@ -85,19 +85,19 @@ def snt_dhis2_outliers_imputation_path(
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
                 "DEVIATION_MEAN": deviation_mean,
             }
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_outliers_imputation_path",
-                parameters=input_params,
-                output_path=data_path,
-                country_code=country_code,
-            )
-
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_path.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+                country_code=country_code,
+            )
+
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_imputation_path",
+                parameters=input_params,
+                output_path=data_path,
                 country_code=country_code,
             )
 

@@ -195,13 +195,23 @@ def make_table(
     shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
     log_message(logger, f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
-    # Check shapes
-    invalid_shapes = shapes[shapes.geometry.isna()]
+    # Check shapes: drop rows with null or None geometry (zonal_stats fails on None).
+    # Dropped ADM2 will not appear in map_data.parquet; in assemble_results they get NA for map
+    # indicators (left join on ADM2_ID). The shapes file in the dataset is not modified.
+    invalid_shapes = shapes[shapes.geometry.isna() | shapes.geometry.apply(lambda g: g is None)]
     if len(invalid_shapes) > 0:
         log_message(
             logger, f"Dropping {len(invalid_shapes)} organisation units without geometry.", level="warning"
         )
-    shapes = shapes[shapes.geometry.notna()]
+    shapes = shapes[shapes.geometry.notna() & shapes.geometry.apply(lambda g: g is not None)]
+
+    # Drop empty geometries so rasterstats/shapely don't get invalid geometries
+    empty_shapes = shapes[shapes.geometry.is_empty]
+    if len(empty_shapes) > 0:
+        log_message(
+            logger, f"Dropping {len(empty_shapes)} organisation units with empty geometry.", level="warning"
+        )
+    shapes = shapes[~shapes.geometry.is_empty]
 
     if len(shapes) == 0:
         return

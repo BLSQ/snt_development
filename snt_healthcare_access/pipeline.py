@@ -5,7 +5,6 @@ from openhexa.sdk import current_run, pipeline, File, parameter, workspace
 
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
-    get_file_from_dataset,
     load_configuration_snt,
     run_notebook,
     run_report_notebook,
@@ -138,27 +137,8 @@ def snt_healthcare_access(
                     f"No raster selected; using latest WorldPop: {path_found.name} (year {year_found})"
                 )
             else:
-                # Optional: try dataset (config key WORLDPOP_YEARS_TO_TRY = list of years)
+                # No dataset fallback: we only use data/worldpop/raw/ (from WorldPop extract in this workspace).
                 pop_file_path = None
-                dataset_id = snt_config_dict.get("SNT_DATASET_IDENTIFIERS", {}).get(
-                    "WORLDPOP_DATASET_EXTRACT"
-                )
-                years_to_try = snt_config_dict.get("WORLDPOP_YEARS_TO_TRY")
-                if dataset_id and years_to_try:
-                    for y in sorted(years_to_try, reverse=True):
-                        try:
-                            p = get_file_from_dataset(
-                                dataset_id=dataset_id,
-                                filename=f"{country_code}_worldpop_ppp_{y}.tif",
-                            )
-                            if p is not None and getattr(p, "__fspath__", None):
-                                pop_file_path = str(p)
-                                current_run.log_info(
-                                    f"No raster in workspace; using WorldPop from dataset: year {y}"
-                                )
-                                break
-                        except Exception:
-                            continue
 
         if not run_report_only:
             input_params = {

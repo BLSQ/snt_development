@@ -134,9 +134,25 @@ def snt_dhis2_reporting_rate_dataelement(
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
+        # Build parameters dict and save to JSON in all cases (like other pipelines)
+        routine_file = f"{country_code}{resolve_routine_filename(outliers_method, use_removed_outliers)}"
+        nb_parameters = {
+            "SNT_ROOT_PATH": root_path.as_posix(),
+            "ROUTINE_FILE": routine_file,
+            "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
+            "ACTIVITY_INDICATORS": activity_indicators,
+            "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
+            "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
+        }
+        parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_dhis2_reporting_rate_dataelement",
+            parameters=nb_parameters,
+            output_path=data_path,
+            country_code=country_code,
+        )
+        current_run.log_info(f"Saved pipeline parameters to {parameters_file}")
+
         if not run_report_only:
-            routine_file = resolve_routine_filename(outliers_method, use_removed_outliers)
-            routine_file = f"{country_code}{routine_file}"
             if outliers_method == "Routine data (Raw)":
                 ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
             else:
@@ -150,23 +166,6 @@ def snt_dhis2_reporting_rate_dataelement(
                     "Processing cannot continue."
                 )
                 return
-
-            nb_parameters = {
-                "SNT_ROOT_PATH": root_path.as_posix(),
-                "ROUTINE_FILE": routine_file,
-                "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
-                "ACTIVITY_INDICATORS": activity_indicators,
-                "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
-                "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
-            }
-
-            params_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_reporting_rate_dataelement",
-                parameters=nb_parameters,
-                output_path=data_path,
-                country_code=country_code,
-            )
-            current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate_dataelement.ipynb",
@@ -182,16 +181,18 @@ def snt_dhis2_reporting_rate_dataelement(
                 file_paths=[
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataelement.parquet"))],
                     *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataelement.csv"))],
-                    params_file,
+                    parameters_file,
                 ],
             )
 
         else:
             current_run.log_info("Skipping calculations, running only the reporting.")
 
+        # Compatible with snt_lib (snt_utils): do not pass nb_parameters
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_dataelement_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
 

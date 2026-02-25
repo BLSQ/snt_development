@@ -123,6 +123,28 @@ log_msg <- function(msg , level="info") {
         }
 }
 
+# Helper for logging when not in OH
+pipeline_msg <- function(
+  target_msg,
+  pipeline_error = "object 'openhexa' not found",
+  extra_info = "not connected to pipeline run"
+) {
+  tryCatch(
+    {
+      log_msg(target_msg)
+    },
+    error = function(e) {
+      # if the error is about openhexa
+      if (grepl(pipeline_error, e$message)) {
+        print(extra_info)
+        print(target_msg)
+      } else {
+        # rethrow the other errors
+        stop(e)
+      }
+    }
+  )
+}
 
 # Helper function for exporting data (csv and parquet files) 
 export_data <- function(data_object, file_path) {
@@ -149,10 +171,7 @@ export_data <- function(data_object, file_path) {
     # Log the export
     log_msg(paste0("Exported : ", file_path))
 }
-    
-
-#%% SEASONALITY -------------------------------------------------------------------
-                                                 
+                                                  
 #############
 convert_columns <- function(dt, col_type_map) {
     
@@ -399,6 +418,57 @@ fill_missing_cases_ts <- function(district_data, original_values_colname, estima
   return(district_data_filled)
 }
 
+#' add string versions of selected integer columns
+#' @param input_dt data.frame or data.table to modify
+#' @param input_pattern pattern used to identify columns to convert
+#' @param output_pattern replacement pattern used to form new column names
+#' @param missing_label string to replace NA values in the new columns
+#'
+#' @return data.table containing the original data and the newly created columns
+add_str_col_from_int <- function(input_dt, input_pattern, output_pattern, missing_label = "<=60%"){
+
+  output_dt <- copy(as.data.table(input_dt))
+  
+  old_colnames <- grep(input_pattern, names(input_dt), value=TRUE)
+
+  for(old_colname in old_colnames){
+  new_colname <- gsub(input_pattern, output_pattern, old_colname)
+  output_dt[, (new_colname) := as.character(get(old_colname))]
+  output_dt[is.na(get(new_colname)), (new_colname) := missing_label]
+  }
+
+  return(output_dt)
+}
+
+#' Bin a numeric column into categories in a data.table
+#' @param dt dt to be modified
+#' @param breaks vector of cut points defining the bin boundaries
+#' @param labels vector of labels for the resulting bins
+#' @param col_in name of the numeric input column to be binned
+#' @param col_out name of the output column to create
+#' @param include.lowest set to true
+#' @return return the modified dt invisibly
+bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = TRUE, right = FALSE) {
+  
+  if (!is.data.table(dt)) {
+    stop("dt must be a data.table")
+  }
+  
+  dt[, (col_out) := cut(
+    get(col_in),
+    breaks = breaks,
+    labels = labels,
+    include.lowest = include.lowest,
+    right = right,
+    ordered_result = TRUE
+  )]
+  
+  invisible(dt)
+}
+
+
+#%% SEASONALITY -------------------------------------------------------------------
+   
 #############
 compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_threshold = 0.6) {
   #' create forward-looking month blocks summing values based on the WHO month-block reasoning for seasonality computation - allows for different block sizes
@@ -639,6 +709,163 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
   print(duration_plot)
   return(duration_plot)
 }
+
+#' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
+#' @param input_dt an input data table (or data frame)
+#' @param values_colname the indicator column, on which the computations are made
+#' @param vector_of_durations the vector with the number of months in a block (3/4/5)
+#' @param admin_colname the administrative units to group 
+#' @param year_colname year grouping column
+#' @param month_colname month grouping column
+#' @param percentage_threshold the percentage which needs to occur in a block, to qualify for seasonality
+#' @return an output data table with the additional column
+compute_block_percentage <- function(input_dt, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', percentage_threshold = 0.6) {
+
+  dt <- copy(as.data.table(input_dt))
+  
+  # ensure correct order
+  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
+  
+  # denominator: annual (calendar year) sum
+  denominator_colname <- toupper("sum_calendar_year")
+  dt[
+    ,
+    (denominator_colname) := sum(get(values_colname), na.rm = TRUE),
+    by = c(admin_colname, year_colname)
+  ]
+  
+  # numerators for each of the durations (forward-looking)
+  for (n in vector_of_durations) {
+    numerator_colname  <- toupper(glue("sum_{n}_mth_fw"))
+    pct_colname <- toupper(glue("pct_{n}_mth_row"))
+    target_colname <- toupper(glue("attained_{percentage_threshold}_cases_{n}_mth"))
+    
+    dt[, (numerator_colname) := frollsum(get(values_colname),
+                                n = n,
+                                align = "left",
+                                na.rm = TRUE),
+       by = c(admin_colname)]
+    
+    dt[, (pct_colname) := 
+          # make NA's where it would be division by zero
+          fifelse(get(denominator_colname) > 0, get(numerator_colname)*100 / get(denominator_colname), NA_real_)]
+    
+    dt[, (target_colname) := as.integer(get(denominator_colname) > 0 &
+                                   get(pct_colname) >= percentage_threshold)]
+  }
+  
+  return(dt)
+}
+
+filter_cycles_data <- function(input_dt, pattern_cycle_colnames, id_colnames, year_colname, reference_years_vector, month_colname, target_month_num=8){
+  #' Filter data on cycles, to only the relevant beginning month
+  #' Keep only the useful columns for plotting/presentation
+  output_dt <- input_dt[
+    get(month_colname) == target_month_num,
+    .SD,
+    .SDcols=c(id_colnames, grep(pattern_cycle_colnames, names(input_dt), value=TRUE))
+  ]
+
+  output_dt[, (month_colname) := NULL]
+
+  output_dt <- output_dt[
+  get(year_colname) %in% reference_years_vector
+]
+
+  return(output_dt)
+}
+
+#' Transform a wide-format data table containing cycle coverage columns into a cleaned long-format table, extract coverage percentages from column names and keep the maximum percentage covered per group
+#' @param input_dt dt in wide format containing:
+#' @param space_colname name of the spatial grouping column
+#' @param time_colname name of the temporalgrouping column
+#' @return dt in long format with columns space_colname}{Spatial identifier column.}
+#'   \item{time_colname}{Temporal identifier column.}
+#'   \item{num_cycles}{Number of cycles (non-missing values only).}
+#'   \item{max_pct_covered}{Maximum extracted percentage per group.}
+#' }
+prep_cycles_long <- function(input_dt, space_colname, time_colname){
+  output_dt <- melt(
+    data=input_dt,
+    id.vars=c(space_colname, time_colname),
+    variable.name="category",
+    value.name="num_cycles"
+  )
+
+  # extract the number covered as integer, from the "category" column
+  output_dt[,max_pct_covered:= as.integer(sub(".*?(\\d+).*", "\\1", category))]
+
+  # remove the original "category" column
+  output_dt[, category :=NULL]
+
+  # remove rows with missing number of cycles
+  output_dt <- output_dt[
+    !is.na(num_cycles)
+  ]
+
+  # keep only the maximum number of cases covered, for each number of cycles
+  output_dt <- output_dt[, .(max_pct_covered = max(max_pct_covered)), by=c(space_colname, time_colname, "num_cycles")]
+
+  return(output_dt)
+}
+
+#' Fill missing values in long-format cycles data
+#' @param input_dt df/dt in long format containing spatial, temporal, ordering and value columns
+#' @param spatial_colname name of the spatial grouping column
+#' @param temporal_colname name of the temporal grouping column
+#' @param order_colname column for within-group ordering (determines the sequence for LOCF filling)
+#' @param value_colname column containing values to be filled
+#'
+#' @return dt with missing values in value_colname, filled using last observation carried forward within groups
+fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, order_colname, value_colname){
+	output_dt <- copy(as.data.table(input_dt))
+	
+	# ensure correct order before filling
+	setorderv(
+	  output_dt,
+	  c(spatial_colname, temporal_colname, order_colname),
+	  c(1L, 1L, 1L)
+	)
+
+	output_dt[, (value_colname) := nafill(get(value_colname), type = "locf"), by = c(spatial_colname, temporal_colname)]
+
+}
+
+#' Make a choropleth map from an sf object
+#'
+#' @param spatial_df sf object containing geometries and the variable map
+#' @param target_colname name of the column to use for the fill aesthetic
+#' @param map_colors vector of colors to scale_fill_manual with names that match the levels of the target variable
+#' @param plot_title plot title
+#' @param legend_title legend title
+#' @return map
+make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title, legend_title){
+  output_plot <- ggplot(spatial_df) +
+    geom_sf(aes(fill = get(target_colname)))+
+    coord_sf() +
+    scale_fill_manual(
+      legend_title,
+      values=map_colors
+    ) +
+    guides(fill=guide_legend(nrow = 2)) +
+    theme_void() +
+    theme(
+      plot.title = element_text(
+        family = "Helvetica",
+        # face = "bold",
+        hjust = 0.5
+      ),
+      legend.position = "bottom", legend.key.width = unit(2,"cm"),
+      legend.text=element_text(
+        family = "Helvetica",
+        size=10
+      )
+    ) +
+    labs(title=plot_title)
+
+  print(output_plot)
+  return(output_plot)
+ }
 
 
 #%% DHS ------------------------------

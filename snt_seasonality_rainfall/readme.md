@@ -61,7 +61,7 @@ The pipeline performs the following main operations:
     3. Flags the month in question as a valid start month for the respective administrative unit. This means that most of the year's rainfall falls within the {n}-month window beginning in that month and year
 5. **Classify administrative units as seasonal or non-seasonal**: for each administrative unit, the pipeline evaluates whether the it consistently exhibits this rainfall concentration pattern. For each month and block duration ({n}), the pipeline calculates the proportion of years in which that month was flagged as a valid start (from Step 4.3.). If this proportion exceeds the `proportion_seasonal_years_threshold`, the district is classified as seasonal for that block duration. This ensures that the classification reflects a recurring climatic pattern, rather than an isolated event.
  
-5. **Determine season duration**: Some districts may qualify as seasonal for multiple block lengths (such as both 4-month and 5-month windows). For each administrative unit, the pipeline compares all qualifying block durations {n} and selects the smallest one. This represents the shortest continuous period in which the required proportion of annual rainfall is concentrated.
+5. **Determine season duration**: Some districts may qualify as seasonal for multiple block lengths (such as both 4-month and 5-month windows). For each administrative unit, the pipeline compares all qualifying block durations {n} and selects the smallest one. This represents the shortest continuous period in which the required proportion of the total annual rainfall is concentrated.
 
 6. **Visualization**: The results of the classification and of the season duration (steps 5. and 6.) are plotted as choropleth maps.
 

@@ -1,5 +1,8 @@
+import re
 from pathlib import Path
+
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
+
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
@@ -9,6 +12,30 @@ from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     save_pipeline_parameters,
 )
+
+
+def _find_latest_worldpop_raster(root_path: Path, country_code: str) -> tuple[Path | None, int | None]:
+    """Find the most recent WorldPop PPP raster for a country in data/worldpop/raw/.
+
+    Looks for files {COUNTRY}_worldpop_ppp_*.tif (excluding _UNadj). Returns (path, year)
+    for the file with the highest year, or (None, None) if none found.
+    """
+    raw_dir = root_path / "data" / "worldpop" / "raw"
+    if not raw_dir.is_dir():
+        return None, None
+    country_upper = country_code.upper()
+    pattern = re.compile(rf"^{re.escape(country_upper)}_worldpop_ppp_(\d+)\.tif$")
+    candidates: list[tuple[Path, int]] = []
+    for p in raw_dir.iterdir():
+        if not p.is_file() or p.suffix.lower() != ".tif" or "_UNadj" in p.name:
+            continue
+        m = pattern.match(p.name)
+        if m:
+            candidates.append((p, int(m.group(1))))
+    if not candidates:
+        return None, None
+    best = max(candidates, key=lambda x: x[1])
+    return best[0], best[1]
 
 
 @pipeline("snt_healthcare_access")
@@ -99,11 +126,25 @@ def snt_healthcare_access(
         # get country identifier for naming
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
 
+        # Population raster: use selected file, or by default the most recent WorldPop (by year) in data/worldpop/raw/
+        if input_pop_file is not None:
+            pop_file_path = input_pop_file.path
+        else:
+            path_found, year_found = _find_latest_worldpop_raster(snt_root_path, country_code)
+            if path_found is not None:
+                pop_file_path = str(path_found)
+                current_run.log_info(
+                    f"No raster selected; using latest WorldPop: {path_found.name} (year {year_found})"
+                )
+            else:
+                # No dataset fallback: we only use data/worldpop/raw/ (from WorldPop extract in this workspace).
+                pop_file_path = None
+
         if not run_report_only:
             input_params = {
                 "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
                 "RADIUS_METERS": input_radius_meters,
-                "POP_FILE": input_pop_file.path if input_pop_file is not None else None,
+                "POP_FILE": pop_file_path,
             }
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",

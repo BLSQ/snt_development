@@ -1641,3 +1641,94 @@ get_updated_children <- function(new_level_table, group_table, level, target_lev
     }
     return(child_updated)
 }
+
+
+## Handle Scales and Breaks in Reporting notebooks ----------------------------------------------
+
+### Evaluate "type" of scale (percentage, proportion, else ... ) --------------------------------
+
+#' Parse and evaluate the scale of metadata breaks or data vectors
+#'
+#' @param x Either the raw scale metadata from the config, or the numeric data vector.
+#' @param type Either "metadata" or "data"
+#' @return If type="metadata", returns a list with `break_vals` and `scale_type`. If type="data", returns a string for the `scale_type`.
+check_scale <- function(x, type = c("metadata", "data")) {
+  type <- match.arg(type)
+  
+  if (type == "metadata") {
+    # Handle missing or empty scale_raw
+    if (is.null(x) || length(x) == 0) {
+      break_vals <- c(0.5, 0.8, 0.9, 0.95, 1.00)
+      log_msg(paste0("[WARNING] No break values found in metadata. Using default values : ", 
+                     paste(break_vals, collapse = ", ")), "warning")
+      return(list(break_vals = break_vals, scale_type = "proportion"))
+    }
+    
+    # Parse the metadata (supports both JSON string and parsed array)
+    if (is.character(x) && length(x) == 1) {
+      break_vals <- as.numeric(jsonlite::fromJSON(x))
+    } else {
+      break_vals <- as.numeric(unlist(x))
+    }
+    
+    # Evaluate metadata scale type
+    if (all(break_vals > 0 & break_vals <= 1)) {
+      scale_type <- "proportion"
+      log_msg(paste0("Scale break values loaded: ", paste(break_vals, collapse = ", "), 
+                     ". Scale break values are in the range of 0 to 1 (proportion)."))
+    } else if (all(break_vals > 0 & break_vals <= 100)) {
+      scale_type <- "percentage"
+      log_msg(paste0("Scale break values loaded: ", paste(break_vals, collapse = ", "), 
+                     ". Scale break values are in the range of 0 to 100 (percentage)."))
+    } else {
+      scale_type <- "other"
+      log_msg(paste0("Scale break values loaded: ", paste(break_vals, collapse = ", ")))
+    }
+    
+    return(list(break_vals = break_vals, scale_type = scale_type))
+    
+  } else if (type == "data") {
+    # Evaluate data scale type
+    min_val <- min(x, na.rm = TRUE)
+    max_val <- max(x, na.rm = TRUE)
+    
+    if (min_val >= 0 & max_val <= 1) {
+      return("proportion")
+    } else if (min_val >= 0 & max_val <= 100) {
+      return("percentage")
+    } else {
+      return("other")
+    }
+  }
+}
+
+
+### Compare and adjust metadata break values to match data scale --------------------------------
+
+#' Compare and adjust metadata break values to match data scale
+#'
+#' @param break_vals Numeric vector of current break values
+#' @param metadata_scale_type String indicating metadata scale ("proportion", "percentage", "other")
+#' @param data_scale_type String indicating data scale ("proportion", "percentage", "other")
+#' @return Adjusted `break_vals` vector
+fix_metadata_scale <- function(break_vals, metadata_scale_type, data_scale_type) {
+  if (metadata_scale_type == data_scale_type) {
+    log_msg(paste0("Metadata scale type (", metadata_scale_type, ") matches data scale type (", data_scale_type, ")."))
+    return(break_vals)
+  }
+  
+  log_msg(paste0("Metadata scale type (", metadata_scale_type, ") does NOT match data scale type (", data_scale_type, ")."), "warning")
+  
+  if (metadata_scale_type == "proportion" && data_scale_type == "percentage") {
+    break_vals <- break_vals * 100
+    log_msg(paste0("Converted metadata scale break values from proportion to percentage by multiplying by 100. New metadata scale break values: ", paste(break_vals, collapse = ", ")), "warning")
+  } else if (metadata_scale_type == "percentage" && data_scale_type == "proportion") {
+    break_vals <- break_vals / 100
+    log_msg(paste0("Converted metadata scale break values from percentage to proportion by dividing by 100. New metadata scale break values: ", paste(break_vals, collapse = ", ")), "warning")
+  } else {
+    log_msg("Warning: Metadata scale type cannot be easily converted to match data scale type! This will affect the display of the data in the report (plots)!", "warning")
+  }
+  
+  return(break_vals)
+}
+

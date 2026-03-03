@@ -15,122 +15,60 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_dhis2_outliers_detection_mg")
 @parameter(
-    "run_mg_partial",
-    name="Run magic glasses partial method (up to MAD10)",
-    help="Identifies outliers based on MAD15 and removes them, then identifies outliers based on MAD10",
-    type=bool,
-    default=True,
-    required=False,
-)
-@parameter(
-    "run_mg_complete",
-    name="Run magic glasses complete method (up to seasonal3)",
-    help="Picks up from magic glasses partial, and then applies seasonal 5 and seasonal 3",
-    type=bool,
-    default=False,
-    required=False,
-)
-@parameter(
-    "deviation_mad15",
-    name="MAD deviation first pass",
-    help="Number of MAD used for the first MG partial pass (default: 15).",
-    type=int,
-    default=15,
-    required=False,
-)
-@parameter(
-    "deviation_mad10",
-    name="MAD deviation second pass",
-    help="Number of MAD used for the second MG partial pass (default: 10).",
-    type=int,
-    default=10,
-    required=False,
-)
-@parameter(
-    "deviation_seasonal5",
-    name="Seasonal deviation first pass",
-    help="Deviation threshold for first seasonal pass in MG complete (default: 5).",
-    type=int,
-    default=5,
-    required=False,
-)
-@parameter(
-    "deviation_seasonal3",
-    name="Seasonal deviation second pass",
-    help="Deviation threshold for second seasonal pass in MG complete (default: 3).",
-    type=int,
-    default=3,
-    required=False,
-)
-@parameter(
-    "seasonal_workers",
-    name="Seasonal workers",
-    help="Number of workers for seasonal outlier detection when MG complete is enabled.",
-    type=int,
-    default=1,
+    "mode",
+    name="Mode de détection",
+    help="Partial = rapide (MAD15 puis MAD10). Complete = idem + détection saisonnière (plus long).",
+    type=str,
+    default="partial",
     required=False,
 )
 @parameter(
     "dev_subset",
-    name="Use dev subset",
-    help="If enabled, run on a subset of ADM1 values to speed up debugging.",
+    name="Limiter aux 2 premières régions (debug)",
+    help="Réduit les données à 2 ADM1 pour tester plus vite.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
-    "dev_subset_adm1_n",
-    name="Dev subset ADM1 count",
-    help="Number of ADM1 values to keep when dev subset is enabled.",
-    type=int,
-    default=2,
-    required=False,
-)
-@parameter(
     "push_db",
-    name="Push outliers table to DB",
-    help="Push outliers table to DB for the Shiny app.",
+    name="Pousser vers la base Shiny",
+    help="Envoie la table outliers vers la base pour l’app Shiny.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "run_report_only",
-    name="Run reporting only",
-    help="This will only execute the reporting notebook",
+    name="Rapport uniquement",
+    help="Exécute seulement le notebook de rapport (sans recalcul).",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "pull_scripts",
-    name="Pull Scripts",
-    help="Pull the latest scripts from the repository",
+    name="Mettre à jour les scripts",
+    help="Récupère les derniers scripts du dépôt avant exécution.",
     type=bool,
     default=False,
     required=False,
 )
 def snt_dhis2_outliers_detection_mg(
-    run_mg_partial: bool,
-    run_mg_complete: bool,
-    deviation_mad15: int,
-    deviation_mad10: int,
-    deviation_seasonal5: int,
-    deviation_seasonal3: int,
-    seasonal_workers: int,
+    mode: str,
     dev_subset: bool,
-    dev_subset_adm1_n: int,
     push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
     """Dedicated Magic Glasses outliers detection pipeline for SNT DHIS2 data."""
-    if not run_mg_partial and not run_mg_complete:
-        raise ValueError("At least one MG mode must be enabled: run_mg_partial or run_mg_complete.")
-    if seasonal_workers < 1:
-        raise ValueError("seasonal_workers must be >= 1.")
-    if dev_subset_adm1_n < 1:
-        raise ValueError("dev_subset_adm1_n must be >= 1.")
+    mode_clean = (mode or "partial").strip().lower()
+    if mode_clean not in ("partial", "complete"):
+        raise ValueError('mode must be "partial" or "complete".')
+    run_mg_partial = True
+    run_mg_complete = mode_clean == "complete"
+    dev_subset_adm1_n = 2
+    seasonal_workers = 1  # défaut : exécution séquentielle de la détection saisonnière
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -162,10 +100,10 @@ def snt_dhis2_outliers_detection_mg(
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
                 "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                 "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
-                "DEVIATION_MAD15": deviation_mad15,
-                "DEVIATION_MAD10": deviation_mad10,
-                "DEVIATION_SEASONAL5": deviation_seasonal5,
-                "DEVIATION_SEASONAL3": deviation_seasonal3,
+                "DEVIATION_MAD15": 15,
+                "DEVIATION_MAD10": 10,
+                "DEVIATION_SEASONAL5": 5,
+                "DEVIATION_SEASONAL3": 3,
                 "SEASONAL_WORKERS": seasonal_workers,
                 "DEV_SUBSET": dev_subset,
                 "DEV_SUBSET_ADM1_N": dev_subset_adm1_n,

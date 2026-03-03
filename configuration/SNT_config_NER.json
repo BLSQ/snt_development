@@ -15,6 +15,7 @@
 		"DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate", 
 		"DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
 		"DHIS2_INCIDENCE": "snt-dhis2-incidence",
+		"DHIS2_QUALITY_OF_CARE": "snt-dhis2-quality-of-care",
 		"DHS_INDICATORS": "snt-dhs-indicators",
 		"WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
 		"SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",

@@ -16,40 +16,41 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_dhis2_outliers_detection_mg")
 @parameter(
     "mode",
-    name="Mode de détection",
-    help="Partial = rapide (MAD15 puis MAD10). Complete = idem + détection saisonnière (plus long).",
+    name="Detection mode",
+    help="Partial = fast (MAD15 then MAD10). Complete = same + seasonal detection (longer).",
     type=str,
     default="partial",
     required=False,
+    choices=["partial", "complete"],
 )
 @parameter(
     "dev_subset",
-    name="Limiter aux 2 premières régions (debug)",
-    help="Réduit les données à 2 ADM1 pour tester plus vite.",
+    name="Limit to first 2 regions (debug)",
+    help="Restrict data to 2 ADM1 for faster testing.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "push_db",
-    name="Pousser vers la base Shiny",
-    help="Envoie la table outliers vers la base pour l’app Shiny.",
+    name="Push to Shiny database",
+    help="Send the outliers table to the database for the Shiny app.",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "run_report_only",
-    name="Rapport uniquement",
-    help="Exécute seulement le notebook de rapport (sans recalcul).",
+    name="Report only",
+    help="Run only the reporting notebook (no recomputation).",
     type=bool,
     default=False,
     required=False,
 )
 @parameter(
     "pull_scripts",
-    name="Mettre à jour les scripts",
-    help="Récupère les derniers scripts du dépôt avant exécution.",
+    name="Update scripts",
+    help="Pull the latest scripts from the repository before running.",
     type=bool,
     default=False,
     required=False,
@@ -68,7 +69,7 @@ def snt_dhis2_outliers_detection_mg(
     run_mg_partial = True
     run_mg_complete = mode_clean == "complete"
     dev_subset_adm1_n = 2
-    seasonal_workers = 1  # défaut : exécution séquentielle de la détection saisonnière
+    seasonal_workers = 1  # default: sequential execution of seasonal detection
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")

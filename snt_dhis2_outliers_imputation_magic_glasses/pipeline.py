@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
@@ -17,19 +18,11 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "mode",
     name="Detection mode",
-    help="Partial = fast (~7 min, MAD15 then MAD10). Complete = same + seasonal detection; very slow, can take several hours.",
+    help="Partial: fast (~7 min, MAD15 then MAD10). Complete: Partial + seasonal detection, can take several hours.",
     type=str,
     default="partial",
     required=False,
     choices=["partial", "complete"],
-)
-@parameter(
-    "dev_subset",
-    name="Limit to first 2 regions (debug)",
-    help="Restrict data to 2 ADM1 for faster testing.",
-    type=bool,
-    default=False,
-    required=False,
 )
 @parameter(
     "push_db",
@@ -57,7 +50,6 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_dhis2_outliers_imputation_magic_glasses(
     mode: str,
-    dev_subset: bool,
     push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
@@ -68,11 +60,14 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         raise ValueError('mode must be "partial" or "complete".')
     run_mg_partial = True
     run_mg_complete = mode_clean == "complete"
+    current_run.log_info(f"Selected detection mode: {mode_clean}")
+    current_run.log_info(
+        f"Flags => RUN_MAGIC_GLASSES_PARTIAL={run_mg_partial}, RUN_MAGIC_GLASSES_COMPLETE={run_mg_complete}"
+    )
     if run_mg_complete:
         current_run.log_warning(
             "Complete mode selected: seasonal detection is very slow and can take several hours to run."
         )
-    dev_subset_adm1_n = 2
     seasonal_workers = 1  # default: sequential execution of seasonal detection
 
     if pull_scripts:
@@ -101,6 +96,12 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
+            # Avoid publishing stale artifacts from previous runs.
+            for old_file in data_path.glob(f"{country_code}_flagged_outliers_magic_glasses.parquet"):
+                old_file.unlink(missing_ok=True)
+            for old_file in data_path.glob(f"{country_code}_outlier_magic_glasses_*.parquet"):
+                old_file.unlink(missing_ok=True)
+
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
                 "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
@@ -110,9 +111,8 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 "DEVIATION_SEASONAL5": 5,
                 "DEVIATION_SEASONAL3": 3,
                 "SEASONAL_WORKERS": seasonal_workers,
-                "DEV_SUBSET": dev_subset,
-                "DEV_SUBSET_ADM1_N": dev_subset_adm1_n,
             }
+            run_start_ts = time.time()
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_magic_glasses.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -122,6 +122,19 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 country_code=country_code,
             )
 
+            partial_file = data_path / f"{country_code}_outlier_magic_glasses_partial.parquet"
+            complete_file = data_path / f"{country_code}_outlier_magic_glasses_complete.parquet"
+            if not partial_file.exists() or partial_file.stat().st_mtime < run_start_ts:
+                raise RuntimeError(
+                    "Partial output file was not generated during this run."
+                )
+            if run_mg_complete and (
+                not complete_file.exists() or complete_file.stat().st_mtime < run_start_ts
+            ):
+                raise RuntimeError(
+                    "Complete mode selected but complete seasonal output was not generated during this run."
+                )
+
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_outliers_imputation_magic_glasses",
                 parameters=input_params,
@@ -129,15 +142,14 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 country_code=country_code,
             )
 
-            mg_files = [
-                *data_path.glob(f"{country_code}_flagged_outliers_magic_glasses.parquet"),
-                *data_path.glob(f"{country_code}_outlier_magic_glasses_*.parquet"),
-                parameters_file,
-            ]
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
                 country_code=country_code,
-                file_paths=mg_files,
+                file_paths=[
+                    *data_path.glob(f"{country_code}_flagged_outliers_magic_glasses.parquet"),
+                    *data_path.glob(f"{country_code}_outlier_magic_glasses_*.parquet"),
+                    parameters_file,
+                ],
             )
 
             if push_db:

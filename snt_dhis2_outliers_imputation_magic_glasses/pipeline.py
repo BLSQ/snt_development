@@ -13,7 +13,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("snt_dhis2_outliers_detection_mg")
+@pipeline("snt_dhis2_outliers_imputation_magic_glasses")
 @parameter(
     "mode",
     name="Detection mode",
@@ -55,7 +55,7 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_outliers_detection_mg(
+def snt_dhis2_outliers_imputation_magic_glasses(
     mode: str,
     dev_subset: bool,
     push_db: bool,
@@ -78,16 +78,16 @@ def snt_dhis2_outliers_detection_mg(
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
         pull_scripts_from_repository(
-            pipeline_name="snt_dhis2_outliers_detection_mg",
-            report_scripts=["snt_dhis2_outliers_detection_mg_report.ipynb"],
-            code_scripts=["snt_dhis2_outliers_detection_mg.ipynb"],
+            pipeline_name="snt_dhis2_outliers_imputation_magic_glasses",
+            report_scripts=["snt_dhis2_outliers_imputation_magic_glasses_report.ipynb"],
+            code_scripts=["snt_dhis2_outliers_imputation_magic_glasses.ipynb"],
         )
 
     try:
-        current_run.log_info("Starting SNT DHIS2 dedicated Magic Glasses outliers pipeline...")
+        current_run.log_info("Starting SNT DHIS2 Magic Glasses outliers pipeline...")
 
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_detection_mg"
+        pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_magic_glasses"
         data_path = root_path / "data" / "dhis2" / "outliers_detection"
 
         pipeline_path.mkdir(parents=True, exist_ok=True)
@@ -114,7 +114,7 @@ def snt_dhis2_outliers_detection_mg(
                 "DEV_SUBSET_ADM1_N": dev_subset_adm1_n,
             }
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_detection_mg.ipynb",
+                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_magic_glasses.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
@@ -123,7 +123,7 @@ def snt_dhis2_outliers_detection_mg(
             )
 
             parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_outliers_detection_mg",
+                pipeline_name="snt_dhis2_outliers_imputation_magic_glasses",
                 parameters=input_params,
                 output_path=data_path,
                 country_code=country_code,
@@ -152,13 +152,13 @@ def snt_dhis2_outliers_detection_mg(
             current_run.log_info("Skipping calculations, running only the reporting notebook.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_detection_mg_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_magic_glasses_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
 
-        current_run.log_info("Dedicated MG pipeline finished successfully.")
+        current_run.log_info("Magic Glasses pipeline finished successfully.")
 
     except Exception as e:
         current_run.log_error(f"Notebook execution failed: {e}")
@@ -166,4 +166,4 @@ def snt_dhis2_outliers_detection_mg(
 
 
 if __name__ == "__main__":
-    snt_dhis2_outliers_detection_mg()
+    snt_dhis2_outliers_imputation_magic_glasses()

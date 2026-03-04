@@ -17,7 +17,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "mode",
     name="Detection mode",
-    help="Partial = fast (MAD15 then MAD10). Complete = same + seasonal detection (longer).",
+    help="Partial = fast (~7 min, MAD15 then MAD10). Complete = same + seasonal detection; very slow, can take several hours.",
     type=str,
     default="partial",
     required=False,
@@ -68,6 +68,10 @@ def snt_dhis2_outliers_detection_mg(
         raise ValueError('mode must be "partial" or "complete".')
     run_mg_partial = True
     run_mg_complete = mode_clean == "complete"
+    if run_mg_complete:
+        current_run.log_warning(
+            "Complete mode selected: seasonal detection is very slow and can take several hours to run."
+        )
     dev_subset_adm1_n = 2
     seasonal_workers = 1  # default: sequential execution of seasonal detection
 

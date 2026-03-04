@@ -49,7 +49,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pull_scripts",
-    name="Update scripts",
+    name="Pull scripts",
     help="Pull the latest scripts from the repository before running.",
     type=bool,
     default=False,

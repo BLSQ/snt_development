@@ -470,52 +470,77 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 #%% SEASONALITY -------------------------------------------------------------------
    
 #############
-compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_threshold = 0.6) {
-  #' create forward-looking month blocks summing values based on the WHO month-block reasoning for seasonality computation - allows for different block sizes
+compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, 
+                                      admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', 
+                                      proportion_threshold = 0.6, 
+                                      use_calendar_year_denominator = FALSE) {
+  #' Compute month-level seasonality indicators using forward-looking month blocks.
+  #' This function implements the WHO month-block reasoning for seasonality computation.
+  #' 
   #' @param input_dt an input data table (or data frame)
   #' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
   #' @param values_colname the indicator column, on which the computations are made
   #' @param vector_of_durations the vector with the number of months in a block (3/4/5)
-  #' @param admin_colname the administrative units to group 
+  #' @param admin_colname the administrative units to group
   #' @param year_colname year grouping column
-  #' @param montn_colname month grouping column
+  #' @param month_colname month grouping column
   #' @param proportion_threshold the proportion of indicator which needs to occur in a block, to qualify for seasonality
-  #' @return an output data table with the additional column
+  #' @param use_calendar_year_denominator Logical. If TRUE, uses the total accumulated value of the current 
+  #'        calendar year (Jan-Dec) as the denominator. If FALSE (default), uses the 12-month forward-looking 
+  #'        sliding window as denominator (WHO approach).
+  #' @return an output data table with the additional columns for seasonality indicators
 
   indicator <- toupper(indicator)
   dt <- copy(as.data.table(input_dt))
-  
+   
   # ensure correct order
   dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
-  
-  # denominator: 12-month forward-looking sliding sum (left-aligned)
-  denominator_colname <- paste(indicator, "SUM", 12, "MTH", "FW", sep = "_")
-  dt[, (denominator_colname) := frollsum(get(values_colname),
-                                n = 12,
-                                align = "left",
-                                na.rm = TRUE),
-     by = admin_colname]
-  
-  # numerators for each of the durations (forward-looking)
+   
+  # ---------------------------------------------------------
+  # DENOMINATOR CALCULATION
+  # ---------------------------------------------------------
+  if (use_calendar_year_denominator) {
+    # Alternative Approach: Total accumulated value for the current calendar year (Jan-Dec)
+    denominator_colname <- paste(indicator, "SUM_CALENDAR_YEAR", sep = "_")
+    
+    dt[, (denominator_colname) := sum(get(values_colname), na.rm = TRUE), 
+       by = c(admin_colname, year_colname)]
+       
+  } else {
+    # Original Approach (WHO): 12-month forward-looking sliding sum (left-aligned)
+    denominator_colname <- paste(indicator, "SUM", 12, "MTH", "FW", sep = "_")
+    
+    dt[, (denominator_colname) := frollsum(get(values_colname),
+                                           n = 12,
+                                           align = "left",
+                                           na.rm = TRUE),
+       by = admin_colname]
+  }
+   
+  # ---------------------------------------------------------
+  # NUMERATOR & RATIO CALCULATIONS
+  # ---------------------------------------------------------
   for (n in vector_of_durations) {
     numerator_colname  <- paste(indicator, "SUM", n, "MTH", "FW", sep = "_")
     prop_name <- paste(indicator, n, "MTH", "ROW", "PROP", sep = "_")
     seasonality_colname <- paste(indicator, n, "MTH", "ROW", "SEASONALITY", sep = "_")
-    
+     
+    # Calculate numerator: Rolling sum of next n months
     dt[, (numerator_colname) := frollsum(get(values_colname),
-                                n = n,
-                                align = "left",
-                                na.rm = TRUE),
+                                         n = n,
+                                         align = "left",
+                                         na.rm = TRUE),
        by = admin_colname]
-    
+     
+    # Calculate Proportion: Numerator / Denominator
     dt[, (prop_name) := 
-          # make NA's where it would be division by zero
           fifelse(get(denominator_colname) > 0, get(numerator_colname) / get(denominator_colname), NA_real_)]
-    
+     
+    # Calculate Seasonality Flag
     dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
-                                   get(prop_name) >= proportion_threshold)]
+                                             get(prop_name) >= proportion_threshold)]
   }
-  
+   
   # return the data
   dt[]
 }

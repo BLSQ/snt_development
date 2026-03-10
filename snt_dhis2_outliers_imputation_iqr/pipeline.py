@@ -1,4 +1,5 @@
 from pathlib import Path
+import tempfile
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
@@ -11,6 +12,68 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
     create_outliers_db_table,
 )
+
+
+def preserve_and_add_files_to_dataset(
+    dataset_id: str,
+    country_code: str,
+    new_files: list[Path],
+    method_prefix: str,
+):
+    """
+    Add new files to dataset while preserving existing files from other methods.
+    
+    Args:
+        dataset_id: Dataset identifier
+        country_code: Country code
+        new_files: List of new file paths to add
+        method_prefix: Prefix pattern to identify files from this method (e.g., "mean", "median", "magic_glasses")
+    """
+    try:
+        dataset = workspace.get_dataset(dataset_id)
+        latest_version = dataset.latest_version
+        existing_files = latest_version.list_files()
+        
+        # Filter out files from this method but keep others
+        preserved_files = []
+        for file_obj in existing_files:
+            filename = file_obj.name
+            
+            # Determine if this file belongs to the current method
+            is_current_method = False
+            if method_prefix == "magic_glasses":
+                # Magic Glasses files: flagged_outliers_magic_glasses.parquet, outlier_magic_glasses_*.parquet
+                is_current_method = (
+                    filename == f"{country_code}_flagged_outliers_magic_glasses.parquet" or
+                    filename.startswith(f"{country_code}_outlier_magic_glasses_")
+                )
+            else:
+                # Other methods: routine_outliers-{method}*.parquet
+                is_current_method = filename.startswith(f"{country_code}_routine_outliers-{method_prefix}")
+            
+            # Preserve files from other methods
+            if not is_current_method:
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp_file:
+                        tmp_path = Path(tmp_file.name)
+                        file_obj.download(tmp_path)
+                        preserved_files.append(tmp_path)
+                        current_run.log_info(f"Preserving existing file: {filename}")
+                except Exception as e:
+                    current_run.log_warning(f"Could not preserve file {filename}: {e}")
+        
+        # Combine preserved files with new files
+        all_files = preserved_files + new_files
+        current_run.log_info(f"Adding {len(new_files)} new files and preserving {len(preserved_files)} existing files")
+    except Exception as e:
+        current_run.log_warning(f"Could not preserve existing files, adding only new files: {e}")
+        all_files = new_files
+    
+    add_files_to_dataset(
+        dataset_id=dataset_id,
+        country_code=country_code,
+        file_paths=all_files,
+    )
 
 
 @pipeline("snt_dhis2_outliers_imputation_iqr")
@@ -100,10 +163,15 @@ def snt_dhis2_outliers_imputation_iqr(
             )
 
             iqr_files = list(data_path.glob(f"{country_code}_routine_outliers-iqr*.parquet"))
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
+            new_files = [*iqr_files, parameters_file]
+            
+            # Preserve existing files from other methods and add new ones
+            dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+            preserve_and_add_files_to_dataset(
+                dataset_id=dataset_id,
                 country_code=country_code,
-                file_paths=[*iqr_files, parameters_file],
+                new_files=new_files,
+                method_prefix="iqr",
             )
 
             if push_db:

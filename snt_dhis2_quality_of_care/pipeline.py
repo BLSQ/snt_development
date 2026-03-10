@@ -18,7 +18,7 @@ from snt_lib.snt_pipeline_utils import (
     name="Outlier imputation method",
     help="Choose which outlier detection/imputation method to use.",
     type=str,
-    choices=["mean", "median", "iqr", "trend"],
+    choices=["mean", "median", "iqr", "trend", "mg-partial", "mg-complete"],
     default="mean",
     required=True,
 )

@@ -8,8 +8,13 @@ Parameters
 
   outlier_imputation_method (String, required)
     Name: Outlier imputation method
-    Description: Select which imputed routine file to load from DHIS2_OUTLIERS_IMPUTATION.
-    Choices/Default: mean, median, iqr, trend, mg-partial, mg-complete. Default: mean.
+    Description: Select which outlier detection/imputation method to use.
+    Choices/Default: mean, median, iqr, trend. Default: mean.
+
+  data_action (String, required)
+    Name: Data action
+    Description: Choose whether to use imputed data (outliers replaced) or removed data (outliers removed).
+    Choices/Default: imputed, removed. Default: imputed.
 
   run_report_only (Boolean, optional)
     Name: Run reporting only

@@ -12,7 +12,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("snt_quality_of_care")
+@pipeline("snt_dhis2_quality_of_care")
 @parameter(
     "outlier_imputation_method",
     name="Outlier imputation method",
@@ -47,7 +47,7 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_quality_of_care(
+def snt_dhis2_quality_of_care(
     outlier_imputation_method: str,
     data_action: str,
     run_report_only: bool,
@@ -57,7 +57,7 @@ def snt_quality_of_care(
     try:
         current_run.log_info("Starting SNT Quality of Care pipeline...")
         root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_quality_of_care"
+        pipeline_path = root_path / "pipelines" / "snt_dhis2_quality_of_care"
         data_path = root_path / "data" / "dhis2" / "quality_of_care"
         pipeline_path.mkdir(parents=True, exist_ok=True)
         data_path.mkdir(parents=True, exist_ok=True)
@@ -65,9 +65,9 @@ def snt_quality_of_care(
         if pull_scripts:
             current_run.log_info("Pulling pipeline scripts from repository.")
             pull_scripts_from_repository(
-                pipeline_name="snt_quality_of_care",
-                report_scripts=["snt_quality_of_care_report.ipynb"],
-                code_scripts=["snt_quality_of_care.ipynb"],
+                pipeline_name="snt_dhis2_quality_of_care",
+                report_scripts=["snt_dhis2_quality_of_care_report.ipynb"],
+                code_scripts=["snt_dhis2_quality_of_care.ipynb"],
             )
 
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
@@ -80,7 +80,7 @@ def snt_quality_of_care(
         }
 
         parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_quality_of_care",
+            pipeline_name="snt_dhis2_quality_of_care",
             parameters=nb_parameters,
             output_path=data_path,
             country_code=country_code,
@@ -88,7 +88,7 @@ def snt_quality_of_care(
 
         if not run_report_only:
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_quality_of_care.ipynb",
+                nb_path=pipeline_path / "code" / "snt_dhis2_quality_of_care.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=nb_parameters,
@@ -110,7 +110,7 @@ def snt_quality_of_care(
             current_run.log_info("Skipping computations, running only reporting notebook.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_quality_of_care_report.ipynb",
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_quality_of_care_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
@@ -123,4 +123,4 @@ def snt_quality_of_care(
 
 
 if __name__ == "__main__":
-    snt_quality_of_care()
+    snt_dhis2_quality_of_care()

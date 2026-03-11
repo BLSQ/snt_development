@@ -86,12 +86,8 @@ def snt_dhis2_quality_of_care(
             )
 
             files_to_dataset = [
-                data_path / f"{country_code}_quality_of_care_{data_action}.parquet",
-                data_path / f"{country_code}_quality_of_care_{data_action}.csv",
-                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.parquet",
-                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.csv",
-                data_path / f"{country_code}_quality_of_care_year_summary_{data_action}.parquet",
-                data_path / f"{country_code}_quality_of_care_year_summary_{data_action}.csv",
+                data_path / f"{country_code}_quality_of_care_district_year_imputed.parquet",
+                data_path / f"{country_code}_quality_of_care_district_year_imputed.csv",
                 parameters_file,
             ]
             existing_files = [f for f in files_to_dataset if f.exists()]

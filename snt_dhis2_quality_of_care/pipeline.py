@@ -14,15 +14,6 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_dhis2_quality_of_care")
 @parameter(
-    "outlier_imputation_method",
-    name="Outlier imputation method",
-    help="Choose which outlier detection/imputation method to use.",
-    type=str,
-    choices=["mean", "median", "iqr", "trend", "mg-partial", "mg-complete"],
-    default="mean",
-    required=True,
-)
-@parameter(
     "data_action",
     name="Data action",
     help="Choose whether to use imputed data (outliers replaced) or removed data (outliers removed).",
@@ -48,7 +39,6 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_quality_of_care(
-    outlier_imputation_method: str,
     data_action: str,
     run_report_only: bool,
     pull_scripts: bool,
@@ -75,7 +65,6 @@ def snt_dhis2_quality_of_care(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         nb_parameters = {
-            "outlier_imputation_method": outlier_imputation_method,
             "data_action": data_action,
         }
 
@@ -96,15 +85,24 @@ def snt_dhis2_quality_of_care(
                 country_code=country_code,
             )
 
+            files_to_dataset = [
+                data_path / f"{country_code}_quality_of_care_{data_action}.parquet",
+                data_path / f"{country_code}_quality_of_care_{data_action}.csv",
+                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.parquet",
+                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.csv",
+                data_path / f"{country_code}_quality_of_care_year_summary_{data_action}.parquet",
+                data_path / f"{country_code}_quality_of_care_year_summary_{data_action}.csv",
+                parameters_file,
+            ]
+            existing_files = [f for f in files_to_dataset if f.exists()]
+            missing_files = [f for f in files_to_dataset if not f.exists()]
+            for missing in missing_files:
+                current_run.log_warning(f"Output file not found, skipped for dataset upload: {missing}")
+
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_QUALITY_OF_CARE"],
                 country_code=country_code,
-                file_paths=[
-                    data_path / f"{country_code}_quality_of_care_{outlier_imputation_method}_{data_action}.parquet",
-                    data_path / f"{country_code}_quality_of_care_{outlier_imputation_method}_{data_action}.csv",
-                    data_path / f"{country_code}_quality_of_care_{outlier_imputation_method}_{data_action}.xlsx",
-                    parameters_file,
-                ],
+                file_paths=existing_files,
             )
         else:
             current_run.log_info("Skipping computations, running only reporting notebook.")

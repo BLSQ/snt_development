@@ -86,8 +86,8 @@ def snt_dhis2_quality_of_care(
             )
 
             files_to_dataset = [
-                data_path / f"{country_code}_quality_of_care_district_year_imputed.parquet",
-                data_path / f"{country_code}_quality_of_care_district_year_imputed.csv",
+                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.parquet",
+                data_path / f"{country_code}_quality_of_care_district_year_{data_action}.csv",
                 parameters_file,
             ]
             existing_files = [f for f in files_to_dataset if f.exists()]
@@ -95,11 +95,14 @@ def snt_dhis2_quality_of_care(
             for missing in missing_files:
                 current_run.log_warning(f"Output file not found, skipped for dataset upload: {missing}")
 
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_QUALITY_OF_CARE"],
-                country_code=country_code,
-                file_paths=existing_files,
-            )
+            if existing_files:
+                add_files_to_dataset(
+                    dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_QUALITY_OF_CARE"],
+                    country_code=country_code,
+                    file_paths=existing_files,
+                )
+            else:
+                current_run.log_warning("No output files found for dataset upload.")
         else:
             current_run.log_info("Skipping computations, running only reporting notebook.")
 

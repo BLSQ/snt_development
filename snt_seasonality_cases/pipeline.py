@@ -15,25 +15,25 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_minimum_month_block_size",
     name="Minimum number of months per block",
-    help="",
+    help="Minimum duration of the seasonal block (in months). Used only when running the full pipeline.",
     type=int,
     choices=[3, 4, 5],
-    default=4,
+    default=3,
     required=True,
 )
 @parameter(
     "get_maximum_month_block_size",
     name="Maximum number of months per block",
-    help="",
+    help="Maximum duration of the seasonal block (in months). Used only when running the full pipeline.",
     type=int,
-    default=4,
+    default=5,
     choices=[3, 4, 5],
     required=True,
 )
 @parameter(
     "get_threshold_for_seasonality",
-    name="Minimal proportion of cases/cases for seasonality",
-    help="",
+    name="Minimal proportion of cases for seasonality",
+    help="The proportion of annual cases that must fall within the block to qualify as seasonal (e.g., 0.6 = 60%).",
     type=float,
     default=0.6,
     required=True,
@@ -41,15 +41,23 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_threshold_proportion_seasonal_years",
     name="Minimal proportion of seasonal years",
-    help="",
+    help="The proportion of years that must be classified as seasonal for an ADM2 to be considered seasonal overall.",
     type=float,
     default=0.5,
     required=False,
 )
 @parameter(
+    "use_calendar_year_denominator",
+    name="Use calendar year as denominator",
+    help="Method to define 'annual' cases for the denominator. FALSE (default): 12-month forward-looking sliding window (WHO approach). TRUE: calendar year (Jan-Dec).",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
-    help="This will only execute the reporting notebook",
+    help="Skip calculations and only execute the reporting notebook.",
     type=bool,
     default=False,
     required=False,
@@ -57,7 +65,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "pull_scripts",
     name="Pull scripts",
-    help="Pull the latest scripts from the repository",
+    help="Pull the latest scripts from the repository before execution.",
     type=bool,
     default=False,
     required=False,
@@ -67,14 +75,17 @@ def snt_seasonality_cases(
     get_maximum_month_block_size: int,
     get_threshold_for_seasonality: float,
     get_threshold_proportion_seasonal_years: float,
+    use_calendar_year_denominator: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Retrieve cases data by ADM2 level from DHIS2 dataset.
+    """Compute case seasonality indicators by ADM2 level using DHIS2 routine data.
 
-    Compute whether or not the admin unit qualifies as seasonal from a case perspective
-    Compute the minimal duration of the seasonal block (in months) for each district
-    Plot maps and save the output table to dataset
+    This pipeline classifies administrative units (ADM2) as seasonal or non-seasonal
+    based on confirmed malaria cases, determines the duration of their transmission season,
+    and identifies the onset month.
+
+    See the pipeline's README.md for detailed methodology and parameter explanations.
     """
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_seasonality_cases"
@@ -102,6 +113,7 @@ def snt_seasonality_cases(
                 "maximum_month_block_size": get_maximum_month_block_size,
                 "threshold_for_seasonality": get_threshold_for_seasonality,
                 "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
+                "use_calendar_year_denominator": use_calendar_year_denominator,
             }
             validate_parameters(input_params)
 
@@ -161,12 +173,15 @@ def validate_parameters(parameters: dict):
     TypeError: if integer parameter is not an integer
     """
     for current_parameter, current_value in parameters.items():
+        # Skip boolean parameters
+        if isinstance(current_value, bool):
+            continue
         if current_value < 0:
             raise ValueError("Please supply only positive values.")
         if current_parameter in ["minimum_periods", "minimum_month_block_size", "maximum_month_block_size"]:
             if not isinstance(current_value, int):
                 raise TypeError("Please supply integer values for number of months/periods.")
-        else:
+        elif current_parameter in ["threshold_for_seasonality", "threshold_proportion_seasonal_years"]:
             if current_value > 1:
                 raise ValueError("Proportions values should be between 0 and 1.")
 

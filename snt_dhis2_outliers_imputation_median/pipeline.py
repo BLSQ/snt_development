@@ -99,7 +99,7 @@ def snt_dhis2_outliers_imputation_median(
                 country_code=country_code,
             )
 
-            median_files = list(data_path.glob(f"{country_code}_routine_outliers-median*.parquet"))
+            median_files = list(data_path.glob(f"{country_code}_routine_outliers*.parquet"))
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
                 country_code=country_code,

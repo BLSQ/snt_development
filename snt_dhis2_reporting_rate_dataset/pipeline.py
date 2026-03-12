@@ -190,7 +190,7 @@ def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
     except KeyError as err:
         raise ValueError(f"Unknown outliers method: {outliers_method}") from err
 
-    return f"_routine_outliers-{suffix}{'_removed' if is_removed else '_imputed'}.parquet"
+    return f"_routine_outliers{'_removed' if is_removed else '_imputed'}.parquet"
 
 
 if __name__ == "__main__":

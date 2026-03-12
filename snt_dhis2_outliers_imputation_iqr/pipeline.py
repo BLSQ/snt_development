@@ -99,7 +99,7 @@ def snt_dhis2_outliers_imputation_iqr(
                 country_code=country_code,
             )
 
-            iqr_files = list(data_path.glob(f"{country_code}_routine_outliers-iqr*.parquet"))
+            iqr_files = list(data_path.glob(f"{country_code}_routine_outliers*.parquet"))
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
                 country_code=country_code,

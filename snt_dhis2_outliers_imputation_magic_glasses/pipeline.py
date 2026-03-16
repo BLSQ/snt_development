@@ -1,6 +1,8 @@
 from pathlib import Path
 import time
+import math
 
+import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
@@ -12,6 +14,62 @@ from snt_lib.snt_pipeline_utils import (
     save_pipeline_parameters,
     validate_config,
 )
+
+
+def _materialize_standard_outputs_from_legacy(
+    legacy_file: Path, output_dir: Path, country_code: str, use_complete_flag: bool
+) -> None:
+    """Build standard outliers outputs from legacy MG flagged table."""
+    df = pd.read_parquet(legacy_file)
+    flag_col = (
+        "OUTLIER_MAGIC_GLASSES_COMPLETE" if use_complete_flag else "OUTLIER_MAGIC_GLASSES_PARTIAL"
+    )
+    if flag_col not in df.columns:
+        raise RuntimeError(f"Legacy file does not contain expected flag column: {flag_col}")
+
+    fixed_cols = ["PERIOD", "YEAR", "MONTH", "ADM1_ID", "ADM2_ID", "OU_ID"]
+    required_cols = [*fixed_cols, "INDICATOR", "VALUE", flag_col]
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        raise RuntimeError(f"Legacy file missing required columns: {', '.join(missing)}")
+
+    # 1) detected subset
+    detected = df[df[flag_col] == True].copy()  # noqa: E712
+    detected.to_parquet(output_dir / f"{country_code}_routine_outliers_detected.parquet", index=False)
+
+    # 2) removed (set outliers to NA)
+    removed_long = df.copy()
+    removed_long.loc[removed_long[flag_col] == True, "VALUE"] = pd.NA  # noqa: E712
+
+    # 3) imputed (same approach as other pipelines: centered moving average n=3)
+    imputed_long = df.copy()
+    imputed_long["TO_IMPUTE"] = imputed_long["VALUE"].where(imputed_long[flag_col] != True, pd.NA)  # noqa: E712
+    sort_cols = ["ADM1_ID", "ADM2_ID", "OU_ID", "INDICATOR", "PERIOD", "YEAR", "MONTH"]
+    imputed_long = imputed_long.sort_values(sort_cols)
+
+    group_cols = ["ADM1_ID", "ADM2_ID", "OU_ID", "INDICATOR"]
+    moving_avg = (
+        imputed_long.groupby(group_cols)["TO_IMPUTE"]
+        .apply(lambda s: s.rolling(window=3, center=True, min_periods=3).mean())
+        .reset_index(level=group_cols, drop=True)
+    )
+    imputed_long["MOVING_AVG"] = moving_avg.apply(
+        lambda x: pd.NA if pd.isna(x) else float(math.ceil(x))
+    )
+    imputed_long["VALUE"] = imputed_long["TO_IMPUTE"].where(imputed_long["TO_IMPUTE"].notna(), imputed_long["MOVING_AVG"])
+
+    def _to_wide(dt: pd.DataFrame) -> pd.DataFrame:
+        wide = dt.pivot_table(
+            index=fixed_cols,
+            columns="INDICATOR",
+            values="VALUE",
+            aggfunc="first",
+        ).reset_index()
+        wide.columns.name = None
+        return wide
+
+    _to_wide(imputed_long).to_parquet(output_dir / f"{country_code}_routine_outliers_imputed.parquet", index=False)
+    _to_wide(removed_long).to_parquet(output_dir / f"{country_code}_routine_outliers_removed.parquet", index=False)
 
 
 @pipeline("snt_dhis2_outliers_imputation_magic_glasses")
@@ -131,10 +189,54 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 if (not path.exists() or path.stat().st_mtime < run_start_ts)
             ]
             if missing_outputs:
-                raise RuntimeError(
-                    "Expected output files were not generated during this run: "
-                    + ", ".join(missing_outputs)
+                # Fallback for legacy MG notebooks still writing legacy file names.
+                legacy_data_path = root_path / "data" / "dhis2" / "outliers_detection"
+                legacy_candidates = [
+                    data_path / f"{country_code}_flagged_outliers_magic_glasses.parquet",
+                    legacy_data_path / f"{country_code}_flagged_outliers_magic_glasses.parquet",
+                ]
+                legacy_file = next(
+                    (p for p in legacy_candidates if p.exists() and p.stat().st_mtime >= run_start_ts),
+                    None,
                 )
+
+                if legacy_file is not None:
+                    current_run.log_warning(
+                        "Legacy MG output detected. Rebuilding standard outputs from "
+                        f"{legacy_file}."
+                    )
+                    _materialize_standard_outputs_from_legacy(
+                        legacy_file=legacy_file,
+                        output_dir=data_path,
+                        country_code=country_code,
+                        use_complete_flag=run_mg_complete,
+                    )
+                    missing_outputs = [
+                        path.name
+                        for path in expected_outputs
+                        if (not path.exists() or path.stat().st_mtime < run_start_ts)
+                    ]
+
+                if missing_outputs:
+                    # Log available artifacts for quicker debugging.
+                    available_new = sorted(p.name for p in data_path.glob(f"{country_code}_*.parquet"))
+                    available_legacy = (
+                        sorted(p.name for p in legacy_data_path.glob(f"{country_code}_*.parquet"))
+                        if legacy_data_path.exists()
+                        else []
+                    )
+                    current_run.log_warning(
+                        "Available parquet files in outliers_imputation: "
+                        + (", ".join(available_new) if available_new else "none")
+                    )
+                    current_run.log_warning(
+                        "Available parquet files in outliers_detection: "
+                        + (", ".join(available_legacy) if available_legacy else "none")
+                    )
+                    raise RuntimeError(
+                        "Expected output files were not generated during this run: "
+                        + ", ".join(missing_outputs)
+                    )
 
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_outliers_imputation_magic_glasses",

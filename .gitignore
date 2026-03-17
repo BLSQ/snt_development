@@ -2,6 +2,7 @@ SNT_extract_changes.txt
 SNT Process/
 .vscode/
 venv/
+uv.lock
 
 # Jupyter stuff -------------------------
 

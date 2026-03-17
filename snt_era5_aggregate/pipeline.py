@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import geopandas as gpd
+import numpy as np
 import polars as pl
 import pandas as pd
 from openhexa.sdk import current_run, parameter, pipeline, workspace
@@ -260,14 +261,27 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
     pl.DataFrame
         Polars DataFrame with daily aggregated values for each boundary.
     """
-    # Filter out invalid/empty geometries before aggregation
-    # Check for valid geometries (not empty, not null, has area > 0)
-    valid_mask = (
-        boundaries.geometry.notna() 
-        & ~boundaries.geometry.is_empty 
-        & (boundaries.geometry.area > 0)
-    )
-    
+    # Ensure boundaries are in lon/lat degrees to match ERA5 grids.
+    # ERA5 datasets use WGS84 coordinates.
+    if boundaries.crs and boundaries.crs.to_string() != "EPSG:4326":
+        boundaries = boundaries.to_crs("EPSG:4326")
+
+    # Filter out null/empty geometries.
+    # For area checks, use an equal-area projection to avoid geographic CRS warnings.
+    area_geometries = boundaries.geometry
+    do_area_check = False
+    if boundaries.crs:
+        try:
+            area_geometries = boundaries.to_crs("EPSG:6933").geometry
+            do_area_check = True
+        except Exception:
+            # If reprojection fails, keep original geometries and skip strict area checks.
+            area_geometries = boundaries.geometry
+
+    valid_mask = boundaries.geometry.notna() & ~boundaries.geometry.is_empty
+    if do_area_check:
+        valid_mask = valid_mask & (area_geometries.area > 0)
+
     valid_boundaries = boundaries[valid_mask].copy()
     invalid_ids = boundaries[~valid_mask][column_uid].tolist()
     
@@ -301,6 +315,26 @@ def get_daily(input_dir: Path, boundaries: gpd.GeoDataFrame, variable: str, colu
 
         # build binary raster masks for each boundary geometry for spatial aggregation
         masks = build_masks(valid_boundaries, nrows, ncols, transform)
+
+        # Some geometries can be valid but still not overlap any ERA5 pixel.
+        # Keep only boundaries with at least 1 rasterized pixel to avoid empty reductions.
+        pixel_count = masks.reshape(masks.shape[0], -1).sum(axis=1)
+        non_empty_mask = pixel_count > 0
+
+        if not np.all(non_empty_mask):
+            skipped_ids = valid_boundaries.loc[~non_empty_mask, column_uid].tolist()
+            current_run.log_warning(
+                f"Skipping {len(skipped_ids)} geometries with no ERA5 pixel overlap: "
+                f"{skipped_ids[:10]}{'...' if len(skipped_ids) > 10 else ''}"
+            )
+            valid_boundaries = valid_boundaries.loc[non_empty_mask].copy()
+            masks = masks[non_empty_mask, :, :]
+
+        if len(valid_boundaries) == 0:
+            raise ValueError(
+                "No boundaries overlap ERA5 pixels after rasterization. "
+                "Check boundary shapes CRS and extent against ERA5 input data."
+            )
 
         var = VARIABLES[variable]["shortname"]
 

@@ -146,6 +146,17 @@ pipeline_msg <- function(
   )
 }
 
+# Helper to create a folder path if it doesn't already exist
+safe_create_dir <- function(dir_path){
+  # Check if the directory exists, and if not, create it
+  if (!dir.exists(dir_path)) {
+    dir.create(dir_path, recursive = TRUE)
+    message("Directory created: ", dir_path)
+  } else {
+    message("Directory already exists: ", dir_path)
+  }
+}
+
 # Helper function for exporting data (csv and parquet files) 
 export_data <- function(data_object, file_path) {
     

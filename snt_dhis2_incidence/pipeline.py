@@ -25,22 +25,22 @@ from snt_lib.snt_pipeline_utils import (
     "routine_data_choice",
     name="Routine data to use",
     help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
-    "'raw_without_outliers' is the raw data after outliers removed (based on `outlier_detection_method`);"
+    "'raw_without_outliers' is the raw data after outliers removed;"
     " 'imputed' contains imputed values after outliers removal",
     choices=["raw", "raw_without_outliers", "imputed"],
     type=str,
     default="imputed",
     required=True,
 )
-@parameter(
-    "outlier_detection_method",
-    name="Outlier detection method",
-    help="Method used to detect outliers in the routine data",
-    choices=["mean", "median", "iqr", "trend", "mg_partial", "mg_complete"],
-    type=str,
-    default="mean",
-    required=True,
-)
+# @parameter(
+#     "outlier_detection_method",
+#     name="Outlier detection method",
+#     help="Method used to detect outliers in the routine data",
+#     choices=["mean", "median", "iqr", "trend", "mg_partial", "mg_complete"],
+#     type=str,
+#     default="mean",
+#     required=True,
+# )
 @parameter(
     "use_csb_data",
     name="Use care seeking behaviour (CSB) data (source: DHS)",
@@ -60,10 +60,11 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "disaggregation_selection",
-    name="Disaggregation selection (NER only)",
-    help="Select the disaggregation for indicence computation, available only for Niger.",
+    name="Disaggregation selection (only if available)",
+    help="Select the disaggregation for incidence computation. "
+    "This option is only available if the data supports it.",
     multiple=False,
-    choices=["pregnant", "under5"],
+    choices=["under_5", "0_1_y", "1_2_y", "5_10_y", "5_36_m", "pregnant_woman"], 
     type=str,
     default=None,
     required=False,
@@ -88,7 +89,7 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_incidence(
     n1_method: str,
     routine_data_choice: str,
-    outlier_detection_method: str,
+    # outlier_detection_method: str,
     use_csb_data: bool,
     use_adjusted_population: bool,
     disaggregation_selection: str,
@@ -121,7 +122,7 @@ def snt_dhis2_incidence(
         notebook_params = {
             "N1_METHOD": n1_method,
             "ROUTINE_DATA_CHOICE": routine_data_choice,
-            "OUTLIER_DETECTION_METHOD": outlier_detection_method,
+            # "OUTLIER_DETECTION_METHOD": outlier_detection_method,
             "USE_CSB_DATA": use_csb_data,
             "USE_ADJUSTED_POPULATION": use_adjusted_population,
             "DISAGGREGATION_SELECTION": (

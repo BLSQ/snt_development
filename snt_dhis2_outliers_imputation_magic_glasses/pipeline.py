@@ -78,6 +78,16 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_magic_glasses"
         data_path = root_path / "data" / "dhis2" / "outliers_imputation"
+        code_notebook = (
+            pipeline_path
+            / "code"
+            / "snt_dhis2_outliers_imputation_magic_glasses.ipynb"
+        )
+        report_notebook = (
+            pipeline_path
+            / "reporting"
+            / "snt_dhis2_outliers_imputation_magic_glasses_report.ipynb"
+        )
 
         pipeline_path.mkdir(parents=True, exist_ok=True)
         data_path.mkdir(parents=True, exist_ok=True)
@@ -106,7 +116,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
             }
             run_start_ts = time.time()
             run_notebook(
-                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_magic_glasses.ipynb",
+                nb_path=code_notebook,
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
@@ -158,7 +168,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
             current_run.log_info("Skipping calculations, running only the reporting notebook.")
 
         run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_magic_glasses_report.ipynb",
+            nb_file=report_notebook,
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,

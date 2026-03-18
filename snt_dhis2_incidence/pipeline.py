@@ -32,15 +32,6 @@ from snt_lib.snt_pipeline_utils import (
     default="imputed",
     required=True,
 )
-# @parameter(
-#     "outlier_detection_method",
-#     name="Outlier detection method",
-#     help="Method used to detect outliers in the routine data",
-#     choices=["mean", "median", "iqr", "trend", "mg_partial", "mg_complete"],
-#     type=str,
-#     default="mean",
-#     required=True,
-# )
 @parameter(
     "use_csb_data",
     name="Use care seeking behaviour (CSB) data (source: DHS)",
@@ -64,7 +55,9 @@ from snt_lib.snt_pipeline_utils import (
     help="Select the disaggregation for incidence computation. "
     "This option is only available if the data supports it.",
     multiple=False,
-    choices=["under_5", "0_1_y", "1_2_y", "5_10_y", "5_36_m", "pregnant_woman"], 
+    # choices=["under_5", "0_1_y", "1_2_y", "5_10_y", "5_36_m", "pregnant_woman"], 
+    choices=["Under 5 years", "0 to 1 year", "1 to 2 years", "5 to 10 years", "5 to 36 months", 
+             "Pregnant women"],
     type=str,
     default=None,
     required=False,
@@ -89,7 +82,6 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_incidence(
     n1_method: str,
     routine_data_choice: str,
-    # outlier_detection_method: str,
     use_csb_data: bool,
     use_adjusted_population: bool,
     disaggregation_selection: str,
@@ -119,14 +111,22 @@ def snt_dhis2_incidence(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         # Helper to format the parameters for injection
+        mapping_dictionary = {
+            "Under 5 years": "UNDER_5",
+            "0 to 1 year": "0_1_Y",
+            "1 to 2 years": "1_2_Y",
+            "5 to 10 years": "5_10_Y",
+            "5 to 36 months": "5_36_M",
+            "Pregnant women": "PREGNANT_WOMAN",
+        }
+        
         notebook_params = {
             "N1_METHOD": n1_method,
             "ROUTINE_DATA_CHOICE": routine_data_choice,
-            # "OUTLIER_DETECTION_METHOD": outlier_detection_method,
             "USE_CSB_DATA": use_csb_data,
             "USE_ADJUSTED_POPULATION": use_adjusted_population,
             "DISAGGREGATION_SELECTION": (
-                disaggregation_selection.upper() if disaggregation_selection else None
+                mapping_dictionary.get(disaggregation_selection) if disaggregation_selection else None
             ),
             "ROOT_PATH": root_path.as_posix(),
         }

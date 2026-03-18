@@ -3,13 +3,13 @@ from pathlib import Path
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
+    push_data_to_db_table,
     load_configuration_snt,
     pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,
     save_pipeline_parameters,
     validate_config,
-    create_outliers_db_table,
 )
 
 
@@ -81,6 +81,7 @@ def snt_dhis2_outliers_imputation_iqr(
         if not run_report_only:
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                "OUTLIERS_METHOD": "IQR",
                 "DEVIATION_IQR": deviation_iqr,
             }
             run_notebook(
@@ -118,7 +119,10 @@ def snt_dhis2_outliers_imputation_iqr(
             )
 
             if push_db:
-                create_outliers_db_table(country_code=country_code, data_path=data_path)
+                push_data_to_db_table(
+                    table_name="outliers_detection_iqr",
+                    file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
+                )
 
         else:
             current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")

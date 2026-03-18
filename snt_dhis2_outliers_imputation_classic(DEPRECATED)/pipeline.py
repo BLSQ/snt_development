@@ -4,11 +4,11 @@ from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
+    push_data_to_db_table,
     pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,
     validate_config,
-    create_outliers_db_table,
 )
 
 
@@ -128,7 +128,10 @@ def snt_dhis2_outliers_imputation_classic(
 
             # Create consolidated outliers DB table
             if push_db:
-                create_outliers_db_table(country_code=country_code, data_path=data_path)
+                push_data_to_db_table(
+                    table_name="outliers_detection_classic",
+                    file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
+                )
 
         else:
             current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")

@@ -1,66 +1,150 @@
 {
-	"SNT_CONFIG": {
-		"COUNTRY_CODE": "NER",
-		"COUNTRY_NAME": "NIGER",
-		"NA_TREATMENT": "SET_0_TO_NA",
-		"DHIS2_ADMINISTRATION_1": "level_2_name",
-		"DHIS2_ADMINISTRATION_2": "level_3_name",
-		"ANALYTICS_ORG_UNITS_LEVEL" : 6,		
-		"REPORTING_RATE_PRODUCT_UID" : []
-	},
-	"SNT_DATASET_IDENTIFIERS" : {
-		"DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
-		"DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",	
-		"DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
-		"DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate", 
-		"DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
-		"DHIS2_INCIDENCE": "snt-dhis2-incidence",
-		"DHS_INDICATORS": "snt-dhs-indicators",
-		"WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
-		"SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",
-		"ERA5_DATASET_CLIMATE": "snt-era5-climate",		
-        "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
-        "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
-		"SNT_MAP_EXTRACTS": "snt-map-extracts",
-		"SNT_RESULTS": "snt-results"
-	},
-	"DHIS2_DATA_DEFINITIONS" : {
-		"POPULATION_DEFINITIONS": {
-			"TOTAL_POPULATION_REF":null,
-			"GROWTH_FACTOR" :null,
-			"REFERENCE_YEAR": null,
-			"POPULATION_INDICATORS": {
-				"POPULATION": {"ids": ["iIS0MGyL3EL"], "type": "dataElement"}
-			},
-			"POPULATION_DISAGGREGATIONS": {				
-			}			
-		},	
-		"DHIS2_INDICATOR_DEFINITIONS": {
-			"SUSP": ["SE8vUT7xeWO"],
-			"TEST": ["Hc1bP08WsJf"],
-			"CONF": ["S4S3iPZMvPb"],
-			"PRES": ["Dq6jCpvgXjN"],
-			"PRESSEV": [],
-			"MALTREAT": ["DLrfnBPUmH2"],
-			"MALADM": ["VJN9TulWOl7"],
-			"MALDTH": ["dl7lZ8HoO1K"],
-			"CASRECU" : [],
-			"CPN1" : []
-		},
-		"DHIS2_REPORTING_RATES" : {
-			"REPORTING_DATASETS": [
-				{
-					"DATASET" : "",
-					"METRICS": {
-						"ACTUAL_REPORTS": "float",
-						"EXPECTED_REPORTS": "float"
-					}
-				}
-			],			
-			"REPORTING_INDICATORS" : {
-				"ACTUAL_REPORTS" : "",
-				"EXPECTED_REPORTS": ""
-			}
-		}	
-	}
+  "SNT_CONFIG": {
+    "COUNTRY_CODE": "NER",
+    "COUNTRY_NAME": "NIGER",
+    "NA_TREATMENT": "SET_0_TO_NA",
+    "DHIS2_ADMINISTRATION_1": "level_2_name",
+    "DHIS2_ADMINISTRATION_2": "level_3_name",
+    "ANALYTICS_ORG_UNITS_LEVEL": 6,
+    "REPORTING_RATE_PRODUCT_UID": ["LUo8tmRIJc9", "ki7YKOfyxjf"]
+  },
+  "SNT_DATASET_IDENTIFIERS": {
+    "DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
+    "DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",
+    "DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
+    "DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate",
+    "DHIS2_OUTLIERS_DETECTION": "snt-dhis2-outliers-detection",
+    "DHIS2_OUTLIERS_REMOVAL_IMPUTATION": "snt-dhis2-outliers-removal-imputation",
+    "DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
+    "DHIS2_INCIDENCE": "snt-dhis2-incidence",
+    "DHS_INDICATORS": "snt-dhs-indicators",
+    "MIS_INDICATORS": "snt-mis-indicators",
+    "WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
+    "SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",
+    "ERA5_DATASET_CLIMATE": "snt-era5-climate",
+    "SNT_SEASONALITY": "snt-seasonality",
+    "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
+    "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+    "SNT_MAP_EXTRACTS": "snt-map-extracts",
+    "SNT_RESULTS": "snt-results"
+  },
+  "DHIS2_DATA_DEFINITIONS": {
+    "POPULATION_DEFINITIONS": {
+      "TOTAL_POPULATION_REF": 27032412,
+      "GROWTH_FACTOR": 0.0334,
+      "REFERENCE_YEAR": 2024,
+      "POPULATION_INDICATORS": {
+        "POPULATION": { "ids": ["iIS0MGyL3EL"], "type": "dataElement" },
+        "POP_UNDER_5": {
+          "ids": ["tiaX3KnlpRt", "BjCyMF2Thxn"],
+          "type": "dataElement"
+        },
+        "POP_PREGNANT_WOMAN": { "ids": ["mEyVFwBw2QV"], "type": "dataElement" }
+      },
+      "POPULATION_DISAGGREGATIONS": {
+        "POP_UNDER_5": 0.195,
+        "POP_PREGNANT_WOMAN": 0.052,
+        "POP_0_1_Y": 0.04,
+        "POP_1_2_Y": 0.079
+      }
+    },
+    "DHIS2_INDICATOR_DEFINITIONS": {
+      "SUSP": ["SE8vUT7xeWO"],
+      "SUSP_UNDER_5": ["SE8vUT7xeWO.KdO1NS2OI0c"],
+      "SUSP_ABOVE_5": ["SE8vUT7xeWO.CkWBRP9TqZd"],
+      "SUSP_PREGNANT_WOMAN": ["SE8vUT7xeWO.HfUn1dkLunb"],
+      "TEST": ["Hc1bP08WsJf", "IcxzDQ2iViL"],
+      "TEST_UNDER_5": ["Hc1bP08WsJf.KdO1NS2OI0c", "IcxzDQ2iViL.KdO1NS2OI0c"],
+      "TEST_ABOVE_5": ["Hc1bP08WsJf.CkWBRP9TqZd", "IcxzDQ2iViL.CkWBRP9TqZd"],
+      "TEST_PREGNANT_WOMAN": [
+        "Hc1bP08WsJf.HfUn1dkLunb",
+        "IcxzDQ2iViL.HfUn1dkLunb"
+      ],
+      "CONF": ["S4S3iPZMvPb", "ScFIzTswCih"],
+      "CONF_UNDER_5": ["S4S3iPZMvPb.KdO1NS2OI0c", "ScFIzTswCih.KdO1NS2OI0c"],
+      "CONF_ABOVE_5": ["S4S3iPZMvPb.CkWBRP9TqZd", "ScFIzTswCih.CkWBRP9TqZd"],
+      "CONF_PREGNANT_WOMAN": [
+        "S4S3iPZMvPb.HfUn1dkLunb",
+        "ScFIzTswCih.HfUn1dkLunb"
+      ],
+      "PRES": ["Dq6jCpvgXjN"],
+      "PRES_UNDER_5": ["Dq6jCpvgXjN.KdO1NS2OI0c"],
+      "PRES_ABOVE_5": ["Dq6jCpvgXjN.CkWBRP9TqZd"],
+      "PRES_PREGNANT_WOMAN": ["Dq6jCpvgXjN.HfUn1dkLunb"],
+      "MALTREAT": ["DLrfnBPUmH2"],
+      "MALTREAT_UNDER_5": ["DLrfnBPUmH2.KdO1NS2OI0c"],
+      "MALTREAT_ABOVE_5": ["DLrfnBPUmH2.CkWBRP9TqZd"],
+      "MALTREAT_PREGNANT_WOMAN": ["DLrfnBPUmH2.HfUn1dkLunb"],
+      "MALSIMP": ["GWVBGrF5JOd"],
+      "MALSIMP_UNDER_5": ["GWVBGrF5JOd.KdO1NS2OI0c"],
+      "MALSIMP_ABOVE_5": ["GWVBGrF5JOd.CkWBRP9TqZd"],
+      "MALSIMP_PREGNANT_WOMAN": ["GWVBGrF5JOd.HfUn1dkLunb"],
+      "MALSEV": ["VJN9TulWOl7"],
+      "MALSEV_UNDER_5": ["VJN9TulWOl7.KdO1NS2OI0c"],
+      "MALSEV_ABOVE_5": ["VJN9TulWOl7.CkWBRP9TqZd"],
+      "MALSEV_PREGNANT_WOMAN": ["VJN9TulWOl7.HfUn1dkLunb"],
+      "MALDTH": ["dl7lZ8HoO1K", "nJI3Bjb2bwx"],
+      "MALDTH_UNDER_5": ["dl7lZ8HoO1K.KdO1NS2OI0c", "nJI3Bjb2bwx.KdO1NS2OI0c"],
+      "MALDTH_ABOVE_5": ["dl7lZ8HoO1K.CkWBRP9TqZd", "nJI3Bjb2bwx.CkWBRP9TqZd"],
+      "MALDTH_PREGNANT_WOMAN": [
+        "dl7lZ8HoO1K.HfUn1dkLunb",
+        "nJI3Bjb2bwx.HfUn1dkLunb"
+      ],
+      "MALADM": ["f00QZis2J3n"],
+      "MALADM_UNDER_5": ["f00QZis2J3n.KdO1NS2OI0c"],
+      "MALADM_ABOVE_5": ["f00QZis2J3n.CkWBRP9TqZd"],
+      "MALADM_PREGNANT_WOMAN": ["f00QZis2J3n.HfUn1dkLunb"],
+      "ALLADM": [
+        "UqVkeBwgB06.bDk33CXuRo9",
+        "UqVkeBwgB06.vxmwRpP1cBe",
+        "UqVkeBwgB06.MLGLuR5CK0f"
+      ],
+      "ALLDTH": ["UqVkeBwgB06.vgdSzy5iJbZ"],
+      "ALLOUT": ["aAMNlG1Qjfn"],
+      "TPI1": ["PavbxlgreSC"],
+      "TPI3": ["tEqFtDVL2Y6"],
+      "CPN": ["gzj9zjZrNPi"],
+      "MILDA_CPN": ["hL3WOkhfxo3"],
+      "MILDA_VAR": ["azdUYKPccDe"],
+      "VAR1": ["Uk6UmYQp0Pd"],
+      "UTILISATION": [
+        "aAMNlG1Qjfn.OfgifKSFiib",
+        "aAMNlG1Qjfn.Xj9ayPI0QYh",
+        "aAMNlG1Qjfn.AkcjRa8rdqa",
+        "aAMNlG1Qjfn.LqxtDRM0nb1",
+        "mvmPcDnpbqE.OfgifKSFiib",
+        "mvmPcDnpbqE.Xj9ayPI0QYh",
+        "mvmPcDnpbqE.AkcjRa8rdqa",
+        "mvmPcDnpbqE.LqxtDRM0nb1",
+        "wuIvQlLQsmx.XXvecDe14Bn",
+        "wuIvQlLQsmx.mOzOcdV7a8c",
+        "DPyo6EUCfmU.OfgifKSFiib",
+        "DPyo6EUCfmU.Xj9ayPI0QYh",
+        "DPyo6EUCfmU.AkcjRa8rdqa",
+        "DPyo6EUCfmU.LqxtDRM0nb1"
+      ]
+    },
+    "DHIS2_REPORTING_RATES": {
+      "REPORTING_DATASETS": [
+        {
+          "DATASET": "LUo8tmRIJc9",
+          "METRICS": {
+            "ACTUAL_REPORTS": "float",
+            "EXPECTED_REPORTS": "float"
+          }
+        },
+        {
+          "DATASET": "ki7YKOfyxjf",
+          "METRICS": {
+            "ACTUAL_REPORTS": "float",
+            "EXPECTED_REPORTS": "float"
+          }
+        }
+      ],
+      "REPORTING_INDICATORS": {
+        "ACTUAL_REPORTS": "",
+        "EXPECTED_REPORTS": ""
+      }
+    }
+  }
 }

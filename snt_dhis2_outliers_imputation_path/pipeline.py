@@ -127,7 +127,7 @@ def snt_dhis2_outliers_imputation_path(
             # Create consolidated outliers DB table
             if push_db:
                 push_data_to_db_table(
-                    table_name="outliers_detection_path",
+                    table_name="outliers_detected",
                     file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
                 )
 

@@ -158,11 +158,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
 
             if push_db:
                 push_data_to_db_table(
-                    table_name=(
-                        "outliers_detection_magic_glasses_complete"
-                        if run_mg_complete
-                        else "outliers_detection_magic_glasses_partial"
-                    ),
+                    table_name="outliers_detected",
                     file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
                 )
 

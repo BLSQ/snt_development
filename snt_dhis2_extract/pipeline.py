@@ -1,4 +1,5 @@
 import re
+import json
 import tempfile
 from datetime import datetime
 from itertools import product
@@ -1407,6 +1408,10 @@ def add_files_to_dataset(
             elif ext == ".csv":
                 df = pd.read_csv(src)
                 tmp_suffix = ".csv"
+            elif ext == ".json":
+                with open(src, encoding="utf-8") as f:
+                    json_data = json.load(f)
+                tmp_suffix = ".json"
             else:
                 current_run.log_warning(f"Unsupported file format: {src.name}")
                 continue
@@ -1414,8 +1419,11 @@ def add_files_to_dataset(
             with tempfile.NamedTemporaryFile(suffix=tmp_suffix) as tmp:
                 if ext == ".parquet":
                     df.to_parquet(tmp.name)
-                else:
+                elif ext == ".csv":
                     df.to_csv(tmp.name, index=False)
+                elif ext == ".json":
+                    with open(tmp.name, "w", encoding="utf-8") as f:
+                        json.dump(json_data, f, indent=2)
 
                 if not added_any:
                     new_version = get_new_dataset_version(

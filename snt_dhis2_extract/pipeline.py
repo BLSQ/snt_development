@@ -1409,7 +1409,7 @@ def add_files_to_dataset(
                 df = pd.read_csv(src)
                 tmp_suffix = ".csv"
             elif ext == ".json":
-                with open(src, encoding="utf-8") as f:
+                with open(src, encoding="utf-8") as f:  # noqa: PTH123
                     json_data = json.load(f)
                 tmp_suffix = ".json"
             else:
@@ -1422,7 +1422,7 @@ def add_files_to_dataset(
                 elif ext == ".csv":
                     df.to_csv(tmp.name, index=False)
                 elif ext == ".json":
-                    with open(tmp.name, "w", encoding="utf-8") as f:
+                    with open(tmp.name, "w", encoding="utf-8") as f:  # noqa: PTH123
                         json.dump(json_data, f, indent=2)
 
                 if not added_any:

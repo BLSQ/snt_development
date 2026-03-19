@@ -63,6 +63,14 @@ def _find_latest_worldpop_raster(root_path: Path, country_code: str) -> tuple[Pa
     help="If not provided, the default WorldPop raster will be used.",
 )
 @parameter(
+    "input_shapes_file",
+    name="Shapes file (.geojson)",
+    type=File,
+    required=False,
+    default=None,
+    help="If not provided, the default HMIS/NMDR shapes file will be used.",
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -82,6 +90,7 @@ def snt_healthcare_access(
     input_fosa_file: File,
     input_radius_meters: int,
     input_pop_file: File,
+    input_shapes_file: File,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -100,11 +109,30 @@ def snt_healthcare_access(
     data_output_path.mkdir(parents=True, exist_ok=True)
 
     num_km = input_radius_meters / 1000
+    shapes_file_path: str | None = None
     if input_fosa_file is not None:
         current_run.log_info(f"Coordinates file: {input_fosa_file.path}")
     current_run.log_info(f"Using radii of {num_km} km around each FOSA.")
     if input_pop_file is not None:
         current_run.log_info(f"Population raster: {input_pop_file.path}")
+    if input_shapes_file is not None:
+        shapes_path_obj = Path(input_shapes_file.path)
+        if shapes_path_obj.suffix.lower() != ".geojson":
+            error_msg = (
+                f"Invalid custom shapes file extension: {shapes_path_obj.suffix or '<none>'}. "
+                "Expected a .geojson file."
+            )
+            current_run.log_error(error_msg)
+            raise ValueError(error_msg)
+        shapes_file_path = str(shapes_path_obj)
+        current_run.log_info(f"Custom shapes file: {shapes_file_path}")
+        current_run.log_warning(
+            "Custom shapefile provided: hierarchy may not align with the extracted DHIS2 pyramid. "
+            "During data assembly, this can cause missing values for some organizational units "
+            "(especially at ADM2) when IDs do not match across files."
+        )
+    else:
+        current_run.log_info("No custom shapes file selected; using default HMIS/NMDR shapes.")
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -145,6 +173,7 @@ def snt_healthcare_access(
                 "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
                 "RADIUS_METERS": input_radius_meters,
                 "POP_FILE": pop_file_path,
+                "SHAPES_FILE": shapes_file_path,
             }
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",

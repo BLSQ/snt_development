@@ -29,6 +29,10 @@ from snt_lib.snt_pipeline_utils import (
     save_pipeline_parameters,
 )
 
+# Tickets:
+# -https://bluesquare.atlassian.net/browse/SNT25-406
+# Github repository: https://github.com/BLSQ/snt_development
+
 
 @pipeline("snt_dhis2_extract", timeout=43200)  # 3600 * 12 = 43200 (12h)
 @parameter(
@@ -147,6 +151,7 @@ def snt_dhis2_extract(
 
             shapes_ready = download_dhis2_shapes(
                 source_pyramid=dhis2_pyramid,
+                dhis2_client=dhis2_client,
                 output_dir=dhis2_raw_data_path / "shapes_data",
                 snt_config=snt_config_dict,
             )
@@ -1172,6 +1177,7 @@ def download_indicators(
 @snt_dhis2_extract.task
 def download_dhis2_shapes(
     source_pyramid: pl.DataFrame,
+    dhis2_client: DHIS2,
     output_dir: Path,
     snt_config: dict,
 ) -> bool:
@@ -1181,6 +1187,8 @@ def download_dhis2_shapes(
     ----------
     source_pyramid : pl.DataFrame
         DataFrame containing the DHIS2 pyramid data.
+    dhis2_client : DHIS2
+        DHIS2 client instance for API interaction.
     output_dir : Path
         Directory to save the downloaded shapes data.
     snt_config : dict
@@ -1196,8 +1204,7 @@ def download_dhis2_shapes(
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # get org unit level
-    # TODO: move this validation to validate_config()
+    # get org unit level from config
     admin_level_2 = snt_config["SNT_CONFIG"].get("DHIS2_ADMINISTRATION_2")
     match = re.search(r"\d+", admin_level_2)
     if match:
@@ -1224,6 +1231,11 @@ def download_dhis2_shapes(
     except Exception as e:
         raise Exception(f"Error while filtering shapes data: {e}") from e
 
+    # retrieve org units level names
+    org_unit_levels = pl.DataFrame(dhis2_client.meta.organisation_unit_levels())
+    df_lvl_selection = add_org_level_names_to(org_unit_levels, df_lvl_selection)
+
+    # format and save shapes data
     try:
         fp = output_dir / f"{country_code}_dhis2_raw_shapes.parquet"
         df_lvl_selection_pd = df_lvl_selection.to_pandas()
@@ -1234,6 +1246,36 @@ def download_dhis2_shapes(
         raise Exception(f"Error while saving shapes data: {e}") from e
 
     return True
+
+
+def add_org_level_names_to(org_unit_levels: pl.DataFrame, df_shapes: pl.DataFrame) -> pl.DataFrame:
+    """Add organisation unit level name columns to the DataFrame based on the levels metadata.
+
+    Returns
+    -------
+    pl.DataFrame
+        DataFrame with added organisation unit level name columns.
+    """
+    level_to_name = dict(zip(org_unit_levels["level"], org_unit_levels["name"], strict=True))
+
+    # Find all level_X_name columns using regex
+    pattern = re.compile(r"^level_(\d+)_name$")
+    new_columns = []
+    for col in df_shapes.columns:
+        match = pattern.match(col)
+        if match:
+            level_num = int(match.group(1))
+            org_unit_name = level_to_name.get(level_num)
+            if org_unit_name:
+                new_columns.append(pl.lit(org_unit_name).alias(f"org_level_{level_num}_name"))
+            else:
+                current_run.log_warning(f"Warning: No metadata found for level {level_num}")
+
+    # Add all organisation unit level name columns to the DataFrame
+    if new_columns:
+        df_shapes = df_shapes.with_columns(new_columns)
+
+    return df_shapes
 
 
 @snt_dhis2_extract.task

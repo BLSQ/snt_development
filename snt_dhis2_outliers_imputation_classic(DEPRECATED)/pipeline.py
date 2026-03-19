@@ -4,7 +4,6 @@ from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
-    push_data_to_db_table,
     pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,

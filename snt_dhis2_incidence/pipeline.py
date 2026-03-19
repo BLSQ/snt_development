@@ -24,10 +24,11 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "routine_data_choice",
     name="Routine data to use",
-    help="Which routine data to use for the analysis. Options: 'raw' data is simply formatted and aligned;"
-    "'raw_without_outliers' is the raw data after outliers removed;"
-    " 'imputed' contains imputed values after outliers removal",
-    choices=["raw", "raw_without_outliers", "imputed"],
+    help="Which routine data to use for the analysis. "
+    "'raw' loads formatted routine data, "
+    "'imputed' loads outliers-imputed routine data, "
+    "'outliers_removed' loads routine data with outliers removed.",
+    choices=["raw", "imputed", "outliers_removed"],
     type=str,
     default="imputed",
     required=True,
@@ -120,9 +121,12 @@ def snt_dhis2_incidence(
             "Pregnant women": "PREGNANT_WOMAN",
         }
         
+        notebook_routine_data_choice = (
+            "raw_without_outliers" if routine_data_choice == "outliers_removed" else routine_data_choice
+        )
         notebook_params = {
             "N1_METHOD": n1_method,
-            "ROUTINE_DATA_CHOICE": routine_data_choice,
+            "ROUTINE_DATA_CHOICE": notebook_routine_data_choice,
             "USE_CSB_DATA": use_csb_data,
             "USE_ADJUSTED_POPULATION": use_adjusted_population,
             "DISAGGREGATION_SELECTION": (

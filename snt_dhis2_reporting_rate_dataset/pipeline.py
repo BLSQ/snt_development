@@ -15,35 +15,17 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_dhis2_reporting_rate_dataset")
 @parameter(
-    "outliers_method",
-    name="Outlier processing method",
-    help="Specify which method was used to detect outliers in routine data. "
-    "Chose 'Routine data (Raw)' to use raw routine data.",
+    "routine_data_choice",
+    name="Routine data source",
+    help="Select which routine data to use. "
+    "'raw' loads formatted routine data, "
+    "'imputed' loads outliers-imputed routine data, "
+    "'outliers_removed' loads routine data with outliers removed.",
     multiple=False,
-    choices=[
-        "Routine data (Raw)",
-        "Mean (Classic)",
-        "Median (Classic)",
-        "IQR (Classic)",
-        "Trend (PATH)",
-        "MG Partial (MagicGlasses2)",
-        "MG Complete (MagicGlasses2)",
-    ],
+    choices=["raw", "imputed", "outliers_removed"],
     type=str,
-    default="Routine data (Raw)",
+    default="imputed",
     required=True,
-)
-@parameter(
-    "use_removed_outliers",
-    name="Use routine data with outliers removed (else: uses imputed)",
-    help="Enable this option to use routine data after outliers have been removed, "
-    "based on the outlier detection method you selected above. "
-    " If you leave this off, the pipeline will instead use either:"
-    " A) the imputed routine data (where outlier values have been replaced), or"
-    " B) the raw routine data, if you chose 'Routine data (Raw)' as your outlier processing method.",
-    type=bool,
-    default=False,
-    required=False,
 )
 @parameter(
     "run_report_only",
@@ -66,7 +48,7 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_reporting_rate_dataset(
-    outliers_method: list, use_removed_outliers: bool, run_report_only: bool, pull_scripts: bool
+    routine_data_choice: str, run_report_only: bool, pull_scripts: bool
 ):
     """Orchestration function. Calls other functions within the pipeline."""
     if pull_scripts:
@@ -90,19 +72,27 @@ def snt_dhis2_reporting_rate_dataset(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
-            routine_file = resolve_routine_filename(outliers_method, use_removed_outliers)
-            routine_file = f"{country_code}{routine_file}"
-            if outliers_method == "Routine data (Raw)":
+            routine_file_candidates = resolve_routine_file_candidates(
+                country_code=country_code, routine_data_choice=routine_data_choice
+            )
+            if routine_data_choice == "raw":
                 ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
             else:
                 ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
 
-            # Check the file exists in the dataset
-            if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
+            routine_file = next(
+                (
+                    filename
+                    for filename in routine_file_candidates
+                    if dataset_file_exists(ds_id=ds_outliers_id, filename=filename)
+                ),
+                None,
+            )
+            if routine_file is None:
                 current_run.log_warning(
-                    f"Routine file {routine_file} not found in the dataset {ds_outliers_id}, "
-                    "perhaps the outliers imputation pipeline has not been run yet. "
-                    "Processing cannot continue."
+                    f"None of the expected routine files were found in dataset {ds_outliers_id}: "
+                    f"{routine_file_candidates}. "
+                    "Perhaps the outliers-imputation pipeline has not been run yet. Processing cannot continue."
                 )
                 return
 
@@ -112,7 +102,7 @@ def snt_dhis2_reporting_rate_dataset(
             }
 
             params_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_reporting_rate_dataelement",
+                pipeline_name="snt_dhis2_reporting_rate_dataset",
                 parameters=nb_parameters,
                 output_path=data_path,
                 country_code=country_code,
@@ -153,44 +143,34 @@ def snt_dhis2_reporting_rate_dataset(
         raise
 
 
-def resolve_routine_filename(outliers_method: str, is_removed: bool) -> str:
-    """Returns the routine data filename based on the selected outliers method.
+def resolve_routine_file_candidates(country_code: str, routine_data_choice: str) -> list[str]:
+    """Returns ordered candidate filenames for a routine data choice."""
+    if routine_data_choice == "raw":
+        return [f"{country_code}_routine.parquet"]
 
-    Parameters
-    ----------
-    outliers_method : str
-        The method used for outlier removal.
-    is_removed : bool
-        Whether to return the filename for removed outliers or imputed outliers.
+    if routine_data_choice == "imputed":
+        return [
+            f"{country_code}_routine_outliers_imputed.parquet",
+            f"{country_code}_routine_outliers-mean_imputed.parquet",
+            f"{country_code}_routine_outliers-median_imputed.parquet",
+            f"{country_code}_routine_outliers-iqr_imputed.parquet",
+            f"{country_code}_routine_outliers-trend_imputed.parquet",
+            f"{country_code}_routine_outliers-mg-partial_imputed.parquet",
+            f"{country_code}_routine_outliers-mg-complete_imputed.parquet",
+        ]
 
-    Returns
-    -------
-    str
-        The filename corresponding to the selected outliers method.
+    if routine_data_choice == "outliers_removed":
+        return [
+            f"{country_code}_routine_outliers_removed.parquet",
+            f"{country_code}_routine_outliers-mean_removed.parquet",
+            f"{country_code}_routine_outliers-median_removed.parquet",
+            f"{country_code}_routine_outliers-iqr_removed.parquet",
+            f"{country_code}_routine_outliers-trend_removed.parquet",
+            f"{country_code}_routine_outliers-mg-partial_removed.parquet",
+            f"{country_code}_routine_outliers-mg-complete_removed.parquet",
+        ]
 
-    Raises
-    ------
-    ValueError
-        If the outliers method is unknown.
-    """
-    if outliers_method == "Routine data (Raw)":
-        return "_routine.parquet"
-
-    method_suffix_map = {
-        "Mean (Classic)": "mean",
-        "Median (Classic)": "median",
-        "IQR (Classic)": "iqr",
-        "Trend (PATH)": "trend",
-        "MG Partial (MagicGlasses2)": "mg-partial",
-        "MG Complete (MagicGlasses2)": "mg-complete",
-    }
-
-    try:
-        suffix = method_suffix_map[outliers_method]
-    except KeyError as err:
-        raise ValueError(f"Unknown outliers method: {outliers_method}") from err
-
-    return f"_routine_outliers-{suffix}{'_removed' if is_removed else '_imputed'}.parquet"
+    raise ValueError(f"Unknown routine data choice: {routine_data_choice}")
 
 
 if __name__ == "__main__":

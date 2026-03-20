@@ -27,13 +27,11 @@ log_msg(glue("Created directory for intermediate results: {INTERMEDIATE_DATA_PAT
 }
 
 load_utils <- function() {
-# Idea: just load always from "/home/hexa/workspace/code/snt_utils.r" and "/home/hexa/workspace/code/snt_palettes.r"
-# else now I always have to first set `CODE_PATH` and only then load utils & palette
-utils_path <<- file.path(CODE_PATH, "snt_utils.r")
-palettes_path <<- file.path(CODE_PATH, "snt_palettes.r")
-source(utils_path)
+utils_path <- "/home/hexa/workspace/code/snt_utils.r"
+palettes_path <- "/home/hexa/workspace/code/snt_palettes.r"
+source("/home/hexa/workspace/code/snt_utils.r")
 message("Utils loaded from: ", utils_path)
-source(palettes_path)
+source("/home/hexa/workspace/code/snt_palettes.r")
 message("Palettes loaded from: ", palettes_path)
 }
 
@@ -211,9 +209,9 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
       DISAGGREGATED_INDICATORS_FOUND <<- TRUE 
     } else {
       missing_cols <- setdiff(target_colnames, colnames(dhis2_routine))
-      log_msg(glue::glue("Population Disaggregation: Disaggregation on '{disaggregation_selection}' failed."), "warning")
+      log_msg(glue::glue("Population Disaggregation: Disaggregation on '{DISAGGREGATION_SELECTION}' failed."), "warning")
       log_msg(glue::glue("Population Disaggregation: Missing columns in routine dataset: {paste(missing_cols, collapse = ', ')}"), "warning")
-      msg <- glue::glue("[ERROR] 🛑 Population Disaggregation: Required columns for disaggregation '{disaggregation_selection}' are missing.")  
+      msg <- glue::glue("[ERROR] 🛑 Population Disaggregation: Required columns for disaggregation '{DISAGGREGATION_SELECTION}' are missing.")  
       stop(msg)
     }
   } else {

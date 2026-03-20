@@ -89,6 +89,7 @@ def snt_dhis2_reporting_rate_dataset(
 
             nb_parameters = {
                 "SNT_ROOT_PATH": root_path.as_posix(),
+                "ROUTINE_DATA_CHOICE": routine_data_choice,
                 "ROUTINE_FILE": routine_file,
             }
 

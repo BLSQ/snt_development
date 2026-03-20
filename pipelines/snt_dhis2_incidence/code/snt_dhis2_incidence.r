@@ -160,7 +160,7 @@ return(head(dhis2_population_adm2, 3))
 # if (!is.null(DISAGGREGATION_SELECTION) && N1_METHOD %in% c("SUSP-TEST", "PRES")) {
 #   # Determine the expected column names based on the disaggregation selection and method
 #   prefix_method <- ifelse(N1_METHOD == "SUSP-TEST", "SUSP", "PRES")
-#   prefix_fixed <- c("SUSP", "PRES") 
+#   prefix_fixed <- c("TEST", "CONF") 
 #   prefix_all    <- c(prefix_method, prefix_fixed) 
 #   target_colnames <- glue("{prefix_all}_{DISAGGREGATION_SELECTION}")
   
@@ -192,9 +192,9 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
   if (!is.null(DISAGGREGATION_SELECTION) && N1_METHOD %in% c("SUSP-TEST", "PRES")) {
     # Determine the expected column names based on the disaggregation selection and method
     prefix_method <- ifelse(N1_METHOD == "SUSP-TEST", "SUSP", "PRES")
-    prefix_fixed <- c("SUSP", "PRES") 
+    prefix_fixed <- c("TEST", "CONF") 
     prefix_all    <- c(prefix_method, prefix_fixed) 
-    target_colnames <- glue::glue("{prefix_all}_{DISAGGREGATION_SELECTION}")
+    target_colnames <<- glue::glue("{prefix_all}_{DISAGGREGATION_SELECTION}")
     
     if (all(target_colnames %in% colnames(dhis2_routine))) {
       # Map the disaggregated columns (e.g., SUSP_UNDER_5) to generic names (e.g., SUSP) so that 
@@ -235,12 +235,12 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
 
 select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICATORS_FOUND, DISAGGREGATION_SELECTION) {
   # Default value for the selection if the condition isn't met or if it fails
-  POPULATION_SELECTION <- "POPULATION"
+  POPULATION_SELECTION <<- "POPULATION"
   if (DISAGGREGATED_INDICATORS_FOUND) { 
-      POPULATION_SELECTION <- paste0("POP_", DISAGGREGATION_SELECTION)    
+      POPULATION_SELECTION <<- paste0("POP_", DISAGGREGATION_SELECTION)    
       if (!(POPULATION_SELECTION %in% colnames(dhis2_population_adm2))) {
           log_msg(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset."), "warning")
-          POPULATION_SELECTION <- "POPULATION"
+          POPULATION_SELECTION <<- "POPULATION"
       }
       # The selected column is assigned to POPULATION col so that later code can use it generically
       dhis2_population_adm2$POPULATION <- dhis2_population_adm2[[POPULATION_SELECTION]]

@@ -121,12 +121,9 @@ def snt_dhis2_incidence(
             "Pregnant women": "PREGNANT_WOMAN",
         }
         
-        notebook_routine_data_choice = (
-            "raw_without_outliers" if routine_data_choice == "outliers_removed" else routine_data_choice
-        )
         notebook_params = {
             "N1_METHOD": n1_method,
-            "ROUTINE_DATA_CHOICE": notebook_routine_data_choice,
+            "ROUTINE_DATA_CHOICE": routine_data_choice,
             "USE_CSB_DATA": use_csb_data,
             "USE_ADJUSTED_POPULATION": use_adjusted_population,
             "DISAGGREGATION_SELECTION": (

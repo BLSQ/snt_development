@@ -72,7 +72,7 @@ def snt_dhis2_reporting_rate_dataset(
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
         if not run_report_only:
-            routine_file_candidates = resolve_routine_file_candidates(
+            routine_file = resolve_routine_filename(
                 country_code=country_code, routine_data_choice=routine_data_choice
             )
             if routine_data_choice == "raw":
@@ -80,18 +80,9 @@ def snt_dhis2_reporting_rate_dataset(
             else:
                 ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
 
-            routine_file = next(
-                (
-                    filename
-                    for filename in routine_file_candidates
-                    if dataset_file_exists(ds_id=ds_outliers_id, filename=filename)
-                ),
-                None,
-            )
-            if routine_file is None:
+            if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
                 current_run.log_warning(
-                    f"None of the expected routine files were found in dataset {ds_outliers_id}: "
-                    f"{routine_file_candidates}. "
+                    f"Routine file {routine_file} was not found in dataset {ds_outliers_id}. "
                     "Perhaps the outliers-imputation pipeline has not been run yet. Processing cannot continue."
                 )
                 return
@@ -143,32 +134,16 @@ def snt_dhis2_reporting_rate_dataset(
         raise
 
 
-def resolve_routine_file_candidates(country_code: str, routine_data_choice: str) -> list[str]:
-    """Returns ordered candidate filenames for a routine data choice."""
+def resolve_routine_filename(country_code: str, routine_data_choice: str) -> str:
+    """Returns the canonical routine filename for a routine data choice."""
     if routine_data_choice == "raw":
-        return [f"{country_code}_routine.parquet"]
+        return f"{country_code}_routine.parquet"
 
     if routine_data_choice == "imputed":
-        return [
-            f"{country_code}_routine_outliers_imputed.parquet",
-            f"{country_code}_routine_outliers-mean_imputed.parquet",
-            f"{country_code}_routine_outliers-median_imputed.parquet",
-            f"{country_code}_routine_outliers-iqr_imputed.parquet",
-            f"{country_code}_routine_outliers-trend_imputed.parquet",
-            f"{country_code}_routine_outliers-mg-partial_imputed.parquet",
-            f"{country_code}_routine_outliers-mg-complete_imputed.parquet",
-        ]
+        return f"{country_code}_routine_outliers_imputed.parquet"
 
     if routine_data_choice == "outliers_removed":
-        return [
-            f"{country_code}_routine_outliers_removed.parquet",
-            f"{country_code}_routine_outliers-mean_removed.parquet",
-            f"{country_code}_routine_outliers-median_removed.parquet",
-            f"{country_code}_routine_outliers-iqr_removed.parquet",
-            f"{country_code}_routine_outliers-trend_removed.parquet",
-            f"{country_code}_routine_outliers-mg-partial_removed.parquet",
-            f"{country_code}_routine_outliers-mg-complete_removed.parquet",
-        ]
+        return f"{country_code}_routine_outliers_removed.parquet"
 
     raise ValueError(f"Unknown routine data choice: {routine_data_choice}")
 

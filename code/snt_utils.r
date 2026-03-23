@@ -59,19 +59,19 @@ install_and_load <- function(packages) {
 }
 
 # Helper to safely extract values from parameters (allows to specify the type)
-get_param <- function(params, name, default, cast_method = identity) {
+get_param <- function(params_list, target_param, default, cast_method = identity) {
   #' Safely retrieve a parameter if it exists in the input, using a default fallback if it doesn't exist in the inupt
   #'
-  #' @param params list of the input parameters (can be null, if it doesn't exist)
-  #' @param name parameter to retrieve
+  #' @param params_list list of the input parameters (can be null, if it doesn't exist)
+  #' @param target_param parameter to retrieve
   #' @param default default value to return if the parameter doesn't exist/is null
-  #' @param cast_fn how to cast the parameter value (if necessary)
+  #' @param cast_method how to cast the parameter value (if necessary, defaults to self)
   #'
   #' @returns the (cast) parameter value from the input if it exists or the default value otherwise
 
-  if (!is.null(params) && is.list(params) &&
-      !is.null(params[[name]])) {
-    return(cast_method(params[[name]]))
+  if (!is.null(params_list) && is.list(params_list) &&
+      !is.null(params_list[[target_param]])) {
+    return(cast_method(params_list[[target_param]]))
   } else {
     return(default)
   }

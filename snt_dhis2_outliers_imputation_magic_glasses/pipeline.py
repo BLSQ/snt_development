@@ -1,81 +1,17 @@
 from pathlib import Path
 import time
-import tempfile
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
-    create_outliers_db_table,
     load_configuration_snt,
+    push_data_to_db_table,
     pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,
     save_pipeline_parameters,
     validate_config,
 )
-
-
-def preserve_and_add_files_to_dataset(
-    dataset_id: str,
-    country_code: str,
-    new_files: list[Path],
-    method_prefix: str,
-):
-    """
-    Add new files to dataset while preserving existing files from other methods.
-    
-    Args:
-        dataset_id: Dataset identifier
-        country_code: Country code
-        new_files: List of new file paths to add
-        method_prefix: Prefix pattern to identify files from this method (e.g., "mean", "median", "magic_glasses")
-    """
-    try:
-        dataset = workspace.get_dataset(dataset_id)
-        latest_version = dataset.latest_version
-        existing_files = latest_version.list_files()
-        
-        # Filter out files from this method but keep others
-        preserved_files = []
-        for file_obj in existing_files:
-            filename = file_obj.name
-            
-            # Determine if this file belongs to the current method
-            is_current_method = False
-            if method_prefix == "magic_glasses":
-                # Magic Glasses files: flagged_outliers_magic_glasses.parquet, outlier_magic_glasses_*.parquet
-                is_current_method = (
-                    filename == f"{country_code}_flagged_outliers_magic_glasses.parquet" or
-                    filename.startswith(f"{country_code}_outlier_magic_glasses_")
-                )
-            else:
-                # Other methods: routine_outliers-{method}*.parquet
-                is_current_method = filename.startswith(f"{country_code}_routine_outliers-{method_prefix}")
-            
-            # Preserve files from other methods
-            if not is_current_method:
-                try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp_file:
-                        tmp_path = Path(tmp_file.name)
-                        file_obj.download(tmp_path)
-                        preserved_files.append(tmp_path)
-                        current_run.log_info(f"Preserving existing file: {filename}")
-                except Exception as e:
-                    current_run.log_warning(f"Could not preserve file {filename}: {e}")
-        
-        # Combine preserved files with new files
-        all_files = preserved_files + new_files
-        current_run.log_info(f"Adding {len(new_files)} new files and preserving {len(preserved_files)} existing files")
-    except Exception as e:
-        current_run.log_warning(f"Could not preserve existing files, adding only new files: {e}")
-        all_files = new_files
-    
-    add_files_to_dataset(
-        dataset_id=dataset_id,
-        country_code=country_code,
-        file_paths=all_files,
-    )
-
 
 @pipeline("snt_dhis2_outliers_imputation_magic_glasses")
 @parameter(
@@ -146,7 +82,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
 
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_magic_glasses"
-        data_path = root_path / "data" / "dhis2" / "outliers_detection"
+        data_path = root_path / "data" / "dhis2" / "outliers_imputation"
 
         pipeline_path.mkdir(parents=True, exist_ok=True)
         data_path.mkdir(parents=True, exist_ok=True)
@@ -160,13 +96,12 @@ def snt_dhis2_outliers_imputation_magic_glasses(
 
         if not run_report_only:
             # Avoid publishing stale artifacts from previous runs.
-            for old_file in data_path.glob(f"{country_code}_flagged_outliers_magic_glasses.parquet"):
-                old_file.unlink(missing_ok=True)
-            for old_file in data_path.glob(f"{country_code}_outlier_magic_glasses_*.parquet"):
+            for old_file in data_path.glob(f"{country_code}_routine_outliers_*.parquet"):
                 old_file.unlink(missing_ok=True)
 
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
+                "OUTLIERS_METHOD": "MG_COMPLETE" if run_mg_complete else "MG_PARTIAL",
                 "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                 "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
                 "DEVIATION_MAD15": 15,
@@ -185,17 +120,20 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 country_code=country_code,
             )
 
-            partial_file = data_path / f"{country_code}_outlier_magic_glasses_partial.parquet"
-            complete_file = data_path / f"{country_code}_outlier_magic_glasses_complete.parquet"
-            if not partial_file.exists() or partial_file.stat().st_mtime < run_start_ts:
+            expected_outputs = [
+                data_path / f"{country_code}_routine_outliers_detected.parquet",
+                data_path / f"{country_code}_routine_outliers_imputed.parquet",
+                data_path / f"{country_code}_routine_outliers_removed.parquet",
+            ]
+            missing_outputs = [
+                file_path.name
+                for file_path in expected_outputs
+                if not file_path.exists() or file_path.stat().st_mtime < run_start_ts
+            ]
+            if missing_outputs:
                 raise RuntimeError(
-                    "Partial output file was not generated during this run."
-                )
-            if run_mg_complete and (
-                not complete_file.exists() or complete_file.stat().st_mtime < run_start_ts
-            ):
-                raise RuntimeError(
-                    "Complete mode selected but complete seasonal output was not generated during this run."
+                    "Expected output files were not generated during this run: "
+                    + ", ".join(missing_outputs)
                 )
 
             parameters_file = save_pipeline_parameters(
@@ -205,27 +143,21 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 country_code=country_code,
             )
 
-            # Get new files for Magic Glasses
-            mg_files = list(data_path.glob(f"{country_code}_flagged_outliers_magic_glasses.parquet"))
-            mg_files.extend(data_path.glob(f"{country_code}_outlier_magic_glasses_*.parquet"))
-            new_files = [*mg_files, parameters_file]
-            
-            # Preserve existing files from other methods and add new ones
             dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
-            preserve_and_add_files_to_dataset(
+            add_files_to_dataset(
                 dataset_id=dataset_id,
                 country_code=country_code,
-                new_files=new_files,
-                method_prefix="magic_glasses",
+                file_paths=[
+                    *expected_outputs,
+                    parameters_file,
+                ],
             )
 
             if push_db:
-                try:
-                    create_outliers_db_table(country_code=country_code, data_path=data_path)
-                except Exception as e:
-                    current_run.log_warning(
-                        f"MG files were produced but DB push failed with current utility: {e}"
-                    )
+                push_data_to_db_table(
+                    table_name="outliers_detected",
+                    file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
+                )
 
         else:
             current_run.log_info("Skipping calculations, running only the reporting notebook.")

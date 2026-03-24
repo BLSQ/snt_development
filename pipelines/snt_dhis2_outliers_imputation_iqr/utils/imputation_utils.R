@@ -1,0 +1,47 @@
+# Compute moving-average imputations for a selected outlier flag column.
+impute_outliers_dt <- function(dt, outlier_col) {
+    dt <- data.table::as.data.table(dt)
+    data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)
+    dt[, TO_IMPUTE := data.table::fifelse(get(outlier_col) == TRUE, NA_real_, VALUE)]
+
+    dt[, MOVING_AVG := data.table::frollapply(
+        TO_IMPUTE,
+        n = 3,
+        FUN = function(x) ceiling(mean(x, na.rm = TRUE)),
+        align = "center"
+    ), by = .(ADM1_ID, ADM2_ID, OU_ID, INDICATOR)]
+
+    dt[, VALUE_IMPUTED := data.table::fifelse(is.na(TO_IMPUTE), MOVING_AVG, TO_IMPUTE)]
+    dt[, c("TO_IMPUTE") := NULL]
+
+    return(as.data.frame(data.table::copy(dt)))
+}
+
+# Format imputed/removed routine output tables.
+format_routine_data_selection <- function(
+    df,
+    outlier_column,
+    DHIS2_INDICATORS,
+    fixed_cols,
+    pyramid_names,
+    remove = FALSE
+) {
+    if (remove) {
+        df <- df %>% dplyr::filter(!.data[[outlier_column]])
+    }
+
+    target_cols <- c(
+        "PERIOD", "YEAR", "MONTH", "ADM1_NAME", "ADM1_ID",
+        "ADM2_NAME", "ADM2_ID", "OU_ID", "OU_NAME", DHIS2_INDICATORS
+    )
+
+    output <- df %>%
+        dplyr::select(-VALUE) %>%
+        dplyr::rename(VALUE = VALUE_IMPUTED) %>%
+        dplyr::select(dplyr::all_of(fixed_cols), INDICATOR, VALUE) %>%
+        dplyr::mutate(VALUE = ifelse(is.nan(VALUE), NA_real_, VALUE)) %>%
+        tidyr::pivot_wider(names_from = "INDICATOR", values_from = "VALUE") %>%
+        dplyr::left_join(pyramid_names, by = c("ADM1_ID", "ADM2_ID", "OU_ID"))
+
+    return(output %>% dplyr::select(dplyr::all_of(intersect(target_cols, names(output)))))
+}

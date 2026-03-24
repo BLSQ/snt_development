@@ -26,6 +26,7 @@
     "SNT_SEASONALITY": "snt-seasonality",
     "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
     "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+    "DHIS2_QUALITY_OF_CARE" : "snt-dhis2-quality-of-care",
     "SNT_MAP_EXTRACTS": "snt-map-extracts",
     "SNT_RESULTS": "snt-results"
   },

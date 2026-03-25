@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.sdk import current_run, parameter, pipeline, workspace, File
 from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     add_files_to_dataset,
@@ -16,11 +16,19 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
     "adjust_population",
-    name="Adjust using UN totals",
-    help="Adjust the DHIS2 population using the UN total (TOTAL_POPULATION_REF) specified in the config file",
+    name="Adjust using population totals",
+    help="Adjust the DHIS2 population using TOTAL_POPULATION_REF specified in the config file",
     type=bool,
     default=False,
     required=False,
+)
+@parameter(
+    "disaggregation_file",
+    name="Use disaggregation proportions (.csv)",
+    type=File,
+    required=False,
+    default=None,
+    help="Select user-uploaded file with population disaggregations proportions at ADM2 level.",
 )
 @parameter(
     "run_report_only",
@@ -38,7 +46,9 @@ from snt_lib.snt_pipeline_utils import (
     default=False,
     required=False,
 )
-def snt_dhis2_population_transformation(adjust_population: bool, run_report_only: bool, pull_scripts: bool):
+def snt_dhis2_population_transformation(
+    adjust_population: bool, disaggregation_file: File, run_report_only: bool, pull_scripts: bool
+):
     """Write your pipeline orchestration here.
 
     Pipeline functions should only call tasks and should never perform IO operations or
@@ -74,9 +84,18 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
             current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
         if not run_report_only:
+            if disaggregation_file and not Path(disaggregation_file.path).exists():
+                current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
+                raise FileNotFoundError
+
+            parameters = {
+                "ADJUST_TOTALS": adjust_population,
+                "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
+            }
+
             params_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_population_transformation",
-                parameters={"ADJUST_WITH_UNTOTALS": adjust_population},
+                parameters=parameters,
                 output_path=snt_dhis2_pop_transform_path,
                 country_code=country_code,
             )
@@ -87,7 +106,7 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
                 snt_root_path=snt_root_path,
                 pipeline_root_path=snt_pipeline_path,
                 snt_config=snt_config_dict,
-                adjust_population=adjust_population,
+                nb_parameter=parameters,
             )
 
             add_files_to_dataset(
@@ -110,7 +129,7 @@ def snt_dhis2_population_transformation(adjust_population: bool, run_report_only
         )
 
     except Exception as e:
-        current_run.log_error(f"Error in SNT DHIS2 formatting: {e}")
+        current_run.log_error(f"Error in population transformation: {e}")
         raise
 
 
@@ -118,16 +137,13 @@ def dhis2_population_transformation(
     snt_root_path: Path,
     pipeline_root_path: Path,
     snt_config: dict,
-    adjust_population: bool,
+    nb_parameter: dict,
 ) -> None:
     """Format DHIS2 analytics data for SNT."""
     current_run.log_info("Running DHIS2 population data transformations.")
 
     # set parameters for notebook
-    nb_parameter = {
-        "SNT_ROOT_PATH": str(snt_root_path),
-        "ADJUST_WITH_UNTOTALS": adjust_population,
-    }
+    nb_parameter.update({"SNT_ROOT_PATH": str(snt_root_path)})
 
     # Check if the reporting rates data file exists
     country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
@@ -135,7 +151,7 @@ def dhis2_population_transformation(
     if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_population.parquet"):
         current_run.log_warning(
             f"File {country_code} DHIS2 population formatted not found, "
-            "perhaps DHIS2 formatting pipeline has not yet been execute. Skipping transformation."
+            "perhaps DHIS2 formatting pipeline has not yet been executed. Skipping process."
         )
         return
 
@@ -148,7 +164,7 @@ def dhis2_population_transformation(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting analytics data: {e}") from e
+        raise Exception(f"Error in executing population transformation notebook: {e}") from e
 
 
 if __name__ == "__main__":

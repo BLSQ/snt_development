@@ -55,9 +55,7 @@ from snt_lib.snt_pipeline_utils import (
     help="Select the disaggregation for incidence computation. "
     "This option is only available if the data supports it.",
     multiple=False,
-    # choices=["under_5", "0_1_y", "1_2_y", "5_10_y", "5_36_m", "pregnant_woman"], 
-    choices=["Under 5 years", "0 to 1 year", "1 to 2 years", "5 to 10 years", "5 to 36 months", 
-             "Pregnant women"],
+    choices=["Children Under 5 Years Old", "Pregnant Women"],
     type=str,
     default=None,
     required=False,
@@ -112,12 +110,8 @@ def snt_dhis2_incidence(
 
         # Helper to format the parameters for injection
         mapping_dictionary = {
-            "Under 5 years": "UNDER_5",
-            "0 to 1 year": "0_1_Y",
-            "1 to 2 years": "1_2_Y",
-            "5 to 10 years": "5_10_Y",
-            "5 to 36 months": "5_36_M",
-            "Pregnant women": "PREGNANT_WOMAN",
+            "Children Under 5 Years Old": "UNDER_5",
+            "Pregnant Women": "PREGNANT_WOMAN",
         }
         
         notebook_params = {

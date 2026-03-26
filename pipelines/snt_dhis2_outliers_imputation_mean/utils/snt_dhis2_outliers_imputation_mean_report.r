@@ -1,150 +1,180 @@
 # Report helpers for mean outliers imputation pipeline.
 .this_file <- tryCatch(normalizePath(sys.frame(1)$ofile), error = function(e) NA_character_)
 .this_dir <- if (!is.na(.this_file)) dirname(.this_file) else getwd()
-source(file.path(.this_dir, "bootstrap.R"))
-source(file.path(.this_dir, "reporting_utils.R"))
+source(file.path(.this_dir, "snt_dhis2_outliers_imputation_mean.r"))
+
+printdim <- function(df, name = deparse(substitute(df))) {
+    cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
+}
+
+plot_outliers <- function(ind_name, df, outlier_col) {
+    df_ind <- df %>% dplyr::filter(INDICATOR == ind_name)
+    df_ind <- df_ind %>% dplyr::filter(!is.na(YEAR), !is.na(VALUE), is.finite(VALUE))
+    ggplot2::ggplot(df_ind, ggplot2::aes(x = YEAR, y = VALUE)) +
+        ggplot2::geom_point(alpha = 0.25, color = "grey40", na.rm = TRUE) +
+        ggplot2::geom_point(
+            data = df_ind %>% dplyr::filter(.data[[outlier_col]] == TRUE),
+            ggplot2::aes(x = YEAR, y = VALUE),
+            color = "red",
+            size = 2.8,
+            alpha = 0.85,
+            na.rm = TRUE
+        ) +
+        ggplot2::labs(
+            title = paste("Outliers for indicator:", ind_name),
+            subtitle = "Grey = all values, red = detected outliers",
+            x = "Year",
+            y = "Value"
+        ) +
+        ggplot2::theme_minimal(base_size = 14)
+}
+
+plot_outliers_by_district_facet_year <- function(ind_name, df, outlier_col) {
+    df_ind <- df %>%
+        dplyr::filter(
+            INDICATOR == ind_name,
+            !is.na(YEAR),
+            !is.na(VALUE),
+            is.finite(VALUE)
+        )
+    if (nrow(df_ind) == 0) {
+        return(NULL)
+    }
+    ggplot2::ggplot(df_ind, ggplot2::aes(x = ADM2_ID, y = VALUE)) +
+        ggplot2::geom_point(color = "grey60", alpha = 0.3) +
+        ggplot2::geom_point(
+            data = df_ind %>% dplyr::filter(.data[[outlier_col]] == TRUE),
+            color = "red",
+            size = 2.8,
+            alpha = 0.85
+        ) +
+        ggplot2::facet_wrap(~ YEAR, scales = "free_y") +
+        ggplot2::labs(
+            title = paste("Outliers by district and year:", ind_name),
+            x = "District",
+            y = "Value"
+        ) +
+        ggplot2::theme_minimal(base_size = 12)
+}
+
+plot_coherence_heatmap <- function(df, selected_year, agg_level = "ADM1_NAME", filename = NULL, do_plot = TRUE) {
+    if (!(agg_level %in% c("ADM1_NAME", "ADM2_NAME"))) stop("agg_level must be ADM1_NAME or ADM2_NAME")
+    if (!all(c("INDICATOR", "YEAR", agg_level, "VALUE", "VALUE_IMPUTED") %in% colnames(df))) {
+        stop("Data frame is missing required columns.")
+    }
+    comp <- df %>%
+        dplyr::filter(YEAR == selected_year) %>%
+        dplyr::group_by(INDICATOR, !!rlang::sym(agg_level)) %>%
+        dplyr::summarise(
+            coherence = ifelse(sum(!is.na(VALUE)) == 0, NA, sum(VALUE == VALUE_IMPUTED, na.rm = TRUE) / sum(!is.na(VALUE))),
+            n = dplyr::n(),
+            .groups = "drop"
+        )
+    p <- ggplot2::ggplot(comp, ggplot2::aes(x = .data[[agg_level]], y = INDICATOR, fill = coherence)) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+        ggplot2::scale_fill_gradient(low = "#fee5d9", high = "#a50f15", na.value = "grey90", limits = c(0, 1)) +
+        ggplot2::labs(
+            title = paste("Coherence heatmap -", agg_level, "-", selected_year),
+            x = agg_level,
+            y = "Indicator",
+            fill = "Coherence"
+        ) +
+        ggplot2::theme_minimal(base_size = 12) +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    if (!is.null(filename)) ggplot2::ggsave(filename, p, width = 12, height = 6)
+    if (isTRUE(do_plot)) print(p)
+    invisible(p)
+}
+
+plot_coherence_map <- function(map_data, col_name, indicator_label = NULL) {
+    if (!inherits(map_data, "sf")) stop("map_data must be an sf object.")
+    if (!(col_name %in% names(map_data))) stop(paste("Column", col_name, "not found in map_data."))
+    ttl <- ifelse(is.null(indicator_label), paste("Map of", col_name), paste("Map of", col_name, "-", indicator_label))
+    ggplot2::ggplot(map_data) +
+        ggplot2::geom_sf(ggplot2::aes(fill = .data[[col_name]]), color = "grey30", linewidth = 0.1) +
+        ggplot2::scale_fill_viridis_c(option = "C", na.value = "grey90") +
+        ggplot2::labs(title = ttl, fill = col_name) +
+        ggplot2::theme_minimal(base_size = 12)
+}
 
 get_coherence_definitions <- function() {
-  checks <- list(
-    allout_susp = c("ALLOUT", "SUSP"),
-    allout_test = c("ALLOUT", "TEST"),
-    susp_test = c("SUSP", "TEST"),
-    test_conf = c("TEST", "CONF"),
-    conf_treat = c("CONF", "MALTREAT"),
-    adm_dth = c("MALADM", "MALDTH")
-  )
-
-  check_labels <- c(
-    pct_coherent_allout_susp = "Ambulatoire >= Suspects",
-    pct_coherent_allout_test = "Ambulatoire >= Testes",
-    pct_coherent_susp_test = "Suspects >= Testes",
-    pct_coherent_test_conf = "Testes >= Confirmes",
-    pct_coherent_conf_treat = "Confirmes >= Traites",
-    pct_coherent_adm_dth = "Admissions Palu >= Deces Palu"
-  )
-
-  list(checks = checks, check_labels = check_labels)
+    checks <- list(
+        "long_term" = function(x) (x >= 0.95),
+        "short_term" = function(x) (x >= 0.95),
+        "cyclicality" = function(x) (x >= 0.90),
+        "volatility" = function(x) (x >= 0.90),
+        "rolling_sd" = function(x) (x <= 0.80),
+        "spatial" = function(x) (x <= 0.80),
+        "residual" = function(x) (x <= 2),
+        "trend_strength" = function(x) (x >= 0.20)
+    )
+    check_labels <- c(
+        "long_term" = "Long-term (>= 95%)",
+        "short_term" = "Short-term (>= 95%)",
+        "cyclicality" = "Cyclicality (>= 90%)",
+        "volatility" = "Volatility (>= 90%)",
+        "rolling_sd" = "Rolling SD (<= 80%)",
+        "spatial" = "Spatial (<= 80%)",
+        "residual" = "Residual (<= 2)",
+        "trend_strength" = "Trend strength (>= 20%)"
+    )
+    list(checks = checks, check_labels = check_labels)
 }
 
 compute_national_coherency_metrics <- function(df, checks, check_labels) {
-  df_checks <- df %>%
-    dplyr::mutate(
-      !!!lapply(names(checks), function(check_name) {
-        cols <- checks[[check_name]]
-        if (all(cols %in% names(df))) {
-          rlang::expr(!!rlang::sym(cols[1]) >= !!rlang::sym(cols[2]))
-        } else {
-          rlang::expr(NA)
-        }
-      }) %>% stats::setNames(paste0("check_", names(checks)))
-    )
-
-  check_cols <- intersect(paste0("check_", names(checks)), names(df_checks))
-
-  df_checks %>%
-    dplyr::group_by(.data$YEAR) %>%
-    dplyr::summarise(
-      dplyr::across(
-        dplyr::all_of(check_cols),
-        ~ mean(.x, na.rm = TRUE) * 100,
-        .names = "pct_{.col}"
-      ),
-      .groups = "drop"
-    ) %>%
-    tidyr::pivot_longer(
-      cols = dplyr::starts_with("pct_"),
-      names_to = "check_type",
-      names_prefix = "pct_check_",
-      values_to = "pct_coherent"
-    ) %>%
-    dplyr::filter(!is.na(.data$pct_coherent)) %>%
-    dplyr::mutate(
-      check_label = dplyr::recode(
-        .data$check_type,
-        !!!stats::setNames(check_labels, sub("^pct_coherent_", "", names(check_labels)))
-      ),
-      check_label = factor(.data$check_label, levels = unique(.data$check_label)),
-      check_label = forcats::fct_reorder(.data$check_label, .data$pct_coherent, .fun = median, na.rm = TRUE)
-    )
+    coherency_metrics <- purrr::imap_dfr(checks, function(cond, check_name) {
+        vals <- df[[check_name]]
+        tibble::tibble(
+            check = check_name,
+            label = check_labels[[check_name]],
+            percent = round(100 * mean(cond(vals), na.rm = TRUE), 1)
+        )
+    })
+    coherency_metrics$label <- factor(coherency_metrics$label, levels = rev(check_labels))
+    coherency_metrics
 }
 
 plot_national_coherence_heatmap <- function(coherency_metrics) {
-  ggplot2::ggplot(coherency_metrics, ggplot2::aes(
-    x = factor(.data$YEAR),
-    y = .data$check_label,
-    fill = .data$pct_coherent
-  )) +
-    ggplot2::geom_tile(color = NA, width = 0.88, height = 0.88) +
-    ggplot2::geom_text(
-      ggplot2::aes(label = sprintf("%.0f%%", .data$pct_coherent)),
-      color = "white",
-      fontface = "bold",
-      size = 5
-    ) +
-    viridis::scale_fill_viridis(
-      name = "% Coherent",
-      option = "viridis",
-      limits = c(0, 100),
-      direction = -1
-    ) +
-    ggplot2::labs(
-      title = "Controles de coherence des donnees (niveau national)",
-      x = "Annee",
-      y = NULL
-    ) +
-    ggplot2::theme_minimal(base_size = 14) +
-    ggplot2::theme(
-      panel.grid = ggplot2::element_blank(),
-      plot.title = ggplot2::element_text(size = 22, face = "bold", hjust = 0.5),
-      axis.text.y = ggplot2::element_text(size = 16, hjust = 0),
-      axis.text.x = ggplot2::element_text(size = 16),
-      legend.title = ggplot2::element_text(size = 16, face = "bold"),
-      legend.text = ggplot2::element_text(size = 14),
-      legend.key.width = grid::unit(0.7, "cm"),
-      legend.key.height = grid::unit(1.2, "cm")
-    )
+    ggplot2::ggplot(coherency_metrics, ggplot2::aes(x = 1, y = label, fill = percent)) +
+        ggplot2::geom_tile(color = "white", width = 0.95, height = 0.9) +
+        ggplot2::geom_text(ggplot2::aes(label = paste0(percent, "%")), size = 4, color = "black", fontface = "bold") +
+        ggplot2::scale_fill_gradient2(
+            low = "#f7fcf5", mid = "#74c476", high = "#00441b",
+            midpoint = 85, limits = c(0, 100), name = "% indicators pass"
+        ) +
+        ggplot2::scale_x_continuous(expand = c(0, 0)) +
+        ggplot2::labs(
+            title = "National coherence overview",
+            subtitle = "Percentage of indicators meeting each coherence criterion",
+            x = NULL, y = NULL
+        ) +
+        ggplot2::theme_minimal(base_size = 13) +
+        ggplot2::theme(
+            axis.text.x = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_blank(),
+            panel.grid = ggplot2::element_blank(),
+            legend.position = "right",
+            plot.title = ggplot2::element_text(face = "bold"),
+            plot.subtitle = ggplot2::element_text(color = "gray30"),
+            axis.text.y = ggplot2::element_text(face = "bold")
+        )
 }
 
 compute_adm_coherence_long <- function(df, checks, check_labels, min_reports = 5) {
-  df_checks <- df %>%
-    dplyr::mutate(
-      !!!lapply(names(checks), function(check_name) {
-        cols <- checks[[check_name]]
-        if (all(cols %in% names(df))) {
-          rlang::expr(!!rlang::sym(cols[1]) >= !!rlang::sym(cols[2]))
-        } else {
-          rlang::expr(NA_real_)
-        }
-      }) %>% stats::setNames(paste0("check_", names(checks)))
-    )
-
-  check_cols <- names(df_checks)[grepl("^check_", names(df_checks))]
-  valid_checks <- check_cols[
-    purrr::map_lgl(df_checks[check_cols], ~ !all(is.na(.x)))
-  ]
-
-  adm_coherence <- df_checks %>%
-    dplyr::group_by(.data$ADM1_NAME, .data$ADM2_NAME, .data$ADM2_ID, .data$YEAR) %>%
-    dplyr::summarise(
-      total_reports = dplyr::n(),
-      !!!purrr::map(
-        valid_checks,
-        ~ rlang::expr(100 * mean(.data[[.x]], na.rm = TRUE))
-      ) %>%
-        stats::setNames(paste0("pct_coherent_", sub("^check_", "", valid_checks))),
-      .groups = "drop"
-    ) %>%
-    dplyr::filter(.data$total_reports >= min_reports)
-
-  adm_long <- adm_coherence %>%
-    tidyr::pivot_longer(
-      cols = dplyr::starts_with("pct_coherent_"),
-      names_to = "check_type",
-      values_to = "pct_coherent"
-    ) %>%
-    dplyr::filter(!is.na(.data$pct_coherent)) %>%
-    dplyr::mutate(check_label = dplyr::recode(.data$check_type, !!!check_labels))
-
-  list(adm_coherence = adm_coherence, adm_long = adm_long)
+    ADM_levels <- c("ADM1_NAME", "ADM2_NAME", "OU_NAME")
+    adm_long <- lapply(ADM_levels, function(level) {
+        df %>%
+            dplyr::filter(!is.na(.data[[level]]), !is.na(INDICATOR)) %>%
+            dplyr::group_by(.data[[level]], INDICATOR) %>%
+            dplyr::summarise(
+                dplyr::across(dplyr::all_of(names(checks)), ~ mean(checks[[cur_column()]](.x), na.rm = TRUE)),
+                n_reports = dplyr::n(),
+                .groups = "drop"
+            ) %>%
+            dplyr::filter(n_reports >= min_reports) %>%
+            tidyr::pivot_longer(cols = dplyr::all_of(names(checks)), names_to = "check", values_to = "coherence_rate") %>%
+            dplyr::mutate(level = level, label = check_labels[check])
+    }) %>% dplyr::bind_rows()
+    adm_long$label <- factor(adm_long$label, levels = rev(check_labels))
+    adm_long
 }
-

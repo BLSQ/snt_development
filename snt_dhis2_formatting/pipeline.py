@@ -67,6 +67,12 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
 
         if not run_report_only:
+            # Shapes must be generated first because pyramid coordinate validation
+            # uses the country geojson boundaries.
+            dhis2_shapes_formatting(
+                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+            )
+
             dhis2_pyramid_formatting(
                 snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
@@ -78,9 +84,6 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
                 snt_root_path=snt_root_path,
                 pipeline_root_path=snt_pipeline_path,
                 snt_config=snt_config_dict,
-            )
-            dhis2_shapes_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
             )
 
             dhis2_reporting_rates_formatting(

@@ -17,6 +17,7 @@
     "DHIS2_OUTLIERS_REMOVAL_IMPUTATION": "snt-dhis2-outliers-removal-imputation",
     "DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
     "DHIS2_INCIDENCE": "snt-dhis2-incidence",
+    "DHIS2_QUALITY_OF_CARE": "snt-dhis2-quality-of-care",
     "DHS_INDICATORS": "snt-dhs-indicators",
     "MIS_INDICATORS": "snt-mis-indicators",
     "WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
@@ -25,6 +26,7 @@
     "SNT_SEASONALITY": "snt-seasonality",
     "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
     "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+    "DHIS2_QUALITY_OF_CARE" : "snt-dhis2-quality-of-care",
     "SNT_MAP_EXTRACTS": "snt-map-extracts",
     "SNT_RESULTS": "snt-results"
   },

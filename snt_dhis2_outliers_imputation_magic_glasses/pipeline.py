@@ -13,15 +13,15 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 
-
 @pipeline("snt_dhis2_outliers_imputation_magic_glasses")
 @parameter(
-    "complete",
-    name="Run complete mode",
-    help="False (default): Partial mode (MAD15 then MAD10). True: Complete mode (Partial + seasonal detection, can take several hours).",
-    type=bool,
-    default=False,
+    "mode",
+    name="Detection mode",
+    help="Partial: fast (~7 min, MAD15 then MAD10). Complete: Partial + seasonal detection, can take several hours.",
+    type=str,
+    default="partial",
     required=False,
+    choices=["partial", "complete"],
 )
 @parameter(
     "push_db",
@@ -48,15 +48,20 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_outliers_imputation_magic_glasses(
-    complete: bool,
+    mode: str,
     push_db: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Dedicated Magic Glasses outliers pipeline for SNT DHIS2 data."""
-    run_mg_complete = bool(complete)
+    """Dedicated Magic Glasses outliers detection pipeline for SNT DHIS2 data."""
+    mode_clean = (mode or "partial").strip().lower()
+    if mode_clean not in ("partial", "complete"):
+        raise ValueError('mode must be "partial" or "complete".')
+    run_mg_partial = True
+    run_mg_complete = mode_clean == "complete"
+    current_run.log_info(f"Selected detection mode: {mode_clean}")
     current_run.log_info(
-        f"Selected detection mode: {'complete' if run_mg_complete else 'partial'}"
+        f"Flags => RUN_MAGIC_GLASSES_PARTIAL={run_mg_partial}, RUN_MAGIC_GLASSES_COMPLETE={run_mg_complete}"
     )
     if run_mg_complete:
         current_run.log_warning(
@@ -78,16 +83,6 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         root_path = Path(workspace.files_path)
         pipeline_path = root_path / "pipelines" / "snt_dhis2_outliers_imputation_magic_glasses"
         data_path = root_path / "data" / "dhis2" / "outliers_imputation"
-        code_notebook = (
-            pipeline_path
-            / "code"
-            / "snt_dhis2_outliers_imputation_magic_glasses.ipynb"
-        )
-        report_notebook = (
-            pipeline_path
-            / "reporting"
-            / "snt_dhis2_outliers_imputation_magic_glasses_report.ipynb"
-        )
 
         pipeline_path.mkdir(parents=True, exist_ok=True)
         data_path.mkdir(parents=True, exist_ok=True)
@@ -101,12 +96,13 @@ def snt_dhis2_outliers_imputation_magic_glasses(
 
         if not run_report_only:
             # Avoid publishing stale artifacts from previous runs.
-            for old_file in data_path.glob(f"{country_code}_routine_outliers*.parquet"):
+            for old_file in data_path.glob(f"{country_code}_routine_outliers_*.parquet"):
                 old_file.unlink(missing_ok=True)
 
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
                 "OUTLIERS_METHOD": "MG_COMPLETE" if run_mg_complete else "MG_PARTIAL",
+                "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                 "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
                 "DEVIATION_MAD15": 15,
                 "DEVIATION_MAD10": 10,
@@ -116,7 +112,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
             }
             run_start_ts = time.time()
             run_notebook(
-                nb_path=code_notebook,
+                nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_magic_glasses.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
                 kernel_name="ir",
                 parameters=input_params,
@@ -130,9 +126,9 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 data_path / f"{country_code}_routine_outliers_removed.parquet",
             ]
             missing_outputs = [
-                path.name
-                for path in expected_outputs
-                if (not path.exists() or path.stat().st_mtime < run_start_ts)
+                file_path.name
+                for file_path in expected_outputs
+                if not file_path.exists() or file_path.stat().st_mtime < run_start_ts
             ]
             if missing_outputs:
                 raise RuntimeError(
@@ -147,11 +143,12 @@ def snt_dhis2_outliers_imputation_magic_glasses(
                 country_code=country_code,
             )
 
+            dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
             add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
+                dataset_id=dataset_id,
                 country_code=country_code,
                 file_paths=[
-                    *data_path.glob(f"{country_code}_routine_outliers*.parquet"),
+                    *expected_outputs,
                     parameters_file,
                 ],
             )
@@ -166,7 +163,7 @@ def snt_dhis2_outliers_imputation_magic_glasses(
             current_run.log_info("Skipping calculations, running only the reporting notebook.")
 
         run_report_notebook(
-            nb_file=report_notebook,
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_magic_glasses_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,

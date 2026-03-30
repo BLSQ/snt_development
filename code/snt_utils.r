@@ -233,6 +233,11 @@ get_latest_dataset_file_in_memory <- function(dataset, filename) {
 
 
 # helper function for OpenHEXA logging
+printdim <- function(df, name = deparse(substitute(df))) {
+    cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
+}
+
+# helper function for OpenHEXA logging
 log_msg <- function(msg , level="info") {
     print(msg)
     if (!is.null(openhexa$current_run)) {

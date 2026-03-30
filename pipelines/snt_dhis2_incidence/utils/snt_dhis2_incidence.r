@@ -358,6 +358,121 @@ handle_zeros_in_reporting_rate <- function() {
 }
 
 
+build_monthly_cases <- function(
+    routine_data,
+    reporting_rate_data,
+    N1_METHOD,
+    care_seeking_data_f = NULL,
+    careseeking_data = NULL
+) {
+    monthly_cases <- routine_data |>
+        dplyr::group_by(ADM1_ID, ADM2_ID, YEAR, MONTH) |>
+        dplyr::summarise(
+            CONF = sum(CONF, na.rm = TRUE),
+            TEST = sum(TEST, na.rm = TRUE),
+            SUSP = sum(SUSP, na.rm = TRUE),
+            dplyr::across(dplyr::any_of("PRES"), ~sum(., na.rm = TRUE), .names = "PRES"),
+            .groups = "drop"
+        ) |>
+        dplyr::mutate(TEST = ifelse(N1_METHOD == "SUSP-TEST" & !is.na(SUSP) & (TEST > SUSP), SUSP, TEST)) |>
+        dplyr::left_join(reporting_rate_data, by = c("ADM2_ID", "YEAR", "MONTH")) |>
+        dplyr::mutate(TPR = ifelse(!is.na(CONF) & !is.na(TEST) & (TEST != 0), CONF / TEST, 1))
+
+    if (N1_METHOD == "SUSP-TEST") {
+        monthly_cases <- monthly_cases %>%
+            dplyr::mutate(N1 = CONF + ((SUSP - TEST) * TPR))
+        log_msg("Calculating N1 as `N1 = CONF + ((SUSP - TEST) * TPR)`")
+    } else if (N1_METHOD == "PRES") {
+        if ("PRES" %in% names(monthly_cases) && !all(is.na(monthly_cases$PRES))) {
+            monthly_cases <- monthly_cases %>%
+                dplyr::mutate(N1 = CONF + (PRES * TPR))
+            log_msg("ℹ️ Calculating N1 as `N1 = CONF + (PRES * TPR)`")
+        } else {
+            log_msg("🚨 Warning: 'PRES' not found in routine data or contains all `NA` values! 🚨 Calculating N1 using 'SUSP-TEST' method instead.")
+            monthly_cases <- monthly_cases %>%
+                dplyr::mutate(N1 = CONF + ((SUSP - TEST) * TPR))
+        }
+    } else {
+        log_msg("Invalid N1_METHOD. Please use 'PRES' or 'SUSP-TEST'.")
+    }
+
+    monthly_cases <- monthly_cases %>%
+        dplyr::mutate(N2 = ifelse(REPORTING_RATE == 0, NA_real_, N1 / REPORTING_RATE))
+
+    if (!is.null(care_seeking_data_f)) {
+        monthly_cases <- monthly_cases %>%
+            dplyr::left_join(care_seeking_data_f %>% dplyr::select(ADM1_ID, PCT), by = c("ADM1_ID")) %>%
+            dplyr::mutate(N3 = N2 / PCT) %>%
+            dplyr::select(-PCT)
+        log_msg("N2 adjusted by care seeking data (NER Specific).")
+    }
+
+    if (!is.null(careseeking_data)) {
+        monthly_cases <- monthly_cases |>
+            dplyr::mutate(YEAR = as.numeric(YEAR)) |>
+            dplyr::left_join(careseeking_data, by = c("ADM1_ID")) |>
+            dplyr::mutate(
+                N3 = N2 + (N2 * PCT_PRIVATE_CARE / PCT_PUBLIC_CARE) + (N2 * PCT_NO_CARE / PCT_PUBLIC_CARE)
+            )
+    } else {
+        print("🦘 Careseeking data not available, skipping calculation of N3.")
+    }
+
+    monthly_cases
+}
+
+
+build_yearly_incidence <- function(monthly_cases, dhis2_population_adm2, care_seeking_data_f = NULL, careseeking_data = NULL) {
+    monthly_cases <- monthly_cases %>%
+        dplyr::mutate(dplyr::across(where(is.numeric), as.numeric))
+
+    population_data <- dhis2_population_adm2 %>%
+        dplyr::mutate(dplyr::across(c(YEAR, POPULATION), as.numeric))
+
+    yearly_incidence <- monthly_cases %>%
+        dplyr::group_by(ADM2_ID, YEAR) %>%
+        dplyr::summarise(
+            dplyr::across(c(CONF, N1, N2), ~sum(.)),
+            .groups = "drop"
+        ) %>%
+        dplyr::left_join(
+            population_data,
+            by = c("ADM2_ID", "YEAR")
+        ) %>%
+        dplyr::mutate(
+            INCIDENCE_CRUDE = CONF / POPULATION * 1000,
+            INCIDENCE_ADJ_TESTING = N1 / POPULATION * 1000,
+            INCIDENCE_ADJ_REPORTING = N2 / POPULATION * 1000
+        ) |>
+        dplyr::ungroup()
+
+    if (!is.null(care_seeking_data_f) && "N3" %in% names(monthly_cases)) {
+        n3_data <- monthly_cases %>%
+            dplyr::group_by(ADM2_ID, YEAR) %>%
+            dplyr::summarise(N3 = sum(N3, na.rm = TRUE), .groups = "drop") |>
+            dplyr::ungroup()
+
+        yearly_incidence <- yearly_incidence %>%
+            dplyr::left_join(n3_data, by = c("ADM2_ID", "YEAR")) %>%
+            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = N3 / POPULATION * 1000)
+    } else if (!is.null(careseeking_data) && "N3" %in% names(monthly_cases)) {
+        n3_data <- monthly_cases %>%
+            dplyr::group_by(ADM2_ID, YEAR) %>%
+            dplyr::summarise(N3 = sum(N3, na.rm = TRUE), .groups = "drop") |>
+            dplyr::ungroup()
+
+        yearly_incidence <- yearly_incidence %>%
+            dplyr::left_join(n3_data, by = c("ADM2_ID", "YEAR")) %>%
+            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = N3 / POPULATION * 1000)
+    } else {
+        yearly_incidence <- yearly_incidence |>
+            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = NA)
+    }
+
+    yearly_incidence
+}
+
+
 export_monthly_cases <- function(monthly_cases) {
     file_path <- file.path(INTERMEDIATE_DATA_PATH, paste0(COUNTRY_CODE, "_monthly_cases.parquet"))
     arrow::write_parquet(monthly_cases, file_path)

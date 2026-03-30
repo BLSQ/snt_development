@@ -1,5 +1,9 @@
 # Shared helpers for snt_dhis2_extract notebooks.
 
+printdim <- function(df, name = deparse(substitute(df))) {
+    cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
+}
+
 make_point_geojson <- function(lat, lon) {
     sprintf('{"type": "Point", "coordinates": [%f, %f]}', lon, lat)
 }
@@ -70,4 +74,48 @@ norm_fosa_type <- function(x) {
         stringr::str_detect(x_up, "^CNSS\\b") ~ "CNSS",
         TRUE ~ "Autre"
     )
+}
+
+map_points_to_ds_polygons <- function(points_sf, polygons_sf) {
+    inside_matrix <- sf::st_within(points_sf, polygons_sf, sparse = FALSE)
+    point_polygon_dict <- list()
+
+    for (i in seq_len(nrow(points_sf))) {
+        point_id <- points_sf$id[[i]]
+        point_name <- points_sf$name[[i]]
+        polygons_containing <- which(inside_matrix[i, ])
+
+        if (length(polygons_containing) > 0) {
+            found_polygons <- polygons_sf[polygons_containing, ]
+            found_polygons_ds <- found_polygons[grepl("^DS", found_polygons$name), ]
+
+            if (nrow(found_polygons_ds) >= 1) {
+                polygon_id <- found_polygons_ds$id[1]
+                polygon_name <- found_polygons_ds$name[1]
+
+                point_polygon_dict[[point_id]] <- list(
+                    point_name = point_name,
+                    polygon_id = polygon_id,
+                    polygon_name = polygon_name
+                )
+                print(glue::glue("Point: {point_name} ({point_id}) is inside polygon: {polygon_name} ({polygon_id})"))
+            } else {
+                point_polygon_dict[[point_id]] <- list(
+                    point_name = point_name,
+                    polygon_id = NA,
+                    polygon_name = NA
+                )
+                cat("Point:", point_id, "is not inside any district (DS) polygon\n")
+            }
+        } else {
+            point_polygon_dict[[point_id]] <- list(
+                point_name = point_name,
+                polygon_id = NA,
+                polygon_name = NA
+            )
+            cat("Point:", point_id, "is not inside any district (DS) polygon\n")
+        }
+    }
+
+    point_polygon_dict
 }

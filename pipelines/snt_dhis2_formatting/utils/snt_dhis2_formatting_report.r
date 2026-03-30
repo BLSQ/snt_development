@@ -1,5 +1,9 @@
 # Shared helpers for snt_dhis2_formatting reporting notebook.
 
+printdim <- function(df, name = deparse(substitute(df))) {
+    cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
+}
+
 detect_mad_outliers <- function(data_long, deviation = 15, outlier_column = "mad_flag") {
     data_long %>%
         dplyr::group_by(OU, indicator, YEAR) %>%

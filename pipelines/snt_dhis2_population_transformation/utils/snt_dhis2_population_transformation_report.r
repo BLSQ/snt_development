@@ -16,3 +16,62 @@ create_dynamic_labels <- function(breaks) {
     )
     return(labels)
 }
+
+
+parse_metadata_scale <- function(scale_value) {
+    if (is.character(scale_value) && length(scale_value) == 1) {
+        return(jsonlite::fromJSON(scale_value))
+    }
+    as.numeric(unlist(scale_value, use.names = FALSE))
+}
+
+
+build_population_choropleth <- function(
+    population_data_filtered,
+    shapes_data,
+    population_column,
+    breaks_values,
+    labels,
+    legend_title,
+    plot_title,
+    palette_values
+) {
+    names(palette_values) <- labels
+
+    population_data_filtered %>%
+        dplyr::mutate(
+            CATEGORY_POPULATION = cut(
+                .data[[population_column]],
+                breaks = c(0, breaks_values, Inf),
+                labels = labels,
+                right = TRUE,
+                include.lowest = TRUE
+            )
+        ) %>%
+        dplyr::left_join(shapes_data, by = dplyr::join_by(ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID)) %>%
+        ggplot2::ggplot() +
+        ggplot2::geom_sf(
+            ggplot2::aes(geometry = geometry, fill = CATEGORY_POPULATION),
+            color = "black",
+            linewidth = 0.25,
+            show.legend = TRUE
+        ) +
+        ggplot2::labs(
+            title = plot_title,
+            subtitle = "Source: NMDR / DHIS2",
+            fill = legend_title
+        ) +
+        ggplot2::scale_fill_manual(values = palette_values, limits = labels, drop = FALSE) +
+        ggplot2::facet_wrap(~YEAR, ncol = 3) +
+        ggplot2::theme_void() +
+        ggplot2::theme(
+            plot.title = ggplot2::element_text(face = "bold"),
+            plot.subtitle = ggplot2::element_text(margin = ggplot2::margin(5, 0, 20, 0)),
+            legend.position = "bottom",
+            legend.title = ggplot2::element_text(face = "bold"),
+            legend.title.position = "top",
+            strip.text = ggplot2::element_text(face = "bold"),
+            legend.key.height = grid::unit(0.5, "line"),
+            legend.margin = ggplot2::margin(20, 0, 0, 0)
+        )
+}

@@ -52,6 +52,7 @@ ignore = [
     "D107", # Missing docstring in __init__
     "D401", # First line should be in imperative mood
     "D413", # Missing blank line after last section
+    "D420", # Order of the docstring sections
     "D203", # 1 blank line required before class docstring
     "SIM108", # Use ternary operators
     "SIM102", # Use a single if statement instead of nested if statements

@@ -1,5 +1,5 @@
 from pathlib import Path
-from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.sdk import current_run, parameter, pipeline, workspace, File
 from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     run_notebook,
@@ -32,14 +32,24 @@ from snt_lib.snt_pipeline_utils import (
     default="imputed",
     required=True,
 )
+# @parameter(
+#     "use_csb_data",
+#     name="Use care seeking behaviour (CSB) data (source: DHS)",
+#     help="If True, the pipeline will use care seeking behaviour data (source: DHS) for the analysis,"
+#     " and calculate incidence adjusted for care seeking behaviour ('INCIDENCE_ADJ_CARESEEKING')",
+#     type=bool,
+#     default=False,
+#     required=True,
+# )
 @parameter(
-    "use_csb_data",
-    name="Use care seeking behaviour (CSB) data (source: DHS)",
-    help="If True, the pipeline will use care seeking behaviour data (source: DHS) for the analysis,"
-    " and calculate incidence adjusted for care seeking behaviour ('INCIDENCE_ADJ_CARESEEKING')",
-    type=bool,
-    default=False,
-    required=True,
+    "careseeking_file_path",
+    name="Care seeking behaviour (CSB) data file (.csv)",
+    help="Path to the care seeking behaviour data file to be used for the analysis. If none provided,"
+    " the pipeline will attempt to load DHS data. If this is also not available, the analysis will proceed "
+    "without CSB data, hence skipping the last step of calculating 'INCIDENCE_ADJ_CARESEEKING'.",
+    type=File,
+    required=False,
+    default=None,
 )
 @parameter(
     "use_adjusted_population",
@@ -80,7 +90,7 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_incidence(
     n1_method: str,
     routine_data_choice: str,
-    use_csb_data: bool,
+    careseeking_file_path: File,
     use_adjusted_population: bool,
     disaggregation_selection: str,
     run_report_only: bool,
@@ -117,7 +127,7 @@ def snt_dhis2_incidence(
         notebook_params = {
             "N1_METHOD": n1_method,
             "ROUTINE_DATA_CHOICE": routine_data_choice,
-            "USE_CSB_DATA": use_csb_data,
+            "CARESEEKING_FILE_PATH": careseeking_file_path,
             "USE_ADJUSTED_POPULATION": use_adjusted_population,
             "DISAGGREGATION_SELECTION": (
                 mapping_dictionary.get(disaggregation_selection) if disaggregation_selection else None

@@ -6,14 +6,20 @@ message("This step sets up the environment for the DHIS2 incidence pipeline, inc
 It basically handles all the boring stuff so that you can focus on the code that matters :)
 ")
 
+# Check that PIPELINE_NAME is defined. This myst be defined at the top of each code notebook!
+if (!exists("PIPELINE_NAME")) stop("PIPELINE_NAME is not defined")
+
 setup_paths <- function() {
 SNT_ROOT_PATH <<- "/home/hexa/workspace"
 CODE_PATH <<- file.path(SNT_ROOT_PATH, 'code')
+PIPELINE_PATH <<- file.path(SNT_ROOT_PATH, 'pipelines', PIPELINE_NAME)
 CONFIG_PATH <<- file.path(SNT_ROOT_PATH, 'configuration')
 DATA_PATH <<- file.path(SNT_ROOT_PATH, 'data', 'dhis2', 'incidence')
 INTERMEDIATE_DATA_PATH <<- file.path(DATA_PATH, "intermediate_results")
 message("Paths set up:")
+message("SNT_ROOT_PATH", SNT_ROOT_PATH)
 message("CODE_PATH: ", CODE_PATH)
+message("PIPELINE_PATH: ", PIPELINE_PATH)
 message("CONFIG_PATH: ", CONFIG_PATH)
 message("DATA_PATH: ", DATA_PATH)
 message("INTERMEDIATE_DATA_PATH: ", INTERMEDIATE_DATA_PATH)
@@ -255,28 +261,50 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 # --- --- --- --- --- --- --- --- ---
 
 
-load_careseeking_data <- function() {
-    if (USE_CSB_DATA == TRUE) {
+# load_careseeking_data <- function() {
+#     # if (USE_CSB_DATA == TRUE) {
+#     if (USE_DHS_DATA == TRUE) {
+#         dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
+#         file_name <<- glue::glue("{COUNTRY_CODE}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
+#         careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
+#                       error = function(e) {
+#                           msg <- paste("🛑 Error while loading DHS Care Seeking data file from `", dataset_name, file_name ,"`.", conditionMessage(e))  # log error message
+#                           log_msg(msg, "error")
+#                           return(NULL) # make object NULL on error
+#                       })
+#         if (!is.null(careseeking_data)) {
+#             log_msg(paste0("Care Seeking data : ", file_name, " loaded from dataset : ", dataset_name))
+#             log_msg(paste0("Care Seeking data frame dimensions: ", nrow(careseeking_data), " rows, ", ncol(careseeking_data), " columns."))
+#             head(careseeking_data)
+#         } else {
+#             log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `careseeking_data` is set to `NULL`!"), "warning")
+#         }
+#     } else {
+#         careseeking_data <<- NULL
+#         print("USE_CSB_DATA is set to FALSE. Care-seeking data will be ignored and `careseeking_data` is set to `NULL`.")
+#     }
+# }
+
+load_dhs_careseeking_data <- function() {
         dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
         file_name <<- glue::glue("{COUNTRY_CODE}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
-        careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
+        dhs_careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
                       error = function(e) {
                           msg <- paste("🛑 Error while loading DHS Care Seeking data file from `", dataset_name, file_name ,"`.", conditionMessage(e))  # log error message
                           log_msg(msg, "error")
                           return(NULL) # make object NULL on error
                       })
-        if (!is.null(careseeking_data)) {
+        if (!is.null(dhs_careseeking_data)) {
             log_msg(paste0("Care Seeking data : ", file_name, " loaded from dataset : ", dataset_name))
-            log_msg(paste0("Care Seeking data frame dimensions: ", nrow(careseeking_data), " rows, ", ncol(careseeking_data), " columns."))
-            head(careseeking_data)
+            log_msg(paste0("Care Seeking data frame dimensions: ", nrow(dhs_careseeking_data), " rows, ", ncol(dhs_careseeking_data), " columns."))
+            # Added (20260331) store name of filename used for final log_msg() at end of code script 
+            careseeking_file_name <<- file_name
+            head(dhs_careseeking_data)
         } else {
-            log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `careseeking_data` is set to `NULL`!"), "warning")
+            log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `dhs_careseeking_data` is set to `NULL`!"), "warning")
         }
-    } else {
-        careseeking_data <<- NULL
-        print("USE_CSB_DATA is set to FALSE. Care-seeking data will be ignored and `careseeking_data` is set to `NULL`.")
-    }
-}
+    } 
+
 
 
 load_reporting_rate_data <- function() {

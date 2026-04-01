@@ -10,6 +10,8 @@ bootstrap_outliers_context <- function(
     code_path <- file.path(root_path, "code")
     config_path <- file.path(root_path, "configuration")
     data_path <- file.path(root_path, "data")
+    output_dir <- file.path(data_path, "dhis2", "outliers_imputation")
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
     source(file.path(code_path, "snt_utils.r"))
     install_and_load(required_packages)
@@ -39,6 +41,7 @@ bootstrap_outliers_context <- function(
         CODE_PATH = code_path,
         CONFIG_PATH = config_path,
         DATA_PATH = data_path,
+        OUTPUT_DIR = output_dir,
         openhexa = openhexa,
         config_json = config_json
     ))

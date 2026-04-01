@@ -1,5 +1,39 @@
 # Helpers for PATH outliers imputation notebook.
 
+bootstrap_path_context <- function(
+    root_path = "~/workspace",
+    required_packages = c("arrow", "tidyverse", "jsonlite", "DBI", "RPostgres", "reticulate", "glue"),
+    load_openhexa = TRUE
+) {
+    code_path <- file.path(root_path, "code")
+    config_path <- file.path(root_path, "configuration")
+    data_path <- file.path(root_path, "data")
+    output_dir <- file.path(data_path, "dhis2", "outliers_imputation")
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+    source(file.path(code_path, "snt_utils.r"))
+    install_and_load(required_packages)
+
+    Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
+    Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+
+    openhexa <- NULL
+    if (load_openhexa) {
+        openhexa <- reticulate::import("openhexa.sdk")
+    }
+    assign("openhexa", openhexa, envir = .GlobalEnv)
+
+    return(list(
+        ROOT_PATH = root_path,
+        CODE_PATH = code_path,
+        CONFIG_PATH = config_path,
+        DATA_PATH = data_path,
+        OUTPUT_DIR = output_dir,
+        openhexa = openhexa
+    ))
+}
+
 build_path_routine_long <- function(dhis2_routine, DHIS2_INDICATORS) {
     dhis2_routine %>%
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM1_NAME", "ADM2_ID", "ADM2_NAME", "OU_ID", "OU_NAME", "PERIOD", DHIS2_INDICATORS))) %>%

@@ -57,12 +57,9 @@ def snt_dhis2_outliers_imputation_magic_glasses(
     mode_clean = (mode or "partial").strip().lower()
     if mode_clean not in ("partial", "complete"):
         raise ValueError('mode must be "partial" or "complete".')
-    run_mg_partial = True
     run_mg_complete = mode_clean == "complete"
     current_run.log_info(f"Selected detection mode: {mode_clean}")
-    current_run.log_info(
-        f"Flags => RUN_MAGIC_GLASSES_PARTIAL={run_mg_partial}, RUN_MAGIC_GLASSES_COMPLETE={run_mg_complete}"
-    )
+    current_run.log_info(f"RUN_MAGIC_GLASSES_COMPLETE={run_mg_complete}")
     if run_mg_complete:
         current_run.log_warning(
             "Complete mode selected: seasonal detection is very slow and can take several hours to run."
@@ -101,8 +98,6 @@ def snt_dhis2_outliers_imputation_magic_glasses(
 
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                "OUTLIERS_METHOD": "MG_COMPLETE" if run_mg_complete else "MG_PARTIAL",
-                "RUN_MAGIC_GLASSES_PARTIAL": run_mg_partial,
                 "RUN_MAGIC_GLASSES_COMPLETE": run_mg_complete,
                 "DEVIATION_MAD15": 15,
                 "DEVIATION_MAD10": 10,

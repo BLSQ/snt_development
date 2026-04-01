@@ -1157,6 +1157,33 @@ compare_values <- function(df1, df1_colname, df2, df2_colname) {
   return(values_only_df1)
 }
 
+##########
+#' Compare unique combinations of columns between two df and return those in the first, but not in the second
+#'
+#' @param df1 first df/dt
+#' @param df1_colnames character vector with the column names in df1
+#' @param df2 second df/dt
+#' @param df2_colnames character vector with the column names in df2
+#'
+#' @return data.table of unique combinations found only in the first df/dt
+compare_combinations <- function(df1, df1_colnames, df2, df2_colnames) {
+     
+  # make both be data tables
+  df1 <- as.data.table(df1)
+  df2 <- as.data.table(df2)
+
+  # extract unique combinations of the specified columns
+  df1_combos <- unique(df1[, ..df1_colnames])
+  df2_combos <- unique(df2[, ..df2_colnames])
+
+  # align column names so fsetdiff can compare them
+  setnames(df2_combos, old = df2_colnames, new = df1_colnames)
+
+  # return combinations only in df1
+  values_only_df1 <- fsetdiff(df1_combos, df2_combos)
+  return(values_only_df1)
+}
+
 #########################################
 aggregate_geometry <- function(sf_data, admin_id_colname, admin_name_colname) {
   #' aggregate the geometries of sf data, at a specified level, given by id and name columns

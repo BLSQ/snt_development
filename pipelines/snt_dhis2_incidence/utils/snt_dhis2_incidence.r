@@ -260,50 +260,76 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 
 # --- --- --- --- --- --- --- --- ---
 
+load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = config_json) {
+    # 1. Prepare identifiers
+    dataset_name <- config$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
+    file_name    <- glue::glue("{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
+    # 2. Attempt to load
+    data <- tryCatch({
+        get_latest_dataset_file_in_memory(dataset_name, file_name)
+    }, error = function(e) {
+        # log_msg(paste("🛑 Error loading DHS data:", conditionMessage(e)), "error")
+        return(NULL)
+    })
+    # 3. Validation & Logging
+    if (!is.null(data)) {
+        log_msg(glue::glue("✅ Care Seeking data: {file_name} loaded from {dataset_name}"))
+        log_msg(glue::glue("Dimensions: {nrow(data)} rows, {ncol(data)} columns."))
+        # Keep this global becuase it's needed for the final log summary (at the end of the script)
+        careseeking_file_name <<- file_name 
+        return(data)
+    } else {
+        log_msg("Loading of careseeking data from DHS failed. Returning NULL.", "warning")
+        return(NULL)
+    }
+}
 
-# load_careseeking_data <- function() {
-#     # if (USE_CSB_DATA == TRUE) {
-#     if (USE_DHS_DATA == TRUE) {
-#         dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
-#         file_name <<- glue::glue("{COUNTRY_CODE}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
-#         careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
-#                       error = function(e) {
-#                           msg <- paste("🛑 Error while loading DHS Care Seeking data file from `", dataset_name, file_name ,"`.", conditionMessage(e))  # log error message
-#                           log_msg(msg, "error")
-#                           return(NULL) # make object NULL on error
-#                       })
-#         if (!is.null(careseeking_data)) {
-#             log_msg(paste0("Care Seeking data : ", file_name, " loaded from dataset : ", dataset_name))
-#             log_msg(paste0("Care Seeking data frame dimensions: ", nrow(careseeking_data), " rows, ", ncol(careseeking_data), " columns."))
-#             head(careseeking_data)
-#         } else {
-#             log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `careseeking_data` is set to `NULL`!"), "warning")
-#         }
-#     } else {
-#         careseeking_data <<- NULL
-#         print("USE_CSB_DATA is set to FALSE. Care-seeking data will be ignored and `careseeking_data` is set to `NULL`.")
-#     }
-# }
 
-load_dhs_careseeking_data <- function() {
-        dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
-        file_name <<- glue::glue("{COUNTRY_CODE}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
-        dhs_careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
-                      error = function(e) {
-                          msg <- paste("🛑 Error while loading DHS Care Seeking data file from `", dataset_name, file_name ,"`.", conditionMessage(e))  # log error message
-                          log_msg(msg, "error")
-                          return(NULL) # make object NULL on error
-                      })
-        if (!is.null(dhs_careseeking_data)) {
-            log_msg(paste0("Care Seeking data : ", file_name, " loaded from dataset : ", dataset_name))
-            log_msg(paste0("Care Seeking data frame dimensions: ", nrow(dhs_careseeking_data), " rows, ", ncol(dhs_careseeking_data), " columns."))
-            # Added (20260331) store name of filename used for final log_msg() at end of code script 
-            careseeking_file_name <<- file_name
-            head(dhs_careseeking_data)
-        } else {
-            log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `dhs_careseeking_data` is set to `NULL`!"), "warning")
+validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
+    if (is.null(data)) {
+        print("No careseeking data to validate.")
+        return(NULL)
+    }
+    log_msg("Validating careseeking data...")
+    # 1. Determine which column we expect based on the source
+    # This keeps the logic modular and avoids repeating column-specific checks
+    target_col <- if (from_file) "CARESEEKING_PCT" else if (from_dhs) "PCT_PUBLIC_CARE" else NULL
+    # 2. Check for ADM1_ID and the source-specific percentage column
+    required_cols <- c("ADM1_ID", target_col)
+    missing_cols  <- setdiff(required_cols, colnames(data))
+    if (length(missing_cols) > 0) {
+        log_msg(paste("Required columns missing:", paste(missing_cols, collapse = ", ")), "error")
+        return(NULL)
+    }
+    # 3. Ensure the percentage column is numeric
+    if (!is.numeric(data[[target_col]])) {
+        log_msg(paste("Column", target_col, "is not numeric. Attempting conversion..."), "warning")
+        # Try to convert, but keep a backup to check for conversion failures
+        converted_vals <- as.numeric(data[[target_col]])
+        if (any(is.na(converted_vals)) && any(!is.na(data[[target_col]]))) {
+            log_msg(paste("Non-numeric values found in", target_col, ". Validation failed."), "error")
+            return(NULL)
         }
-    } 
+        data[[target_col]] <- converted_vals
+    }
+    # 4. Handle Range Adjustment (0-1 to 0-100)
+    # We check if the maximum is <= 1 to see if it's likely a proportion
+    max_val <- max(data[[target_col]], na.rm = TRUE)
+    if (!is.na(max_val) && max_val <= 1) {
+        log_msg(paste("Values in", target_col, "appear to be 0-1. Scaling to 0-100."), "warning")
+        data[[target_col]] <- data[[target_col]] * 100
+    }
+    # 5. STANDARDIZATION STEP: Rename to CARESEEKING_PCT
+    if (target_col != "CARESEEKING_PCT") {
+        log_msg(paste("Renaming source column", target_col, "to standardized name 'CARESEEKING_PCT'."))
+        colnames(data)[colnames(data) == target_col] <- "CARESEEKING_PCT"
+    }
+    log_msg("✅ Careseeking data validation and formatting completed.")
+    return(data)
+}
+
+
+
 
 
 

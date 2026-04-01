@@ -1132,18 +1132,18 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
 #%% MISC FUNCTIONS
                             
 
-#########################################
+##########
+#' Compare the unique values of two columns from two df/dt
+#' 
+#' @param df1 first df/dt
+#' @param df1_colname string with the column name in df1
+#' @param df2 second df/dt
+#' @param df2_colname string with the column name in df2
+#'
+#' @return unique values found only in the first df/dt
 compare_values <- function(df1, df1_colname, df2, df2_colname) {
-  #' Compare unique values of a column between two df and return those in the first, but not in the second
-  #'
-  #' @param df1 first df/dt
-  #' @param df1_colname string with the column name in df1
-  #' @param df2 second df/dt
-  #' @param df2_colname string with the column name in df2
-  #'
-  #' @return unique values found only in the first df/dt
-  
-  # make both be dta tables
+
+  # make both be data tables
   df1 <- as.data.table(df1)
   df2 <- as.data.table(df2)
   

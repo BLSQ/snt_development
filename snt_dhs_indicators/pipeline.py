@@ -55,6 +55,8 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
                 "snt_dhs_mortality_computation.ipynb",
                 "snt_dhs_prevalence_computation.ipynb",
                 "snt_dhs_vaccination_computation.ipynb",
+                "utils/snt_dhs_indicator_tables.r",
+                "utils/snt_dhs_careseeking_computation.r",
             ],
         )
 

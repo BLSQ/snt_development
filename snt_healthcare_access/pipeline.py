@@ -139,7 +139,7 @@ def snt_healthcare_access(
         pull_scripts_from_repository(
             pipeline_name="snt_healthcare_access",
             report_scripts=["snt_healthcare_access_report.ipynb"],
-            code_scripts=["snt_healthcare_access.ipynb"],
+            code_scripts=["snt_healthcare_access.ipynb", "utils/snt_healthcare_access.r"],
         )
 
     try:

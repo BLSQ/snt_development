@@ -97,7 +97,7 @@ def snt_seasonality_rainfall(
         pull_scripts_from_repository(
             pipeline_name="snt_seasonality_rainfall",
             report_scripts=["snt_seasonality_rainfall_report.ipynb"],
-            code_scripts=["snt_seasonality_rainfall.ipynb"],
+            code_scripts=["snt_seasonality_rainfall.ipynb", "utils/snt_seasonality_rainfall.r"],
         )
 
     # ------------------------------------------------------------------

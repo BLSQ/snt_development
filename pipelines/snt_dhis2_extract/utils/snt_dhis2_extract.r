@@ -1,5 +1,35 @@
 # Shared helpers for snt_dhis2_extract notebooks.
 
+bootstrap_dhis2_extract_context <- function(
+    root_path = "~/workspace",
+    required_packages = c("arrow", "dplyr", "tidyverse", "jsonlite", "reticulate", "glue", "sf"),
+    load_openhexa = TRUE
+) {
+    code_path <- file.path(root_path, "code")
+    pipeline_path <- file.path(root_path, "pipelines", "snt_dhis2_extract")
+
+    source(file.path(code_path, "snt_utils.r"))
+    install_and_load(required_packages)
+
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+    openhexa <- NULL
+    openhexa_toolbox <- NULL
+    if (load_openhexa) {
+        openhexa <- reticulate::import("openhexa.sdk")
+        openhexa_toolbox <- reticulate::import("openhexa.toolbox")
+    }
+    assign("openhexa", openhexa, envir = .GlobalEnv)
+    assign("openhexa_toolbox", openhexa_toolbox, envir = .GlobalEnv)
+
+    list(
+        ROOT_PATH = root_path,
+        CODE_PATH = code_path,
+        PIPELINE_PATH = pipeline_path,
+        openhexa = openhexa,
+        openhexa_toolbox = openhexa_toolbox
+    )
+}
+
 printdim <- function(df, name = deparse(substitute(df))) {
     cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
 }

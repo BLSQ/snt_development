@@ -1,3 +1,41 @@
+bootstrap_healthcare_access_context <- function(
+    root_path = "~/workspace",
+    required_packages = c(
+        "jsonlite", "dplyr", "data.table", "ggplot2", "arrow", "glue",
+        "sf", "terra", "httr", "reticulate", "stringr"
+    ),
+    load_openhexa = TRUE
+) {
+    code_path <- file.path(root_path, "code")
+    config_path <- file.path(root_path, "configuration")
+    data_path <- file.path(root_path, "data")
+    output_data_path <- file.path(data_path, "healthcare_access")
+    output_plots_path <- file.path(root_path, "pipelines", "snt_healthcare_access", "reporting", "outputs")
+    dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
+    dir.create(output_plots_path, recursive = TRUE, showWarnings = FALSE)
+
+    source(file.path(code_path, "snt_utils.r"))
+    install_and_load(required_packages)
+    terra::terraOptions(memfrac = 0.5)
+
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+    openhexa <- NULL
+    if (load_openhexa) {
+        openhexa <- reticulate::import("openhexa.sdk")
+    }
+    assign("openhexa", openhexa, envir = .GlobalEnv)
+
+    list(
+        ROOT_PATH = root_path,
+        CODE_PATH = code_path,
+        CONFIG_PATH = config_path,
+        DATA_PATH = data_path,
+        OUTPUT_DATA_PATH = output_data_path,
+        OUTPUT_PLOTS_PATH = output_plots_path,
+        openhexa = openhexa
+    )
+}
+
 load_spatial_units_data <- function(shapes_file, dhis2_dataset, country_code) {
     if (!is.null(shapes_file) && !is.na(shapes_file) && trimws(shapes_file) != "") {
         custom_shapes_path <- path.expand(shapes_file)

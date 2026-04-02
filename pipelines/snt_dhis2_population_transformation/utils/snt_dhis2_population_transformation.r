@@ -1,3 +1,32 @@
+bootstrap_population_transformation_context <- function(
+    root_path = "~/workspace",
+    required_packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate", "rlang"),
+    load_openhexa = TRUE
+) {
+    code_path <- file.path(root_path, "code")
+    config_path <- file.path(root_path, "configuration")
+    population_data_path <- file.path(root_path, "data", "dhis2", "population_transformed")
+    dir.create(population_data_path, recursive = TRUE, showWarnings = FALSE)
+
+    source(file.path(code_path, "snt_utils.r"))
+    install_and_load(required_packages)
+
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+    openhexa <- NULL
+    if (load_openhexa) {
+        openhexa <- reticulate::import("openhexa.sdk")
+    }
+    assign("openhexa", openhexa, envir = .GlobalEnv)
+
+    list(
+        ROOT_PATH = root_path,
+        CODE_PATH = code_path,
+        CONFIG_PATH = config_path,
+        POPULATION_DATA_PATH = population_data_path,
+        openhexa = openhexa
+    )
+}
+
 get_total_population_reference <- function(config_json, adjust_with_untotals = FALSE) {
     if (!adjust_with_untotals) {
         return(NULL)

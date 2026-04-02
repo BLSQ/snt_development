@@ -1,3 +1,55 @@
+bootstrap_dhs_indicators_context <- function(
+    root_path = "~/workspace",
+    required_packages = c(
+        "haven", "sf", "glue", "survey", "data.table", "stringi",
+        "jsonlite", "httr", "reticulate", "arrow"
+    ),
+    load_openhexa = TRUE
+) {
+    code_path <- file.path(root_path, "code")
+    config_path <- file.path(root_path, "configuration")
+    data_path <- file.path(root_path, "data")
+    dhs_data_path <- file.path(data_path, "dhs", "raw")
+
+    source(file.path(code_path, "snt_utils.r"))
+    install_and_load(required_packages)
+
+    Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
+    Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+
+    openhexa <- NULL
+    if (load_openhexa) {
+        openhexa <- reticulate::import("openhexa.sdk")
+    }
+    assign("openhexa", openhexa, envir = .GlobalEnv)
+
+    config_file_name <- "SNT_config.json"
+    config_json <- tryCatch(
+        {
+            jsonlite::fromJSON(file.path(config_path, config_file_name))
+        },
+        error = function(e) {
+            msg <- paste0("Error while loading configuration", conditionMessage(e))
+            cat(msg)
+            stop(msg)
+        }
+    )
+
+    log_msg(paste0("SNT configuration loaded from  : ", file.path(config_path, config_file_name)))
+
+    list(
+        ROOT_PATH = root_path,
+        CODE_PATH = code_path,
+        CONFIG_PATH = config_path,
+        DATA_PATH = data_path,
+        DHS_DATA_PATH = dhs_data_path,
+        config_json = config_json,
+        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
+        openhexa = openhexa
+    )
+}
+
 compute_and_export_indicator_table <- function(
     design_obj,
     indicator_name,

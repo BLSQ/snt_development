@@ -47,6 +47,37 @@ bootstrap_outliers_context <- function(
     ))
 }
 
+load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
+    dhis2_routine <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_routine.parquet"))
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading DHIS2 routine data file for {country_code} : {conditionMessage(e)}")
+            log_msg(msg)
+            stop(msg)
+        }
+    )
+
+    log_msg(glue::glue("DHIS2 routine data loaded from dataset : {dataset_name}"))
+    log_msg(glue::glue("DHIS2 routine data loaded has dimensions: {nrow(dhis2_routine)} rows, {ncol(dhis2_routine)} columns."))
+
+    if (cast_year_month && all(c("YEAR", "MONTH") %in% colnames(dhis2_routine))) {
+        dhis2_routine[c("YEAR", "MONTH")] <- lapply(dhis2_routine[c("YEAR", "MONTH")], as.integer)
+    }
+
+    if (!is.null(required_indicators)) {
+        missing_indicators <- setdiff(required_indicators, colnames(dhis2_routine))
+        if (length(missing_indicators) > 0) {
+            msg <- paste("[ERROR] Missing indicator column(s) in routine data:", paste(missing_indicators, collapse = ", "))
+            log_msg(msg)
+            stop(msg)
+        }
+    }
+
+    dhis2_routine
+}
+
 impute_outliers_dt <- function(dt, outlier_col) {
     dt <- data.table::as.data.table(dt)
     data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)

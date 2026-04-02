@@ -33,6 +33,37 @@ bootstrap_magic_glasses_context <- function(
     ))
 }
 
+load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
+    dhis2_routine <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_routine.parquet"))
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading DHIS2 routine data file for {country_code} : {conditionMessage(e)}")
+            log_msg(msg)
+            stop(msg)
+        }
+    )
+
+    log_msg(glue::glue("DHIS2 routine data loaded from dataset : {dataset_name}"))
+    log_msg(glue::glue("DHIS2 routine data loaded has dimensions: {nrow(dhis2_routine)} rows, {ncol(dhis2_routine)} columns."))
+
+    if (cast_year_month && all(c("YEAR", "MONTH") %in% colnames(dhis2_routine))) {
+        dhis2_routine[c("YEAR", "MONTH")] <- lapply(dhis2_routine[c("YEAR", "MONTH")], as.integer)
+    }
+
+    if (!is.null(required_indicators)) {
+        missing_indicators <- setdiff(required_indicators, colnames(dhis2_routine))
+        if (length(missing_indicators) > 0) {
+            msg <- paste("[ERROR] Missing indicator column(s) in routine data:", paste(missing_indicators, collapse = ", "))
+            log_msg(msg)
+            stop(msg)
+        }
+    }
+
+    dhis2_routine
+}
+
 detect_outliers_mad_custom <- function(dt, deviation) {
     flag_col <- paste0("OUTLIER_MAD", deviation)
     dt <- data.table::copy(dt)
@@ -177,22 +208,11 @@ prepare_magic_glasses_input <- function(
     indicators_to_keep <- names(config_json$DHIS2_DATA_DEFINITIONS$DHIS2_INDICATOR_DEFINITIONS)
 
     dataset_name <- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
-    dhis2_routine <- tryCatch(
-        {
-            get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_routine.parquet"))
-        },
-        error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading DHIS2 routine data file for {country_code} : {conditionMessage(e)}")
-            log_msg(msg)
-            stop(msg)
-        }
+    dhis2_routine <- load_routine_data(
+        dataset_name = dataset_name,
+        country_code = country_code,
+        required_indicators = indicators_to_keep
     )
-    log_msg(glue::glue("DHIS2 routine data loaded from dataset : {dataset_name}"))
-    log_msg(glue::glue("DHIS2 routine data loaded has dimensions: {nrow(dhis2_routine)} rows, {ncol(dhis2_routine)} columns."))
-
-    if (all(c("YEAR", "MONTH") %in% names(dhis2_routine))) {
-        dhis2_routine[c("YEAR", "MONTH")] <- lapply(dhis2_routine[c("YEAR", "MONTH")], as.integer)
-    }
 
     cols_to_select <- intersect(c(fixed_cols, indicators_to_keep), names(dhis2_routine))
     dt_routine <- data.table::as.data.table(dhis2_routine)[, ..cols_to_select]

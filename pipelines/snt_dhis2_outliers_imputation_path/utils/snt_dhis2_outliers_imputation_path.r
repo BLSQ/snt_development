@@ -1,5 +1,15 @@
 # Helpers for PATH outliers imputation notebook.
 
+#' Initialize runtime context for the PATH outliers pipeline.
+#'
+#' Creates standard project paths, loads shared dependencies and utilities,
+#' initializes OpenHEXA SDK access, and returns a context object used by
+#' notebooks.
+#'
+#' @param root_path Project root folder (workspace).
+#' @param required_packages Character vector of R packages to install/load.
+#' @param load_openhexa Logical; import OpenHEXA SDK when TRUE.
+#' @return Named list with paths, OpenHEXA handle, and parsed config.
 bootstrap_path_context <- function(
     root_path = "~/workspace",
     required_packages = c("arrow", "tidyverse", "jsonlite", "DBI", "RPostgres", "reticulate", "glue"),
@@ -24,16 +34,39 @@ bootstrap_path_context <- function(
     }
     assign("openhexa", openhexa, envir = .GlobalEnv)
 
+    config_json <- tryCatch(
+        {
+            jsonlite::fromJSON(file.path(config_path, "SNT_config.json"))
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading configuration {conditionMessage(e)}")
+            log_msg(msg)
+            stop(msg)
+        }
+    )
+
     return(list(
         ROOT_PATH = root_path,
         CODE_PATH = code_path,
         CONFIG_PATH = config_path,
         DATA_PATH = data_path,
         OUTPUT_DIR = output_dir,
-        openhexa = openhexa
+        openhexa = openhexa,
+        config_json = config_json
     ))
 }
 
+#' Load DHIS2 routine input data with validation and logging.
+#'
+#' Reads the latest routine parquet file from OpenHEXA, logs dataset details,
+#' optionally casts YEAR and MONTH to integers, and validates indicator columns.
+#' Stops execution with a clear error when required fields are missing.
+#'
+#' @param dataset_name OpenHEXA dataset identifier/name.
+#' @param country_code Country code used in routine filename prefix.
+#' @param required_indicators Optional character vector of required indicators.
+#' @param cast_year_month Logical; cast YEAR/MONTH columns to integer.
+#' @return Data frame containing validated routine data.
 load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
     dhis2_routine <- tryCatch(
         {
@@ -65,6 +98,15 @@ load_routine_data <- function(dataset_name, country_code, required_indicators = 
     dhis2_routine
 }
 
+#' Build PATH-ready long routine table.
+#'
+#' Selects required administrative/time columns, pivots indicator values to
+#' long format, and completes missing PERIOD/INDICATOR combinations for each
+#' location.
+#'
+#' @param dhis2_routine Routine data in wide format.
+#' @param DHIS2_INDICATORS Indicator column names to pivot.
+#' @return Long-format routine data frame used by PATH detection.
 build_path_routine_long <- function(dhis2_routine, DHIS2_INDICATORS) {
     dhis2_routine %>%
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM1_NAME", "ADM2_ID", "ADM2_NAME", "OU_ID", "OU_NAME", "PERIOD", DHIS2_INDICATORS))) %>%
@@ -73,6 +115,13 @@ build_path_routine_long <- function(dhis2_routine, DHIS2_INDICATORS) {
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD", "INDICATOR", "VALUE")))
 }
 
+#' Remove duplicate observations in PATH long routine data.
+#'
+#' Detects duplicate keys at ADM/OU/PERIOD/INDICATOR level, logs duplicate
+#' counts, and keeps distinct rows only when duplicates exist.
+#'
+#' @param dhis2_routine_long Long-format routine data frame.
+#' @return List with cleaned `data` and `duplicated` summary table.
 remove_path_duplicates <- function(dhis2_routine_long) {
     duplicated <- dhis2_routine_long %>%
         dplyr::group_by(ADM1_ID, ADM2_ID, OU_ID, PERIOD, INDICATOR) %>%
@@ -88,6 +137,15 @@ remove_path_duplicates <- function(dhis2_routine_long) {
     list(data = dhis2_routine_long, duplicated = duplicated)
 }
 
+#' Detect potential stock-out exceptions in PATH logic.
+#'
+#' Flags periods where PRES is marked outlier while TEST is unusually low and
+#' PRES remains within a reasonable upper range, indicating likely stock-out
+#' behavior rather than true anomaly.
+#'
+#' @param dhis2_routine_outliers Routine table with OUTLIER_TREND and stats.
+#' @param MEAN_DEVIATION Deviation multiplier used in PATH thresholds.
+#' @return Data frame of flagged stock-out exception keys.
 detect_possible_stockout <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
     low_testing_periods <- dhis2_routine_outliers %>%
         dplyr::filter(INDICATOR == "TEST") %>%
@@ -105,6 +163,15 @@ detect_possible_stockout <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD", "POSSIBLE_STKOUT")))
 }
 
+#' Detect potential epidemic exceptions in PATH logic.
+#'
+#' Identifies periods where CONF is outlier and TEST also supports epidemic
+#' behavior (test outlier or TEST >= CONF), so values should not be suppressed
+#' as reporting anomalies.
+#'
+#' @param dhis2_routine_outliers Routine table with OUTLIER_TREND and stats.
+#' @param MEAN_DEVIATION Deviation multiplier used in PATH thresholds.
+#' @return Data frame of flagged epidemic exception keys.
 detect_possible_epidemic <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
     dhis2_routine_outliers %>%
         dplyr::filter(INDICATOR == "TEST" | INDICATOR == "CONF") %>%
@@ -121,6 +188,15 @@ detect_possible_epidemic <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD", "POSSIBLE_EPID")))
 }
 
+#' Apply PATH exception logic and build cleaned outlier table.
+#'
+#' Joins stock-out and epidemic exception flags, updates OUTLIER_TREND after
+#' exception rules, and standardizes key output columns including YEAR/MONTH.
+#'
+#' @param dhis2_routine_outliers Base PATH outlier table.
+#' @param possible_stockout Output from `detect_possible_stockout`.
+#' @param possible_epidemic Output from `detect_possible_epidemic`.
+#' @return Cleaned long-format outlier table for imputation/export.
 build_path_clean_outliers <- function(dhis2_routine_outliers, possible_stockout, possible_epidemic) {
     dhis2_routine_outliers %>%
         dplyr::left_join(possible_stockout, by = c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD")) %>%
@@ -140,6 +216,14 @@ build_path_clean_outliers <- function(dhis2_routine_outliers, possible_stockout,
         )))
 }
 
+#' Impute PATH outliers and enforce TEST/CONF consistency.
+#'
+#' Replaces flagged values using MEAN_80, reshapes data to evaluate TEST vs CONF
+#' consistency, and reverts impossible imputations when they create TEST < CONF
+#' while original values were logically consistent.
+#'
+#' @param routine_data_outliers_clean Clean outlier table from PATH logic.
+#' @return Long-format routine table with VALUE_OLD, VALUE_IMPUTED and flags.
 impute_path_outliers <- function(routine_data_outliers_clean) {
     routine_data_outliers_clean %>%
         dplyr::rename(VALUE_OLD = VALUE) %>%

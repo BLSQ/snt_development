@@ -1,4 +1,18 @@
 # Shared bootstrap for the IQR outliers pipeline notebooks.
+#
+# Function docs use lightweight R comments to keep notebooks readable
+# while documenting expected inputs/outputs for analysts and maintainers.
+
+#' Initialize runtime context for the IQR outliers pipeline.
+#'
+#' Creates standard project paths, loads shared dependencies and utilities,
+#' initializes OpenHEXA SDK access, loads SNT configuration, and returns a
+#' single context object used by notebooks.
+#'
+#' @param root_path Project root folder (workspace).
+#' @param required_packages Character vector of R packages to install/load.
+#' @param load_openhexa Logical; import OpenHEXA SDK when TRUE.
+#' @return Named list with paths, OpenHEXA handle, and parsed config.
 bootstrap_iqr_context <- function(
     root_path = "~/workspace",
     required_packages = c(
@@ -24,6 +38,8 @@ bootstrap_iqr_context <- function(
     if (load_openhexa) {
         openhexa <- reticulate::import("openhexa.sdk")
     }
+    # snt_utils::log_msg() expects a global `openhexa` object.
+    assign("openhexa", openhexa, envir = .GlobalEnv)
 
     config_json <- tryCatch(
         {
@@ -47,6 +63,17 @@ bootstrap_iqr_context <- function(
     ))
 }
 
+#' Load DHIS2 routine input data with validation and logging.
+#'
+#' Reads the latest routine parquet file from OpenHEXA, logs dataset details,
+#' optionally casts YEAR and MONTH to integers, and validates indicator columns.
+#' Stops execution with a clear error when required fields are missing.
+#'
+#' @param dataset_name OpenHEXA dataset identifier/name.
+#' @param country_code Country code used in routine filename prefix.
+#' @param required_indicators Optional character vector of required indicators.
+#' @param cast_year_month Logical; cast YEAR/MONTH columns to integer.
+#' @return Data frame containing validated routine data.
 load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
     dhis2_routine <- tryCatch(
         {
@@ -78,7 +105,15 @@ load_routine_data <- function(dataset_name, country_code, required_indicators = 
     dhis2_routine
 }
 
-# Compute moving-average imputations for a selected outlier flag column.
+#' Impute flagged outliers using a centered moving average.
+#'
+#' For each ADM/OU/indicator time series, values marked as outliers are
+#' replaced by a 3-point centered moving average (ceiling), preserving
+#' non-outlier observations.
+#'
+#' @param dt Routine data in long format.
+#' @param outlier_col Name of the logical outlier flag column.
+#' @return Data frame with VALUE_IMPUTED column and helper columns removed.
 impute_outliers_dt <- function(dt, outlier_col) {
     dt <- data.table::as.data.table(dt)
     data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)
@@ -97,7 +132,19 @@ impute_outliers_dt <- function(dt, outlier_col) {
     return(as.data.frame(data.table::copy(dt)))
 }
 
-# Format imputed/removed routine output tables.
+#' Build final routine output tables (imputed or removed).
+#'
+#' Reshapes long-format routine values back to wide indicator columns, joins
+#' location names, and standardizes output columns expected by downstream
+#' datasets and reporting.
+#'
+#' @param df Long-format routine data including VALUE_IMPUTED.
+#' @param outlier_column Outlier flag column used to filter removed records.
+#' @param DHIS2_INDICATORS Indicator columns to keep in the final table.
+#' @param fixed_cols Fixed identifier/date columns in long format.
+#' @param pyramid_names Mapping table with ADM/OU names.
+#' @param remove Logical; when TRUE returns outlier-removed data.
+#' @return Wide routine data frame ready for export.
 format_routine_data_selection <- function(
     df,
     outlier_column,

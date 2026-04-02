@@ -1,4 +1,15 @@
 # Main helpers for magic glasses outliers imputation pipeline.
+
+#' Initialize runtime context for the Magic Glasses pipeline.
+#'
+#' Creates standard project paths, loads shared dependencies and utilities,
+#' initializes OpenHEXA SDK access, and returns a context object consumed by
+#' downstream setup and processing functions.
+#'
+#' @param root_path Project root folder (workspace).
+#' @param required_packages Character vector of R packages to install/load.
+#' @param load_openhexa Logical; import OpenHEXA SDK when TRUE.
+#' @return Named list with paths and OpenHEXA handle.
 bootstrap_magic_glasses_context <- function(
     root_path = "~/workspace",
     required_packages = c("arrow", "data.table", "jsonlite", "reticulate", "glue"),
@@ -33,6 +44,17 @@ bootstrap_magic_glasses_context <- function(
     ))
 }
 
+#' Load DHIS2 routine input data with validation and logging.
+#'
+#' Reads the latest routine parquet file from OpenHEXA, logs dataset details,
+#' optionally casts YEAR and MONTH to integers, and validates indicator columns.
+#' Stops execution with a clear error when required fields are missing.
+#'
+#' @param dataset_name OpenHEXA dataset identifier/name.
+#' @param country_code Country code used in routine filename prefix.
+#' @param required_indicators Optional character vector of required indicators.
+#' @param cast_year_month Logical; cast YEAR/MONTH columns to integer.
+#' @return Data frame containing validated routine data.
 load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
     dhis2_routine <- tryCatch(
         {
@@ -64,6 +86,14 @@ load_routine_data <- function(dataset_name, country_code, required_indicators = 
     dhis2_routine
 }
 
+#' Detect point outliers using MAD thresholding.
+#'
+#' Computes median and MAD by YEAR, OU_ID and INDICATOR, then flags observations
+#' outside median +/- deviation * MAD.
+#'
+#' @param dt Long-format routine data table.
+#' @param deviation Numeric MAD multiplier.
+#' @return Data table with method-specific outlier flag column.
 detect_outliers_mad_custom <- function(dt, deviation) {
     flag_col <- paste0("OUTLIER_MAD", deviation)
     dt <- data.table::copy(dt)
@@ -75,6 +105,16 @@ detect_outliers_mad_custom <- function(dt, deviation) {
     dt
 }
 
+#' Detect seasonal outliers using cleaned time series residuals.
+#'
+#' Applies `forecast::tsclean` per OU/indicator series and flags observations
+#' whose distance from cleaned signal exceeds a MAD-scaled deviation threshold.
+#' Supports optional parallel execution when workers > 1.
+#'
+#' @param dt Long-format routine data table.
+#' @param deviation Numeric threshold on scaled residuals.
+#' @param workers Number of parallel workers for group processing.
+#' @return Data table with seasonal outlier flag column.
 detect_seasonal_outliers <- function(dt, deviation, workers = 1) {
     outlier_col <- paste0("OUTLIER_SEASONAL", deviation)
     dt <- data.table::copy(dt)
@@ -138,6 +178,16 @@ detect_seasonal_outliers <- function(dt, deviation, workers = 1) {
     result_dt
 }
 
+#' Convert long routine data back to wide export format.
+#'
+#' Casts indicator rows to columns, joins administrative names, and guarantees
+#' expected export columns exist with appropriate default types.
+#'
+#' @param dt_long Long-format routine data.
+#' @param fixed_cols Fixed identifier/date columns.
+#' @param indicators_to_keep Indicator columns expected in output.
+#' @param pyramid_names Mapping table with ADM/OU names.
+#' @return Wide routine data table ready for parquet export.
 to_routine_wide <- function(dt_long, fixed_cols, indicators_to_keep, pyramid_names) {
     routine_wide <- data.table::dcast(
         dt_long[, .(PERIOD, YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, VALUE)],
@@ -162,6 +212,19 @@ to_routine_wide <- function(dt_long, fixed_cols, indicators_to_keep, pyramid_nam
     routine_wide
 }
 
+#' Prepare validated inputs for Magic Glasses detection.
+#'
+#' Bootstraps runtime context, loads configuration and routine input data,
+#' validates required indicators, reshapes data to long format, deduplicates
+#' keys, and optionally subsets data for development runs.
+#'
+#' @param root_path Project root folder (workspace).
+#' @param config_file_name Configuration filename under configuration folder.
+#' @param run_complete Logical; enable seasonal complete mode.
+#' @param seasonal_workers Number of workers for seasonal detection.
+#' @param dev_subset Logical; keep only a subset of ADM1 for development.
+#' @param dev_subset_adm1_n Number of ADM1 values to keep in dev mode.
+#' @return List with setup context, config variables and prepared data tables.
 prepare_magic_glasses_input <- function(
     root_path,
     config_file_name = "SNT_config.json",
@@ -193,15 +256,6 @@ prepare_magic_glasses_input <- function(
     }
 
     config_json <- jsonlite::fromJSON(file.path(setup_ctx$CONFIG_PATH, config_file_name))
-
-    snt_config_mandatory <- c("COUNTRY_CODE", "DHIS2_ADMINISTRATION_1", "DHIS2_ADMINISTRATION_2")
-    for (conf in snt_config_mandatory) {
-        if (is.null(config_json$SNT_CONFIG[[conf]])) {
-            msg <- paste("Missing configuration input:", conf)
-            log_msg(msg)
-            stop(msg)
-        }
-    }
 
     country_code <- config_json$SNT_CONFIG$COUNTRY_CODE
     fixed_cols <- c("PERIOD", "YEAR", "MONTH", "ADM1_ID", "ADM2_ID", "OU_ID")
@@ -264,6 +318,20 @@ prepare_magic_glasses_input <- function(
     )
 }
 
+#' Run Magic Glasses outlier detection workflow.
+#'
+#' Executes MAD15 then MAD10 detection, and optionally seasonal5 then seasonal3
+#' detection for complete mode, returning intermediate/final flag tables used by
+#' export and reporting.
+#'
+#' @param dhis2_routine_long Long-format routine data.
+#' @param deviation_mad15 MAD threshold for first pass.
+#' @param deviation_mad10 MAD threshold for second pass.
+#' @param run_complete Logical; run seasonal stages when TRUE.
+#' @param deviation_seasonal5 Seasonal threshold for first seasonal pass.
+#' @param deviation_seasonal3 Seasonal threshold for second seasonal pass.
+#' @param seasonal_workers Number of workers for seasonal detection.
+#' @return List with partial and complete outlier-flag tables.
 run_magic_glasses_outlier_detection <- function(
     dhis2_routine_long,
     deviation_mad15 = 15,
@@ -344,6 +412,21 @@ run_magic_glasses_outlier_detection <- function(
     )
 }
 
+#' Export Magic Glasses outputs for datasets and downstream use.
+#'
+#' Builds unified detection table, writes imputed and removed routine outputs,
+#' and chooses partial or complete outlier flag depending on execution mode.
+#'
+#' @param dhis2_routine_long Long-format routine data used as base.
+#' @param flagged_outliers_mad15_mad10 Partial detection output.
+#' @param flagged_outliers_seasonal5_seasonal3 Complete detection output.
+#' @param run_complete Logical; export complete method flags when available.
+#' @param dhis2_routine Original wide routine table for name mapping.
+#' @param fixed_cols Fixed identifier/date columns.
+#' @param indicators_to_keep Indicator columns expected in outputs.
+#' @param output_dir Output folder path.
+#' @param country_code Country code used in output filenames.
+#' @return Invisible list with selected active outlier column metadata.
 export_magic_glasses_outputs <- function(
     dhis2_routine_long,
     flagged_outliers_mad15_mad10,

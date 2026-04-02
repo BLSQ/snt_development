@@ -36,6 +36,37 @@ bootstrap_seasonality_cases_context <- function(
     )
 }
 
+load_seasonality_input_data <- function(dataset_name, country_code) {
+    spatial_filename <- paste(country_code, "shapes.geojson", sep = "_")
+    routine_filename <- paste(country_code, "routine.parquet", sep = "_")
+
+    spatial_data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, spatial_filename)
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading DHIS2 shapes file for {country_code}: {conditionMessage(e)}")
+            log_msg(msg, level = "error")
+            stop(msg)
+        }
+    )
+    log_msg(glue::glue("File {spatial_filename} successfully loaded from dataset version: {dataset_name}"))
+
+    original_dt <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, routine_filename)
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading DHIS2 routine file for {country_code}: {conditionMessage(e)}")
+            log_msg(msg, level = "error")
+            stop(msg)
+        }
+    )
+    log_msg(glue::glue("File {routine_filename} successfully loaded from dataset version: {dataset_name}"))
+
+    list(spatial_data = spatial_data, original_dt = original_dt)
+}
+
 compute_cases_proportion <- function(admin_id, block_duration, row_data, annual_data, admin_col, year_column) {
     if (is.na(block_duration) || is.infinite(block_duration)) {
         return(NA_real_)

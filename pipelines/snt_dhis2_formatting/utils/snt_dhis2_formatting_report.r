@@ -4,6 +4,28 @@ printdim <- function(df, name = deparse(substitute(df))) {
     cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
 }
 
+load_routine_data_report <- function(dataset_name, country_code) {
+    routine_data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_routine.parquet"))
+        },
+        error = function(e) {
+            msg <- paste0(
+                "[WARNING] Error while loading DHIS2 Routine data for: ",
+                country_code,
+                " the report cannot be executed. [ERROR DETAILS] ",
+                conditionMessage(e)
+            )
+            stop(msg)
+        }
+    )
+
+    log_msg(glue::glue(
+        "DHIS2 routine file loaded from dataset: {dataset_name}. Dimensions: {nrow(routine_data)} rows, {ncol(routine_data)} columns."
+    ))
+    routine_data
+}
+
 detect_mad_outliers <- function(data_long, deviation = 15, outlier_column = "mad_flag") {
     data_long %>%
         dplyr::group_by(OU, indicator, YEAR) %>%

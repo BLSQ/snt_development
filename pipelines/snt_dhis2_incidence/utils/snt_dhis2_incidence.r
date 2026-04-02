@@ -94,7 +94,7 @@ routine_filename <<- paste0(COUNTRY_CODE, routine_name)
 log_msg(glue("Selected routine dataset: {routine_dataset_name}, filename: {routine_filename}"))
 }
 
-load_dhis2_routine_data <- function() {
+load_dhis2_routine_data <- function(required_fixed_cols = NULL, required_indicators = NULL, cast_year_month = TRUE) {
 dhis2_routine <<- tryCatch({ get_latest_dataset_file_in_memory(routine_dataset_name, routine_filename) },
 error = function(e) {
 if (grepl("does not exist", conditionMessage(e), ignore.case = TRUE)) {
@@ -104,6 +104,29 @@ msg <- paste0("[ERROR] 🛑 Error while loading DHIS2 routine data file : ", rou
 }
 stop(msg)
 })
+
+if (cast_year_month && all(c("YEAR", "MONTH") %in% names(dhis2_routine))) {
+dhis2_routine[c("YEAR", "MONTH")] <- lapply(dhis2_routine[c("YEAR", "MONTH")], as.numeric)
+}
+
+if (!is.null(required_fixed_cols)) {
+missing_fixed <- setdiff(required_fixed_cols, colnames(dhis2_routine))
+if (length(missing_fixed) > 0) {
+msg <- paste0("🚨 Missing fixed columns in routine data: ", paste(missing_fixed, collapse = ", "))
+log_msg(msg, "error")
+stop(msg)
+}
+}
+
+if (!is.null(required_indicators)) {
+missing_indicators <- setdiff(required_indicators, colnames(dhis2_routine))
+if (length(missing_indicators) > 0) {
+msg <- paste0("🚨 Missing DHIS2 indicators in routine data: ", paste(missing_indicators, collapse = ", "))
+log_msg(msg, "error")
+stop(msg)
+}
+}
+
 log_msg(paste0("DHIS2 routine data : ", routine_filename, " loaded. Dims: ", paste(dim(dhis2_routine), collapse=", ")))
 return(head(dhis2_routine, 3))
 }

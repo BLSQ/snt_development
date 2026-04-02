@@ -50,6 +50,22 @@ bootstrap_dhs_indicators_context <- function(
     )
 }
 
+load_dhs_spatial_data <- function(dhis2_dataset, country_code) {
+    spatial_data_filename <- paste(country_code, "shapes.geojson", sep = "_")
+    spatial_data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dhis2_dataset, spatial_data_filename)
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading DHIS2 shapes data for {country_code}: {conditionMessage(e)}")
+            log_msg(msg, "error")
+            stop(msg)
+        }
+    )
+    log_msg(glue::glue("File {spatial_data_filename} successfully loaded from dataset version: {dhis2_dataset}"))
+    spatial_data
+}
+
 compute_and_export_indicator_table <- function(
     design_obj,
     indicator_name,

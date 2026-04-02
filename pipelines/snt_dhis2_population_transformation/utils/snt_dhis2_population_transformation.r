@@ -27,6 +27,23 @@ bootstrap_population_transformation_context <- function(
     )
 }
 
+load_population_input_data <- function(dataset_name, country_code) {
+    tryCatch(
+        {
+            dhis2_population <- get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_population.parquet"))
+            log_msg(glue::glue(
+                "DHIS2 population data loaded from dataset : {dataset_name} dataframe dimensions: [{paste(dim(dhis2_population), collapse=', ')}]"
+            ))
+            dhis2_population
+        },
+        error = function(e) {
+            msg <- paste("[ERROR] Error while loading DHIS2 population file for:", country_code, conditionMessage(e))
+            log_msg(msg, "error")
+            stop(msg)
+        }
+    )
+}
+
 get_total_population_reference <- function(config_json, adjust_with_untotals = FALSE) {
     if (!adjust_with_untotals) {
         return(NULL)

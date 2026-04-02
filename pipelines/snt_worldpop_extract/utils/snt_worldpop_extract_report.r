@@ -10,6 +10,21 @@ find_country_parquet_file <- function(dataset_last_version, country_code) {
     parquet_file
 }
 
+load_worldpop_report_input <- function(dataset_name, filename, label = "dataset file") {
+    data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, filename)
+        },
+        error = function(e) {
+            msg <- paste("Error while loading", label, filename, conditionMessage(e))
+            cat(msg)
+            stop(msg)
+        }
+    )
+    log_msg(paste0(label, " loaded from dataset: ", dataset_name, " dataframe dimensions: ", paste(dim(data), collapse = ", ")))
+    data
+}
+
 
 get_comparison_years <- function(worldpop_population, dhis2_population) {
     worldpop_year <- min(worldpop_population$YEAR)

@@ -52,3 +52,35 @@ build_routine_indicators <- function(routine_data_ind, dhis_indicator_definition
         empty_data_indicators = empty_data_indicators
     )
 }
+
+validate_required_snt_config <- function(config_json, required_fields = c("COUNTRY_CODE", "DHIS2_ADMINISTRATION_1", "DHIS2_ADMINISTRATION_2")) {
+    for (conf in required_fields) {
+        if (is.null(config_json$SNT_CONFIG[[conf]])) {
+            msg <- paste("Missing configuration input:", conf)
+            log_msg(msg, level = "error")
+            stop(msg)
+        }
+    }
+    invisible(TRUE)
+}
+
+load_dhis2_analytics_extract <- function(dataset_name, country_code) {
+    dhis2_data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_dhis2_raw_analytics.parquet"))
+        },
+        error = function(e) {
+            msg <- paste("Error while loading DHIS2 analytics file for:", country_code, conditionMessage(e))
+            log_msg(msg, level = "error")
+            stop(msg)
+        }
+    )
+    msg <- paste0(
+        "DHIS2 analytics data loaded from dataset : ",
+        dataset_name,
+        " dataframe dimensions: ",
+        paste(dim(dhis2_data), collapse = ", ")
+    )
+    log_msg(msg)
+    dhis2_data
+}

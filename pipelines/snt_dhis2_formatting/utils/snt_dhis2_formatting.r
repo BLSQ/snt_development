@@ -83,59 +83,181 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 }
 
 
+#' Select and Validate Indicator Definitions
+#'
+#' Processes indicator definitions by standardizing names to uppercase,
+#' removing invalid entries (NULL, empty, or whitespace-only), and trimming values.
+#'
+#' @param config_ind_definitions Named list of indicator definitions from SNT configuration.
+#'
+#' @return List with two elements:
+#'   \item{valid_indicators}{Named list of valid indicators with trimmed values.}
+#'   \item{empty_indicators}{Character vector of indicator names with no available data.}
+indicators_selection <- function(config_ind_definitions) {
+    
+    # Get list of indicator definitions from SNT configuration
+    ind_definitions <- config_ind_definitions
+    names(ind_definitions) <- toupper(names(ind_definitions))
+    valid_ind_definitions <- ind_definitions
+    empty_ind_definitions <- c()  # empty are those indicators with no available data
+    
+    # Loop over the indicators and clean the list
+    for (name in names(valid_ind_definitions)) {
+      value <- valid_ind_definitions[[name]]
+      
+      # If value is NULL or length zero, leave as is or set to NULL
+      if (is.null(value) || length(value) == 0 || all(value == "")) {
+        valid_ind_definitions[[name]] <- NULL 
+        empty_ind_definitions <- c(empty_ind_definitions, name)
+        next
+      }  
+      # Trim whitespace and then check if empty string
+      value_trimmed <- trimws(value)
+      valid_ind_definitions[[name]] <- value_trimmed  
+    }
+    
+    return(list(
+        valid_indicators=valid_ind_definitions,  # This is a named list
+        empty_indicators=empty_ind_definitions
+    ))
+}
 
-build_routine_indicators <- function(routine_data_ind, dhis_indicator_definitions_clean) {
+
+#' Build Indicator Columns from Data Elements
+#'
+#' Creates indicator columns by summing specified data elements from DHIS2 routine data.
+#' Handles missing data elements and optionally includes empty indicators as NA columns.
+#'
+#' @param data Data frame containing DHIS2 data elements.
+#' @param valid_indicators Named list where names are indicators and values are 
+#'   character vectors of data element UIDs to sum.
+#' @param empty_indicators Character vector of indicator names with no definitions.
+#' @param include_empty_ind Logical. If TRUE, adds empty indicators as NA columns. Default TRUE.
+#'
+#' @return Data frame with added indicator columns. Multi-element indicators are 
+#'   summed; single-element indicators are copied; empty indicators become NA.
+build_indicators <- function(data, valid_indicators, empty_indicators, include_empty_ind=TRUE) {
+
+    # loop over the definitions
     empty_data_indicators <- c()
-
-    for (indicator in names(dhis_indicator_definitions_clean)) {
-        data_element_uids <- dhis_indicator_definitions_clean[[indicator]]
+    for (indicator in names(valid_indicators)) {
+            
+        data_element_uids <- valid_indicators[[indicator]]    
         col_names <- c()
-
+    
         if (length(data_element_uids) > 0) {
             for (dx in data_element_uids) {
-                dx_co <- gsub("\\.", "_", dx)
+                dx_co <- gsub("\\.", "_", dx)            
                 if (grepl("_", dx_co)) {
-                    col_names <- c(col_names, dx_co)
+                    col_names <- c(col_names , dx_co)
                 } else {
-                    if (!any(grepl(dx, colnames(routine_data_ind)))) {
-                        msg <- paste0("Data element : ", dx, " of indicator ", indicator, " is missing in the DHIS2 routine data.")
-                        log_msg(msg, level = "warning")
+                    if (!any(grepl(dx, colnames(data)))) {  # is there no dx what match?
+                        msg <- paste0("Data element : " , dx, " of indicator ", indicator , " is missing in the DHIS2 routine data.")
+                        log_msg(msg, level="warning")
                     } else {
-                        col_names <- c(col_names, colnames(routine_data_ind)[grepl(dx, colnames(routine_data_ind))])
-                    }
+                        col_names <- c(col_names , colnames(data)[grepl(dx, colnames(data))])
+                    }                
                 }
             }
-
+        
+            # check if there are matching data elements
             if (length(col_names) == 0) {
-                msg <- paste0("No data elements available to build indicator : ", indicator, ", skipped.")
-                log_msg(msg, level = "warning")
+                msg <- paste0("No data elements available to build indicator : " , indicator, ", skipped.")
+                log_msg(msg, level="warning")
                 empty_data_indicators <- c(empty_data_indicators, indicator)
                 next
             }
-
-            msg <- paste0("Building indicator : ", indicator, " -> column selection : ", paste(col_names, collapse = ", "))
+            
+            # logs
+            msg <- paste0("Building indicator : ", indicator, " -> column selection : ", paste(col_names, collapse = ", "))        
             log_msg(msg)
-
+            
             if (length(col_names) > 1) {
-                sums <- rowSums(routine_data_ind[, col_names], na.rm = TRUE)
-                all_na <- rowSums(!is.na(routine_data_ind[, col_names])) == 0
-                sums[all_na] <- NA
-                routine_data_ind[[indicator]] <- sums
+                sums <- rowSums(data[, col_names], na.rm = TRUE)
+                all_na <- rowSums(!is.na(data[, col_names])) == 0
+                sums[all_na] <- NA  # Keep NA if all rows are NA!
+                data[[indicator]] <- sums            
             } else {
-                routine_data_ind[indicator] <- routine_data_ind[, col_names]
+                data[indicator] <- data[, col_names] 
             }
+            
         } else {
-            routine_data_ind[indicator] <- NA
+            data[indicator] <- NA
+            
+            # logs
             msg <- paste0("Building indicator : ", indicator, " -> column selection : NULL")
             log_msg(msg)
         }
     }
 
-    list(
-        routine_data_ind = routine_data_ind,
-        empty_data_indicators = empty_data_indicators
-    )
+    # Add the empty indicator columns (if not needed this can be commented)
+    if (include_empty_ind) {
+        for (empty_indicator in empty_indicators) {
+            data[empty_indicator] <- NA
+            
+            # logs
+            msg <- paste0("Building indicator : ", empty_indicator, " -> column selection : NULL")
+            log_msg(msg)
+        }    
+    }
+    
+    return(data)
 }
+
+
+#' Merge and Format Routine Data with Metadata
+#'
+#' Combines routine DHIS2 data with organizational unit metadata and formats 
+#' the output with standardized column names and temporal variables.
+#'
+#' @param data Data frame with routine data containing OU, PE, and indicator columns.
+#' @param metadata Data frame with organizational unit metadata (OU hierarchies and names).
+#' @param indicator_definitions Named list of indicator definitions (names used for column selection).
+#'
+#' @return Data frame with formatted columns: PERIOD, YEAR, MONTH, OU_ID, OU_NAME, 
+#'   ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID, and all built indicators. Sorted by period.
+merge_and_format_routine_data <- function(data, metadata, indicator_definitions) {
+            
+    # Filter routine data columns by indicators
+    built_indicators <- names(indicator_definitions)
+    routine_data_selection <- data[, c("OU", "PE", built_indicators)]
+    
+    # left join with metadata 
+    routine_data_merged <- merge(routine_data_selection, metadata, by = "OU", all.x = TRUE)
+    
+    # Select administrative columns
+    adm_1_id_col <- gsub("_NAME", "_ID", ADMIN_1)
+    adm_1_name_col <- ADMIN_1
+    adm_2_id_col <- gsub("_NAME", "_ID", ADMIN_2)
+    adm_2_name_col <- ADMIN_2
+    
+    # Select and Rename
+    routine_data_formatted <- routine_data_merged %>%
+        mutate(        
+            YEAR = as.numeric(substr(PE, 1, 4)),
+            MONTH = as.numeric(substr(PE, 5, 6)),
+            PE = as.numeric(PE)
+        ) %>%
+        select(
+            PERIOD = PE,
+            YEAR,
+            MONTH,
+            OU_ID = OU,
+            OU_NAME = !!sym(max_admin_col_name),
+            ADM1_NAME = !!sym(adm_1_name_col),
+            ADM1_ID = !!sym(adm_1_id_col),
+            ADM2_NAME = !!sym(adm_2_name_col),
+            ADM2_ID = !!sym(adm_2_id_col),
+            all_of(built_indicators)
+        )
+    
+    # Column names to upper case
+    colnames(routine_data_formatted) <- clean_column_names(routine_data_formatted)
+    
+    # Sort dataframe by period
+    routine_data_formatted <- routine_data_formatted[order(as.numeric(routine_data_formatted$PERIOD)), ]
+}
+
 
 #
 # Claude: Helpers for DHIS2 formatting pipeline.

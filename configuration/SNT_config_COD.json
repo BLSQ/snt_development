@@ -32,7 +32,7 @@
 			"REFERENCE_YEAR": 2024,
 			"POPULATION_INDICATORS": {
 				"POPULATION": {"ids": ["WLSKVyA8LoY"], "type": "dataElement"},
-				"POP_UNDER_5": {"ids": ["nGZz4qgNal7"], "type": "indicator"}			
+				"POP_UNDER_5": {"ids": ["nGZz4qgNal7"], "type": "dataElement"}			
 			},			
 			"POPULATION_DISAGGREGATIONS": {
 				"POP_UNDER_5" : 0.189,

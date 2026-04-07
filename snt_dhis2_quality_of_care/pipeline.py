@@ -43,7 +43,12 @@ def snt_dhis2_quality_of_care(
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Compute quality-of-care indicators from outliers-imputed DHIS2 routine data."""
+    """Compute quality-of-care indicators from outliers routine data.
+
+    The pipeline reads the latest outliers output matching `data_action`
+    (`imputed` or `removed`), computes district-year quality-of-care indicators,
+    saves outputs, and runs the reporting notebook.
+    """
     try:
         current_run.log_info("Starting SNT Quality of Care pipeline...")
         root_path = Path(workspace.files_path)
@@ -68,14 +73,14 @@ def snt_dhis2_quality_of_care(
             "data_action": data_action,
         }
 
-        parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_dhis2_quality_of_care",
-            parameters=nb_parameters,
-            output_path=data_path,
-            country_code=country_code,
-        )
-
         if not run_report_only:
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_quality_of_care",
+                parameters=nb_parameters,
+                output_path=data_path,
+                country_code=country_code,
+            )
+
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_quality_of_care.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",

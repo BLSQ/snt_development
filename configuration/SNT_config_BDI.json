@@ -2,7 +2,6 @@
 	"SNT_CONFIG": {
 		"COUNTRY_CODE": "BDI",
 		"COUNTRY_NAME": "Burundi",
-		"NA_TREATMENT": "SET_0_TO_NA",
 		"DHIS2_ADMINISTRATION_1": "level_2_name",
 		"DHIS2_ADMINISTRATION_2": "level_4_name",
 		"ANALYTICS_ORG_UNITS_LEVEL" : 6,

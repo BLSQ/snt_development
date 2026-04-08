@@ -4,6 +4,7 @@
 source(file.path("~/workspace/code", "snt_utils.r"))   
 
 
+
 #' Get Setup Variables for SNT Workspace
 #' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
 #'
@@ -81,6 +82,11 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
     }    
     return(data)
 }
+
+
+# ------------------------------------------------------------------------------------
+# Routine util functions ------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 
 
 #' Select and Validate Indicator Definitions
@@ -257,6 +263,107 @@ merge_and_format_routine_data <- function(data, metadata, indicator_definitions)
     # Sort dataframe by period
     routine_data_formatted <- routine_data_formatted[order(as.numeric(routine_data_formatted$PERIOD)), ]
 }
+
+
+# -----------------------------------------------------------------------------------------
+# Shapes util functions -------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
+
+
+#' Convert GeoJSON Strings to sf Object
+#'
+#' Converts a data frame containing GeoJSON strings in a GEOMETRY column to an
+#' sf (simple features) object with proper spatial geometry.
+#'
+#' @param data Data frame containing a GEOMETRY column with GeoJSON strings.
+#' @param geom_col Character string. Name of the column containing GeoJSON 
+#'   geometry strings (default: "GEOMETRY").
+#' @param crs Coordinate reference system. Numeric EPSG code or CRS object 
+#'   (default: 4326 for WGS84).
+#'
+#' @return An sf object with the GEOMETRY column converted to sfc geometry.
+#'   Invalid or NA geometries are replaced with empty geometry collections.
+#'
+#' @export
+geojson_to_sf <- function(data, geom_col = "GEOMETRY", crs = 4326) {
+
+    # Make column name lookup case-insensitive
+    geom_col_match <- names(data)[tolower(names(data)) == tolower(geom_col)]
+    
+    if (length(geom_col_match) == 0) {
+        stop(paste0("Error: Column '", geom_col, "' not found in data"))
+    }
+    
+    # Use the matched column
+    geom_col <- geom_col_match[1]
+    
+    # Convert GeoJSON strings to sfg objects
+    geometry_sfc <- lapply(data[[geom_col]], function(g) {
+        if (is.na(g) || is.null(g)) return(sf::st_geometrycollection())
+        tryCatch({
+          geo <- geojsonsf::geojson_sfc(g)
+          geo[[1]]  # extract sfg
+        }, error = function(e) {
+          sf::st_geometrycollection()  # return empty but valid geometry
+        })
+    })
+    
+    # Convert to sfc
+    geometry_sfc <- sf::st_sfc(geometry_sfc, crs = crs)
+    
+    # Create sf object (exclude original geometry column)
+    cols_to_keep <- setdiff(names(data), geom_col)
+    data_no_geom <- data[, cols_to_keep, drop = FALSE]
+    # data_no_geom <- data[, !names(data) %in% geom_col, drop = FALSE]
+    shapes_sf <- sf::st_sf(data_no_geom, geometry = geometry_sfc)
+    
+    return(shapes_sf)
+}
+
+
+#' Simplify geometries in an sf object
+#'
+#' This function simplifies all geometries in an `sf` object using
+#' `rmapshaper::ms_simplify` and ensures the result remains valid.
+#'
+#' @param sf_object An `sf` object containing geometries.
+#' @param keep A numeric value between 0 and 1 indicating the proportion of points
+#'   to retain during simplification (default is 0.05).
+#'
+#' @return An `sf` object with simplified and valid geometries.
+#'
+#' @details
+#' - All geometries (POLYGON, MULTIPOLYGON, etc.) are simplified.
+#' - Topology is preserved using `keep_shapes = TRUE`.
+#' - Geometry validity is enforced using `sf::st_make_valid()`.
+#'
+#' @importFrom sf st_make_valid
+#' @importFrom rmapshaper ms_simplify
+#'
+#' @export
+simplify_geometries <- function(sf_object, keep = 0.05) {
+    # Optional safety check
+    if (!inherits(sf_object, "sf")) {
+        stop("Input must be an sf object")
+    }
+    # Save original column order
+    original_cols <- names(sf_object)
+    
+    # Simplify all geometries at once
+    simplified_sf <- rmapshaper::ms_simplify(
+        sf_object,
+        keep = keep,
+        keep_shapes = TRUE
+    )
+    
+    # Ensure validity
+    simplified_sf <- sf::st_make_valid(simplified_sf)
+    simplified_sf <- simplified_sf[, original_cols, drop = FALSE]
+    
+    return(simplified_sf)
+}
+
+
 
 
 #

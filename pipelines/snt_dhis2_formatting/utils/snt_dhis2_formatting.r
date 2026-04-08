@@ -15,11 +15,11 @@ source(file.path("~/workspace/code", "snt_utils.r"))
 #' @export
 get_setup_variables <- function(
     SNT_ROOT_PATH='~/workspace', 
-    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
+    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
 ) {
         
     # List required pcks
-    required_packages <- packages
+    required_packages <- unique(c(packages, "reticulate"))
     install_and_load(required_packages)
     
     # Set environment to load openhexa.sdk from the right environment
@@ -100,6 +100,7 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 #' @return List with two elements:
 #'   \item{valid_indicators}{Named list of valid indicators with trimmed values.}
 #'   \item{empty_indicators}{Character vector of indicator names with no available data.}
+#' @export
 indicators_selection <- function(config_ind_definitions) {
     
     # Get list of indicator definitions from SNT configuration
@@ -143,6 +144,7 @@ indicators_selection <- function(config_ind_definitions) {
 #'
 #' @return Data frame with added indicator columns. Multi-element indicators are 
 #'   summed; single-element indicators are copied; empty indicators become NA.
+#' @export
 build_indicators <- function(data, valid_indicators, empty_indicators, include_empty_ind=TRUE) {
 
     # loop over the definitions
@@ -223,6 +225,7 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
 #'
 #' @return Data frame with formatted columns: PERIOD, YEAR, MONTH, OU_ID, OU_NAME, 
 #'   ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID, and all built indicators. Sorted by period.
+#' @export
 merge_and_format_routine_data <- function(data, metadata, indicator_definitions) {
             
     # Filter routine data columns by indicators
@@ -381,6 +384,7 @@ simplify_geometries <- function(sf_object, keep = 0.05) {
 #' @return A named list with two elements:
 #'   \item{name}{The original administrative level name column}
 #'   \item{id}{The corresponding ID column (NAME replaced with ID)}
+#' @export
 build_admin_columns <- function(admin_level) {
     list(
         name = admin_level,
@@ -400,6 +404,7 @@ build_admin_columns <- function(admin_level) {
 #' @return A named list with two elements:
 #'   \item{level1}{List with name and id columns for administrative level 1}
 #'   \item{level2}{List with name and id columns for administrative level 2}
+#' @export
 get_admin_config <- function(snt_configuration) {
     list(
         level1 = build_admin_columns(toupper(snt_configuration$SNT_CONFIG$DHIS2_ADMINISTRATION_1)),
@@ -419,6 +424,7 @@ get_admin_config <- function(snt_configuration) {
 #'
 #' @return A data frame with distinct rows containing four columns:
 #'   administrative level 1 name and ID, administrative level 2 name and ID
+#' @export
 get_org_units_selection <- function(ou_data, admin_cols) {
     ou_data %>%
         select(
@@ -450,6 +456,7 @@ get_org_units_selection <- function(ou_data, admin_cols) {
 #'   \item{YEAR}{Numeric year from PE}
 #'   \item{<admin_level2_id>}{Organizational unit ID (dynamically named)}
 #'   \item{<ind_name>}{Aggregated integer value (dynamically named)}
+#' @export
 aggregate_indicator <- function(pop_data, indicator_def, ind_name, admin_cols) {
     pop_data %>%
         filter(DX %in% indicator_def$ids) %>%
@@ -494,6 +501,7 @@ aggregate_indicator <- function(pop_data, indicator_def, ind_name, admin_cols) {
 #'     \item One column per population indicator with aggregated values
 #'   }
 #'   Sorted by YEAR, admin level 1 name, and admin level 2 name.
+#' @export
 build_population_indicators <- function(pop_data, ou_data, snt_configuration) {
     
     # Extract configuration
@@ -532,6 +540,7 @@ build_population_indicators <- function(pop_data, ou_data, snt_configuration) {
 #'   configurations (output from \code{get_admin_config})
 #'
 #' @return Data frame with formatted administrative level name columns
+#' @export
 format_admin_names <- function(data, admin_cols) {
     data %>%
         mutate(
@@ -556,6 +565,7 @@ format_admin_names <- function(data, admin_cols) {
 #'     \item Formatted administrative level name strings
 #'     \item All other columns preserved
 #'   }
+#' @export
 standardize_population_columns <- function(population_table, admin_cols) {
     population_table %>%
         format_admin_names(admin_cols) %>%
@@ -568,10 +578,82 @@ standardize_population_columns <- function(population_table, admin_cols) {
 }
 
 
-#
-# Claude: Helpers for DHIS2 formatting pipeline.
-#
+# -----------------------------------------------------------------------------------------
+# Pyramid util functions ------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 
+
+
+#' Clean Dataframe Formats and Column Names
+#'
+#' @description Formats string values in any column containing "_NAME" and standardizes all column names.
+#'
+#' @param data A dataframe containing the data to be cleaned.
+#'
+#' @return A dataframe with formatted name values and cleaned column names.
+#' @export
+clean_input_data <- function(data, verbose=TRUE) {
+
+    name_columns <- colnames(data)[grepl("_NAME", colnames(data))]
+    for (column in name_columns){
+        if (verbose) log_msg(glue("Formatting strings of : {column}"))    
+        data[[column]] <- format_names(data[[column]])  # Clean strings 
+    }
+      
+    # Column names to upper case
+    colnames(data) <- clean_column_names(data)
+    return(data)
+}
+
+
+#' Extract Coordinates from Geometry
+#'
+#' @description Extracts longitude and latitude from a specified geometry column, 
+#' appends them as new columns, and removes the original geometry column.
+#'
+#' @param data A dataframe containing the geometry column.
+#' @param geom_col A character string specifying the name of the geometry column. Defaults to "GEOMETRY".
+#'
+#' @return A dataframe with 'LONGITUDE' and 'LATITUDE' columns added, and the geometry column removed.
+#' @export
+extract_geometry_coordinates <- function(data, geom_col = "GEOMETRY", verbose=TRUE) {
+  
+    # 1. Use double brackets [[ ]] to dynamically access the column in Base R
+    coords_list <- lapply(data[[geom_col]], extract_geo_coords)
+    coords_df <- dplyr::bind_rows(lapply(coords_list, as.data.frame))
+
+    # Log failures 
+    parse_fail_idx <- which(!coords_df$parse_ok)
+    parse_failures <- length(parse_fail_idx)
+    if (parse_failures > 0) {
+        parse_fail_examples <- paste(head(parse_fail_idx, 10), collapse = ", ")
+        if (verbose) {
+            log_msg(
+                glue("[WARNING] {parse_failures} GEOMETRY records could not be parsed. Resulting LONGITUDE/LATITUDE are NA for those rows."),
+                "warning"
+            )  
+        } 
+    }
+    
+  # 2. Use dplyr::all_of() to dynamically drop a column by its string name
+  data <- data %>%
+    dplyr::mutate(
+      LONGITUDE = coords_df$lon,
+      LATITUDE = coords_df$lat
+    ) %>%
+    dplyr::select(-dplyr::all_of(geom_col))
+    
+  return(data)
+}
+
+#' Extract Coordinates from Geometry JSON
+#'
+#' @description Parses a JSON string representing geographic geometry and extracts the longitude and latitude. Includes error handling for empty, invalid, or missing coordinates.
+#'
+#' @param geom_json A character string containing the geometry data in JSON format.
+#'
+#' @return A named list containing three elements: \code{lon} (numeric), \code{lat} (numeric), and \code{parse_ok} (logical indicating if the parsing was successful).
+#' @export
 extract_geo_coords <- function(geom_json) {
   if (is.na(geom_json) || !nzchar(geom_json)) {
     return(list(lon = NA_real_, lat = NA_real_, parse_ok = FALSE))
@@ -591,6 +673,227 @@ extract_geo_coords <- function(geom_json) {
   )
 }
 
+
+#' Safely Read GeoJSON File
+#'
+#' @description Reads a GeoJSON file from a specified path with built-in error handling. 
+#' Checks if the file exists and catches parsing errors if the file is corrupted.
+#'
+#' @param file_path A character string specifying the full path to the GeoJSON file.
+#'
+#' @return A spatial dataframe (sf object) if successful, or NULL if the process fails.
+#' @export
+read_geojson_safe <- function(file_path) {
+  
+    # 1. Check if the file exists in the folder
+    if (!file.exists(file_path)) {
+        # If you have a custom log_msg function from earlier, you can swap 'message' for it!
+        log_msg(glue("[ERROR] File does not exist at the specified path: {file_path}"))
+        return(NULL)
+    }
+    
+    # 2. Try to read the file and catch corruption/parsing errors
+    geo_data <- tryCatch({ sf::read_sf(file_path, quiet = TRUE)}, 
+        error = function(e) {
+            log_msg(glue("[ERROR] Failed to parse the GeoJSON file. It may be corrupted. R says: {e$message}"))
+            return(NULL)
+        })
+    
+    return(geo_data)
+}
+
+
+#' Safely Read GeoJSON File
+#'
+#' @description Reads a GeoJSON file from a specified path with built-in error handling. 
+#' Checks if the file exists and catches parsing errors if the file is corrupted.
+#' 
+#' @details This function wraps \code{sf::read_sf()} inside a \code{tryCatch} block. 
+#' It is particularly useful in automated data pipelines where missing or corrupted 
+#' geographic files should be logged but shouldn't crash the entire script.
+#'
+#' @param file_path A character string specifying the full path to the GeoJSON file.
+#'
+#' @return A spatial dataframe (\code{sf} object) if successful, or \code{NULL} if the process fails.
+#' 
+#' @examples
+#' \dontrun{
+#'   # Example of a successful read
+#'   my_geo_data <- read_geojson_safe("data/valid_regions.geojson")
+#'   
+#'   # Example of handling a missing file gracefully (returns NULL)
+#'   missing_data <- read_geojson_safe("data/does_not_exist.geojson")
+#' }
+#' 
+#' @importFrom sf read_sf
+#' @importFrom glue glue
+#' @export
+points_within_country_batch <- function(lon_vec, lat_vec, boundary_sf) {
+    out <- rep(FALSE, length(lon_vec))
+    ok_idx <- which(
+        !is.na(lon_vec) &
+          !is.na(lat_vec) &
+          (abs(lon_vec) <= 180) &
+          (abs(lat_vec) <= 90)
+        )
+    
+    if (length(ok_idx) == 0) return(out)
+    
+    pts <- sf::st_as_sf(
+        data.frame(LONGITUDE = lon_vec[ok_idx], LATITUDE = lat_vec[ok_idx]),
+        coords = c("LONGITUDE", "LATITUDE"),
+        crs = 4326
+    )
+    
+    out[ok_idx] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
+    return(out)
+}
+
+
+#' Prepare Country Boundary
+#'
+#' @description Merges multiple geographic shapes (e.g., internal administrative regions) into a single unified country boundary. It validates the input, ensures the Coordinate Reference System (CRS) is standard WGS 84 (EPSG:4326), and dissolves internal borders.
+#'
+#' @param country_shapes_sf An \code{sf} object containing the geographic shapes to be processed.
+#'
+#' @return A new \code{sf} object containing a single unified geometry column named \code{GEOMETRY}.
+#' 
+#' @importFrom sf st_crs st_transform st_union st_geometry st_sf
+#' @export
+prepare_country_boundary <- function(country_shapes_sf) {
+    if (!inherits(country_shapes_sf, "sf")) {
+        stop("[ERROR] Country shapes must be an sf object.")
+    }
+    
+    # warn the user if the CRS is missing, but don't guess what it is!
+    if (is.na(sf::st_crs(country_shapes_sf))) {
+        warning("CRS is missing from the input shapefile. Proceeding without a defined CRS.")
+    }
+    
+    country_boundary <- sf::st_union(sf::st_geometry(country_shapes_sf))
+    
+    # Return as sf object (st_union automatically preserves the original CRS)
+    return(sf::st_sf(GEOMETRY = country_boundary))
+}
+
+
+
+fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2) {
+	if (is.na(lon) || is.na(lat)) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
+	}
+	
+	candidates <- build_coordinate_candidates(lon, lat, max_shift = max_shift)
+	candidate_names <- names(candidates)
+	
+	m <- matrix(NA_real_, nrow = length(candidate_names), ncol = 2)
+	for (j in seq_along(candidate_names)) {
+		cand <- candidates[[candidate_names[j]]]
+		m[j, 1] <- as.numeric(cand[1])
+		m[j, 2] <- as.numeric(cand[2])
+	}
+	
+	earth_ok <- abs(m[, 1]) <= 180 & abs(m[, 2]) <= 90
+	if (!any(earth_ok)) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
+	}
+	
+	pts <- sf::st_as_sf(
+		data.frame(LONGITUDE = m[earth_ok, 1], LATITUDE = m[earth_ok, 2]),
+		coords = c("LONGITUDE", "LATITUDE"),
+		crs = 4326
+	)
+	
+	inside <- rep(FALSE, nrow(m))
+	inside[earth_ok] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
+	ok_idx <- which(earth_ok & inside)
+	
+	if (length(ok_idx) == 0) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
+	}
+	
+	j <- min(ok_idx)
+	list(LONGITUDE = m[j, 1], LATITUDE = m[j, 2], METHOD = candidate_names[j], VALID = TRUE)
+}
+
+
+#' Fix Coordinate Pair within Country Boundary
+#'
+#' @description Takes a longitude and latitude pair, generates potential candidate 
+#' coordinates (e.g., to fix typos or swapped coordinates), and checks which 
+#' candidate falls within the provided geographic boundary.
+#'
+#' @param lon A numeric value representing longitude.
+#' @param lat A numeric value representing latitude.
+#' @param boundary_sf An \code{sf} polygon or multipolygon object representing the valid boundary.
+#' @param max_shift A numeric value for the maximum coordinate shift/adjustment. Defaults to 2.
+#'
+#' @return A named list containing \code{LONGITUDE}, \code{LATITUDE}, \code{METHOD} 
+#' (the name of the successful candidate transformation), and a \code{VALID} boolean flag.
+#' 
+#' @importFrom sf st_as_sf st_crs st_transform st_within
+#' @export
+fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2) {
+	if (is.na(lon) || is.na(lat)) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
+	}
+
+	if (is.na(lon) || is.na(lat)) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
+	}
+	
+	candidates <- build_coordinate_candidates(lon, lat, max_shift = max_shift)
+	candidate_names <- names(candidates)
+	
+	m <- matrix(NA_real_, nrow = length(candidate_names), ncol = 2)
+	for (j in seq_along(candidate_names)) {
+		cand <- candidates[[candidate_names[j]]]
+		m[j, 1] <- as.numeric(cand[1])
+		m[j, 2] <- as.numeric(cand[2])
+	}
+	
+	# This check relies on standard geographic coordinates (WGS84 degrees)
+	earth_ok <- abs(m[, 1]) <= 180 & abs(m[, 2]) <= 90
+	if (!any(earth_ok)) {
+		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
+	}
+	
+	# 1. Define the points as standard lat/long (4326) since they are bounded by 180/90
+	pts <- sf::st_as_sf(
+	data.frame(LONGITUDE = m[earth_ok, 1], LATITUDE = m[earth_ok, 2]),
+	coords = c("LONGITUDE", "LATITUDE"),
+	crs = 4326
+	)
+	
+	# 2. Dynamically transform the points to match the boundary's native CRS!
+	if (!is.na(sf::st_crs(boundary_sf))) {
+	pts <- sf::st_transform(pts, sf::st_crs(boundary_sf))
+	}
+	
+	inside <- rep(FALSE, nrow(m))
+	inside[earth_ok] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
+	ok_idx <- which(earth_ok & inside)
+	
+	if (length(ok_idx) == 0) {
+	return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
+	}
+	
+	j <- min(ok_idx)
+	list(LONGITUDE = m[j, 1], LATITUDE = m[j, 2], METHOD = candidate_names[j], VALID = TRUE)
+}
+
+
+#' Shift Decimal Point Left to Right
+#'
+#' @description A helper function that corrects misplaced or missing decimal points in a numeric value. 
+#'				 It extracts all digits and forcibly places the decimal point exactly \code{k} digits from the left, 
+#'				 preserving the original sign.
+#'
+#' @param value A numeric value (e.g., a coordinate with a typo like 45123 instead of 45.123).
+#' @param k An integer specifying how many digits should appear before the new decimal point.
+#'
+#' @return A numeric value with the shifted decimal point, or \code{NA_real_} if the input is invalid or too short.
+#' @export
 shift_decimal_left_to_right <- function(value, k) {
   if (is.na(value)) return(NA_real_)
 
@@ -602,6 +905,18 @@ shift_decimal_left_to_right <- function(value, k) {
   sign_val * suppressWarnings(as.numeric(shifted))
 }
 
+
+#' Build Coordinate Correction Candidates
+#'
+#' @description Generates a comprehensive list of potential corrections for a pair of coordinates based on common human data entry errors. 
+#'				 This includes swapping longitude and latitude, flipping signs (missing/extra negatives), and shifting decimal points.
+#'
+#' @param lon A numeric value representing the original longitude.
+#' @param lat A numeric value representing the original latitude.
+#' @param max_shift An integer specifying the maximum number of decimal places to test for shifting. Defaults to 2.
+#'
+#' @return A named list where each element is a numeric vector of length 2 (\code{c(lon, lat)}) representing a candidate correction.
+#' @export
 build_coordinate_candidates <- function(lon, lat, max_shift = 2) {
   candidates <- list(
     ORIGINAL = c(lon, lat),
@@ -629,75 +944,55 @@ build_coordinate_candidates <- function(lon, lat, max_shift = 2) {
   candidates
 }
 
-prepare_country_boundary <- function(country_shapes_sf) {
-  if (!inherits(country_shapes_sf, "sf")) {
-    stop("Country shapes must be an sf object.")
-  }
 
-  if (is.na(sf::st_crs(country_shapes_sf))) {
-    sf::st_crs(country_shapes_sf) <- 4326
-  }
-
-  country_shapes_sf <- sf::st_transform(country_shapes_sf, 4326)
-  country_boundary <- sf::st_union(sf::st_geometry(country_shapes_sf))
-  sf::st_sf(GEOMETRY = country_boundary)
-}
-
-points_within_country_batch <- function(lon_vec, lat_vec, boundary_sf) {
-  out <- rep(FALSE, length(lon_vec))
-  ok_idx <- which(
-    !is.na(lon_vec) &
-      !is.na(lat_vec) &
-      (abs(lon_vec) <= 180) &
-      (abs(lat_vec) <= 90)
+#' Plot Corrected Coordinates on Country Boundary
+#'
+#' @description Extracts longitude and latitude from a results list, converts them to spatial points, and plots them in green over the provided country boundary.
+#'
+#' @param fix_results A list of coordinate results, where each element contains at least \code{$LONGITUDE} and \code{$LATITUDE}.
+#' @param shapes_sf_boundary An \code{sf} polygon/multipolygon object representing the country boundaries.
+#'
+#' @return A \code{ggplot} object containing the map.
+#' 
+#' @importFrom sf st_as_sf
+#' @importFrom ggplot2 ggplot geom_sf theme_minimal labs
+#' @export
+plot_fixed_coordinates <- function(fix_results, shapes_sf_boundary) {
+  
+  # 1. Extract the coordinates from the list into a dataframe
+  # We use sapply to pull out all lons and lats quickly
+  pts_df <- data.frame(
+    LONGITUDE = sapply(fix_results, function(x) x$LONGITUDE),
+    LATITUDE = sapply(fix_results, function(x) x$LATITUDE)
   )
-
-  if (length(ok_idx) == 0) return(out)
-
-  pts <- sf::st_as_sf(
-    data.frame(LONGITUDE = lon_vec[ok_idx], LATITUDE = lat_vec[ok_idx]),
-    coords = c("LONGITUDE", "LATITUDE"),
-    crs = 4326
-  )
-
-  out[ok_idx] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
-  out
-}
-
-fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2) {
-  if (is.na(lon) || is.na(lat)) {
-    return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
+  
+  # 2. Filter out any rows where coordinates are NA (so ggplot doesn't complain)
+  pts_df <- pts_df[!is.na(pts_df$LONGITUDE) & !is.na(pts_df$LATITUDE), ]
+  
+  if (nrow(pts_df) == 0) {
+    message("No valid coordinates to plot.")
+    return(NULL)
   }
-
-  candidates <- build_coordinate_candidates(lon, lat, max_shift = max_shift)
-  candidate_names <- names(candidates)
-
-  m <- matrix(NA_real_, nrow = length(candidate_names), ncol = 2)
-  for (j in seq_along(candidate_names)) {
-    cand <- candidates[[candidate_names[j]]]
-    m[j, 1] <- as.numeric(cand[1])
-    m[j, 2] <- as.numeric(cand[2])
-  }
-
-  earth_ok <- abs(m[, 1]) <= 180 & abs(m[, 2]) <= 90
-  if (!any(earth_ok)) {
-    return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
-  }
-
-  pts <- sf::st_as_sf(
-    data.frame(LONGITUDE = m[earth_ok, 1], LATITUDE = m[earth_ok, 2]),
-    coords = c("LONGITUDE", "LATITUDE"),
-    crs = 4326
-  )
-
-  inside <- rep(FALSE, nrow(m))
-  inside[earth_ok] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
-  ok_idx <- which(earth_ok & inside)
-
-  if (length(ok_idx) == 0) {
-    return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
-  }
-
-  j <- min(ok_idx)
-  list(LONGITUDE = m[j, 1], LATITUDE = m[j, 2], METHOD = candidate_names[j], VALID = TRUE)
+  
+  # 3. Convert the regular dataframe into an 'sf' spatial object (assuming standard 4326 CRS)
+  pts_sf <- sf::st_as_sf(pts_df, coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
+  
+  # 4. Create the plot using ggplot2
+  map_plot <- ggplot2::ggplot() +
+    # Layer 1: The country boundary (transparent fill, black outline)
+    ggplot2::geom_sf(data = shapes_sf_boundary, fill = "transparent", color = "black", size = 0.5) +
+    # Layer 2: The fixed points (green, size 2)
+    ggplot2::geom_sf(data = pts_sf, color = "green", size = 2) +
+    # Clean up the background
+    ggplot2::theme_minimal() +
+    ggplot2::labs(
+      title = "Corrected Coordinates Validation",
+      subtitle = paste("Showing", nrow(pts_df), "points inside boundaries")
+    )
+  
+  # Print the plot to the Viewer/Notebook
+  print(map_plot)
+  
+  # Return the plot object in case you want to save it later using ggsave()
+  invisible(map_plot)
 }

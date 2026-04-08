@@ -32,7 +32,8 @@ get_setup_variables <- function(
     return(
         list(
             CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
-            FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted")
+            FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
+            UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
         )
     )
 }
@@ -84,7 +85,7 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 }
 
 
-# ------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 # Routine util functions ------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------
 
@@ -364,6 +365,207 @@ simplify_geometries <- function(sf_object, keep = 0.05) {
 }
 
 
+# -----------------------------------------------------------------------------------------
+# Population util functions ---------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
+
+
+#' Build Administrative Column Names
+#'
+#' Creates a list containing both the name and ID column names for an
+#' administrative level by converting the _NAME suffix to _ID.
+#'
+#' @param admin_level Character string representing the administrative level
+#'   column name (e.g., "PROVINCE_NAME")
+#'
+#' @return A named list with two elements:
+#'   \item{name}{The original administrative level name column}
+#'   \item{id}{The corresponding ID column (NAME replaced with ID)}
+build_admin_columns <- function(admin_level) {
+    list(
+        name = admin_level,
+        id = gsub("_NAME", "_ID", admin_level)
+    )
+}
+
+#' Extract Administrative Configuration
+#'
+#' Extracts and structures the administrative level configuration from the
+#' SNT configuration object, converting both levels to uppercase and building
+#' their corresponding column names.
+#'
+#' @param snt_configuration List containing SNT configuration with nested
+#'   elements SNT_CONFIG$DHIS2_ADMINISTRATION_1 and DHIS2_ADMINISTRATION_2
+#'
+#' @return A named list with two elements:
+#'   \item{level1}{List with name and id columns for administrative level 1}
+#'   \item{level2}{List with name and id columns for administrative level 2}
+get_admin_config <- function(snt_configuration) {
+    list(
+        level1 = build_admin_columns(toupper(snt_configuration$SNT_CONFIG$DHIS2_ADMINISTRATION_1)),
+        level2 = build_admin_columns(toupper(snt_configuration$SNT_CONFIG$DHIS2_ADMINISTRATION_2))
+    )
+}
+
+#' Get Organizational Units Selection
+#'
+#' Selects and returns distinct organizational unit data for both administrative
+#' levels, including both name and ID columns.
+#'
+#' @param ou_data Data frame containing organizational unit information with
+#'   columns for administrative level names and IDs
+#' @param admin_cols Named list with level1 and level2 administrative column
+#'   configurations (output from \code{get_admin_config})
+#'
+#' @return A data frame with distinct rows containing four columns:
+#'   administrative level 1 name and ID, administrative level 2 name and ID
+get_org_units_selection <- function(ou_data, admin_cols) {
+    ou_data %>%
+        select(
+            all_of(c(
+                admin_cols$level1$name,
+                admin_cols$level1$id,
+                admin_cols$level2$name,
+                admin_cols$level2$id
+            ))
+        ) %>%
+        distinct()
+}
+
+
+#' Aggregate Individual Population Indicator
+#'
+#' Filters population data for a specific indicator, aggregates values by
+#' organizational unit and period, and formats the result for joining.
+#'
+#' @param pop_data Data frame containing population data with columns:
+#'   DX (data element), PE (period), OU (organizational unit), VALUE
+#' @param indicator_def List containing indicator definition with an 'ids'
+#'   element specifying which DX values to include
+#' @param ind_name Character string name for the indicator (used as column name
+#'   in output)
+#' @param admin_cols Named list with administrative column configurations
+#'
+#' @return A data frame with columns:
+#'   \item{YEAR}{Numeric year from PE}
+#'   \item{<admin_level2_id>}{Organizational unit ID (dynamically named)}
+#'   \item{<ind_name>}{Aggregated integer value (dynamically named)}
+aggregate_indicator <- function(pop_data, indicator_def, ind_name, admin_cols) {
+    pop_data %>%
+        filter(DX %in% indicator_def$ids) %>%
+        group_by(PE, OU) %>%
+        summarise(
+            VALUE = sum(as.integer(as.numeric(VALUE)), na.rm = TRUE),
+            .groups = "drop"
+        ) %>%
+        transmute(
+            YEAR = as.numeric(PE),
+            !!admin_cols$level2$id := OU,
+            !!ind_name := VALUE
+        )
+}
+
+
+#' Build Population Indicators Dataset
+#'
+#' Creates a comprehensive dataset of population indicators by combining
+#' organizational unit structure with population data across multiple years
+#' and indicators.
+#'
+#' @param pop_data Data frame containing raw population data with columns:
+#'   PE (period/year), OU (organizational unit), DX (data element),
+#'   VALUE (numeric value)
+#' @param ou_data Data frame containing organizational unit hierarchy with
+#'   administrative level name and ID columns
+#' @param snt_configuration List containing SNT configuration including:
+#'   \itemize{
+#'     \item SNT_CONFIG$DHIS2_ADMINISTRATION_1: First admin level name
+#'     \item SNT_CONFIG$DHIS2_ADMINISTRATION_2: Second admin level name
+#'     \item DHIS2_DATA_DEFINITIONS$POPULATION_DEFINITIONS$POPULATION_INDICATORS:
+#'       Named list of indicator definitions
+#'   }
+#'
+#' @return A data frame with one row per year-organizational unit combination,
+#'   containing:
+#'   \itemize{
+#'     \item YEAR: Integer year
+#'     \item Administrative level 1 name and ID columns
+#'     \item Administrative level 2 name and ID columns
+#'     \item One column per population indicator with aggregated values
+#'   }
+#'   Sorted by YEAR, admin level 1 name, and admin level 2 name.
+build_population_indicators <- function(pop_data, ou_data, snt_configuration) {
+    
+    # Extract configuration
+    admin_cols <- get_admin_config(snt_configuration)
+    pop_indicators <- snt_configuration$DHIS2_DATA_DEFINITIONS$POPULATION_DEFINITIONS[["POPULATION_INDICATORS"]]
+    
+    # Build organizational units template
+    ou_selection <- get_org_units_selection(ou_data, admin_cols)
+    pop_template <- crossing(
+        YEAR = unique(as.integer(pop_data$PE)),
+        ou_selection
+    )
+    
+    # Process each population indicator
+    for (ind_name in names(pop_indicators)) {
+        ind_name_upper <- toupper(ind_name)
+        log_msg(glue("Building DHIS2 population indicator: {ind_name_upper}."))        
+        pop_template <- pop_template %>%
+            left_join(
+                aggregate_indicator(pop_data, pop_indicators[[ind_name]], ind_name_upper, admin_cols),
+                by = c("YEAR", admin_cols$level2$id)
+            )
+    }
+    
+    # Sort and return
+    pop_template %>% arrange(YEAR, !!sym(admin_cols$level1$name), !!sym(admin_cols$level2$name))
+}
+
+
+#' Format Administrative Level Names
+#'
+#' Applies string formatting to administrative level name columns in a data frame.
+#'
+#' @param data Data frame containing administrative level columns
+#' @param admin_cols Named list with level1 and level2 administrative column
+#'   configurations (output from \code{get_admin_config})
+#'
+#' @return Data frame with formatted administrative level name columns
+format_admin_names <- function(data, admin_cols) {
+    data %>%
+        mutate(
+            !!admin_cols$level1$name := format_names(!!sym(admin_cols$level1$name)),
+            !!admin_cols$level2$name := format_names(!!sym(admin_cols$level2$name))
+        )
+}
+
+#' Standardize Population Table Column Names
+#'
+#' Renames administrative level columns to standard names (ADM1_NAME, ADM1_ID,
+#' ADM2_NAME, ADM2_ID) and formats the name columns.
+#'
+#' @param population_table Data frame containing population data with
+#'   administrative level columns
+#' @param admin_cols Named list with level1 and level2 administrative column
+#'   configurations (output from \code{get_admin_config})
+#'
+#' @return Data frame with:
+#'   \itemize{
+#'     \item Standardized column names (ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID)
+#'     \item Formatted administrative level name strings
+#'     \item All other columns preserved
+#'   }
+standardize_population_columns <- function(population_table, admin_cols) {
+    population_table %>%
+        format_admin_names(admin_cols) %>%
+        rename(
+            ADM1_NAME = !!sym(admin_cols$level1$name),
+            ADM1_ID = !!sym(admin_cols$level1$id),
+            ADM2_NAME = !!sym(admin_cols$level2$name),
+            ADM2_ID = !!sym(admin_cols$level2$id)
+        )
+}
 
 
 #

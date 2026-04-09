@@ -30,7 +30,7 @@ get_setup_variables <- function(
         sdk <- reticulate::import("openhexa.sdk")
         assign("openhexa", sdk, envir = .GlobalEnv)
     }, error = function(e) {
-        log_msg("[WARNING] Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python")
+        log_msg("Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python", "warning")
     })    
 
     # Set paths (add paths here)
@@ -85,9 +85,8 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
             stop(msg)
     })
 
-    if (verbose) {
-        msg <- glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]")
-        log_msg(msg)
+    if (verbose) {        
+        log_msg(glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
     }    
     return(data)
 }
@@ -169,8 +168,7 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
                     col_names <- c(col_names , dx_co)
                 } else {
                     if (!any(grepl(dx, colnames(data)))) {  # is there no dx what match?
-                        msg <- paste0("Data element : " , dx, " of indicator ", indicator , " is missing in the DHIS2 routine data.")
-                        log_msg(msg, level="warning")
+                        log_msg(paste0("Data element : " , dx, " of indicator ", indicator , " is missing in the DHIS2 routine data."), level="warning")
                     } else {
                         col_names <- c(col_names , colnames(data)[grepl(dx, colnames(data))])
                     }                
@@ -179,15 +177,13 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
         
             # check if there are matching data elements
             if (length(col_names) == 0) {
-                msg <- paste0("No data elements available to build indicator : " , indicator, ", skipped.")
-                log_msg(msg, level="warning")
+                log_msg(paste0("No data elements available to build indicator : " , indicator, ", skipped."), level="warning")
                 empty_data_indicators <- c(empty_data_indicators, indicator)
                 next
             }
             
             # logs
-            msg <- paste0("Building indicator : ", indicator, " -> column selection : ", paste(col_names, collapse = ", "))        
-            log_msg(msg)
+            log_msg(paste0("Building indicator : ", indicator, " -> column selection : ", paste(col_names, collapse = ", ")))
             
             if (length(col_names) > 1) {
                 sums <- rowSums(data[, col_names], na.rm = TRUE)
@@ -201,9 +197,8 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
         } else {
             data[indicator] <- NA
             
-            # logs
-            msg <- paste0("Building indicator : ", indicator, " -> column selection : NULL")
-            log_msg(msg)
+            # logs            
+            log_msg(paste0("Building indicator : ", indicator, " -> column selection : NULL"))
         }
     }
 
@@ -213,8 +208,7 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
             data[empty_indicator] <- NA
             
             # logs
-            msg <- paste0("Building indicator : ", empty_indicator, " -> column selection : NULL")
-            log_msg(msg)
+            log_msg(paste0("Building indicator : ", empty_indicator, " -> column selection : NULL"))
         }    
     }
     
@@ -637,7 +631,7 @@ extract_geometry_coordinates <- function(data, geom_col = "GEOMETRY", verbose=TR
         parse_fail_examples <- paste(head(parse_fail_idx, 10), collapse = ", ")
         if (verbose) {
             log_msg(
-                glue("[WARNING] {parse_failures} GEOMETRY records could not be parsed. Resulting LONGITUDE/LATITUDE are NA for those rows."),
+                glue("{parse_failures} GEOMETRY records could not be parsed. Resulting LONGITUDE/LATITUDE are NA for those rows."),
                 "warning"
             )  
         } 
@@ -696,14 +690,14 @@ read_geojson_safe <- function(file_path) {
     # 1. Check if the file exists in the folder
     if (!file.exists(file_path)) {
         # If you have a custom log_msg function from earlier, you can swap 'message' for it!
-        log_msg(glue("[ERROR] File does not exist at the specified path: {file_path}"))
+        log_msg(glue("File does not exist at the specified path: {file_path}"), "error")
         return(NULL)
     }
     
     # 2. Try to read the file and catch corruption/parsing errors
     geo_data <- tryCatch({ sf::read_sf(file_path, quiet = TRUE)}, 
         error = function(e) {
-            log_msg(glue("[ERROR] Failed to parse the GeoJSON file. It may be corrupted. R says: {e$message}"))
+            log_msg(glue("Failed to parse the GeoJSON file. It may be corrupted. R says: {e$message}"), "error")
             return(NULL)
         })
     

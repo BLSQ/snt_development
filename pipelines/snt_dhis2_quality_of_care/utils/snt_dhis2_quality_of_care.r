@@ -6,40 +6,81 @@
 #' @param root_path Workspace root path. Defaults to `~/workspace`.
 #' @param required_packages Character vector of packages to install/load.
 #' @return Named list containing paths, config, dataset IDs, and country code.
+get_setup_variables <- function(
+    SNT_ROOT_PATH = "~/workspace",
+    packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
+) {
+    required_packages <- packages
+    install_and_load(required_packages)
+
+    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
+    reticulate::py_config()$python
+    assign("openhexa", reticulate::import("openhexa.sdk"), envir = .GlobalEnv)
+
+    list(
+        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),
+        FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
+        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
+    )
+}
+
+#' Generic helper to load a file from an OpenHEXA dataset.
+#'
+#' @param dataset_id OpenHEXA dataset identifier.
+#' @param filename Name of file to load from latest dataset version.
+#' @param verbose Whether to log informative messages.
+#' @return Loaded object (data.frame/data.table/sf) depending on file format.
+load_dataset_file_qoc <- function(dataset_id, filename, verbose = TRUE) {
+    data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_id, filename)
+        },
+        error = function(e) {
+            msg <- glue::glue("[ERROR] Error while loading {filename} file for: {conditionMessage(e)}")
+            if (verbose) log_msg(msg, "error")
+            stop(msg)
+        }
+    )
+
+    if (verbose) {
+        msg <- glue::glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]")
+        log_msg(msg)
+    }
+    data
+}
+
 bootstrap_quality_of_care_context <- function(
     root_path = "~/workspace",
     required_packages = c("jsonlite", "data.table", "arrow", "sf", "ggplot2", "glue", "reticulate", "RColorBrewer", "dplyr", "writexl", "knitr", "scales", "gridExtra")
 ) {
+    setup_vars <- get_setup_variables(
+        SNT_ROOT_PATH = root_path,
+        packages = required_packages
+    )
     code_path <- file.path(root_path, "code")
-    config_path <- file.path(root_path, "configuration")
+    pipelines_path <- file.path(root_path, "pipelines")
+    data_path <- file.path(root_path, "data")
+    dhis2_data_path <- file.path(root_path, "data", "dhis2")
+    pipeline_path <- file.path(pipelines_path, "snt_dhis2_quality_of_care")
     output_data_path <- file.path(root_path, "data", "dhis2", "quality_of_care")
-    report_outputs_path <- file.path(root_path, "pipelines", "snt_dhis2_quality_of_care", "reporting", "outputs")
+    report_outputs_path <- file.path(pipeline_path, "reporting", "outputs")
     figures_path <- file.path(report_outputs_path, "figures")
-
-    install_and_load(required_packages)
 
     dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(report_outputs_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(figures_path, recursive = TRUE, showWarnings = FALSE)
-
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    openhexa <- tryCatch(
-        {
-            reticulate::import("openhexa.sdk")
-        },
-        error = function(e) {
-            msg <- paste0("[ERROR] Error while loading openhexa.sdk: ", conditionMessage(e))
-            stop(msg)
-        }
-    )
-    assign("openhexa", openhexa, envir = .GlobalEnv)
-
-    config_json <- load_snt_config(config_path, "SNT_config.json")
+    config_json <- load_snt_config(setup_vars$CONFIG_PATH, "SNT_config.json")
 
     list(
         ROOT_PATH = root_path,
         CODE_PATH = code_path,
-        CONFIG_PATH = config_path,
+        PIPELINES_PATH = pipelines_path,
+        PIPELINE_PATH = pipeline_path,
+        CONFIG_PATH = setup_vars$CONFIG_PATH,
+        DATA_PATH = data_path,
+        DHIS2_DATA_PATH = dhis2_data_path,
+        FORMATTED_DATA_PATH = setup_vars$FORMATTED_DATA_PATH,
+        UPLOADS_PATH = setup_vars$UPLOADS_PATH,
         OUTPUT_DATA_PATH = output_data_path,
         REPORT_OUTPUTS_PATH = report_outputs_path,
         FIGURES_PATH = figures_path,
@@ -72,25 +113,13 @@ validate_quality_of_care_action <- function(data_action) {
 #' @param data_action Action suffix (`imputed` or `removed`).
 #' @return File name of the selected routine parquet.
 select_latest_qoc_routine_file <- function(dataset_last_version, country_code, data_action) {
-    # Accept both current and legacy naming conventions:
-    # - {CC}_routine_outliers_imputed.parquet
-    # - {CC}_routine_outliers_removed.parquet
-    # - {CC}_routine_outliers-<method>_imputed.parquet (legacy)
-    # - {CC}_routine_outliers_<method>_imputed.parquet (legacy)
     target_regex <- paste0("^", country_code, "_routine_outliers(?:[-_].+)?_", data_action, "\\.parquet$")
     files_list <- reticulate::iterate(dataset_last_version$files)
-    matching_files <- c()
-    scanned_files <- c()
-    for (file in files_list) {
-        filename <- file$filename
-        scanned_files <- c(scanned_files, filename)
-        if (grepl(target_regex, filename)) {
-            matching_files <- c(matching_files, filename)
-        }
-    }
+    file_names <- vapply(files_list, function(file) file$filename, character(1))
+    matching_files <- sort(file_names[grepl(target_regex, file_names)], decreasing = TRUE)
 
     if (length(matching_files) == 0) {
-        candidate_files <- scanned_files[grepl(paste0("^", country_code, "_routine_outliers"), scanned_files)]
+        candidate_files <- file_names[grepl(paste0("^", country_code, "_routine_outliers"), file_names)]
         candidate_preview <- if (length(candidate_files) > 0) {
             paste(head(sort(candidate_files), 10), collapse = ", ")
         } else {
@@ -102,71 +131,17 @@ select_latest_qoc_routine_file <- function(dataset_last_version, country_code, d
         ))
     }
 
-    sort(matching_files, decreasing = TRUE)[1]
-}
-
-#' Load routine and shapes inputs for Quality of Care computation.
-#'
-#' @param setup_ctx Context returned by `bootstrap_quality_of_care_context()`.
-#' @param data_action Action selecting imputed/removed outliers data.
-#' @return Named list with routine data, shapes data, and selected filename.
-load_quality_of_care_inputs <- function(setup_ctx, data_action) {
-    data_action <- validate_quality_of_care_action(data_action)
-    log_msg(glue::glue("Searching latest routine file for data_action: {data_action}"))
-    log_msg(glue::glue("Using outliers dataset id: {setup_ctx$OUTLIERS_DATASET}"))
-
-    dataset_last_version <- openhexa$workspace$get_dataset(setup_ctx$OUTLIERS_DATASET)$latest_version
-    if (is.null(dataset_last_version)) {
-        stop(glue::glue("[ERROR] No version available in dataset `{setup_ctx$OUTLIERS_DATASET}`."))
-    }
-
-    routine_filename <- select_latest_qoc_routine_file(
-        dataset_last_version = dataset_last_version,
-        country_code = setup_ctx$COUNTRY_CODE,
-        data_action = data_action
-    )
-
-    log_msg(glue::glue("Using routine file: {routine_filename}"))
-
-    routine <- tryCatch(
-        {
-            get_latest_dataset_file_in_memory(setup_ctx$OUTLIERS_DATASET, routine_filename)
-        },
-        error = function(e) {
-            msg <- paste0("[ERROR] Failed loading routine file `", routine_filename, "`: ", conditionMessage(e))
-            stop(msg)
-        }
-    )
-
-    shapes <- load_country_file_from_dataset(
-        dataset_id = setup_ctx$DHIS2_FORMATTED_DATASET,
-        country_code = setup_ctx$COUNTRY_CODE,
-        suffix = "_shapes.geojson",
-        label = "DHIS2 shapes data"
-    )
-
-    list(routine = routine, shapes = shapes, routine_filename = routine_filename, data_action = data_action)
+    matching_files[1]
 }
 
 #' Compute district-year Quality of Care indicators.
 #'
 #' @param routine Routine dataframe loaded from outliers dataset.
 #' @return Data table with district-year indicators.
-compute_quality_of_care_indicators <- function(routine) {
+normalize_qoc_routine_types <- function(routine) {
     data.table::setDT(routine)
-
-    core_cols <- c("ADM2_ID", "YEAR")
-    core_missing <- setdiff(core_cols, names(routine))
-    if (length(core_missing) > 0) {
-        stop(glue::glue("[ERROR] Missing core columns: {paste(core_missing, collapse = ', ')}"))
-    }
-
     indicator_cols <- c("TEST", "SUSP", "MALTREAT", "CONF", "MALDTH", "MALADM", "ALLADM", "ALLDTH", "ALLOUT", "PRES")
     available_cols <- intersect(indicator_cols, names(routine))
-    missing_cols <- setdiff(indicator_cols, names(routine))
-    if (length(missing_cols) > 0) {
-        log_msg(glue::glue("[WARNING] Missing indicator columns: {paste(missing_cols, collapse = ', ')}"), level = "warning")
-    }
 
     for (col in available_cols) {
         col_vals <- as.character(routine[[col]])
@@ -176,13 +151,29 @@ compute_quality_of_care_indicators <- function(routine) {
 
     routine[, YEAR := as.integer(YEAR)]
     routine[, ADM2_ID := as.character(ADM2_ID)]
+    routine
+}
+
+#' Aggregate QoC routine indicators by district and year.
+#'
+#' @param routine Routine data table with normalized types.
+#' @return Aggregated district-year data table.
+aggregate_qoc_district_year <- function(routine) {
+    indicator_cols <- c("TEST", "SUSP", "MALTREAT", "CONF", "MALDTH", "MALADM", "ALLADM", "ALLDTH", "ALLOUT", "PRES")
+    available_cols <- intersect(indicator_cols, names(routine))
 
     if (length(available_cols) > 0) {
-        qoc <- routine[, lapply(.SD, function(x) sum(x, na.rm = TRUE)), .SDcols = available_cols, by = .(ADM2_ID, YEAR)]
+        routine[, lapply(.SD, function(x) sum(x, na.rm = TRUE)), .SDcols = available_cols, by = .(ADM2_ID, YEAR)]
     } else {
-        qoc <- unique(routine[, .(ADM2_ID, YEAR)])
+        unique(routine[, .(ADM2_ID, YEAR)])
     }
+}
 
+#' Add derived quality-of-care indicators to aggregated district-year data.
+#'
+#' @param qoc Aggregated district-year data table.
+#' @return Data table with derived indicators.
+add_quality_of_care_derived_indicators <- function(qoc) {
     if ("TEST" %in% names(qoc) && "SUSP" %in% names(qoc)) qoc[, testing_rate := data.table::fifelse(SUSP > 0, TEST / SUSP, NA_real_)]
     if ("MALTREAT" %in% names(qoc) && "CONF" %in% names(qoc)) qoc[, treatment_rate := data.table::fifelse(CONF > 0, MALTREAT / CONF, NA_real_)]
     if ("MALDTH" %in% names(qoc) && "MALADM" %in% names(qoc)) qoc[, case_fatality_rate := data.table::fifelse(MALADM > 0, MALDTH / MALADM, NA_real_)]
@@ -194,6 +185,29 @@ compute_quality_of_care_indicators <- function(routine) {
     if ("ALLOUT" %in% names(qoc)) qoc[, non_malaria_all_cause_outpatients := ALLOUT]
     if ("PRES" %in% names(qoc)) qoc[, presumed_cases := PRES]
 
+    qoc
+}
+
+#' Compute district-year Quality of Care indicators.
+#'
+#' @param routine Routine dataframe loaded from outliers dataset.
+#' @return Data table with district-year indicators.
+compute_quality_of_care_indicators <- function(routine) {
+    core_cols <- c("ADM2_ID", "YEAR")
+    core_missing <- setdiff(core_cols, names(routine))
+    if (length(core_missing) > 0) {
+        stop(glue::glue("[ERROR] Missing core columns: {paste(core_missing, collapse = ', ')}"))
+    }
+
+    indicator_cols <- c("TEST", "SUSP", "MALTREAT", "CONF", "MALDTH", "MALADM", "ALLADM", "ALLDTH", "ALLOUT", "PRES")
+    missing_cols <- setdiff(indicator_cols, names(routine))
+    if (length(missing_cols) > 0) {
+        log_msg(glue::glue("[WARNING] Missing indicator columns: {paste(missing_cols, collapse = ', ')}"), level = "warning")
+    }
+
+    routine <- normalize_qoc_routine_types(routine)
+    qoc <- aggregate_qoc_district_year(routine)
+    qoc <- add_quality_of_care_derived_indicators(qoc)
     qoc
 }
 

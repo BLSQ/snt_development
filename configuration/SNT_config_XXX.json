@@ -1,0 +1,68 @@
+{
+  "$schema": "./snt_config.schema.json",
+  "SNT_CONFIG": {
+    "COUNTRY_CODE": "",
+    "COUNTRY_NAME": "",
+    "DHIS2_ADMINISTRATION_1": "level_2_name",
+    "DHIS2_ADMINISTRATION_2": "level_3_name",
+    "ANALYTICS_ORG_UNITS_LEVEL": 0,
+    "REPORTING_RATE_PRODUCT_UID": []
+  },
+  "SNT_DATASET_IDENTIFIERS": {
+    "DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
+    "DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",
+    "DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
+    "DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate",
+    "DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
+    "DHIS2_INCIDENCE": "snt-dhis2-incidence",
+    "DHS_INDICATORS": "snt-dhs-indicators",
+    "WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
+    "SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",
+    "ERA5_DATASET_CLIMATE": "snt-era5-climate",
+    "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
+    "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+    "DHIS2_QUALITY_OF_CARE": "snt-dhis2-quality-of-care",
+    "SNT_MAP_EXTRACTS": "snt-map-extracts",
+    "SNT_RESULTS": "snt-results"
+  },
+  "DHIS2_DATA_DEFINITIONS": {
+    "POPULATION_DEFINITIONS": {
+      "TOTAL_POPULATION_REF": null,
+      "GROWTH_FACTOR": null,
+      "REFERENCE_YEAR": 2024,
+      "POPULATION_INDICATORS": {
+        "POPULATION": { "ids": [], "type": "dataElement" }
+      },
+      "POPULATION_DISAGGREGATIONS": {
+        "POP_UNDER_5": null,
+        "POP_0_1_Y": null,
+        "POP_1_2_Y": null,
+        "POP_5_10_Y": null,
+        "POP_5_36_M": null,
+        "POP_PREGNANT_WOMAN": null
+      }
+    },
+    "DHIS2_INDICATOR_DEFINITIONS": {
+      "SUSP": [],
+      "TEST": [],
+      "CONF": [],
+      "PRES": [],
+      "PRESSEV": [],
+      "MALTREAT": [],
+      "MALADM": [],
+      "MALSEV": [],
+      "MALSEV_ABOVE5": [],
+      "MALSEV_UNDER5": [],
+      "MALDTH": [],
+      "CASRECU": [],
+      "CPN1": []
+    },
+    "DHIS2_REPORTING_RATES": {
+      "REPORTING_DATASETS": [],
+      "REPORTING_INDICATORS": {
+        "ACTUAL_REPORTS": "",
+        "EXPECTED_REPORTS": ""
+      }
+    }
+  }
+}

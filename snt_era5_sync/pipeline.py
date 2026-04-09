@@ -355,14 +355,6 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
 
 @pipeline("snt_era5_sync")
 @parameter(
-    "run_report_only",
-    name="Run reporting only",
-    help="This will only execute the reporting notebook",
-    type=bool,
-    default=False,
-    required=False,
-)
-@parameter(
     "start_date",
     type=str,
     name="Start date",
@@ -392,12 +384,20 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
     default=False,
     required=False,
 )
+@parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
 def snt_era5_sync(
-    run_report_only: bool,
     start_date: str,
     end_date: str | None,
     cds_connection: CustomConnection,
     pull_scripts: bool,
+    run_report_only: bool,
 ) -> None:
     """Unified ERA5 pipeline for SNT: synchronize raw ERA5 then aggregate to SNT outputs."""
     root_path = Path(workspace.files_path)

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SNT Configuration Schema",
+  "type": "object",
+  "required": [
+    "SNT_CONFIG",
+    "SNT_DATASET_IDENTIFIERS",
+    "DHIS2_DATA_DEFINITIONS"
+  ],
+  "properties": {
+    "SNT_CONFIG": {
+      "type": "object",
+      "required": ["COUNTRY_CODE", "COUNTRY_NAME", "ANALYTICS_ORG_UNITS_LEVEL"],
+      "properties": {
+        "COUNTRY_CODE": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-3 code (e.g., COD)"
+        },
+        "COUNTRY_NAME": { "type": "string" },
+        "DHIS2_ADMINISTRATION_1": { "type": "string" },
+        "DHIS2_ADMINISTRATION_2": { "type": "string" },
+        "ANALYTICS_ORG_UNITS_LEVEL": { "type": "integer", "minimum": 1 },
+        "REPORTING_RATE_PRODUCT_UID": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "SNT_DATASET_IDENTIFIERS": {
+      "type": "object",
+      "description": "FIXED: Do not change keys or values here unless updating the global pipeline logic.",
+      "additionalProperties": { "type": "string" }
+    },
+    "DHIS2_DATA_DEFINITIONS": {
+      "type": "object",
+      "properties": {
+        "POPULATION_DEFINITIONS": {
+          "type": "object",
+          "properties": {
+            "TOTAL_POPULATION_REF": { "type": "number" },
+            "GROWTH_FACTOR": { "type": "number" },
+            "REFERENCE_YEAR": { "type": "integer" },
+            "POPULATION_INDICATORS": { "type": "object" },
+            "POPULATION_DISAGGREGATIONS": {
+              "type": "object",
+              "additionalProperties": { "type": "number" }
+            }
+          }
+        },
+        "DHIS2_INDICATOR_DEFINITIONS": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

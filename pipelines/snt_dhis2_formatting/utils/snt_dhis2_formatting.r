@@ -81,7 +81,8 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
     data <- tryCatch({ 
             get_latest_dataset_file_in_memory(dataset_id, filename) 
         }, error = function(e) {
-            if (verbose) log_msg(glue("[ERROR] Error while loading {filename} file for: {conditionMessage(e)}"), "error")
+            msg <- glue("[ERROR] Error while loading {filename} file for: {conditionMessage(e)}")
+            log_msg(msg, "error")
             stop(msg)
     })
 
@@ -350,7 +351,7 @@ geojson_to_sf <- function(data, geom_col = "GEOMETRY", crs = 4326) {
 simplify_geometries <- function(sf_object, keep = 0.05) {
     # Optional safety check
     if (!inherits(sf_object, "sf")) {
-        stop("Input must be an sf object")
+        stop("[ERROR] Input must be an sf object")
     }
     # Save original column order
     original_cols <- names(sf_object)

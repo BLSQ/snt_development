@@ -10,7 +10,7 @@ source(file.path("~/workspace/code", "snt_utils.r"))
 #'
 #' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
 #' @param packages Character vector. R packages to install and load.
-#' @return List with CONFIG_PATH, POPULATION_DATA_PATH.
+#' @return List with SNT paths.
 #'
 #' @export
 get_setup_variables <- function(
@@ -21,21 +21,29 @@ get_setup_variables <- function(
     # List required pcks
     required_packages <- unique(c(packages, "reticulate"))
     install_and_load(required_packages)
-    
+
     # Set environment to load openhexa.sdk from the right environment
     Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    reticulate::py_config()$python
     
-    # Import OpenHEXA SDK and make it available in the environment 
-    assign("openhexa", reticulate::import("openhexa.sdk"), envir = .GlobalEnv)
-    
-    return(
-        list(
-            CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
-            FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
-            UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
-        )
+    # Attempt to import the SDK
+    tryCatch({
+        sdk <- reticulate::import("openhexa.sdk")
+        assign("openhexa", sdk, envir = .GlobalEnv)
+    }, error = function(e) {
+        log_msg("[WARNING] Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python")
+    })    
+
+    # Set paths (add paths here)
+    paths_to_check = list(
+        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
+        FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
+        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
     )
+
+    # create if they do not exist
+    lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE)
+    
+    return(paths_to_check)
 }
 
 

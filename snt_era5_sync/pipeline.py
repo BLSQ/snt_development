@@ -3,7 +3,6 @@ from __future__ import annotations
 import shutil
 import tempfile
 from datetime import date, datetime, timedelta, timezone
-from io import BytesIO
 from math import ceil, floor
 from pathlib import Path
 
@@ -13,7 +12,6 @@ import xarray as xr
 import numpy as np
 from dateutil.relativedelta import relativedelta
 from openhexa.sdk import CustomConnection, current_run, parameter, pipeline, workspace
-from openhexa.sdk.datasets import DatasetFile
 from openhexa.toolbox.era5.cache import Cache
 from openhexa.toolbox.era5.dhis2weeks import WeekType, to_dhis2_week
 from openhexa.toolbox.era5.extract import Client, grib_to_zarr, prepare_requests, retrieve_requests
@@ -21,6 +19,7 @@ from openhexa.toolbox.era5.transform import Period, aggregate_in_space, aggregat
 from openhexa.toolbox.era5.utils import get_variables
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
+    get_file_from_dataset,
     load_configuration_snt,
     pull_scripts_from_repository,
     run_report_notebook,
@@ -32,34 +31,6 @@ CDS_API_URL = "https://cds.climate.copernicus.eu/api"
 DATASET_ID = "reanalysis-era5-land"
 ERA5_VARIABLES = ["total_precipitation"]
 # ERA5_VARIABLES = ["2m_dewpoint_temperature", "2m_temperature", "total_precipitation"]
-
-
-def read_boundaries(boundaries_id: str, filename: str) -> gpd.GeoDataFrame:
-    """Load boundary geometries from a workspace dataset file.
-
-    Returns
-    -------
-    gpd.GeoDataFrame
-        Boundary geometries in their stored CRS.
-    """
-    boundaries_dataset = workspace.get_dataset(boundaries_id)
-    ds = boundaries_dataset.latest_version
-    if not ds:
-        raise FileNotFoundError(f"Dataset {boundaries_id} has no versions available.")
-
-    ds_file: DatasetFile | None = None
-    for f in ds.files:
-        if f.filename == filename and (
-            f.filename.endswith(".parquet") or f.filename.endswith(".geojson") or f.filename.endswith(".gpkg")
-        ):
-            ds_file = f
-
-    if ds_file is None:
-        raise FileNotFoundError(f"File {filename} not found in dataset {ds.name}")
-
-    if ds_file.filename.endswith(".parquet"):
-        return gpd.read_parquet(BytesIO(ds_file.read()))
-    return gpd.read_file(BytesIO(ds_file.read()))
 
 
 def get_bounds(boundaries: gpd.GeoDataFrame) -> tuple[int, int, int, int]:
@@ -384,6 +355,14 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
 
 @pipeline("snt_era5_sync")
 @parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
     "start_date",
     type=str,
     name="Start date",
@@ -414,6 +393,7 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
     required=False,
 )
 def snt_era5_sync(
+    run_report_only: bool,
     start_date: str,
     end_date: str | None,
     cds_connection: CustomConnection,
@@ -441,106 +421,117 @@ def snt_era5_sync(
         except Exception as e:
             current_run.log_warning(f"Could not pull snt_era5_sync scripts: {e}")
 
-    if not is_valid_ymd(start_date):
-        raise ValueError(f"Invalid start date format: {start_date}. Expected YYYY-MM-DD.")
-    if not is_valid_ymd(end_date):
-        raise ValueError(f"Invalid end date format: {end_date}. Expected YYYY-MM-DD.")
-
     snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
     validate_config(snt_config)
     country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    if not run_report_only:
+        if not is_valid_ymd(start_date):
+            raise ValueError(f"Invalid start date format: {start_date}. Expected YYYY-MM-DD.")
+        if not is_valid_ymd(end_date):
+            raise ValueError(f"Invalid end date format: {end_date}. Expected YYYY-MM-DD.")
 
-    variables_to_run = ERA5_VARIABLES
-    current_run.log_info(f"Variables to process: {variables_to_run}")
+        variables_to_run = ERA5_VARIABLES
+        current_run.log_info(f"Variables to process: {variables_to_run}")
 
-    dhis2_formatted_dataset = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-    era5_dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["ERA5_DATASET_CLIMATE"]
-    boundaries = read_boundaries(dhis2_formatted_dataset, filename=f"{country_code}_shapes.geojson")
-    area = [int(v) for v in get_bounds(boundaries)]
+        dhis2_formatted_dataset = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+        era5_dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["ERA5_DATASET_CLIMATE"]
+        boundaries = get_file_from_dataset(
+            dataset_id=dhis2_formatted_dataset,
+            filename=f"{country_code}_shapes.geojson",
+        )
+        if not isinstance(boundaries, gpd.GeoDataFrame):
+            raise TypeError(
+                f"Expected GeoDataFrame for boundaries, got {type(boundaries).__name__} "
+                f"from dataset {dhis2_formatted_dataset}."
+            )
+        area = [int(v) for v in get_bounds(boundaries)]
 
-    if start_date:
-        start_date = start_date[0:8] + "01"
-    if not end_date:
-        end_date = (
-            datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
-        ).strftime("%Y-%m-%d")
+        if start_date:
+            start_date = start_date[0:8] + "01"
+        if not end_date:
+            end_date = (
+                datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
+            ).strftime("%Y-%m-%d")
+        else:
+            end_date = to_last_day_previous_month(end_date)
+
+        start_d = date.fromisoformat(start_date)
+        end_d = date.fromisoformat(end_date)
+        current_run.log_info(f"Sync period: {start_d} to {end_d}")
+
+        cds_key = get_cds_api_key(cds_connection=cds_connection)
+        client = Client(url=CDS_API_URL, key=cds_key, retry_after=30)
+        cache = Cache(database_uri=workspace.database_url, cache_dir=cache_dir)
+        current_run.log_info(f"ERA5 cache directory: {cache_dir}")
+        get_variables()  # fail fast if toolbox era5 API is not available as expected
+
+        # 1) synchronize raw ERA5
+        for variable in variables_to_run:
+            sync_variable(
+                client=client,
+                cache=cache,
+                variable=variable,
+                start_d=start_d,
+                end_d=end_d,
+                area=area,
+                raw_dir=raw_dir,
+            )
+            validate_synced_zarr(zarr_store=raw_dir / f"{variable}.zarr", variable=variable)
+
+        # 2) aggregate and export with same outputs as snt_era5_aggregate
+        file_paths_to_upload: list[Path] = []
+        for variable in variables_to_run:
+            current_run.log_info(f"Running SNT aggregation for {variable}")
+            daily = build_daily_snt(
+                zarr_store=raw_dir / f"{variable}.zarr",
+                boundaries=boundaries,
+                variable=variable,
+                column_uid="ADM2_ID",
+            )
+            sum_aggregation = variable == "total_precipitation"
+            weekly = aggregate_daily_snt(daily=daily, key_col="week", sum_aggregation=sum_aggregation)
+            epi_weekly = aggregate_daily_snt(daily=daily, key_col="epi_week", sum_aggregation=sum_aggregation)
+            monthly = aggregate_daily_snt(daily=daily, key_col="period_month", sum_aggregation=sum_aggregation)
+            if monthly.filter(pl.col("mean").is_null()).height > 0:
+                raise ValueError(f"[{variable}] Monthly output contains null `mean` values.")
+
+            dst_dir = output_dir / variable
+            dst_dir.mkdir(parents=True, exist_ok=True)
+
+            daily_fname = dst_dir / f"{country_code}_{variable}_daily.parquet"
+            weekly_fname = dst_dir / f"{country_code}_{variable}_weekly.parquet"
+            epi_weekly_fname = dst_dir / f"{country_code}_{variable}_epi_weekly.parquet"
+            monthly_fname = dst_dir / f"{country_code}_{variable}_monthly.parquet"
+
+            apply_snt_formatting(daily, "daily").write_parquet(daily_fname)
+            apply_snt_formatting(weekly, "weekly").write_parquet(weekly_fname)
+            apply_snt_formatting(epi_weekly, "epi_weekly").write_parquet(epi_weekly_fname)
+            apply_snt_formatting(monthly, "monthly").write_parquet(monthly_fname)
+
+            # Keep upload behavior identical to existing aggregate pipeline (monthly only)
+            file_paths_to_upload.append(monthly_fname)
+
+        params_file = save_pipeline_parameters(
+            pipeline_name="snt_era5_aggregate",
+            parameters={
+                "run_report_only": run_report_only,
+                "start_date": start_date,
+                "end_date": end_date,
+                "variables": variables_to_run,
+                "pull_scripts": pull_scripts,
+            },
+            output_path=output_dir,
+            country_code=country_code,
+        )
+        file_paths_to_upload.append(params_file)
+
+        add_files_to_dataset(
+            dataset_id=era5_dataset_id,
+            country_code=country_code,
+            file_paths=file_paths_to_upload,
+        )
     else:
-        end_date = to_last_day_previous_month(end_date)
-
-    start_d = date.fromisoformat(start_date)
-    end_d = date.fromisoformat(end_date)
-    current_run.log_info(f"Sync period: {start_d} to {end_d}")
-
-    cds_key = get_cds_api_key(cds_connection=cds_connection)
-    client = Client(url=CDS_API_URL, key=cds_key, retry_after=30)
-    cache = Cache(database_uri=workspace.database_url, cache_dir=cache_dir)
-    current_run.log_info(f"ERA5 cache directory: {cache_dir}")
-    get_variables()  # fail fast if toolbox era5 API is not available as expected
-
-    # 1) synchronize raw ERA5
-    for variable in variables_to_run:
-        sync_variable(
-            client=client,
-            cache=cache,
-            variable=variable,
-            start_d=start_d,
-            end_d=end_d,
-            area=area,
-            raw_dir=raw_dir,
-        )
-        validate_synced_zarr(zarr_store=raw_dir / f"{variable}.zarr", variable=variable)
-
-    # 2) aggregate and export with same outputs as snt_era5_aggregate
-    file_paths_to_upload: list[Path] = []
-    for variable in variables_to_run:
-        current_run.log_info(f"Running SNT aggregation for {variable}")
-        daily = build_daily_snt(
-            zarr_store=raw_dir / f"{variable}.zarr",
-            boundaries=boundaries,
-            variable=variable,
-            column_uid="ADM2_ID",
-        )
-        sum_aggregation = variable == "total_precipitation"
-        weekly = aggregate_daily_snt(daily=daily, key_col="week", sum_aggregation=sum_aggregation)
-        epi_weekly = aggregate_daily_snt(daily=daily, key_col="epi_week", sum_aggregation=sum_aggregation)
-        monthly = aggregate_daily_snt(daily=daily, key_col="period_month", sum_aggregation=sum_aggregation)
-        if monthly.filter(pl.col("mean").is_null()).height > 0:
-            raise ValueError(f"[{variable}] Monthly output contains null `mean` values.")
-
-        dst_dir = output_dir / variable
-        dst_dir.mkdir(parents=True, exist_ok=True)
-
-        daily_fname = dst_dir / f"{country_code}_{variable}_daily.parquet"
-        weekly_fname = dst_dir / f"{country_code}_{variable}_weekly.parquet"
-        epi_weekly_fname = dst_dir / f"{country_code}_{variable}_epi_weekly.parquet"
-        monthly_fname = dst_dir / f"{country_code}_{variable}_monthly.parquet"
-
-        apply_snt_formatting(daily, "daily").write_parquet(daily_fname)
-        apply_snt_formatting(weekly, "weekly").write_parquet(weekly_fname)
-        apply_snt_formatting(epi_weekly, "epi_weekly").write_parquet(epi_weekly_fname)
-        apply_snt_formatting(monthly, "monthly").write_parquet(monthly_fname)
-
-        # Keep upload behavior identical to existing aggregate pipeline (monthly only)
-        file_paths_to_upload.append(monthly_fname)
-
-    params_file = save_pipeline_parameters(
-        pipeline_name="snt_era5_aggregate",
-        parameters={
-            "start_date": start_date,
-            "end_date": end_date,
-            "variables": variables_to_run,
-            "pull_scripts": pull_scripts,
-        },
-        output_path=output_dir,
-        country_code=country_code,
-    )
-    file_paths_to_upload.append(params_file)
-
-    add_files_to_dataset(
-        dataset_id=era5_dataset_id,
-        country_code=country_code,
-        file_paths=file_paths_to_upload,
-    )
+        current_run.log_info("run_report_only=True: skipping ERA5 sync/aggregation and dataset publication.")
 
     run_report_notebook(
         nb_file=report_nb,

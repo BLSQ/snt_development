@@ -6,14 +6,20 @@ message("This step sets up the environment for the DHIS2 incidence pipeline, inc
 It basically handles all the boring stuff so that you can focus on the code that matters :)
 ")
 
+# Check that PIPELINE_NAME is defined. This myst be defined at the top of each code notebook!
+if (!exists("PIPELINE_NAME")) stop("PIPELINE_NAME is not defined")
+
 setup_paths <- function() {
 SNT_ROOT_PATH <<- "/home/hexa/workspace"
 CODE_PATH <<- file.path(SNT_ROOT_PATH, 'code')
+PIPELINE_PATH <<- file.path(SNT_ROOT_PATH, 'pipelines', PIPELINE_NAME)
 CONFIG_PATH <<- file.path(SNT_ROOT_PATH, 'configuration')
 DATA_PATH <<- file.path(SNT_ROOT_PATH, 'data', 'dhis2', 'incidence')
 INTERMEDIATE_DATA_PATH <<- file.path(DATA_PATH, "intermediate_results")
 message("Paths set up:")
+message("SNT_ROOT_PATH", SNT_ROOT_PATH)
 message("CODE_PATH: ", CODE_PATH)
+message("PIPELINE_PATH: ", PIPELINE_PATH)
 message("CONFIG_PATH: ", CONFIG_PATH)
 message("DATA_PATH: ", DATA_PATH)
 message("INTERMEDIATE_DATA_PATH: ", INTERMEDIATE_DATA_PATH)
@@ -155,36 +161,6 @@ return(head(dhis2_population_adm2, 3))
 
 # --- DISAGGREGATION LOGIC --- --- --- --- --- --- ---
 
-# DISAGGREGATED_INDICATORS_FOUND <- FALSE # 👈 
-
-# if (!is.null(DISAGGREGATION_SELECTION) && N1_METHOD %in% c("SUSP-TEST", "PRES")) {
-#   # Determine the expected column names based on the disaggregation selection and method
-#   prefix_method <- ifelse(N1_METHOD == "SUSP-TEST", "SUSP", "PRES")
-#   prefix_fixed <- c("TEST", "CONF") 
-#   prefix_all    <- c(prefix_method, prefix_fixed) 
-#   target_colnames <- glue("{prefix_all}_{DISAGGREGATION_SELECTION}")
-  
-#   if (all(target_colnames %in% colnames(dhis2_routine))) {
-#     # Map the disaggregated columns (e.g., SUSP_UNDER_5) to generic names (e.g., SUSP) so that 
-#     # the rest of the pipeline can use them without needing to know about the disaggregation
-#     dhis2_routine[prefix_all] <- dhis2_routine[target_colnames]
-#     for (col in target_colnames) {
-#       log_msg(glue("Population Disaggregation: Successfully mapped indicator: {col}"))
-#     }    
-#     # Signal success for the next code block
-#     DISAGGREGATED_INDICATORS_FOUND <- TRUE # 👈
-#   } else {
-#     missing_cols <- setdiff(target_colnames, colnames(dhis2_routine))
-#     log_msg(glue("Population Disaggregation: Disaggregation on '{DISAGGREGATION_SELECTION}' failed."), "warning")
-#     log_msg(glue("Population Disaggregation: Missing columns in routine dataset: {paste(missing_cols, collapse = ', ')}"), "warning")
-#     msg <- glue("[ERROR] 🛑 Population Disaggregation: Required columns for disaggregation '{DISAGGREGATION_SELECTION}' are missing.")        
-#     stop(msg)
-#   }
-# } else {
-#   # Print just in nb (not in pipeline logs)
-#   print("Population Disaggregation: No disaggregation applied based on the current configuration.")
-# }
-
 prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELECTION, N1_METHOD) {
   # Initialize the flag locally
   DISAGGREGATED_INDICATORS_FOUND <<- FALSE 
@@ -222,17 +198,6 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
     dhis2_routine <<- dhis2_routine
 }
 
-# if (DISAGGREGATED_INDICATORS_FOUND) { 
-#     POPULATION_SELECTION <- paste0("POP_", DISAGGREGATION_SELECTION)    
-#     if (!(POPULATION_SELECTION %in% colnames(dhis2_population_adm2))) {
-#         log_msg(glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset."), "warning")
-#         POPULATION_SELECTION <- "POPULATION"
-#     }
-#     # The selected column is assigned to POPULATION col so that later code can use it generically
-#     dhis2_population_adm2$POPULATION <- dhis2_population_adm2[[POPULATION_SELECTION]]
-#     log_msg(glue("Population Disaggregation: Column '{POPULATION_SELECTION}' selected as population values."))
-# }
-
 select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICATORS_FOUND, DISAGGREGATION_SELECTION) {
   # Default value for the selection if the condition isn't met or if it fails
   POPULATION_SELECTION <<- "POPULATION"
@@ -254,28 +219,104 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 
 # --- --- --- --- --- --- --- --- ---
 
-
-load_careseeking_data <- function() {
-    if (USE_CSB_DATA == TRUE) {
-        dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
-        file_name <<- glue::glue("{COUNTRY_CODE}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
-        careseeking_data <<- tryCatch({ get_latest_dataset_file_in_memory(dataset_name, file_name) },          
-                      error = function(e) {
-                          msg <- paste("🛑 Error while loading DHS Care Seeking data file from `", dataset_name, file_name ,"`.", conditionMessage(e))  # log error message
-                          log_msg(msg, "error")
-                          return(NULL) # make object NULL on error
-                      })
-        if (!is.null(careseeking_data)) {
-            log_msg(paste0("Care Seeking data : ", file_name, " loaded from dataset : ", dataset_name))
-            log_msg(paste0("Care Seeking data frame dimensions: ", nrow(careseeking_data), " rows, ", ncol(careseeking_data), " columns."))
-            head(careseeking_data)
-        } else {
-            log_msg(paste0("🚨 Care-seeking data not loaded due to an error, `careseeking_data` is set to `NULL`!"), "warning")
-        }
+load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = config_json) {
+    # 1. Prepare identifiers
+    dataset_name <- config$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
+    file_name    <- glue::glue("{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
+    # 2. Attempt to load
+    data <- tryCatch({
+        get_latest_dataset_file_in_memory(dataset_name, file_name)
+    }, error = function(e) {
+        # log_msg(paste("🛑 Error loading DHS data:", conditionMessage(e)), "error")
+        return(NULL)
+    })
+    # 3. Validation & Logging
+    if (!is.null(data)) {
+        log_msg(glue::glue("✅ Care Seeking data: {file_name} loaded from {dataset_name}"))
+        log_msg(glue::glue("Dimensions: {nrow(data)} rows, {ncol(data)} columns."))
+        # Keep this global becuase it's needed for the final log summary (at the end of the script)
+        careseeking_file_name <<- file_name 
+        return(data)
     } else {
-        careseeking_data <<- NULL
-        print("USE_CSB_DATA is set to FALSE. Care-seeking data will be ignored and `careseeking_data` is set to `NULL`.")
+        log_msg("Loading of careseeking data from DHS failed. Returning NULL.", "warning")
+        return(NULL)
     }
+}
+
+
+validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
+    if (is.null(data)) {
+        print("No careseeking data to validate.")
+        return(NULL)
+    }
+    log_msg("Validating careseeking data...")
+    # 1. Determine which column we expect based on the source
+    # This keeps the logic modular and avoids repeating column-specific checks
+    target_col <- if (from_file) "CARESEEKING_PCT" else if (from_dhs) "PCT_PUBLIC_CARE" else NULL
+    # 2. Check for ADM1_ID and the source-specific percentage column
+    required_cols <- c("ADM1_ID", target_col)
+    missing_cols  <- setdiff(required_cols, colnames(data))
+    if (length(missing_cols) > 0) {
+        log_msg(paste("Required columns missing:", paste(missing_cols, collapse = ", ")), "error")
+        return(NULL)
+    }
+    # 3. Ensure the percentage column is numeric
+    if (!is.numeric(data[[target_col]])) {
+        log_msg(paste("Column", target_col, "is not numeric. Attempting conversion..."), "warning")
+        # Try to convert, but keep a backup to check for conversion failures
+        converted_vals <- as.numeric(data[[target_col]])
+        if (any(is.na(converted_vals)) && any(!is.na(data[[target_col]]))) {
+            log_msg(paste("Non-numeric values found in", target_col, ". Validation failed."), "error")
+            return(NULL)
+        }
+        data[[target_col]] <- converted_vals
+    }
+    # 4. Handle Range Adjustment (0-1 to 0-100)
+    # We check if the maximum is <= 1 to see if it's likely a proportion
+    max_val <- max(data[[target_col]], na.rm = TRUE)
+    if (!is.na(max_val) && max_val <= 1) {
+        log_msg(paste("Values in", target_col, "appear to be 0-1. Scaling to 0-100."), "warning")
+        data[[target_col]] <- data[[target_col]] * 100
+    }
+    # 5. STANDARDIZATION STEP: Rename to CARESEEKING_PCT
+    if (target_col != "CARESEEKING_PCT") {
+        log_msg(paste("Renaming source column", target_col, "to standardized name 'CARESEEKING_PCT'."))
+        colnames(data)[colnames(data) == target_col] <- "CARESEEKING_PCT"
+    }
+    log_msg("✅ Careseeking data validation and formatting completed.")
+    return(data)
+}
+
+
+join_careseeking_data <- function(main_df, careseeking_data) {
+  # --- 1. Determine the join key based on available columns ---
+  if ("ADM2_ID" %in% colnames(careseeking_data)) {
+    join_key <- "ADM2_ID"
+  } else if ("ADM1_ID" %in% colnames(careseeking_data)) {
+    join_key <- "ADM1_ID"
+  } else {
+    log_msg("Input data must contain 'ADM1_ID' or 'ADM2_ID'.", "error")
+  }
+  # --- 2. Robust Safeguard: Collapse the user data to the join_key level ---
+  # This handles 'broadcasted' duplicates by ensuring only 1 row exists per ID   
+  careseeking_data_clean <- careseeking_data |>
+    select(all_of(join_key), CARESEEKING_PCT) |>
+    # Ensure there's only one value per ID to prevent row duplication
+    distinct(!!sym(join_key), .keep_all = TRUE)
+  # --- 3. Ensure CARESEEKING_PCT is numeric and handles any non-numeric issues ---
+  careseeking_data_clean <- careseeking_data_clean |>
+    mutate(CARESEEKING_PCT = as.numeric(CARESEEKING_PCT)) 
+    if (any(is.na(careseeking_data_clean$CARESEEKING_PCT))) {
+      careseeking_data_clean <- careseeking_data_clean |>
+        mutate(CARESEEKING_PCT = ifelse(is.na(CARESEEKING_PCT), 100, CARESEEKING_PCT))
+      log_msg("Warning: Non-numeric values found in CARESEEKING_PCT. These have been converted to 100%.", "warning")
+    }
+  # --- 4. Perform the join ---
+  # If the key is ADM1, main_df (at ADM2 level) will correctly inherit the value for all its children.
+  result <- main_df |>
+    left_join(careseeking_data_clean, by = join_key)
+  # ---
+  return(result)
 }
 
 

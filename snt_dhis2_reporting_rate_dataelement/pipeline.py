@@ -28,47 +28,6 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
-    "activity_indicators",
-    name="Facility Activity indicators",
-    help="Define which data elements will be used to determine the activity of a facility."
-    " A facility is considered 'active' if at least one of these indicators has a non-missing value greater than zero.",
-    multiple=True,
-    choices=["CONF", "SUSP", "TEST", "PRES"],
-    type=str,
-    default=["CONF", "PRES"],
-    required=True,
-)
-@parameter(
-    "volume_activity_indicators",
-    name="Volume activity indicators",
-    help="Define which data elements will be used to determine the volume of activity at a facility."
-    " Volume of activity is used to calculate WEIGHTED reporting rates.",
-    multiple=True,
-    choices=["CONF", "SUSP", "TEST", "PRES"],
-    type=str,
-    default=["CONF", "PRES"],
-    required=True,
-)
-@parameter(
-    "dataelement_method_denominator",
-    name="Denominator method",
-    help="How to calculate the total nr of facilities expected to report.",
-    type=str,
-    choices=["ROUTINE_ACTIVE_FACILITIES", "PYRAMID_OPEN_FACILITIES"],
-    default="ROUTINE_ACTIVE_FACILITIES",
-    required=True,
-)
-@parameter(
-    "use_weighted_reporting_rates",
-    name="Use weighted reporting rates",
-    help="Weighted reporting rates are calculated using the volume of activity. "
-    "If TRUE, these values will populate the REPORTING_RATE column of the exported data. "
-    "If FALSE, unweighted reporting rates will be used instead.",
-    type=bool,
-    default=False,
-    required=False,
-)
-@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook",
@@ -87,10 +46,6 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_dhis2_reporting_rate_dataelement(
     routine_data_choice: str,
-    activity_indicators: str,
-    volume_activity_indicators: str,
-    dataelement_method_denominator: str,
-    use_weighted_reporting_rates: bool,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -122,10 +77,6 @@ def snt_dhis2_reporting_rate_dataelement(
         nb_parameters = {
             "SNT_ROOT_PATH": root_path.as_posix(),
             "ROUTINE_FILE": routine_file,
-            "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
-            "ACTIVITY_INDICATORS": activity_indicators,
-            "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
-            "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
         }
         parameters_file = save_pipeline_parameters(
             pipeline_name="snt_dhis2_reporting_rate_dataelement",

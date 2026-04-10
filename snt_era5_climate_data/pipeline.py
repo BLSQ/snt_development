@@ -139,7 +139,7 @@ def sync_variable(
             dataset_id=DATASET_ID,
             requests=requests,
             dst_dir=tmp_path,
-            cache=cache,
+            cache=None,
             wait=30,
         )
         grib_to_zarr(

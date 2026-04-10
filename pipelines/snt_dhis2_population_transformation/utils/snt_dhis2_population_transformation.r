@@ -1,202 +1,339 @@
-#' Bootstrap runtime context for population transformation.
-#'
-#' Loads shared utilities and dependencies, initializes OpenHEXA SDK handle,
-#' creates the output directory, and returns common paths used by notebooks.
-#'
-#' @param root_path Root workspace path.
-#' @param required_packages Character vector of required R packages.
-#' @param load_openhexa Whether to import OpenHEXA SDK.
-#' @return Named list containing paths, output directory and SDK handle.
-bootstrap_population_transformation_context <- function(
-    root_path = "~/workspace",
-    required_packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate", "rlang"),
-    load_openhexa = TRUE
-) {
-    code_path <- file.path(root_path, "code")
-    config_path <- file.path(root_path, "configuration")
-    population_data_path <- file.path(root_path, "data", "dhis2", "population_transformed")
-    dir.create(population_data_path, recursive = TRUE, showWarnings = FALSE)
+# Shared helpers for snt_dhis2_formatting code notebooks.
 
-    source(file.path(code_path, "snt_utils.r"))
+# Load base utils
+source(file.path("~/workspace/code", "snt_utils.r"))   
+
+
+#' Get Setup Variables for SNT Workspace
+#' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
+#'
+#' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
+#' @param packages Character vector. R packages to install and load.
+#' @return List with SNT paths.
+#'
+#' @export
+get_setup_variables <- function(
+    SNT_ROOT_PATH='~/workspace', 
+    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
+) {
+        
+    # List required pcks
+    required_packages <- unique(c(packages, "reticulate"))
     install_and_load(required_packages)
 
+    # Set environment to load openhexa.sdk from the right environment
     Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    openhexa <- NULL
-    if (load_openhexa) {
-        openhexa <- reticulate::import("openhexa.sdk")
-    }
-    assign("openhexa", openhexa, envir = .GlobalEnv)
+    
+    # Attempt to import the SDK
+    tryCatch({
+        sdk <- reticulate::import("openhexa.sdk")
+        assign("openhexa", sdk, envir = .GlobalEnv)
+    }, error = function(e) {
+        log_msg("Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python", "warning")
+    })    
 
-    list(
-        ROOT_PATH = root_path,
-        CODE_PATH = code_path,
-        CONFIG_PATH = config_path,
-        POPULATION_DATA_PATH = population_data_path,
-        openhexa = openhexa
+    # Set paths (add paths here)
+    paths_to_check = list(
+        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
+        FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
+        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
+        POPULATION_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "population_transformed")
     )
+
+    # create if they do not exist
+    lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE)
+    
+    return(paths_to_check)
 }
 
-#' Load DHIS2 population parquet input from OpenHEXA dataset.
+
+#' Load SNT Configuration File
+#' Reads and parses a JSON configuration file.
+#' @param snt_config_path Character. Path to the configuration JSON file.
+#' @return List containing parsed configuration.
 #'
-#' Retrieves the latest country-specific population file and logs dimensions.
-#' Stops execution with an explicit error message when loading fails.
+#' @export
+load_snt_config <- function(snt_config_path) {
+
+    # config file path 
+    config_json <- tryCatch({ fromJSON(snt_config_path) },
+                error = function(e) {
+                    stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
+                })
+    
+    log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
+    return(config_json)    
+}
+
+
+#' Load Dataset File from OpenHEXA
+#' Retrieves the latest version of a file from an OpenHEXA dataset.
 #'
-#' @param dataset_name Dataset identifier/name containing population extract.
-#' @param country_code Country code used in the filename prefix.
-#' @return Data frame with DHIS2 population rows.
-load_population_input_data <- function(dataset_name, country_code) {
-    tryCatch(
-        {
-            dhis2_population <- get_latest_dataset_file_in_memory(dataset_name, paste0(country_code, "_population.parquet"))
-            log_msg(glue::glue(
-                "DHIS2 population data loaded from dataset : {dataset_name} dataframe dimensions: [{paste(dim(dhis2_population), collapse=', ')}]"
-            ))
-            dhis2_population
-        },
+#' @param dataset_id Character. OpenHEXA dataset identifier.
+#' @param filename Character. Name of file to load.
+#' @param verbose Bool. Log messages
+#' @return Dataframe containing the loaded data.
+#'
+#' @export
+load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
+    data <- tryCatch({ 
+            get_latest_dataset_file_in_memory(dataset_id, filename) 
+        }, error = function(e) {
+            stop(glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
+    })
+
+    if (verbose) {        
+        log_msg(glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
+    }    
+    return(data)
+}
+
+
+#' Load a CSV File with Error Handling
+#'
+#' @description 
+#' Attempts to read a CSV file from the specified path. If the file cannot be loaded, 
+#' it logs a high-level error message and stops execution.
+#'
+#' @param csv_file_path String representing the file path to the CSV.
+#' @return A dataframe containing the contents of the CSV file.
+#' 
+#' @export
+load_csv_file <- function(csv_file_path) {
+    csv_data <- tryCatch({ read.csv(csv_file_path) },
         error = function(e) {
-            msg <- paste("[ERROR] Error while loading DHIS2 population file for:", country_code, conditionMessage(e))
-            log_msg(msg, "error")
-            stop(msg)
+            stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}"))
         }
     )
-}
-
-#' Get total population reference used for scaling.
-#'
-#' Reads `TOTAL_POPULATION_REF` from config when scaling is enabled.
-#' Returns NULL when adjustment is disabled or missing in config.
-#'
-#' @param config_json Parsed SNT configuration.
-#' @param adjust_with_untotals Logical flag to enable scaling.
-#' @return Numeric population reference or NULL.
-get_total_population_reference <- function(config_json, adjust_with_untotals = FALSE) {
-    if (!adjust_with_untotals) {
-        return(NULL)
-    }
-
-    total_population_reference <- config_json$DHIS2_DATA_DEFINITIONS$POPULATION_DEFINITIONS[["TOTAL_POPULATION_REF"]]
-    if (is.null(total_population_reference)) {
-        log_msg("No total population reference found in 'snt_config'. Adjustment will be skipped.", "warning")
-        return(NULL)
-    }
-
-    log_msg(glue::glue("Using total population reference from SNT configuration file: {total_population_reference}"))
-    total_population_reference
+    log_msg(glue::glue("File loaded: {csv_file_path}"))
+    return(csv_data)
 }
 
 
-#' Scale DHIS2 population values to a reference national total.
+# -----------------------------------------------------------------------------------------
+# Population transformation util functions ------------------------------------------------
+# -----------------------------------------------------------------------------------------
+
+
+#' Compute Yearly Population Scaling Factors
 #'
-#' Computes yearly scaling factors and applies them to each row, producing
-#' `POPULATION_SCALED` while preserving original `POPULATION`.
+#' @description Calculates the total population per year from the input data and 
+#' derives a scaling factor by dividing a reference value by those annual totals. 
 #'
-#' @param dhis2_population Input population table.
-#' @param total_population_reference National reference total.
-#' @return Population table with scaled column when reference is provided.
-apply_total_population_scaling <- function(dhis2_population, total_population_reference) {
-    if (is.null(total_population_reference)) {
-        return(dhis2_population)
-    }
-
-    year_totals <- dhis2_population %>%
-        dplyr::group_by(YEAR) %>%
-        dplyr::summarise(total_year_pop = sum(POPULATION, na.rm = TRUE), .groups = "drop") %>%
-        dplyr::mutate(scaling_factor = total_population_reference / total_year_pop)
-
-    dhis2_population_scaled <- dhis2_population %>%
-        dplyr::left_join(year_totals, by = "YEAR") %>%
-        dplyr::mutate(POPULATION_SCALED = round(POPULATION * scaling_factor)) %>%
-        dplyr::select(-total_year_pop, -scaling_factor)
-
-    for (i in seq_len(nrow(year_totals))) {
-        row <- year_totals[i, ]
-        dhis2_total <- sum(dhis2_population_scaled[dhis2_population_scaled$YEAR == row$YEAR, "POPULATION"], na.rm = TRUE)
-        dhis2_total_scd <- sum(dhis2_population_scaled[dhis2_population_scaled$YEAR == row$YEAR, "POPULATION_SCALED"], na.rm = TRUE)
-        log_msg(glue::glue("DHIS2 population year {row$YEAR} ({dhis2_total}) scaled: {dhis2_total_scd} (scaling_factor={round(row$scaling_factor, 3)})."))
-    }
-
-    dhis2_population_scaled
+#' @param data A dataframe or tibble containing at least \code{YEAR} and \code{POPULATION} columns.
+#' @param reference A numeric value representing the target population (numerator) 
+#' used to calculate the scaling factor.
+#'
+#' @return A tibble with three columns: \code{YEAR}, \code{total_year_pop}, and \code{scaling_factor}.
+#' @importFrom dplyr group_by summarise mutate
+#' @export
+compute_yearly_scaling <- function(data, reference, pop_column="POPULATION") {
+    
+    # Compute totals per DHIS2 year
+    totals <- data %>%
+            group_by(YEAR) %>%
+            summarise(total_year_pop = sum(.data[[pop_column]], na.rm = TRUE))
+    
+    # Compute scaling factor per year
+    result <- totals %>%
+      mutate(scaling_factor = reference / total_year_pop)
+    
+    return(result)
 }
 
 
-#' Project population backward/forward using growth factor.
+#' Compute Adjusted Population
 #'
-#' Uses a reference year and annual growth factor to create historical and
-#' forward projections. Falls back to raw values when no growth factor is set.
+#' @description Merges yearly scaling factors into a dataset, calculates rounded 
+#' adjusted population values, and logs verification totals for each year.
 #'
-#' @param dhis2_population Input population table.
-#' @param growth_factor Annual growth factor (decimal).
-#' @param reference_year Year used as projection baseline.
-#' @param n_years_past Number of years to project backward.
-#' @param n_years_future Number of years to project forward.
-#' @return Population table with projected years and normalized `POPULATION`.
-project_population_with_growth <- function(dhis2_population, growth_factor, reference_year, n_years_past = 6, n_years_future = 6) {
-    population_column <- ifelse(("POPULATION_SCALED" %in% colnames(dhis2_population)), "POPULATION_SCALED", "POPULATION")
-    columns_selection <- c("YEAR", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID", population_column)
-
-    if (is.null(growth_factor)) {
-        pop_result <- dhis2_population[order(dhis2_population$YEAR), columns_selection]
-        pop_result <- pop_result %>% dplyr::rename(POPULATION = !!rlang::sym(population_column))
-        return(pop_result)
+#' @param data A dataframe containing \code{YEAR} and \code{POPULATION} columns.
+#' @param year_scales A dataframe containing \code{YEAR}, \code{total_year_pop}, 
+#' and \code{scaling_factor}.
+#' @param source_column Character string. The name of the existing population column.
+#' @param target_column Character string. The name for the new adjusted column.
+#'
+#' @return A dataframe with an added \code{POPULATION_SCALED} column and 
+#' intermediate scaling columns removed.
+#' 
+#' @export
+compute_adjusted_population <- function(data, year_scales, source_column="POPULATION", target_column="POPULATION_SCALED") {
+    
+    cols_in_data <- colnames(data)
+    pop_column_sel <- cols_in_data[toupper(cols_in_data) == toupper(source_column)]
+    
+    if (length(pop_column_sel) == 0) {
+        stop(glue::glue("[ERROR] Column: {source_column} not found in population data."))
     }
+    
+    # Compute adjusted population
+    data_merged <- data %>%
+      left_join(year_scales, by = "YEAR") %>%
+      mutate(!!target_column := round(.data[[pop_column_sel]] * scaling_factor))
 
-    if (is.null(reference_year) || !(reference_year %in% dhis2_population$YEAR)) {
+    if (any(is.na(data_merged$scaling_factor))) {
+        log_msg("Some years in the data do not have scaling factors!", "warning")
+    }
+    
+    # util logs
+    for (i in seq_len(nrow(year_scales))) {
+        row <- year_scales[i, ]       
+        dhis2_total <- sum(data_merged[[pop_column_sel]][data_merged$YEAR == row$YEAR], na.rm = TRUE)
+        dhis2_total_scd <- sum(data_merged[[target_column]][data_merged$YEAR == row$YEAR], na.rm = TRUE)        
+        log_msg(glue("DHIS2 population year {row$YEAR} ({dhis2_total}) scaled: {dhis2_total_scd} (scaling_factor={round(row$scaling_factor, 3)})."))
+    }
+    
+    # Cleanup: Drop the helper columns
+    data_merged <- data_merged %>% select(-any_of(c("total_year_pop", "scaling_factor")))
+    
+    return(data_merged)
+} 
+
+
+#' Validate and Resolve Reference Year
+#'
+#' @description 
+#' Checks if a provided reference year exists within a population dataset. 
+#' If the year is NULL or missing from the data, it defaults to the maximum 
+#' available year and logs a warning.
+#'
+#' @param dhis2_population A dataframe containing at least a \code{YEAR} column.
+#' @param reference_year The year to validate (numeric or string). Can be NULL.
+#'
+#' @return A numeric or string representing the resolved reference year.
+#' 
+#' @export
+resolve_reference_year <- function(dhis2_population, reference_year = NULL) {
+    
+    # 1. Check if the provided year exists in the dataset
+    year_exists <- !is.null(reference_year) && (reference_year %in% dhis2_population$YEAR)
+    
+    if (!year_exists) {
         not_found <- reference_year
-        reference_year <- max(dhis2_population$YEAR)
-
+        # Default to the most recent year available
+        resolved_year <- max(dhis2_population$YEAR, na.rm = TRUE)
+        
+        # 2. Log warning if a non-NULL year was provided but not found
         if (!is.null(not_found)) {
             log_msg(
-                glue::glue("Reference year {not_found} is not present in the population data, using last year: {reference_year}."),
+                glue::glue("Reference year {not_found} is not present in the population data, using last year: {resolved_year}."), 
                 "warning"
             )
+        } else {
+            log_msg(glue::glue("No reference year provided, defaulting to: {resolved_year}."))
         }
+        
+        return(resolved_year)
     }
-
-    log_msg(glue::glue("Applying growth factor {growth_factor} to project {tolower(population_column)} from reference year {reference_year}."))
-    projection_years_backward <- seq(reference_year - 1, reference_year - n_years_past, by = -1)
-    projection_years_forward <- seq(reference_year + 1, reference_year + n_years_future)
-
-    dhis2_population_reference <- dhis2_population[dhis2_population$YEAR == reference_year, columns_selection]
-    pop_result <- dhis2_population_reference
-    population_forward <- dhis2_population_reference
-    population_backward <- dhis2_population_reference
-
-    for (year in projection_years_forward) {
-        population_forward[["YEAR"]] <- year
-        population_forward[[population_column]] <- round(population_forward[[population_column]] * (1 + growth_factor))
-        pop_result <- rbind(pop_result, population_forward)
-    }
-
-    for (year in projection_years_backward) {
-        population_backward[["YEAR"]] <- year
-        population_backward[[population_column]] <- round(population_backward[[population_column]] / (1 + growth_factor))
-        pop_result <- rbind(pop_result, population_backward)
-    }
-
-    pop_result <- pop_result[order(pop_result$YEAR), ]
-    pop_result %>% dplyr::rename(POPULATION = !!rlang::sym(population_column))
+    
+    return(reference_year)
 }
 
 
-#' Add configured population disaggregation columns.
-#'
-#' Multiplies total population by each configured disaggregation factor and
-#' appends uppercase columns to the output table.
-#'
-#' @param pop_result Population table with `POPULATION`.
-#' @param pop_disagg Named list/vector of disaggregation factors.
-#' @return Population table with additional disaggregation columns.
-add_population_disaggregations <- function(pop_result, pop_disagg) {
-    if (is.null(pop_disagg) || length(pop_disagg) == 0) {
-        message("No population disaggregations defined.")
-        return(pop_result)
+#' Project Specific Population Columns Backward
+#' @param ref_data Dataframe of the base year.
+#' @param years Vector of years to project.
+#' @param growth_factor Numeric growth rate.
+#' @param target_columns Character vector of column names to project.
+project_backward <- function(ref_data, years, growth_factor, target_columns) {
+    if (length(years) == 0) return(NULL)
+    
+    # Validation
+    missing_cols <- setdiff(target_columns, colnames(ref_data))
+    if (length(missing_cols) > 0) {
+        stop(glue::glue("The following target columns were not found in ref_data: {paste(missing_cols, collapse = ', ')}"))
     }
-
-    for (name in names(pop_disagg)) {
-        value <- pop_disagg[[name]]
-        log_msg(glue::glue("Adding disaggregation: {name}, Factor: {value}"))
-        pop_result[[toupper(name)]] <- round(pop_result[["POPULATION"]] * value)
+    
+    results <- list()
+    current_data <- ref_data
+    ordered_years <- sort(years, decreasing = TRUE)
+    
+    for (yr in ordered_years) {
+        current_data[["YEAR"]] <- yr
+        current_data[target_columns] <- lapply(current_data[target_columns], function(x) {
+          round(x / (1 + growth_factor))
+        })    
+        results[[as.character(yr)]] <- current_data
     }
+    
+    return(do.call(rbind, results))
+}
 
-    pop_result
+
+#' Project Specific Population Columns Forward
+#' @param ref_data Dataframe of the base year.
+#' @param years Vector of years to project.
+#' @param growth_factor Numeric growth rate.
+#' @param target_columns Character vector of column names to project (e.g., c("TOTAL_POP", "FEMALE_POP")).
+project_forward <- function(ref_data, years, growth_factor, target_columns) {
+    if (length(years) == 0) return(NULL)
+    
+    # Validation: Ensure all target columns exist in the data
+    missing_cols <- setdiff(target_columns, colnames(ref_data))
+    if (length(missing_cols) > 0) {
+        stop(glue::glue("The following target columns were not found in ref_data: {paste(missing_cols, collapse = ', ')}"))
+    }
+    
+    results <- list()
+    current_data <- ref_data
+    ordered_years <- sort(years)
+    
+    for (yr in ordered_years) {
+        current_data[["YEAR"]] <- yr
+        current_data[target_columns] <- lapply(current_data[target_columns], function(x) {
+          round(x * (1 + growth_factor))
+        })
+        results[[as.character(yr)]] <- current_data
+    }
+    
+    return(do.call(rbind, results))
+}
+
+
+#' Create Disaggregated Population
+#'
+#' This function takes a base population table and disaggregates the total 
+#' population into specific demographic groups (e.g., age, gender) based on 
+#' proportions provided in a secondary table.
+#'
+#' @param population_table A data frame containing at least 'ADM2_ID' and 'POPULATION'.
+#' @param disaggregation_table A data frame containing 'ADM2_ID' and demographic proportion columns.
+#' @return A combined data frame with new columns for each valid disaggregated population group.
+add_population_disaggregations <- function(
+    population_table, 
+    disaggregation_table
+) {
+
+    # Standard checks
+    if (!"POPULATION" %in% colnames(population_table)) stop("[ERROR] Missing POPULATION column in population table")
+    if (!"ADM2_ID" %in% colnames(population_table)) stop("[ERROR] Missing ADM2_ID column in population table")
+    if (!"ADM2_ID" %in% colnames(disaggregation_table)) stop("[ERROR] Missing ADM2_ID column in disaggregation_table")
+    
+    # Identify target columns and convert to numeric
+    meta_cols <- c("ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID")
+    disagg_cols <- setdiff(colnames(disaggregation_data), meta_cols)
+
+    population_table[["POPULATION"]] <- as.numeric(population_table[["POPULATION"]])    
+    disaggregation_table[disagg_cols] <- suppressWarnings(lapply(disaggregation_table[disagg_cols], as.numeric))    
+    
+    # create a list of Valid columns
+    valid_cols <- c()
+    for (col in disagg_cols) {
+        if (any(!is.na(disaggregation_table[[col]]))) {  # Has at least some non-NA values
+            if (col %in% colnames(population_table)) {                
+                log_msg(glue::glue("The column '{col}' already exists in the population table; it will be overwritten by values from the disaggregation file."), "warning")
+            }            
+            log_msg(glue::glue("Creating population disagregation: {col}"))
+            valid_cols <- c(valid_cols, col)
+        }         
+    }
+    
+    # Early exit if no valid columns exist
+    if (length(valid_cols) == 0) return(population_table)    
+    
+    result <- population_table %>% 
+        left_join(disaggregation_table[c("ADM2_ID", valid_cols)], by = "ADM2_ID") %>%
+        mutate(across(all_of(valid_cols), ~ round(POPULATION * .x)))
+    
+    return(result) 
 }

@@ -5,7 +5,7 @@ import time
 from datetime import date, datetime, timezone, timedelta
 from dateutil.relativedelta import relativedelta
 from io import BytesIO
-from math import ceil
+from math import ceil, floor
 from pathlib import Path
 
 import geopandas as gpd
@@ -106,9 +106,7 @@ def era5_extract(
 
         variables = get_variables()
         if variable not in variables:
-            raise ValueError(
-                f"Variable {variable} not supported. Available: {list(variables.keys())}"
-            )
+            raise ValueError(f"Variable {variable} not supported. Available: {list(variables.keys())}")
 
         snt_config_dict = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config_dict)
@@ -255,8 +253,8 @@ def get_bounds(boundaries: gpd.GeoDataFrame) -> tuple[int]:
         Bounding box coordinates in the order (ymax, xmin, ymin, xmax)
     """
     xmin, ymin, xmax, ymax = boundaries.total_bounds
-    xmin = ceil(xmin - 0.5)
-    ymin = ceil(ymin - 0.5)
+    xmin = floor(xmin - 0.5)
+    ymin = floor(ymin - 0.5)
     xmax = ceil(xmax + 0.5)
     ymax = ceil(ymax + 0.5)
     return ymax, xmin, ymin, xmax

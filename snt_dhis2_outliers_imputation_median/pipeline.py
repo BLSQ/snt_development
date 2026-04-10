@@ -81,7 +81,6 @@ def snt_dhis2_outliers_imputation_median(
         if not run_report_only:
             input_params = {
                 "ROOT_PATH": Path(workspace.files_path).as_posix(),
-                "OUTLIERS_METHOD": "MEDIAN",
                 "DEVIATION_MEDIAN": deviation_median,
             }
             run_start_ts = time.time()

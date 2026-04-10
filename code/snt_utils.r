@@ -58,6 +58,114 @@ install_and_load <- function(packages) {
     print(loaded_packages)
 }
 
+# Load SNT configuration file with a consistent error message
+load_snt_config <- function(config_path, config_file_name = "SNT_config.json") {
+  config_file <- file.path(config_path, config_file_name)
+  config_json <- tryCatch(
+    {
+      jsonlite::fromJSON(config_file)
+    },
+    error = function(e) {
+      msg <- paste0("[ERROR] Error while loading configuration ", conditionMessage(e))
+      stop(msg)
+    }
+  )
+  return(config_json)
+}
+
+# Validate that required keys exist in a config section
+validate_required_config_keys <- function(config_json, keys, section = "SNT_CONFIG") {
+  if (is.null(config_json[[section]])) {
+    stop(paste0("[ERROR] Missing configuration section: ", section))
+  }
+
+  missing_keys <- keys[!keys %in% names(config_json[[section]])]
+  if (length(missing_keys) > 0) {
+    stop(paste0("[ERROR] Missing configuration input(s): ", paste(missing_keys, collapse = ", ")))
+  }
+
+  invisible(TRUE)
+}
+
+# Generic helper to load a country-specific dataset file
+load_country_file_from_dataset <- function(dataset_id, country_code, suffix, label = NULL) {
+  file_name <- paste0(country_code, suffix)
+  output_data <- tryCatch(
+    {
+      get_latest_dataset_file_in_memory(dataset_id, file_name)
+    },
+    error = function(e) {
+      target_label <- if (is.null(label)) file_name else label
+      msg <- paste0(
+        "[ERROR] Error while loading ",
+        target_label,
+        " (dataset: ",
+        dataset_id,
+        ", file: ",
+        file_name,
+        "): ",
+        conditionMessage(e)
+      )
+      stop(msg)
+    }
+  )
+
+  log_msg(paste0("Loaded file `", file_name, "` from dataset `", dataset_id, "`."))
+  return(output_data)
+}
+
+# Ensure YEAR and MONTH are stored as integers when present
+normalize_year_month_types <- function(input_df, year_col = "YEAR", month_col = "MONTH") {
+  output_df <- input_df
+  if (year_col %in% names(output_df)) {
+    output_df[[year_col]] <- as.integer(output_df[[year_col]])
+  }
+  if (month_col %in% names(output_df)) {
+    output_df[[month_col]] <- as.integer(output_df[[month_col]])
+  }
+  return(output_df)
+}
+
+# Standard routine preparation: select, pivot longer, optional deduplication
+prepare_routine_long <- function(routine_df, fixed_cols, indicators, deduplicate = TRUE) {
+  cols_to_select <- intersect(c(fixed_cols, indicators), names(routine_df))
+  missing_indicators <- setdiff(indicators, names(routine_df))
+  if (length(missing_indicators) > 0) {
+    stop(paste0("[ERROR] Missing indicator column(s): ", paste(missing_indicators, collapse = ", ")))
+  }
+
+  routine_long <- routine_df %>%
+    dplyr::select(dplyr::all_of(cols_to_select)) %>%
+    tidyr::pivot_longer(
+      cols = dplyr::all_of(indicators),
+      names_to = "INDICATOR",
+      values_to = "VALUE"
+    )
+
+  if (deduplicate) {
+    dedup_keys <- intersect(c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD", "YEAR", "MONTH", "INDICATOR"), names(routine_long))
+    routine_long <- routine_long %>%
+      dplyr::distinct(dplyr::across(dplyr::all_of(dedup_keys)), .keep_all = TRUE)
+  }
+
+  return(routine_long)
+}
+
+# Build a standardized output path under /data and create it if needed
+standard_output_path <- function(data_root_path, domain, subdomain = NULL, create_dir = TRUE) {
+  target_path <- if (is.null(subdomain) || nchar(subdomain) == 0) {
+    file.path(data_root_path, domain)
+  } else {
+    file.path(data_root_path, domain, subdomain)
+  }
+
+  if (create_dir && !dir.exists(target_path)) {
+    dir.create(target_path, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  return(target_path)
+}
+
 # Helper to safely extract values from parameters (allows to specify the type)
 get_param <- function(params_list, target_param, default, cast_method = identity) {
   #' Safely retrieve a parameter if it exists in the input, using a default fallback if it doesn't exist in the inupt
@@ -1132,18 +1240,18 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
 #%% MISC FUNCTIONS
                             
 
-#########################################
+##########
+#' Compare the unique values of two columns from two df/dt
+#' 
+#' @param df1 first df/dt
+#' @param df1_colname string with the column name in df1
+#' @param df2 second df/dt
+#' @param df2_colname string with the column name in df2
+#'
+#' @return unique values found only in the first df/dt
 compare_values <- function(df1, df1_colname, df2, df2_colname) {
-  #' Compare unique values of a column between two df and return those in the first, but not in the second
-  #'
-  #' @param df1 first df/dt
-  #' @param df1_colname string with the column name in df1
-  #' @param df2 second df/dt
-  #' @param df2_colname string with the column name in df2
-  #'
-  #' @return unique values found only in the first df/dt
-  
-  # make both be dta tables
+
+  # make both be data tables
   df1 <- as.data.table(df1)
   df2 <- as.data.table(df2)
   
@@ -1154,6 +1262,33 @@ compare_values <- function(df1, df1_colname, df2, df2_colname) {
   # values only in df1
   values_only_df1 <- df1_values[!df1_values %in% df2_values]
   
+  return(values_only_df1)
+}
+
+##########
+#' Compare unique combinations of columns between two df and return those in the first, but not in the second
+#'
+#' @param df1 first df/dt
+#' @param df1_colnames character vector with the column names in df1
+#' @param df2 second df/dt
+#' @param df2_colnames character vector with the column names in df2
+#'
+#' @return data.table of unique combinations found only in the first df/dt
+compare_combinations <- function(df1, df1_colnames, df2, df2_colnames) {
+     
+  # make both be data tables
+  df1 <- as.data.table(df1)
+  df2 <- as.data.table(df2)
+
+  # extract unique combinations of the specified columns
+  df1_combos <- unique(df1[, ..df1_colnames])
+  df2_combos <- unique(df2[, ..df2_colnames])
+
+  # align column names so fsetdiff can compare them
+  setnames(df2_combos, old = df2_colnames, new = df1_colnames)
+
+  # return combinations only in df1
+  values_only_df1 <- fsetdiff(df1_combos, df2_combos)
   return(values_only_df1)
 }
 

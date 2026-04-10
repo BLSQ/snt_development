@@ -59,24 +59,24 @@ msg <- paste0("[ERROR] Error while loading configuration: ", conditionMessage(e)
 cat(msg)
 stop(msg)
 })
-log_msg(glue("SNT configuration loaded from: {config_path}"))
+log_msg(glue::glue("SNT configuration loaded from: {config_path}"))
 }
 
 config_generic <- function() {
 COUNTRY_CODE <<- config_json$SNT_CONFIG$COUNTRY_CODE
 ADMIN_1 <<- toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_1)
 ADMIN_2 <<- toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2)
-log_msg(glue("Configuration values set: COUNTRY_CODE={COUNTRY_CODE}, ADMIN_1={ADMIN_1}, ADMIN_2={ADMIN_2}"))
+log_msg(glue::glue("Configuration values set: COUNTRY_CODE={COUNTRY_CODE}, ADMIN_1={ADMIN_1}, ADMIN_2={ADMIN_2}"))
 }
 
 config_incidence <- function() {
 DHIS2_INDICATORS <<- names(config_json$DHIS2_DATA_DEFINITIONS$DHIS2_INDICATOR_DEFINITIONS)
-log_msg(glue("DHIS2 indicators set: {paste(DHIS2_INDICATORS, collapse=', ')}"))
+log_msg(glue::glue("DHIS2 indicators set: {paste(DHIS2_INDICATORS, collapse=', ')}"))
 }
 
 set_fixed_cols <- function() {
 fixed_cols <<- c('OU_ID','PERIOD', 'YEAR', 'MONTH', 'ADM1_ID', 'ADM2_ID')
-log_msg(glue("Fixed routine data ('dhis2_routine') columns set: {paste(fixed_cols, collapse=', ')}"))
+log_msg(glue::glue("Fixed routine data ('dhis2_routine') columns set: {paste(fixed_cols, collapse=', ')}"))
 }
 
 resolve_routine_filename <- function() {
@@ -97,7 +97,7 @@ routine_dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_OUTLIERS_IMPU
 routine_name <<- resolve_routine_filename()
 routine_filename <<- paste0(COUNTRY_CODE, routine_name)
 }
-log_msg(glue("Selected routine dataset: {routine_dataset_name}, filename: {routine_filename}"))
+log_msg(glue::glue("Selected routine dataset: {routine_dataset_name}, filename: {routine_filename}"))
 }
 
 load_dhis2_routine_data <- function() {
@@ -110,7 +110,7 @@ msg <- paste0("[ERROR] 🛑 Error while loading DHIS2 routine data file : ", rou
 }
 stop(msg)
 })
-log_msg(paste0("DHIS2 routine data : ", routine_filename, " loaded. Dims: ", paste(dim(dhis2_routine), collapse=", ")))
+log_msg(glue::glue("DHIS2 routine data : {routine_filename} loaded. Dims: {paste(dim(dhis2_routine), collapse=', ')}"))
 return(head(dhis2_routine, 3))
 }
 
@@ -118,9 +118,9 @@ check_fixed_cols_in_routine <- function() {
 actual_cols <- colnames(dhis2_routine)
 missing_cols <- setdiff(fixed_cols, actual_cols)
 if (length(missing_cols) == 0) {
-log_msg(paste0("All expected 'fixed' columns present."))
+log_msg(glue::glue("All expected 'fixed' columns present."))
 } else {
-log_msg(paste0("🚨 Missing Columns: ", paste(missing_cols, collapse = ", ")), "warning")
+log_msg(glue::glue("🚨 Missing Columns: {paste(missing_cols, collapse = ', ')}"), "warning")
 }
 }
 
@@ -128,9 +128,9 @@ check_dhis2_indicators_cols_in_routine <- function() {
 actual_cols <- colnames(dhis2_routine)
 missing_cols <- setdiff(DHIS2_INDICATORS, actual_cols)
 if (length(missing_cols) == 0) {
-log_msg("All DHIS2 indicators present in 'dhis2_routine'.")
+log_msg(glue::glue("All DHIS2 indicators present in 'dhis2_routine'."))
 } else {
-log_msg(paste0("🚨 Missing DHIS2 INDICATORS: ", paste(missing_cols, collapse = ", ")), "warning")
+log_msg(glue::glue("🚨 Missing DHIS2 INDICATORS: {paste(missing_cols, collapse = ', ')}"), "warning")
 }
 }
 
@@ -139,10 +139,10 @@ if (exists("N1_METHOD") && N1_METHOD == "PRES") {
 pres_in_routine <- any(names(dhis2_routine) == "PRES")
 pres_in_config <- any(DHIS2_INDICATORS == "PRES")
     if (!pres_in_routine) {
-        log_msg("🛑 Column `PRES` missing from routine data!", "error")
+        log_msg(glue::glue("🛑 Column `PRES` missing from routine data!"), "error")
         stop()
     }
-    log_msg("Column `PRES` is present. Proceeding.")
+    log_msg(glue::glue("Column `PRES` is present. Proceeding."))
 } else {
         # This is just for the nb, no need to long in pipeline run
         print("N1_METHOD is not set to 'PRES'. No need to check for `PRES` column.")
@@ -153,7 +153,7 @@ load_population_data <- function() {
 dhis2_pop_dataset <- if (USE_ADJUSTED_POPULATION) config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION else config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
 
 dhis2_population_adm2 <<- get_latest_dataset_file_in_memory(dhis2_pop_dataset, paste0(COUNTRY_CODE, "_population.parquet"))
-log_msg(glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))
+log_msg(glue::glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))
 return(head(dhis2_population_adm2, 3))
 
 
@@ -355,12 +355,12 @@ check_reporting_rate_data <- function() {
     if (!is.null(reporting_rate_month)) {
         na_count <<- sum(is.na(reporting_rate_month$REPORTING_RATE))     
         if (na_count > 0) {
-            log_msg(glue("⚠️ Warning: Reporting Rate data contains {na_count} missing values (NA) in 'REPORTING_RATE' column."), "warning")
+            log_msg(glue::glue("⚠️ Warning: Reporting Rate data contains {na_count} missing values (NA) in 'REPORTING_RATE' column."), "warning")
         } else {
-            log_msg("✅ Reporting Rate data contains no missing values (NA) in 'REPORTING_RATE' column.")
+            log_msg(glue::glue("✅ Reporting Rate data contains no missing values (NA) in 'REPORTING_RATE' column."))
         }
     } else {
-        log_msg("🚨 Reporting Rate data frame is NULL. Cannot check for missing values.", "error")
+        log_msg(glue::glue("🚨 Reporting Rate data frame is NULL. Cannot check for missing values."), "error")
     }
 }
 
@@ -368,7 +368,7 @@ check_reporting_rate_data <- function() {
 enforce_numeric_cols <- function() {
     routine_data <<- dhis2_routine |>
         mutate(across(any_of(c("YEAR", "MONTH", "CONF", "TEST", "SUSP", "PRES")), as.numeric))
-    log_msg("Created 'routine_data' dataframe. Ensured correct data types for DHIS2 routine data numerical columns: YEAR, MONTH, CONF, TEST, SUSP, PRES.")
+    log_msg(glue::glue("Created 'routine_data' dataframe. Ensured correct data types for DHIS2 routine data numerical columns: YEAR, MONTH, CONF, TEST, SUSP, PRES."))
     if (!is.null(reporting_rate_month)) {
         reporting_rate_data <<- reporting_rate_month |>
             mutate(across(c(YEAR, MONTH, REPORTING_RATE), as.numeric))
@@ -388,10 +388,10 @@ handle_zeros_in_reporting_rate <- function() {
                 affected_zones = n_distinct(ADM2_ID)
             )
         if (zero_reporting$n_months_zero_reporting > 0) {    
-            log_msg(glue("🚨 Note: {zero_reporting$n_months_zero_reporting} rows had `REPORTING_RATE == 0` across ",
+            log_msg(glue::glue("🚨 Note: {zero_reporting$n_months_zero_reporting} rows had `REPORTING_RATE == 0` across ",
                          "{zero_reporting$affected_zones} ADM2. These N2 values were set to NA."))
         } else {
-            log_msg("✅ Note: no ADM2 has `REPORTING_RATE == 0`. All N2 values were preserved.")
+            log_msg(glue::glue("✅ Note: no ADM2 has `REPORTING_RATE == 0`. All N2 values were preserved."))
         }
     } else {
         log_msg("🚨 Reporting Rate data frame is NULL. Cannot check for zero reporting rates.", "error")
@@ -517,7 +517,7 @@ build_yearly_incidence <- function(monthly_cases, dhis2_population_adm2, care_se
 export_monthly_cases <- function(monthly_cases) {
     file_path <- file.path(INTERMEDIATE_DATA_PATH, paste0(COUNTRY_CODE, "_monthly_cases.parquet"))
     arrow::write_parquet(monthly_cases, file_path)
-    log_msg(glue("Monthly cases data saved to: {file_path}"))
+    log_msg(glue::glue("Monthly cases data saved to: {file_path}"))
 }
 
 
@@ -525,9 +525,9 @@ coherence_check_PRES <- function(monthly_cases) {
     # Run this check only if N1_METHOD == "PRES" (else, problem doesn't exist)
     if (N1_METHOD == "PRES") {
         nr_of_pres_0_adm2_month <<- monthly_cases |> filter(PRES == 0) |> nrow()
-        log_msg(glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
+        log_msg(glue::glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
     } else {
-        log_msg("N1_METHOD is not set to 'PRES'. No need to check for coherence of `PRES` column.")
+        log_msg(glue::glue("N1_METHOD is not set to 'PRES'. No need to check for coherence of `PRES` column."))
     }
 }
 
@@ -537,14 +537,14 @@ coherence_check_SUSP_TEST <- function(monthly_cases) {
         nr_of_negative <<- monthly_cases |> mutate(SUSP_minus_TEST = SUSP - TEST) |> filter(SUSP_minus_TEST < 0) |> nrow() 
         if (nr_of_negative > 0) {
             log_msg(
-            glue("🚨 Note: using formula `SUSP - TEST` for incidence adjustement, but higher tested than suspected cases (`SUSP < TEST`) detected in {nr_of_negative} rows (ADM2 x MONTH)."),
+            glue::glue("🚨 Note: using formula `SUSP - TEST` for incidence adjustement, but higher tested than suspected cases (`SUSP < TEST`) detected in {nr_of_negative} rows (ADM2 x MONTH)."),
             "warning"
             )
         } else {
-            log_msg("✅ Note: using `SUSP - TEST` for incidence adjustment, no cases where `TEST > SUSP` detected.")
+            log_msg(glue::glue("✅ Note: using `SUSP - TEST` for incidence adjustment, no cases where `TEST > SUSP` detected."))
         }
     } else {
-        log_msg("N1_METHOD is not set to 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns.")
+        log_msg(glue::glue("N1_METHOD is not set to 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns."))
     }
 }
 
@@ -552,9 +552,9 @@ coherence_check_SUSP_TEST <- function(monthly_cases) {
 coherence_check_CONF_TEST <- function(monthly_cases) {
     more_confirmed_than_tested <<- monthly_cases |> mutate(CONF_divby_TEST = CONF / TEST) |> filter(CONF_divby_TEST > 1) |> nrow() 
     if (more_confirmed_than_tested > 0) {
-        log_msg(glue("🚨 Note: higher confirmed than tested cases (`CONF/TEST`) detected in {more_confirmed_than_tested} rows (ADM2 x MONTH)."), "warning")
+        log_msg(glue::glue("🚨 Note: higher confirmed than tested cases (`CONF/TEST`) detected in {more_confirmed_than_tested} rows (ADM2 x MONTH)."), "warning")
     } else {
-        log_msg("✅ Note: no cases where `CONF > TEST` detected.")
+        log_msg(glue::glue("✅ Note: no cases where `CONF > TEST` detected."))
     }
 }
 
@@ -587,5 +587,5 @@ save_yearly_incidence <- function(yearly_incidence, data_path, file_extension, w
   }
   # --- Flexibility to use function as provided in argument: "write_csv" or "arrow::write_parquet" ... ---
   write_function(yearly_incidence, file_path)
-  log_msg(paste0("Exporting : ", file_path))
+  log_msg(glue::glue("Exporting : {file_path}"))
 }

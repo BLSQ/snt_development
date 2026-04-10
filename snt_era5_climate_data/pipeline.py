@@ -353,7 +353,7 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
     return df
 
 
-@pipeline("snt_era5_sync")
+@pipeline("snt_era5_climate_data")
 @parameter(
     "start_date",
     type=str,
@@ -392,7 +392,7 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
     default=False,
     required=False,
 )
-def snt_era5_sync(
+def snt_era5_climate_data(
     start_date: str,
     end_date: str | None,
     cds_connection: CustomConnection,
@@ -404,8 +404,8 @@ def snt_era5_sync(
     raw_dir = root_path / "data" / "era5" / "raw"
     cache_dir = root_path / "data" / "era5" / "cache"
     output_dir = root_path / "data" / "era5" / "aggregate"
-    report_nb = root_path / "pipelines" / "snt_era5_sync" / "reporting" / "snt_era5_sync_report.ipynb"
-    report_out = root_path / "pipelines" / "snt_era5_sync" / "reporting" / "outputs"
+    report_nb = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "snt_era5_climate_data_report.ipynb"
+    report_out = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "outputs"
     raw_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -414,12 +414,12 @@ def snt_era5_sync(
         current_run.log_info("Pulling ERA5 scripts from repository.")
         try:
             pull_scripts_from_repository(
-                pipeline_name="snt_era5_sync",
-                report_scripts=["snt_era5_sync_report.ipynb"],
+                pipeline_name="snt_era5_climate_data",
+                report_scripts=["snt_era5_climate_data_report.ipynb"],
                 code_scripts=[],
             )
         except Exception as e:
-            current_run.log_warning(f"Could not pull snt_era5_sync scripts: {e}")
+            current_run.log_warning(f"Could not pull snt_era5_climate_data scripts: {e}")
 
     snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
     validate_config(snt_config)
@@ -531,7 +531,7 @@ def snt_era5_sync(
             file_paths=file_paths_to_upload,
         )
     else:
-        current_run.log_info("run_report_only=True: skipping ERA5 sync/aggregation and dataset publication.")
+        current_run.log_info("run_report_only=True: skipping ERA5 climate-data processing and dataset publication.")
 
     run_report_notebook(
         nb_file=report_nb,
@@ -541,4 +541,4 @@ def snt_era5_sync(
 
 
 if __name__ == "__main__":
-    snt_era5_sync()
+    snt_era5_climate_data()

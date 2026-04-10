@@ -154,37 +154,47 @@ indicators_selection <- function(config_ind_definitions) {
 #'   summed; single-element indicators are copied; empty indicators become NA.
 #' @export
 build_indicators <- function(data, valid_indicators, empty_indicators, include_empty_ind=TRUE) {
-
-    # loop over the definitions
+    
+    all_cols <- colnames(data)
     empty_data_indicators <- c()
+    
+    # loop over the definitions
     for (indicator in names(valid_indicators)) {
             
         data_element_uids <- valid_indicators[[indicator]]    
         col_names <- c()
     
         if (length(data_element_uids) > 0) {
-            for (dx in data_element_uids) {
-                dx_co <- gsub("\\.", "_", dx)            
-                if (grepl("_", dx_co)) {
-                    col_names <- c(col_names , dx_co)
-                } else {
-                    if (!any(grepl(dx, colnames(data)))) {  # is there no dx what match?
-                        log_msg(paste0("Data element : " , dx, " of indicator ", indicator , " is missing in the DHIS2 routine data."), level="warning")
+                        
+            for (dx in data_element_uids) {     
+                dx_norm <- gsub("\\.", "_", dx) # dots to underscores to match columns
+                        
+                # CASE 1: dx_norm is a specific DE_CO pair
+                if (dx_norm %in% all_cols) {
+                    col_names <- unique(c(col_names, dx_norm))
+                } 
+                # CASE 2: dx_norm is a plain DE; find all matching DE_CO combinations
+                else {
+                    # Regex: Starts with UID, followed by an underscore or end of string            
+                    pattern <- paste0("^", dx_norm, "(_|$)")
+                    matches <- all_cols[grepl(pattern, all_cols)]                    
+                    if (length(matches) > 0) {
+                        col_names <- unique(c(col_names, matches))
                     } else {
-                        col_names <- c(col_names , colnames(data)[grepl(dx, colnames(data))])
-                    }                
+                        log_msg(glue("Indicator '{indicator}': data points '{dx_norm}' not found"), level = "warning")
+                    }
                 }
             }
         
             # check if there are matching data elements
             if (length(col_names) == 0) {
-                log_msg(paste0("No data elements available to build indicator : " , indicator, ", skipped."), level="warning")
+                log_msg(glue("Indicator '{indicator}': No data elements found to build indicator, indicator skipped."), level="warning")
                 empty_data_indicators <- c(empty_data_indicators, indicator)
                 next
             }
             
             # logs
-            log_msg(paste0("Building indicator : ", indicator, " -> column selection : ", paste(col_names, collapse = ", ")))
+            log_msg(glue("Building indicator: {indicator} -> column selection: {paste(col_names, collapse = ', ')}"))
             
             if (length(col_names) > 1) {
                 sums <- rowSums(data[, col_names], na.rm = TRUE)
@@ -192,29 +202,26 @@ build_indicators <- function(data, valid_indicators, empty_indicators, include_e
                 sums[all_na] <- NA  # Keep NA if all rows are NA!
                 data[[indicator]] <- sums            
             } else {
-                data[indicator] <- data[, col_names] 
+                data[[indicator]] <- data[[col_names]]
             }
             
         } else {
-            data[indicator] <- NA
-            
-            # logs            
-            log_msg(paste0("Building indicator : ", indicator, " -> column selection : NULL"))
+            data[[indicator]] <- NA
+            log_msg(glue("Setting indicator: {indicator} -> column selection : NULL"))
         }
     }
-
+    
     # Add the empty indicator columns (if not needed this can be commented)
     if (include_empty_ind) {
-        for (empty_indicator in empty_indicators) {
-            data[empty_indicator] <- NA
-            
-            # logs
-            log_msg(paste0("Building indicator : ", empty_indicator, " -> column selection : NULL"))
+        for (empty in unique(c(empty_indicators, empty_data_indicators))) {
+            data[[empty]] <- NA            
+            log_msg(glue("Building indicator: {empty} -> column selection : NA"))
         }    
     }
     
     return(data)
 }
+
 
 
 #' Merge and Format Routine Data with Metadata

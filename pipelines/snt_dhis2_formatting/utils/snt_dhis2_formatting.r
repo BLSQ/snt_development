@@ -4,7 +4,6 @@
 source(file.path("~/workspace/code", "snt_utils.r"))   
 
 
-
 #' Get Setup Variables for SNT Workspace
 #' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
 #'
@@ -37,7 +36,8 @@ get_setup_variables <- function(
     paths_to_check = list(
         CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
         FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
-        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
+        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
+        POPULATION_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "population_transformed")
     )
 
     # create if they do not exist
@@ -58,9 +58,7 @@ load_snt_config <- function(snt_config_path) {
     # config file path 
     config_json <- tryCatch({ fromJSON(snt_config_path) },
                 error = function(e) {
-                    msg <- glue::glue("[ERROR] Error while loading configuration: {snt_config_path}")
-                    cat(msg)
-                    stop(msg)
+                    stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
                 })
     
     log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
@@ -81,15 +79,34 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
     data <- tryCatch({ 
             get_latest_dataset_file_in_memory(dataset_id, filename) 
         }, error = function(e) {
-            msg <- glue("[ERROR] Error while loading {filename} file for: {conditionMessage(e)}")
-            log_msg(msg, "error")
-            stop(msg)
+            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
     })
 
     if (verbose) {        
-        log_msg(glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
+        log_msg(glue::glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
     }    
     return(data)
+}
+
+
+#' Load a CSV File with Error Handling
+#'
+#' @description 
+#' Attempts to read a CSV file from the specified path. If the file cannot be loaded, 
+#' it logs a high-level error message and stops execution.
+#'
+#' @param csv_file_path String representing the file path to the CSV.
+#' @return A dataframe containing the contents of the CSV file.
+#' 
+#' @export
+load_csv_file <- function(csv_file_path) {
+    csv_data <- tryCatch({ read.csv(csv_file_path) },
+        error = function(e) {
+            stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}"))
+        }
+    )
+    log_msg(glue::glue("File loaded: {csv_file_path}"))
+    return(csv_data)
 }
 
 

@@ -34,10 +34,9 @@ get_setup_variables <- function(
 
     # Set paths (add paths here)
     paths_to_check = list(
-        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
-        FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
+        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),        
         UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
-        POPULATION_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "population_transformed")
+        DATA_PATH = file.path(SNT_ROOT_PATH, "data")
     )
 
     # create if they do not exist

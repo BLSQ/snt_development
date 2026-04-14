@@ -1,4 +1,6 @@
 # Load base utils
+# Same bootstrap pattern as reporting_rate_dataelement / formatting review:
+# `load_dataset_file()`, `load_snt_config()`, `get_setup_variables()` + paths_to_check.
 source(file.path("~/workspace/code", "snt_utils.r"))
 
 
@@ -30,6 +32,12 @@ get_setup_variables <- function(
 
     install_and_load(packages)
 
+    if (Sys.getenv("PROJ_LIB", "") == "") {
+        Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
+    }
+    if (Sys.getenv("GDAL_DATA", "") == "") {
+        Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
+    }
     Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
     reticulate::py_config()$python
     assign("openhexa", reticulate::import("openhexa.sdk"), envir = .GlobalEnv)
@@ -58,6 +66,40 @@ load_snt_config <- function(snt_config_path) {
 }
 
 
+#' Fail if Papermill did not inject `ROUTINE_FILE` and `DATASET_ID`.
+#'
+#' Kept as a named entry point so older notebooks that call this before other
+#' setup keep working after utils refactors.
+assert_papermill_reporting_rate_dataset_params <- function() {
+    required <- c("ROUTINE_FILE", "DATASET_ID")
+    missing <- required[!vapply(required, exists, logical(1), inherits = TRUE)]
+    if (length(missing) > 0) {
+        stop(
+            "[ERROR] Missing pipeline parameters (Papermill): ",
+            paste(missing, collapse = ", "),
+            ". Expected only ROUTINE_FILE and DATASET_ID from `snt_dhis2_reporting_rate_dataset`."
+        )
+    }
+}
+
+
+#' Build globals used in the dataset reporting-rate notebook from `SNT_config.json`.
+#'
+#' Calls `assert_papermill_reporting_rate_dataset_params()` first (redundant if the
+#' notebook already called it).
+parse_reporting_rate_dataset_snt_settings <- function(config_json) {
+    assert_papermill_reporting_rate_dataset_params()
+
+    list(
+        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
+        ADMIN_1 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_1),
+        ADMIN_2 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2),
+        REPORTING_RATE_PRODUCT_ID = config_json$SNT_CONFIG$REPORTING_RATE_PRODUCT_UID,
+        fixed_cols_rr = c("YEAR", "MONTH", "ADM2_ID", "REPORTING_RATE")
+    )
+}
+
+
 #' Load Dataset File from OpenHEXA
 #' Retrieves the latest version of a file from an OpenHEXA dataset.
 #'
@@ -78,4 +120,19 @@ load_dataset_file <- function(dataset_id, filename) {
     msg <- glue::glue("{filename} data loaded from dataset: {dataset_id} dataframe dimensions: [{paste(dim(data), collapse = ', ')}]")
     log_msg(msg)
     return(data)
+}
+
+
+#' Write CSV + Parquet under `<DATA_PATH>/dhis2/reporting_rate/`.
+write_reporting_rate_dataset_outputs <- function(reporting_rate_tbl, snt_environment, country_code) {
+    output_dir <- file.path(snt_environment$DATA_PATH, "dhis2", "reporting_rate")
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    base <- paste0(country_code, "_reporting_rate_dataset")
+    csv_path <- file.path(output_dir, paste0(base, ".csv"))
+    pq_path <- file.path(output_dir, paste0(base, ".parquet"))
+    utils::write.csv(reporting_rate_tbl, csv_path, row.names = FALSE)
+    log_msg(glue::glue("Exported: {csv_path}"))
+    arrow::write_parquet(reporting_rate_tbl, pq_path)
+    log_msg(glue::glue("Exported: {pq_path}"))
+    invisible(list(csv_path = csv_path, parquet_path = pq_path))
 }

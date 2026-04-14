@@ -70,10 +70,15 @@ def snt_dhis2_reporting_rate_dataelement(
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
-        # Build parameters dict and save to JSON in all cases (like other pipelines)
         routine_file = resolve_routine_filename(
             country_code=country_code, routine_data_choice=routine_data_choice
         )
+        if routine_data_choice == "raw":
+            ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+        else:
+            ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+
+        # Build parameters dict and save to JSON in all cases (like other pipelines)
         nb_parameters = {
             "SNT_ROOT_PATH": root_path.as_posix(),
             "ROUTINE_FILE": routine_file,
@@ -88,11 +93,6 @@ def snt_dhis2_reporting_rate_dataelement(
         current_run.log_info(f"Saved pipeline parameters to {parameters_file}")
 
         if not run_report_only:
-            if routine_data_choice == "raw":
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-            else:
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
-
             # Check the file exists in the dataset
             if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
                 current_run.log_warning(

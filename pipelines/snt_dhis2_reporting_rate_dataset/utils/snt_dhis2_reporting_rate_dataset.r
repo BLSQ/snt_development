@@ -7,17 +7,25 @@ source(file.path("~/workspace/code", "snt_utils.r"))
 #'
 #' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
 #' @param packages Character vector. R packages to install and load.
-#' @return List with CONFIG_PATH, UPLOADS_PATH, DATA_PATH.
+#' @return List with `paths_to_check` (CONFIG_PATH, UPLOADS_PATH, DATA_PATH) and the
+#'   same three paths at the top level for backward compatibility (`setup$CONFIG_PATH`, …).
 #'
 #' @export
 get_setup_variables <- function(
     SNT_ROOT_PATH = "~/workspace",
-    packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
+    packages = c(
+        "arrow", "dplyr", "tidyr", "ggplot2",
+        "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate"
+    )
 ) {
-    setup_variable <- list(
+    paths_to_check <- list(
         CONFIG_PATH  = file.path(SNT_ROOT_PATH, "configuration"),
         UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
         DATA_PATH    = file.path(SNT_ROOT_PATH, "data")
+    )
+    setup_variable <- c(
+        list(paths_to_check = paths_to_check),
+        paths_to_check
     )
 
     install_and_load(packages)

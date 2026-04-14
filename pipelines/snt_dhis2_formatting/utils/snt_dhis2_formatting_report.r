@@ -32,22 +32,16 @@ create_dynamic_labels <- function(breaks) {
 }
 
 
-#' Facility-level reporting completeness (same logic as full OU x INDICATOR x DATE grid).
-#'
-#' Equivalent to expand_grid on distinct OU, INDICATOR, DATE from long_data, left-join
-#' long_data, then summarise by INDICATOR and DATE. Processes one INDICATOR at a time so
-#' peak memory scales with OU times DATE instead of OU times DATE times INDICATOR.
-#'
-#' Doublons sur (OU, INDICATOR, DATE): un left_join avec plusieurs lignes a droite pour la
-#' meme cle duplique les lignes a gauche et fausse les comptages. Les donnees sont donc
-#' dedupliquees avant nest / join (premiere ligne conservee par cle).
-#'
-#' Optimisations: colonnes minimales, group_nest (un seul passage pour splitter),
-#' pas de filter repete sur tout le jeu, comptages et pourcentages en un summarise.
-#'
-#' @param long_data Tibble with columns OU, INDICATOR, DATE, VALUE (wide routine pivoted long).
-#' @return Tibble with INDICATOR, DATE, n_total, n_missing, n_zero, n_positive, pct_*.
+# Meme logique que expand_grid(OU, INDICATOR, DATE) + left_join(long_data), mais une
+# grille OU x DATE a la fois par indicateur (RAM). Colonnes attendues = notebook
+# snt_dhis2_formatting_report (OU, INDICATOR, DATE, VALUE).
 reporting_summary_facility_chunked <- function(long_data) {
+    req <- c("OU", "INDICATOR", "DATE", "VALUE")
+    miss <- setdiff(req, names(long_data))
+    if (length(miss) > 0L) {
+        stop(paste0("[ERROR] reporting_summary_facility_chunked: missing columns: ", paste(miss, collapse = ", ")))
+    }
+
     ld <- dplyr::transmute(
         long_data,
         OU = as.character(.data$OU),
@@ -55,21 +49,42 @@ reporting_summary_facility_chunked <- function(long_data) {
         DATE = as.Date(.data$DATE),
         VALUE = .data$VALUE
     )
-    # Cle join unique (evite many-to-many / lignes dupliquees au left_join)
+    ld <- dplyr::filter(ld, !is.na(.data$INDICATOR), !is.na(.data$OU), !is.na(.data$DATE))
     ld <- dplyr::distinct(ld, OU, INDICATOR, DATE, .keep_all = TRUE)
+
+    if (nrow(ld) == 0L) {
+        return(dplyr::tibble(
+            INDICATOR = character(),
+            DATE = as.Date(character()),
+            n_total = integer(),
+            n_missing = integer(),
+            n_zero = integer(),
+            n_positive = integer(),
+            pct_missing = numeric(),
+            pct_zero = numeric(),
+            pct_positive = numeric()
+        ))
+    }
 
     ou_levels <- dplyr::distinct(dplyr::select(ld, "OU"))
     date_levels <- dplyr::distinct(dplyr::select(ld, "DATE"))
     ou_date_grid <- tidyr::crossing(ou_levels, date_levels)
+    chunks <- split(ld, ld$INDICATOR, drop = TRUE)
 
-    nested <- dplyr::group_nest(ld, INDICATOR)
-
-    out <- purrr::map2_dfr(nested$INDICATOR, nested$data, function(ind, chunk) {
-        # group_nest() retire INDICATOR des lignes nested : joindre seulement sur OU + DATE
-        dplyr::left_join(
-            dplyr::mutate(ou_date_grid, INDICATOR = as.character(ind)),
+    out <- purrr::imap_dfr(chunks, function(chunk, ind) {
+        ind <- as.character(ind)
+        rhs <- dplyr::transmute(
             chunk,
-            by = c("OU", "DATE")
+            OU = as.character(.data$OU),
+            INDICATOR = ind,
+            DATE = as.Date(.data$DATE),
+            VALUE = .data$VALUE
+        )
+        rhs <- dplyr::distinct(rhs, OU, INDICATOR, DATE, .keep_all = TRUE)
+        dplyr::left_join(
+            dplyr::mutate(ou_date_grid, INDICATOR = ind),
+            rhs,
+            by = c("OU", "INDICATOR", "DATE")
         ) %>%
             dplyr::group_by(.data$INDICATOR, .data$DATE) %>%
             dplyr::summarise(
@@ -84,30 +99,53 @@ reporting_summary_facility_chunked <- function(long_data) {
             )
     })
 
+    if (nrow(out) == 0L) {
+        return(dplyr::tibble(
+            INDICATOR = character(),
+            DATE = as.Date(character()),
+            n_total = integer(),
+            n_missing = integer(),
+            n_zero = integer(),
+            n_positive = integer(),
+            pct_missing = numeric(),
+            pct_zero = numeric(),
+            pct_positive = numeric()
+        ))
+    }
     dplyr::arrange(out, .data$INDICATOR, .data$DATE)
 }
 
 
-#' ADM2-level reporting completeness (same logic as full ADM2 x Indicator x Date grid).
-#'
-#' reporting_check est deja unique sur (ADM2_ID, Indicator, Date) apres le group_by
-#' summarise. Le left_join avec adm_date_grid reste au plus une ligne droite par ligne
-#' gauche; rc_chunk est quand meme passe en distinct par securite.
-#'
-#' Optimisations: transmute pour reduire les colonnes, group_nest sur reporting_check
-#' pour eviter les filtres repetes, pourcentages dans le meme summarise que les comptages.
-#'
-#' @param data_long Tibble with ADM2_ID, OU_ID, Date, Indicator, value.
-#' @return Tibble with Indicator, Date, n_total, n_missing, n_zero, n_positive, pct_*.
+# Meme idee au niveau ADM2. Colonnes attendues = notebook (ADM2_ID, Date, Indicator, value).
 reporting_summary_adm2_chunked <- function(data_long) {
+    req <- c("ADM2_ID", "Date", "Indicator", "value")
+    miss <- setdiff(req, names(data_long))
+    if (length(miss) > 0L) {
+        stop(paste0("[ERROR] reporting_summary_adm2_chunked: missing columns: ", paste(miss, collapse = ", ")))
+    }
+
     dl <- dplyr::transmute(
         data_long,
         ADM2_ID = as.character(.data$ADM2_ID),
-        OU_ID = as.character(.data$OU_ID),
-        Date = as.Date(.data$Date),
         Indicator = as.character(.data$Indicator),
+        Date = as.Date(.data$Date),
         value = .data$value
     )
+    dl <- dplyr::filter(dl, !is.na(.data$Indicator), !is.na(.data$ADM2_ID), !is.na(.data$Date))
+
+    if (nrow(dl) == 0L) {
+        return(dplyr::tibble(
+            Indicator = character(),
+            Date = as.Date(character()),
+            n_total = integer(),
+            n_missing = integer(),
+            n_zero = integer(),
+            n_positive = integer(),
+            pct_missing = numeric(),
+            pct_zero = numeric(),
+            pct_positive = numeric()
+        ))
+    }
 
     adm_levels <- dplyr::distinct(dplyr::select(dl, "ADM2_ID"))
     date_levels <- dplyr::distinct(dplyr::select(dl, "Date"))
@@ -122,17 +160,27 @@ reporting_summary_adm2_chunked <- function(data_long) {
             .groups = "drop"
         )
 
-    nested_rc <- dplyr::group_nest(reporting_check, Indicator)
+    rc_chunks <- split(reporting_check, reporting_check$Indicator, drop = TRUE)
 
-    out <- purrr::map2_dfr(nested_rc$Indicator, nested_rc$data, function(ind, rc_chunk) {
-        # group_nest() retire Indicator des lignes nested : joindre sur ADM2_ID + Date seulement
+    out <- purrr::imap_dfr(rc_chunks, function(rc_chunk, ind) {
+        ind <- as.character(ind)
         rc_chunk <- rc_chunk %>%
             dplyr::mutate(Date = as.Date(.data$Date)) %>%
-            dplyr::distinct(ADM2_ID, Date, .keep_all = TRUE)
-        dplyr::left_join(
-            dplyr::mutate(adm_date_grid, Indicator = as.character(ind)),
+            dplyr::distinct(ADM2_ID, Indicator, Date, .keep_all = TRUE)
+        rhs <- dplyr::transmute(
             rc_chunk,
-            by = c("ADM2_ID", "Date")
+            ADM2_ID = as.character(.data$ADM2_ID),
+            Indicator = ind,
+            Date = as.Date(.data$Date),
+            is_missing = .data$is_missing,
+            is_zero = .data$is_zero,
+            is_positive = .data$is_positive
+        )
+        rhs <- dplyr::distinct(rhs, ADM2_ID, Indicator, Date, .keep_all = TRUE)
+        dplyr::left_join(
+            dplyr::mutate(adm_date_grid, Indicator = ind),
+            rhs,
+            by = c("ADM2_ID", "Indicator", "Date")
         ) %>%
             dplyr::mutate(
                 is_missing = tidyr::replace_na(.data$is_missing, TRUE),
@@ -152,5 +200,18 @@ reporting_summary_adm2_chunked <- function(data_long) {
             )
     })
 
+    if (nrow(out) == 0L) {
+        return(dplyr::tibble(
+            Indicator = character(),
+            Date = as.Date(character()),
+            n_total = integer(),
+            n_missing = integer(),
+            n_zero = integer(),
+            n_positive = integer(),
+            pct_missing = numeric(),
+            pct_zero = numeric(),
+            pct_positive = numeric()
+        ))
+    }
     dplyr::arrange(out, .data$Indicator, .data$Date)
 }

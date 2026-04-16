@@ -1022,3 +1022,302 @@ plot_fixed_coordinates <- function(fix_results, shapes_sf_boundary) {
   # Return the plot object in case you want to save it later using ggsave()
   invisible(map_plot)
 }
+
+
+#' Write a ggplot to PNG (prefer this over huge objects kept in-session for notebooks).
+save_ggplot_png <- function(plot, path, width, height, dpi = 120L, bg = "white") {
+  ggplot2::ggsave(
+    filename = path,
+    plot = plot,
+    width = width,
+    height = height,
+    dpi = dpi,
+    limitsize = FALSE,
+    bg = bg
+  )
+  invisible(path)
+}
+
+
+#' Show a PNG in IRkernel / Jupyter after [save_ggplot_png] (frees RAM vs holding ggplot).
+display_saved_png <- function(path) {
+  if (!file.exists(path)) {
+    stop("Missing plot file: ", path)
+  }
+  if (requireNamespace("IRdisplay", quietly = TRUE)) {
+    IRdisplay::display_png(file = path)
+  } else {
+    message("Saved plot (install IRdisplay for inline preview): ", path)
+  }
+  invisible(path)
+}
+
+
+normalize_report_plot_mode <- function(m) {
+  m <- tolower(as.character(m)[1])
+  if (!m %in% c("none", "light", "full")) {
+    return("full")
+  }
+  m
+}
+
+
+#' Plot policy for the formatting report: `full`, `light` (smaller PNG / dpi), or `none` (skip figures).
+#'
+#' Set Papermill parameter `SNT_FORMAT_REPORT_PLOTS` or environment variable of the same name.
+#' Env wins when non-empty so CI / OpenHEXA can force `none` without changing the notebook JSON.
+report_plots_mode <- function() {
+  envv <- Sys.getenv("SNT_FORMAT_REPORT_PLOTS", unset = "")
+  if (nzchar(envv)) {
+    return(normalize_report_plot_mode(envv))
+  }
+  if (exists("SNT_FORMAT_REPORT_PLOTS", envir = .GlobalEnv, inherits = FALSE)) {
+    return(normalize_report_plot_mode(get("SNT_FORMAT_REPORT_PLOTS", envir = .GlobalEnv)))
+  }
+  "full"
+}
+
+
+report_plots_skip <- function() {
+  identical(report_plots_mode(), "none")
+}
+
+
+report_plots_light <- function() {
+  identical(report_plots_mode(), "light")
+}
+
+
+#' Like [save_ggplot_png] but honours `SNT_FORMAT_REPORT_PLOTS`.
+save_report_plot_png <- function(plot, path, width, height, dpi = 120L, bg = "white") {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] Figure omise : ", path)
+    return(invisible(NULL))
+  }
+  if (report_plots_light()) {
+    dpi <- max(50L, as.integer(dpi * 0.6))
+    width <- width * 0.65
+    height <- height * 0.65
+  }
+  save_ggplot_png(plot, path, width = width, height = height, dpi = dpi, bg = bg)
+}
+
+
+#' Like [display_saved_png] unless plots are disabled.
+display_report_png <- function(path) {
+  if (report_plots_skip()) {
+    return(invisible(NULL))
+  }
+  display_saved_png(path)
+}
+
+
+#' `print` a ggplot unless plots are disabled (avoids building draw buffers when `none`).
+maybe_print_ggplot <- function(plot, label = "figure") {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] Affichage omis : ", label)
+    return(invisible(NULL))
+  }
+  print(plot)
+}
+
+
+#' Wrapper around [ggplot2::ggsave] for notebook chunks (NER choropleths, etc.).
+save_report_builtin_ggsave <- function(plot, filename, ...) {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] ggsave omis : ", filename)
+    return(invisible(NULL))
+  }
+  args <- list(filename = filename, plot = plot)
+  dots <- list(...)
+  if (report_plots_light()) {
+    if (!is.null(dots$dpi)) {
+      dots$dpi <- max(48L, as.integer(dots$dpi * 0.55))
+    }
+    if (!is.null(dots$width)) {
+      dots$width <- dots$width * 0.65
+    }
+    if (!is.null(dots$height)) {
+      dots$height <- dots$height * 0.65
+    }
+  }
+  do.call(ggplot2::ggsave, c(args, dots))
+}
+
+
+#' Remove named objects if they exist, then run a light [gc].
+rm_if_exists <- function(names, envir = parent.frame()) {
+  names <- unique(as.character(names))
+  found <- names[names %in% ls(envir = envir, all.names = FALSE)]
+  if (length(found)) {
+    rm(list = found, envir = envir)
+  }
+  invisible(gc(verbose = FALSE, full = FALSE))
+}
+
+
+#' Split a character vector (e.g. indicator column names) into chunks of at most `batch_size`.
+chunk_name_vector <- function(x, batch_size = 12L) {
+  batch_size <- max(1L, as.integer(batch_size))
+  x <- as.character(x)
+  n <- length(x)
+  if (n == 0L) {
+    return(list())
+  }
+  brks <- ceiling(seq_len(n) / batch_size)
+  unname(split(x, brks))
+}
+
+
+#' HF completeness for one wide indicator column (no `pivot_longer` over all indicators).
+summarise_completeness_hf_wide_one <- function(data_chunk, indicator_name) {
+  if (!indicator_name %in% names(data_chunk)) {
+    stop("Unknown indicator column: ", indicator_name)
+  }
+  long_one <- dplyr::transmute(
+    data_chunk,
+    OU = .data$OU_ID,
+    DATE = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"),
+    INDICATOR = indicator_name,
+    VALUE = as.numeric(.data[[indicator_name]])
+  )
+  summarise_completeness_hf_long(long_one)
+}
+
+
+#' ADM2 completeness for one wide indicator (no factorial `crossing` over all indicators).
+summarise_completeness_adm2_wide_one <- function(data_chunk, indicator_name) {
+  if (!indicator_name %in% names(data_chunk)) {
+    stop("Unknown indicator column: ", indicator_name)
+  }
+
+  dc <- data_chunk %>%
+    dplyr::mutate(Date = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"))
+
+  U <- dplyr::distinct(dc, .data$ADM2_ID, .data$Date)
+
+  tmp <- dplyr::transmute(
+    dc,
+    ADM2_ID = .data$ADM2_ID,
+    Date = .data$Date,
+    value = as.numeric(.data[[indicator_name]])
+  )
+
+  rolled <- tmp %>%
+    dplyr::group_by(.data$ADM2_ID, .data$Date) %>%
+    dplyr::summarise(
+      is_missing = all(is.na(.data$value)),
+      is_zero = all(.data$value == 0, na.rm = TRUE),
+      is_positive = any(.data$value > 0, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(Indicator = indicator_name)
+
+  full_one <- U %>%
+    dplyr::mutate(Indicator = indicator_name) %>%
+    dplyr::left_join(rolled, by = c("ADM2_ID", "Date", "Indicator")) %>%
+    dplyr::mutate(
+      is_missing = tidyr::replace_na(.data$is_missing, TRUE),
+      is_zero = tidyr::replace_na(.data$is_zero, FALSE),
+      is_positive = tidyr::replace_na(.data$is_positive, FALSE)
+    )
+
+  out <- full_one %>%
+    dplyr::group_by(.data$Indicator, .data$Date) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$ADM2_ID),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero & !.data$is_missing),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+
+  rm(dc, U, tmp, rolled, full_one)
+  invisible(gc(verbose = FALSE, full = FALSE))
+  out
+}
+
+
+#' Summarise HF-level completeness from long routine (OU × INDICATOR × DATE).
+summarise_completeness_hf_long <- function(long_df) {
+  long_df %>%
+    dplyr::mutate(
+      is_missing = is.na(.data$VALUE),
+      is_zero = !is.na(.data$VALUE) & .data$VALUE == 0,
+      is_positive = !is.na(.data$VALUE) & .data$VALUE > 0
+    ) %>%
+    dplyr::group_by(.data$INDICATOR, .data$DATE) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$OU),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+}
+
+
+#' ADM2-level completeness summary for one year-chunk of wide routine data.
+summarise_completeness_adm2_chunk <- function(data_chunk, indicator_cols) {
+  data_chunk <- data_chunk %>%
+    dplyr::mutate(Date = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"))
+
+  data_long_chunk <- data_chunk %>%
+    dplyr::select(
+      "ADM2_ID", "OU_ID", "Date",
+      tidyselect::all_of(indicator_cols)
+    ) %>%
+    tidyr::pivot_longer(
+      cols = tidyselect::all_of(indicator_cols),
+      names_to = "Indicator",
+      values_to = "value"
+    ) %>%
+    dplyr::mutate(value = as.numeric(.data$value))
+
+  out <- data_chunk %>%
+    dplyr::distinct(.data$ADM2_ID, .data$Date) %>%
+    tidyr::crossing(Indicator = indicator_cols) %>%
+    dplyr::left_join(
+      data_long_chunk %>%
+        dplyr::group_by(.data$ADM2_ID, .data$Indicator, .data$Date) %>%
+        dplyr::summarise(
+          is_missing = all(is.na(.data$value)),
+          is_zero = all(.data$value == 0, na.rm = TRUE),
+          is_positive = any(.data$value > 0, na.rm = TRUE),
+          .groups = "drop"
+        ),
+      by = c("ADM2_ID", "Indicator", "Date")
+    ) %>%
+    dplyr::mutate(
+      is_missing = tidyr::replace_na(.data$is_missing, TRUE),
+      is_zero = tidyr::replace_na(.data$is_zero, FALSE),
+      is_positive = tidyr::replace_na(.data$is_positive, FALSE)
+    ) %>%
+    dplyr::group_by(.data$Indicator, .data$Date) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$ADM2_ID),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero & !.data$is_missing),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+
+  rm(data_long_chunk)
+  invisible(gc(verbose = FALSE, full = FALSE))
+  out
+}

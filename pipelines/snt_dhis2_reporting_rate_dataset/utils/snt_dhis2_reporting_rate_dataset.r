@@ -1,7 +1,26 @@
 # Load base utils
-# Same bootstrap pattern as reporting_rate_dataelement / formatting review:
-# `load_dataset_file()`, `load_snt_config()`, `get_setup_variables()` + paths_to_check.
+# Helpers are named so the dataset-method reporting notebook reads like a checklist
+# (same idea as `snt_dhis2_reporting_rate_dataelement` utils).
 source(file.path("~/workspace/code", "snt_utils.r"))
+
+
+# JSON reader for this pipeline only (`snt_utils.r` unchanged).
+read_workspace_json_file <- function(json_path, resource_label = "JSON file") {
+    json_path <- as.character(json_path)[[1L]]
+    tryCatch(
+        jsonlite::fromJSON(json_path),
+        error = function(e) {
+            stop(paste0(
+                "[ERROR] Error while loading ",
+                resource_label,
+                " from `",
+                json_path,
+                "`: ",
+                conditionMessage(e)
+            ))
+        }
+    )
+}
 
 
 #' Get Setup Variables for SNT Workspace
@@ -47,30 +66,18 @@ get_setup_variables <- function(
 
 
 #' Load SNT Configuration File
-#' Reads and parses a JSON configuration file.
-#' @param snt_config_path Character. Path to the configuration JSON file.
-#' @return List containing parsed configuration.
-#'
+#' @param snt_config_path Character. Full path to `SNT_config.json`.
 #' @export
 load_snt_config <- function(snt_config_path) {
-    config_json <- tryCatch(
-        { jsonlite::fromJSON(snt_config_path) },
-        error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading configuration: {snt_config_path}")
-            cat(msg)
-            stop(msg)
-        }
-    )
+    config_json <- read_workspace_json_file(snt_config_path, "configuration")
     log_msg(paste0("SNT configuration loaded from: ", snt_config_path))
     return(config_json)
 }
 
 
 #' Fail if Papermill did not inject `ROUTINE_FILE` and `DATASET_ID`.
-#'
-#' Kept as a named entry point so older notebooks that call this before other
-#' setup keep working after utils refactors.
-assert_papermill_reporting_rate_dataset_params <- function() {
+#' @export
+stop_if_dataset_reporting_papermill_params_missing <- function() {
     required <- c("ROUTINE_FILE", "DATASET_ID")
     missing <- required[!vapply(required, exists, logical(1), inherits = TRUE)]
     if (length(missing) > 0) {
@@ -83,56 +90,82 @@ assert_papermill_reporting_rate_dataset_params <- function() {
 }
 
 
-#' Build globals used in the dataset reporting-rate notebook from `SNT_config.json`.
-#'
-#' Calls `assert_papermill_reporting_rate_dataset_params()` first (redundant if the
-#' notebook already called it).
-parse_reporting_rate_dataset_snt_settings <- function(config_json) {
-    assert_papermill_reporting_rate_dataset_params()
+# Legacy alias.
+assert_papermill_reporting_rate_dataset_params <- stop_if_dataset_reporting_papermill_params_missing
 
+
+#' Country, admins, and product filter from `SNT_config.json` (dataset-method RR).
+read_dataset_reporting_identity_from_config <- function(config_json) {
     list(
         COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
         ADMIN_1 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_1),
         ADMIN_2 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2),
-        REPORTING_RATE_PRODUCT_ID = config_json$SNT_CONFIG$REPORTING_RATE_PRODUCT_UID,
-        fixed_cols_rr = c("YEAR", "MONTH", "ADM2_ID", "REPORTING_RATE")
+        REPORTING_RATE_PRODUCT_ID = config_json$SNT_CONFIG$REPORTING_RATE_PRODUCT_UID
     )
 }
 
 
+#' Column names kept when trimming routine extracts to reporting-rate grain.
+fixed_columns_for_dataset_reporting_rate_routine_slice <- function() {
+    c("YEAR", "MONTH", "ADM2_ID", "REPORTING_RATE")
+}
+
+
+#' Build the named settings list used by the dataset-method reporting-rate notebook.
+#'
+#' Calls `stop_if_dataset_reporting_papermill_params_missing()` first, then reads
+#' country / admins / product UID and the fixed routine column list from `config_json`.
+#'
+#' @export
+build_dataset_method_reporting_settings_from_config <- function(config_json) {
+    stop_if_dataset_reporting_papermill_params_missing()
+    id <- read_dataset_reporting_identity_from_config(config_json)
+    c(id, list(fixed_cols_rr = fixed_columns_for_dataset_reporting_rate_routine_slice()))
+}
+
+
+# Legacy alias (same as removed `parse_reporting_rate_dataset_snt_settings`).
+parse_reporting_rate_dataset_snt_settings <- build_dataset_method_reporting_settings_from_config
+
+
 #' Load Dataset File from OpenHEXA
-#' Retrieves the latest version of a file from an OpenHEXA dataset.
 #'
 #' @param dataset_id Character. OpenHEXA dataset identifier.
 #' @param filename Character. Name of file to load.
-#' @return Dataframe containing the loaded data.
-#'
+#' @param verbose Logical. If TRUE, log dataframe dimensions after a successful load.
 #' @export
-load_dataset_file <- function(dataset_id, filename) {
+load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
     data <- tryCatch(
-        { get_latest_dataset_file_in_memory(dataset_id, filename) },
+        {
+            get_latest_dataset_file_in_memory(dataset_id, filename)
+        },
         error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading {filename} file: {conditionMessage(e)}")
-            log_msg(msg, "error")
-            stop(msg)
+            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
         }
     )
-    msg <- glue::glue("{filename} data loaded from dataset: {dataset_id} dataframe dimensions: [{paste(dim(data), collapse = ', ')}]")
-    log_msg(msg)
+    if (verbose) {
+        log_msg(glue::glue(
+            "{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse = ', ')}]"
+        ))
+    }
     return(data)
 }
 
 
-#' Write CSV + Parquet under `<DATA_PATH>/dhis2/reporting_rate/`.
-write_reporting_rate_dataset_outputs <- function(reporting_rate_tbl, snt_environment, country_code) {
+#' Save final dataset-method reporting-rate table as CSV + Parquet under `data/dhis2/reporting_rate/`.
+#' @export
+save_dataset_method_reporting_rate_csv_and_parquet <- function(reporting_rate_tbl, snt_environment, country_code) {
     output_dir <- file.path(snt_environment$DATA_PATH, "dhis2", "reporting_rate")
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-    base <- paste0(country_code, "_reporting_rate_dataset")
-    csv_path <- file.path(output_dir, paste0(base, ".csv"))
-    pq_path <- file.path(output_dir, paste0(base, ".parquet"))
+    csv_path <- file.path(output_dir, paste0(country_code, "_reporting_rate_dataset.csv"))
+    pq_path <- file.path(output_dir, paste0(country_code, "_reporting_rate_dataset.parquet"))
     utils::write.csv(reporting_rate_tbl, csv_path, row.names = FALSE)
     log_msg(glue::glue("Exported: {csv_path}"))
     arrow::write_parquet(reporting_rate_tbl, pq_path)
     log_msg(glue::glue("Exported: {pq_path}"))
     invisible(list(csv_path = csv_path, parquet_path = pq_path))
 }
+
+
+# Legacy alias.
+write_reporting_rate_dataset_outputs <- save_dataset_method_reporting_rate_csv_and_parquet

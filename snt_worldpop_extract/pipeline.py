@@ -144,8 +144,8 @@ def retrieve_population_data(
     wpop_client = WorldPopClient()
     current_run.log_info(f"Downloading data from : {wpop_client.base_url}")
 
-    # Create output directory if it doesn't exist
-    Path.mkdir(output_path, exist_ok=True)
+    # Create output directory (and parents e.g. data/worldpop/) if missing
+    output_path.mkdir(parents=True, exist_ok=True)
     country = country_code.upper()
     pop_filename = f"{country}_worldpop_ppp_{year}.tif"
     pop_unadj_filename = f"{country}_worldpop_ppp_{year}_UNadj.tif"

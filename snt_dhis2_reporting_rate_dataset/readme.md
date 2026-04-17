@@ -1,49 +1,38 @@
-# **Dataset Reporting Rate: Calculation Based on DHIS2 Extracted Data**
+# SNT DHIS2 Reporting Rate (Dataset) Pipeline
 
-The **reporting rate** measures the proportion of registered health facilities that submit data. It is calculated for each administrative level 2 (`ADM2`) area and for each reporting period (`PERIOD` in YYYYMM format).
-<br>
+This pipeline computes **monthly** DHIS2 **dataset-level** reporting rates at **ADM2** resolution by combining routine metadata with pre-computed **actual** and **expected** report counts from DHIS2, then aggregating and deduplicating at facility and district level. Results are written to **`data/dhis2/reporting_rate/`**, registered in the **`DHIS2_REPORTING_RATE`** dataset, and summarized again in the reporting notebook.
 
-**Dataset Selection**<br>
-The choice of dataset(s) used for reporting rate calculation is controlled by modifying the <code>SNT_config.json</code> configuration file. This allows flexible selection among multiple datasets extracted from the same DHIS2 instance.
+## Parameters
 
-**Calculation Logic**<br>
-From the selected dataset(s):
-- **Numerator:** Number of facilities that _actually_ reported, derived from the element <code>"ACTUAL_REPORTS"</code>.
-- **Denominator:** Number of facilities _expected_ to report, derived from the element <code>"EXPECTED_REPORTS"</code>.
+* **`routine_data_choice`** (String, Required):
+  * **Name:** Routine data source
+  * **Description:** Selects which routine Parquet the notebook loads: formatted raw routine, outlier-imputed routine, or outlier-removed routine.
+  * **Choices/Default:** `raw` (**`{COUNTRY_CODE}_routine.parquet`** on **`DHIS2_DATASET_FORMATTED`**), `imputed` (**`{COUNTRY_CODE}_routine_outliers_imputed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**), `outliers_removed` (**`{COUNTRY_CODE}_routine_outliers_removed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**). Default: `imputed`.
 
-After aggregating these counts at the ADM2 level, the reporting rate is computed as:
-<br>
-<code>REPORTING RATE = ACTUAL_REPORTS / EXPECTED_REPORTS</code>
-<br>
-and expressed as a **proportion** between 0 and 1.
-<br>
+## Functionality Overview
 
------
+1. Load **`configuration/SNT_config.json`** and resolve the routine filename implied by **`routine_data_choice`**.
+2. Verify the chosen routine file exists in the appropriate source dataset; exit early with a warning if it is missing (for example before outliers imputation has been run).
+3. Run **`pipelines/snt_dhis2_reporting_rate_dataset/code/snt_dhis2_reporting_rate_dataset.ipynb`** with **`SNT_ROOT_PATH`** and **`ROUTINE_FILE`**.
+4. Save the Papermill parameter record alongside outputs.
+5. Upload **`{COUNTRY_CODE}_reporting_rate_dataset`** tables and the parameter file to **`DHIS2_REPORTING_RATE`**.
+6. Run the dataset reporting notebook to refresh charts and tables in **`reporting/outputs/`**.
 
-### Additional Data Processing Steps
+## Inputs
 
-- **Handling Multiple Datasets:**  
-  When multiple datasets are available, the pipeline uses only those specified in <code>SNT_config.json</code>. For these selected datasets, the counts of actual and expected reports are summed by ADM2 area.
+* **`configuration/SNT_config.json`**: Dataset identifiers (formatted routine versus outliers imputation) and **`COUNTRY_CODE`**.
+* **`{COUNTRY_CODE}_routine.parquet`** or **`{COUNTRY_CODE}_routine_outliers_imputed.parquet`** or **`{COUNTRY_CODE}_routine_outliers_removed.parquet`**: Monthly facility-level routine table (columns include **`PERIOD`** in **`YYYYMM`** form, **`ADM2_ID`**, and indicators as configured).
+* **`{COUNTRY_CODE}_reporting.parquet`**: DHIS2 reporting extract with actual and expected report counts by **`OU_ID`** and **`PERIOD`**, restricted in the notebook to datasets declared in the configuration.
 
-- **Deduplication of Entries:**  
-  Sometimes, the same organizational unit (<code>OU_ID</code>) may appear in multiple datasets for the same period, risking double counting. To address this, deduplication is performed by keeping only the entry with the **highest** <code>ACTUAL_REPORTS</code> value for each unique combination of <code>OU_ID</code> and <code>PERIOD</code>.  
-  <ul>
-    <li><strong>Why keep the highest?</strong> Because <code>ACTUAL_REPORTS</code> values are binary (0 or 1). If duplicates agree (all 0 or all 1), keeping one suffices. If they differ (some 0, some 1), keeping the 1 ensures that presence of a report is not missed.</li>
-    <li><strong>🚨Important:</strong> Deduplication only proceeds if all duplicated values are within {0,1}. If other values are present, deduplication is skipped with a warning to avoid incorrect data handling.</li>
-  </ul>
+## Outputs
 
------
+* **`{COUNTRY_CODE}_reporting_rate_dataset.parquet`** and **`.csv`**: District-month reporting rates (**`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`**, plus supporting admin labels as produced by the notebook).
+* **Pipeline parameters JSON** under **`data/dhis2/reporting_rate/`**.
+* **Papermill output** under **`papermill_outputs/`** and **report outputs** under **`reporting/outputs/`**.
 
-
-### 🇳🇪 <strong>Niger-Specific Processing:</strong>  
-  In Niger, datasets for <strong>HOP</strong> (hospital) facilities are already **pre-aggregated** and may contain values greater than 1 for actual or expected reports, reflecting subunits or departments within a hospital. 
-  <br>
-  To accurately represent reporting at the facility level and avoid overcounting, all values greater than 1 are converted to 1 (presence/absence). This ensures that the reporting rate reflects whether the hospital as a whole reported, rather than counting multiple subunits separately. This step also prevents cases where <code>ACTUAL_REPORTS</code> exceeds <code>EXPECTED_REPORTS</code>.
-
-------
-
-### Pipeline parameters
-
-- **Outliers detection method**: Specify which method was used to detect outliers in routine data. Choose "Routine data (Raw)" to use raw routine data.
-    
-- **Use routine with outliers removed**: Toggle this on to use the routine data after outliers have been removed (using the outliers detection method selected above). Else, this pipeline will use either the imputed routine data (to replace the outlier values removed) or the raw routine data if you selected "Routine data (Raw)" as your choice of “Outlier processing method”.
+> **Notes for the Data Analyst:**
+>
+> - **`Temporal and spatial resolution`**: Reporting rates are computed per **calendar month** (**`PERIOD`** / **`YEAR`**–**`MONTH`**) and summarized to **ADM2**, per the main notebook.
+> - **`routine_data_choice`**: **`imputed`** and **`outliers_removed`** require successful runs of the outliers pipeline; **`raw`** reads only from the formatted routine dataset.
+> - **`Dataset selection`**: When several DHIS2 products exist, the notebook keeps only datasets listed in **`SNT_config.json`** and deduplicates **`OU_ID`** by **`PERIOD`** using the highest **`ACTUAL_REPORTS`** when safe to do so.
+> - **`Period alignment`**: Mismatched years or months between routine and reporting extracts can bias downstream metrics; review overlap checks in the executed notebook.

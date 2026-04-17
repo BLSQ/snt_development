@@ -1,67 +1,43 @@
 # SNT Quality of Care Pipeline
 
-The **SNT Quality of Care** pipeline computes district-year quality-of-care indicators from DHIS2 routine data that has undergone outlier imputation or removal. It calculates key performance metrics such as testing and treatment rates, case fatality, and hospitalization proportions to support health system monitoring.
-
----
+The **SNT Quality of Care** pipeline computes **district-year** quality-of-care indicators from DHIS2 routine data that has already been processed by an outlier imputation or removal pipeline. It derives testing and treatment rates, malaria admission and death shares, case fatality among admissions, and related counts, then exports maps and tabular products for monitoring.
 
 ## Parameters
 
 * **`data_action`** (String, Required):
   * **Name:** Data action
-  * **Description:** Determines whether the pipeline processes data where outliers have been replaced with imputed values or data where outliers have been removed entirely.
+  * **Description:** Selects whether to read outlier-**imputed** routine files or outlier-**removed** routine files from the outliers dataset.
   * **Choices/Default:** `imputed`, `removed`. Default: `imputed`.
-* **`run_report_only`** (Boolean, Optional):
-  * **Name:** Run reporting only
-  * **Description:** When `true`, skips the computation notebook and runs only the reporting notebook (no refreshed district-year outputs or dataset upload from that run).
-  * **Default:** `false`.
-* **`pull_scripts`** (Boolean, Optional):
-  * **Name:** Pull scripts
-  * **Description:** When `true`, pulls the latest code and reporting notebooks for this pipeline from the configured repository before execution.
-  * **Default:** `false`.
-
----
 
 ## Functionality Overview
 
-1.  **Data Acquisition:** Automatically identifies and loads the latest outlier-processed routine data file from the `DHIS2_OUTLIERS_IMPUTATION` dataset based on the selected **`data_action`**.
-2.  **Spatial Metadata Joining:** Loads administrative boundary shapes (`.geojson`) from the `DHIS2_DATASET_FORMATTED` dataset to facilitate mapping and ensure correct **ADM2** naming.
-3.  **Data Cleaning:** Standardizes numeric columns by handling missing values, empty strings, and placeholders (e.g., "-") before converting them to numeric types.
-4.  **Temporal & Spatial Aggregation:** Sums indicator columns by **District (ADM2)** and **Year** so each row is one district-year.
-5.  **Indicator Calculation:** Computes a suite of quality-of-care indicators (Rates and Absolute Counts) using specific DHIS2 data elements.
-6.  **Visual Analytics:** Generates yearly distribution maps for each calculated indicator at the **ADM2** level, saved as `.png` files under the pipeline reporting outputs (from the computation notebook when it runs).
-7.  **Data Export:** Saves the final aggregated indicators in both `.parquet` and `.csv` formats, saves the pipeline parameter file, and uploads those artifacts to the OpenHEXA **`DHIS2_QUALITY_OF_CARE`** dataset (when outputs exist and the computation step is not skipped).
-
----
+1. **Configuration:** Load and validate **`SNT_config.json`** and read **`COUNTRY_CODE`**.
+2. **Routine acquisition:** In **`pipelines/snt_dhis2_quality_of_care/code/snt_dhis2_quality_of_care.ipynb`**, list files in the latest version of **`DHIS2_OUTLIERS_IMPUTATION`**, keep those matching **`[COUNTRY_CODE]_routine_outliers-*_[data_action].parquet`**, and load the **lexicographically greatest** filename (tie-break for multiple imputation methods).
+3. **Shapes:** Load **`[COUNTRY_CODE]_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`** for **ADM2** geometry and **`ADM2_NAME`** merge.
+4. **Cleaning:** Coerce configured indicator columns from character (treating **`""`**, **`"-"`**, and missing as NA) to numeric.
+5. **Aggregation:** Sum all available indicator columns **by `ADM2_ID` and `YEAR`**, producing one row per **district-year**.
+6. **Indicators:** Compute rates (**`testing_rate`**, **`treatment_rate`**, **`case_fatality_rate`**, **`prop_adm_malaria`**, **`prop_malaria_deaths`**) and retain absolute columns (**`non_malaria_all_cause_outpatients`** from **`ALLOUT`**, **`presumed_cases`** from **`PRES`**); rates use **`fifelse`** with **`NA`** when the denominator is zero.
+7. **Maps and export:** When the computation notebook runs, write yearly **ADM2** choropleth **`.png`** maps under the pipeline reporting figures path and write **`[COUNTRY_CODE]_quality_of_care_district_year_[data_action].parquet`** and **`.csv`** under **`data/dhis2/quality_of_care/`**.
+8. **Orchestration (`pipeline.py`):** Run the computation notebook unless reporting-only mode is enabled at the platform level, save parameters JSON, upload parquet, CSV, and parameters file to **`DHIS2_QUALITY_OF_CARE`** when present, then always run **`snt_dhis2_quality_of_care_report.ipynb`**.
 
 ## Inputs
 
-* **`[COUNTRY_CODE]_routine_outliers-*_[data_action].parquet`**: The primary input file containing routine data after outlier treatment.
-* **`[COUNTRY_CODE]_shapes.geojson`**: Geospatial boundaries used for mapping and administrative name resolution.
-
----
+* **`[COUNTRY_CODE]_routine_outliers-*_[data_action].parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`** (latest matching file selected in code).
+* **`[COUNTRY_CODE]_shapes.geojson`** on **`DHIS2_DATASET_FORMATTED`**.
 
 ## Outputs
 
-* **`[COUNTRY_CODE]_quality_of_care_district_year_[data_action].parquet`**: Processed district-year indicators in Parquet format.
-* **`[COUNTRY_CODE]_quality_of_care_district_year_[data_action].csv`**: Processed district-year indicators in CSV format.
-* **Yearly Indicator Maps**: Static `.png` maps (e.g., `testing_rate_2023.png`) stored in the pipeline reporting outputs.
-
----
+* **`[COUNTRY_CODE]_quality_of_care_district_year_[data_action].parquet`** and **`.csv`** in **`data/dhis2/quality_of_care/`** (district-year table).
+* **Yearly indicator maps** (e.g. **`testing_rate_2023.png`**; the outpatient count map uses the internal filename prefix **`allout_`**).
+* **Pipeline parameters JSON** and copies uploaded to **`DHIS2_QUALITY_OF_CARE`** when the computation step produces files.
+* **Reporting artefacts** from **`snt_dhis2_quality_of_care_report.ipynb`**.
 
 > **Notes for the Data Analyst:**
 >
-> * **`testing_rate`**: Calculated as **`TEST`** / **`SUSP`**. Represents the proportion of suspected cases that received a diagnostic test.
-> * **`treatment_rate`**: Calculated as **`MALTREAT`** / **`CONF`**. Represents the proportion of confirmed cases that received antimalarial treatment.
-> * **`case_fatality_rate`**: Calculated as **`MALDTH`** / **`MALADM`**. Specifically monitors in-hospital malaria deaths relative to malaria admissions.
-> * **`prop_adm_malaria`** & **`prop_malaria_deaths`**:
->   * **`prop_adm_malaria`**: Malaria admissions (**`MALADM`**) divided by all-cause admissions (**`ALLADM`**).
->   * **`prop_malaria_deaths`**: Malaria deaths (**`MALDTH`**) divided by all-cause deaths (**`ALLDTH`**).
-> * **`non_malaria_all_cause_outpatients`**: Absolute count derived directly from the **`ALLOUT`** column.
-> * **`presumed_cases`**: Absolute count derived directly from the **`PRES`** column.
-> * **Zero Handling**: For all rate calculations, the pipeline returns `NA` if the denominator is zero to prevent division errors.
-
----
-
-### Note on earlier drafts
-
-An earlier draft of this README documented an `outlier_imputation_method` parameter. The implementation in `pipeline.py` and the notebook instead picks the **latest** outlier-processed file available in the dataset automatically. The sections above match that behavior.
+> - **`testing_rate`**: **`TEST`** / **`SUSP`** when **`SUSP` > 0**, else missing.
+> - **`treatment_rate`**: **`MALTREAT`** / **`CONF`** when **`CONF` > 0**, else missing.
+> - **`case_fatality_rate`**: **`MALDTH`** / **`MALADM`** when **`MALADM` > 0**, else missing.
+> - **`prop_adm_malaria`**: **`MALADM`** / **`ALLADM`** when **`ALLADM` > 0**, else missing.
+> - **`prop_malaria_deaths`**: **`MALDTH`** / **`ALLDTH`** when **`ALLDTH` > 0**, else missing; the notebook also assigns **`prop_deaths_malaria`** as an alias of **`prop_malaria_deaths`**.
+> - **`non_malaria_all_cause_outpatients`**: District-year sum of **`ALLOUT`** after the **`ADM2_ID`–`YEAR` aggregation**.
+> - **`presumed_cases`**: District-year sum of **`PRES`** after the same aggregation.

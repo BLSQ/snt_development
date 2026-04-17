@@ -1,51 +1,40 @@
 # SNT DHIS2 Formatting Pipeline
 
-The `snt_dhis2_formatting` pipeline, processes and formats DHIS2 data extracts for the SNT workflow.
-
-## Description
-
-The `snt_dhis2_formatting` pipeline orchestrates the formatting of various DHIS2 data extracts. It reads raw data, runs a series of Jupyter notebooks to transform and format the data, and then saves the output. The pipeline can also pull the latest versions of the processing scripts from a repository and generate a final report.
-
-The pipeline performs the following steps:
-1. **Script Update:** Optionally pulls the latest data processing scripts from a configured repository.
-2. **Configuration:** Loads and validates the `SNT_config.json` configuration file.
-3. **Data Formatting:** Executes a series of Jupyter notebooks to format different DHIS2 data extracts, including:
-    - Analytics data (`snt_dhis2_formatting_routine.ipynb`)
-    - Population data (`snt_dhis2_formatting_population.ipynb`)
-    - Geospatial shapes data (`snt_dhis2_formatting_shapes.ipynb`)
-    - Population pyramid data (`snt_dhis2_formatting_pyramid.ipynb`)
-    - Reporting rates data (`snt_dhis2_formatting_reporting_rates.ipynb`)
-4. **Output Storage:** Saves the formatted data into `.parquet` and `.csv` files.
-5. **Dataset Update:** Adds the newly formatted files to a designated dataset.
-6. **Reporting:** Runs a final Jupyter notebook (`snt_dhis2_formatting_report.ipynb`) to generate a report based on the formatted data.
+The **SNT DHIS2 Formatting** pipeline converts raw DHIS2 extract Parquet files from the extract dataset into analysis-ready **routine**, **population**, **shapes**, **pyramid**, and **reporting** tables and vectors. It publishes the formatted artifacts to **`DHIS2_DATASET_FORMATTED`** and runs the formatting reporting notebook for quality review.
 
 ## Parameters
 
-The pipeline accepts the following parameters:
+None. `pipeline.py` does not define user-configurable domain parameters; standard OpenHEXA orchestration flags are omitted from this document per project conventions.
 
-| Parameter | Type | Description | Default | Required |
-|---|---|---|---|---|
-| `run_report_only` | `bool` | If set to `True`, the pipeline will only execute the reporting notebook and skip all data formatting steps. | `False` | No |
-| `pull_scripts` | `bool` | If set to `True`, the pipeline will pull the latest scripts from the repository before execution. | `False` | No |
+## Functionality Overview
+
+1. **Configuration:** Load and validate **`SNT_config.json`**, resolve **`COUNTRY_CODE`**, and resolve dataset identifiers for extracts and formatted outputs.
+2. **Shapes (ADM2 geometry):** When **`[COUNTRY_CODE]_dhis2_raw_shapes.parquet`** exists on **`DHIS2_DATASET_EXTRACTS`**, run **`pipelines/snt_dhis2_formatting/code/snt_dhis2_formatting_shapes.ipynb`** to produce **`[COUNTRY_CODE]_shapes.geojson`** (and any companion outputs defined in that notebook).
+3. **Pyramid (facility metadata):** When the raw pyramid extract exists, run **`snt_dhis2_formatting_pyramid.ipynb`** to write **`[COUNTRY_CODE]_pyramid.parquet`** and **`.csv`**.
+4. **Routine (analytics):** When **`[COUNTRY_CODE]_dhis2_raw_analytics.parquet`** exists, run **`snt_dhis2_formatting_routine.ipynb`** to write **`[COUNTRY_CODE]_routine.parquet`** and **`.csv`** (monthly facility-level rows with administrative keys as produced by the notebook).
+5. **Population:** When **`[COUNTRY_CODE]_dhis2_raw_population.parquet`** exists, run **`snt_dhis2_formatting_population.ipynb`** to write **`[COUNTRY_CODE]_population.parquet`** and **`.csv`**.
+6. **Reporting rates:** When **`[COUNTRY_CODE]_dhis2_raw_reporting.parquet`** exists, run **`snt_dhis2_formatting_reporting_rates.ipynb`** to write **`[COUNTRY_CODE]_reporting.parquet`** and **`.csv`**.
+7. **Publish:** Save pipeline parameters JSON, upload all produced formatted files plus the parameter file to **`DHIS2_DATASET_FORMATTED`** via **`add_files_to_dataset`** (steps whose upstream file is missing are skipped).
+8. **Reporting:** Run **`snt_dhis2_formatting_report.ipynb`** to refresh static reporting outputs.
+
+## Inputs
+
+* **`[COUNTRY_CODE]_dhis2_raw_analytics.parquet`**, **`[COUNTRY_CODE]_dhis2_raw_population.parquet`**, **`[COUNTRY_CODE]_dhis2_raw_shapes.parquet`**, **`[COUNTRY_CODE]_dhis2_raw_pyramid.parquet`**, **`[COUNTRY_CODE]_dhis2_raw_reporting.parquet`** on **`DHIS2_DATASET_EXTRACTS`** (each is optional; missing inputs skip the corresponding formatting step).
+* **`configuration/SNT_config.json`** for **`COUNTRY_CODE`** and **`SNT_DATASET_IDENTIFIERS`**.
 
 ## Outputs
 
-The primary outputs of this pipeline are formatted data files and a report.
+* **`data/dhis2/extracts_formatted/[COUNTRY_CODE]_routine.parquet`** and **`.csv`**
+* **`data/dhis2/extracts_formatted/[COUNTRY_CODE]_population.parquet`** and **`.csv`**
+* **`data/dhis2/extracts_formatted/[COUNTRY_CODE]_shapes.geojson`**
+* **`data/dhis2/extracts_formatted/[COUNTRY_CODE]_pyramid.parquet`** and **`.csv`**
+* **`data/dhis2/extracts_formatted/[COUNTRY_CODE]_reporting.parquet`** and **`.csv`**
+* **Pipeline parameters JSON** in the same formatted data directory
+* Copies of the above artifacts on the **`DHIS2_DATASET_FORMATTED`** OpenHEXA dataset
+* **Report outputs** under **`pipelines/snt_dhis2_formatting/reporting/outputs/`**
 
-### Formatted Data
-
-The pipeline generates the following files in the `workspace/data/dhis2/extracts_formatted/` directory, where `{country_code}` is derived from the configuration file:
-
-- `{country_code}_routine.parquet`
-- `{country_code}_routine.csv`
-- `{country_code}_population.parquet`
-- `{country_code}_population.csv`
-- `{country_code}_shapes.geojson`
-- `{country_code}_pyramid.parquet`
-- `{country_code}_pyramid.csv`
-- `{country_code}_reporting.parquet`
-- `{country_code}_reporting.csv`
-
-### Report
-
-A report is generated from the `snt_dhis2_formatting_report.ipynb` notebook and the output is stored in the `workspace/pipelines/snt_dhis2_formatting/reporting/outputs/` directory.
+> **Notes for the Data Analyst:**
+>
+> - **`Routine` resolution**: The formatted routine product is **monthly** at **facility (OU)** level with **`ADM1_ID`**, **`ADM2_ID`**, and **`PERIOD`** / **`YEAR`** / **`MONTH`** as produced by the routine notebook (see that notebook for the authoritative column list).
+> - **`Shapes`**: **`[COUNTRY_CODE]_shapes.geojson`** supplies **ADM2** geometries and identifiers used by downstream SNT pipelines.
+> - **Guarded execution**: Each formatting stage is gated on **`dataset_file_exists`** for its raw extract; do not expect outputs for stages whose raw Parquet was never published to **`DHIS2_DATASET_EXTRACTS`**.

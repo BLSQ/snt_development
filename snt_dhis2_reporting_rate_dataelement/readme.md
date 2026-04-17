@@ -1,82 +1,58 @@
-# **SNT DHIS2 Reporting Rate (Data Element) Pipeline**
+# SNT DHIS2 Reporting Rate (Data Element) Pipeline
 
-This pipeline estimates **routine health facility reporting rates** using HMIS data and facility metadata. It calculates reporting rates by analyzing facility activity (reporting of specific malaria-related indicators) against operational status or annual activity, with options for outlier handling and volume-based weighting.
+This pipeline estimates **monthly** facility **data completeness** at **ADM2** by building a full **`PERIOD` × `OU_ID`** grid from the DHIS2 pyramid, flagging reporting using configurable indicators, and applying either unweighted or volume-**weighted** reporting rates. Outputs land in **`data/dhis2/reporting_rate/`**, are pushed to **`DHIS2_REPORTING_RATE`**, and feed the companion reporting notebook.
 
-First, facility **activity** is assessed **monthly** using a small set of key **Facility Activity Indicators**. A facility is considered active in a month if at least one of these indicators has a non-missing value (zero values are counted as valid reports). These monthly activity signals are then used to determine whether a facility is active during the year, meaning it reported at least once in that year.
+## Parameters
 
-Separately, facility operational status is derived from the facility master (pyramid) dataset using opening and closing dates and explicit closure markers in facility names.
-Reporting rates are computed by comparing monthly activity (**numerator** \= number of facilities active in the month) against one of **two denominators**:
+* **`routine_data_choice`** (String, Required):
+  * **Name:** Routine data source
+  * **Description:** Selects which routine Parquet supplies monthly indicator values for merging with the pyramid grid.
+  * **Choices/Default:** `raw` (**`{COUNTRY_CODE}_routine.parquet`** on **`DHIS2_DATASET_FORMATTED`**), `imputed` (**`{COUNTRY_CODE}_routine_outliers_imputed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**), `outliers_removed` (**`{COUNTRY_CODE}_routine_outliers_removed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**). Default: `imputed`.
 
-* **Operational facilities**: facilities that are declared open in the month (based on opening/closing dates and excluding facilities marked as closed)
-* **Annual active facilities**: facilities that reported at least once during the year
+* **`activity_indicators`** (Multi-select string, Required):
+  * **Name:** Facility activity indicators
+  * **Description:** Subset of indicators used to decide whether a facility is clinically active in a month (strictly positive value on any selected column counts as active).
+  * **Choices/Default:** Any non-empty subset of **`CONF`**, **`SUSP`**, **`TEST`**, **`PRES`**. Default: **`CONF`**, **`PRES`**.
 
-In addition to unweighted reporting rates, the pipeline also computes **weighted reporting rates**, where each facility is weighted by its average reported malaria workload based on the selected **Volume Activity Indicators**, so that high-volume facilities contribute more to the overall reporting rate.
+* **`volume_activity_indicators`** (Multi-select string, Required):
+  * **Name:** Volume activity indicators
+  * **Description:** Same choice set as **`activity_indicators`**; used to build **HF-level weights** for the weighted reporting rate branch.
+  * **Choices/Default:** Subset of **`CONF`**, **`SUSP`**, **`TEST`**, **`PRES`**. Default: **`CONF`**, **`PRES`**.
 
-## **Parameters**
+* **`dataelement_method_denominator`** (String, Required):
+  * **Name:** Denominator method
+  * **Description:** Defines how the monthly expected facility universe is constructed for the data-element denominator.
+  * **Choices/Default:** **`ROUTINE_ACTIVE_FACILITIES`**, **`PYRAMID_OPEN_FACILITIES`**. Default: **`ROUTINE_ACTIVE_FACILITIES`**.
 
-* **`outliers_method`** (String, required):  
-  * **Name:** Outliers detection method  
-  * **Description:** Specifies which method was used to detect outliers in the input routine data. Select "Routine data (Raw)" to use raw data without outlier processing.  
-  * **Choices:** Routine data (Raw), Mean (Classic), Median (Classic), IQR (Classic), Trend (PATH), MG Partial (MagicGlasses2), MG Complete (MagicGlasses2).  
-  * **Default:** None  
-* **`use_removed_outliers`** (Boolean, optional):  
-  * **Name:** Use routine data with outliers removed  
-  * **Description:** If enabled, the pipeline uses routine data where detected outliers have been removed (set to null). If disabled (default), it uses data where outliers have been imputed (replaced), or raw data if "Routine data (Raw)" was selected.  
-  * **Default:** False  
-* **`activity_indicators`** (List of Strings, required):  
-  * **Name:** Facility Activity indicators  
-  * **Description:** Defines the set of data elements used to determine if a facility is "active". A facility is considered active in a given period if at least one of these indicators has a non-missing value greater than or equal to zero.  
-  * **Choices:** CONF, SUSP, TEST, PRES.  
-  * **Default:** \['CONF', 'PRES'\]  
-* **`volume_activity_indicators`** (List of Strings, required):  
-  * **Name:** Volume activity indicators  
-  * **Description:** Defines the set of data elements used to determine the volume of activity (workload). These indicators are used to calculate weights for the "Weighted Reporting Rates" calculation.  
-  * **Choices:** CONF, SUSP, TEST, PRES.  
-  * **Default:** \['CONF', 'PRES'\]  
-* **`dataelement_method_denominator`** (String, required):  
-  * **Name:** Denominator method  
-  * **Description:** Determines how the total number of expected facilities (denominator) is calculated.  
-    * ROUTINE\_ACTIVE\_FACILITIES: Denominator is the number of facilities active (reported at least once) during the entire current year.  
-    * PYRAMID\_OPEN\_FACILITIES: Denominator is the number of facilities considered structurally "Open" (operational) during the specific period.  
-  * **Default:** None  
-* **`use_weighted_reporting_rates`** (Boolean, optional):  
-  * **Name:** Use weighted reporting rates  
-  * **Description:** If enabled, reporting rates are weighted based on the facility's volume of activity (derived from volume\_activity\_indicators). High-volume facilities will have a greater impact on the final aggregated rate.  
-  * **Default:** False
+* **`use_weighted_reporting_rates`** (Boolean, Optional):
+  * **Name:** Use weighted reporting rates
+  * **Description:** When **`true`**, the exported **`REPORTING_RATE`** column uses volume-weighted numerators and denominators; when **`false`**, unweighted rates populate that column.
+  * **Choices/Default:** Default: **`false`**.
 
-## **Functionality Overview**
+## Functionality Overview
 
-The pipeline performs the following key operations:
+1. Resolve paths, load **`SNT_config.json`**, and map **`routine_data_choice`** to a concrete routine filename.
+2. Persist Papermill parameters (**`SNT_ROOT_PATH`**, **`ROUTINE_FILE`**, denominator, indicator lists, weighted flag) before executing the computation notebook.
+3. Verify the routine file exists in the relevant dataset; stop early if the outliers pipeline has not produced imputed or removed files when those options are chosen.
+4. Execute **`pipelines/snt_dhis2_reporting_rate_dataelement/code/snt_dhis2_reporting_rate_dataelement.ipynb`** to merge pyramid openings, monthly indicator activity, optional weights, and **ADM2** aggregates.
+5. Upload **`{COUNTRY_CODE}_reporting_rate_dataelement`** outputs plus the parameter JSON to **`DHIS2_REPORTING_RATE`**.
+6. Render **`snt_dhis2_reporting_rate_dataelement_report.ipynb`** outputs for analysts.
 
-1. **Data Loading:** Loads the appropriate DHIS2 routine data file based on the selected outliers\_method (raw, imputed, or removed) and the facility metadata (pyramid).  
-2. **Facility Activity Assessment:** Evaluates facility activity monthly. A facility is flagged as ACTIVE\_THIS\_PERIOD if it reports valid data (≥0) for any of the selected activity\_indicators.  
-3. **Operational Status Check:** Identifies OPEN facilities by filtering out those with explicit closure keywords in their names (e.g., "CLOTUR", "FERME") and checking opening/closing dates against the reporting period.  
-4. **Annual Activity Check:** Determines if a facility was ACTIVE\_THIS\_YEAR by checking if it reported data at least once during the calendar year.  
-5. **Weight Calculation (Optional):** If weighting is enabled, calculates a weight for each facility based on the average monthly volume of the volume\_activity\_indicators.  
-6. **Reporting Rate Calculation:** Computes the reporting rate aggregated to **Administrative Level 2 (ADM2)** and **Monthly resolution** using the selected denominator method:  
-   * **Method 1 (Routine Active):** Active Facilities in Period / Active Facilities in Year.  
-   * **Method 2 (Pyramid Open):** Active Facilities in Period / Open Facilities in Period.  
-7. **Export:** Selects the appropriate reporting rate column (weighted or unweighted) and exports the data.
+## Inputs
 
-## **Inputs**
+* **`configuration/SNT_config.json`**: Dataset IDs, **`COUNTRY_CODE`**, admin column names, and the list of DHIS2 indicators expected in routine data.
+* **Routine Parquet** (see **`routine_data_choice`**): Monthly values per **`OU_ID`** / **`PERIOD`** with **`ADM1`** / **`ADM2`** identifiers.
+* **`{COUNTRY_CODE}_pyramid.parquet`** (via dataset): Facility metadata including opening and closing dates for open-facility logic.
 
-The pipeline requires the following inputs from the data lake:
+## Outputs
 
-* **DHIS2 Routine Data:** A parquet file containing routine health data. The specific file depends on the `outliers_method` parameter:  
-  * Raw: \[COUNTRY\_CODE\]\_routine.parquet  
-  * Processed: \[COUNTRY\_CODE\]\_routine\_outliers-\[method\]\_\[imputed|removed\].parquet  
-* **DHIS2 Pyramid Data:** A file named "\[COUNTRY\_CODE\]\_pyramid.parquet" from the "SNT\_DHIS2\_FORMATTED" dataset, containing facility metadata (opening dates, hierarchy).  
-* **Configuration:** The "SNT\_config.json" file containing country codes and dataset identifiers.
-
-## **Outputs**
-
-* **\[COUNTRY\_CODE\]\_reporting\_rate\_dataelement.parquet** and **\[COUNTRY\_CODE\]\_reporting\_rate\_dataelement.csv**: These files contain the calculated reporting rates aggregated at the **`ADM2` level** and **`MONTH`ly resolution**. Both files are saved to the DHIS2\_REPORTING\_RATE dataset.
-
+* **`{COUNTRY_CODE}_reporting_rate_dataelement.parquet`** and **`.csv`**: Columns include at least **`YEAR`**, **`MONTH`**, **`ADM2_ID`**, and **`REPORTING_RATE`** (weighted or unweighted per **`use_weighted_reporting_rates`**), plus intermediate count columns retained by the notebook.
+* **Pipeline parameters JSON** under **`data/dhis2/reporting_rate/`**.
+* **Papermill and reporting artefacts** under **`papermill_outputs/`** and **`reporting/outputs/`**.
 
 > **Notes for the Data Analyst:**
-> - **`REPORTING_RATE`**: This is the final calculated rate. Its definition > depends on the pipeline parameters:  
->   - If use\_weighted\_reporting\_rates is **True**, this contains the weighted rate.  
->    - If **False**, it contains the unweighted rate.  
->    - The denominator logic follows the dataelement\_method\_denominator selection.  
-> - **`ADM2_ID`**: The unique identifier for the administrative level 2 area.  
-> - **`YEAR`** & **`MONTH`**: The time period for the reporting rate.  
+>
+> - **`Temporal and spatial resolution`**: Core logic operates on **monthly** **`PERIOD`** values and exports **ADM2-month** reporting rates.
+> - **`activity_indicators`** and **`volume_activity_indicators`**: Activity drives the binary “reported this month” numerator; volume indicators drive **HF-level weights** used only when weighted rates are enabled.
+> - **`dataelement_method_denominator`**: **`PYRAMID_OPEN_FACILITIES`** uses facility open/close dates; mis-specified dates in the pyramid will distort denominators.
+> - **`Weighted reporting rates`**: Weights normalize mean monthly case volumes within **ADM2**; interpret weighted rates as completeness weighted by observed clinical volume proxies.

@@ -1,7 +1,10 @@
+# Load shared SNT helpers.
+source(file.path("~/workspace", "code", "snt_utils.r"))
+
+
 #' Bootstrap context for Quality of Care notebooks.
 #'
-#' Centralizes path definitions, package loading, OpenHEXA import, and SNT
-#' configuration loading so notebooks remain short and readable.
+#' Centralizes path definitions, package loading, and OpenHEXA import.
 #'
 #' @param root_path Workspace root path. Defaults to `~/workspace`.
 #' @param required_packages Character vector of packages to install/load.
@@ -10,8 +13,7 @@ get_setup_variables <- function(
     SNT_ROOT_PATH = "~/workspace",
     packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
 ) {
-    required_packages <- packages
-    install_and_load(required_packages)
+    install_and_load(packages)
 
     Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
     reticulate::py_config()$python
@@ -21,73 +23,6 @@ get_setup_variables <- function(
         CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),
         FORMATTED_DATA_PATH = file.path(SNT_ROOT_PATH, "data", "dhis2", "extracts_formatted"),
         UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads")
-    )
-}
-
-#' Generic helper to load a file from an OpenHEXA dataset.
-#'
-#' @param dataset_id OpenHEXA dataset identifier.
-#' @param filename Name of file to load from latest dataset version.
-#' @param verbose Whether to log informative messages.
-#' @return Loaded object (data.frame/data.table/sf) depending on file format.
-load_dataset_file_qoc <- function(dataset_id, filename, verbose = TRUE) {
-    data <- tryCatch(
-        {
-            get_latest_dataset_file_in_memory(dataset_id, filename)
-        },
-        error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading {filename} file for: {conditionMessage(e)}")
-            if (verbose) log_msg(msg, "error")
-            stop(msg)
-        }
-    )
-
-    if (verbose) {
-        msg <- glue::glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]")
-        log_msg(msg)
-    }
-    data
-}
-
-bootstrap_quality_of_care_context <- function(
-    root_path = "~/workspace",
-    required_packages = c("jsonlite", "data.table", "arrow", "sf", "ggplot2", "glue", "reticulate", "RColorBrewer", "dplyr", "writexl", "knitr", "scales", "gridExtra")
-) {
-    setup_vars <- get_setup_variables(
-        SNT_ROOT_PATH = root_path,
-        packages = required_packages
-    )
-    code_path <- file.path(root_path, "code")
-    pipelines_path <- file.path(root_path, "pipelines")
-    data_path <- file.path(root_path, "data")
-    dhis2_data_path <- file.path(root_path, "data", "dhis2")
-    pipeline_path <- file.path(pipelines_path, "snt_dhis2_quality_of_care")
-    output_data_path <- file.path(root_path, "data", "dhis2", "quality_of_care")
-    report_outputs_path <- file.path(pipeline_path, "reporting", "outputs")
-    figures_path <- file.path(report_outputs_path, "figures")
-
-    dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
-    dir.create(report_outputs_path, recursive = TRUE, showWarnings = FALSE)
-    dir.create(figures_path, recursive = TRUE, showWarnings = FALSE)
-    config_json <- load_snt_config(setup_vars$CONFIG_PATH, "SNT_config.json")
-
-    list(
-        ROOT_PATH = root_path,
-        CODE_PATH = code_path,
-        PIPELINES_PATH = pipelines_path,
-        PIPELINE_PATH = pipeline_path,
-        CONFIG_PATH = setup_vars$CONFIG_PATH,
-        DATA_PATH = data_path,
-        DHIS2_DATA_PATH = dhis2_data_path,
-        FORMATTED_DATA_PATH = setup_vars$FORMATTED_DATA_PATH,
-        UPLOADS_PATH = setup_vars$UPLOADS_PATH,
-        OUTPUT_DATA_PATH = output_data_path,
-        REPORT_OUTPUTS_PATH = report_outputs_path,
-        FIGURES_PATH = figures_path,
-        config_json = config_json,
-        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
-        DHIS2_FORMATTED_DATASET = config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED,
-        OUTLIERS_DATASET = config_json$SNT_DATASET_IDENTIFIERS$DHIS2_OUTLIERS_IMPUTATION
     )
 }
 
@@ -104,34 +39,6 @@ validate_quality_of_care_action <- function(data_action) {
         stop(glue::glue("[ERROR] Invalid data_action `{data_action}`. Allowed: {paste(allowed_actions, collapse = ', ')}"))
     }
     data_action
-}
-
-#' Select latest routine file matching Quality of Care inputs.
-#'
-#' @param dataset_last_version Latest OpenHEXA dataset version.
-#' @param country_code Country code (e.g. COD).
-#' @param data_action Action suffix (`imputed` or `removed`).
-#' @return File name of the selected routine parquet.
-select_latest_qoc_routine_file <- function(dataset_last_version, country_code, data_action) {
-    target_regex <- paste0("^", country_code, "_routine_outliers(?:[-_].+)?_", data_action, "\\.parquet$")
-    files_list <- reticulate::iterate(dataset_last_version$files)
-    file_names <- vapply(files_list, function(file) file$filename, character(1))
-    matching_files <- sort(file_names[grepl(target_regex, file_names)], decreasing = TRUE)
-
-    if (length(matching_files) == 0) {
-        candidate_files <- file_names[grepl(paste0("^", country_code, "_routine_outliers"), file_names)]
-        candidate_preview <- if (length(candidate_files) > 0) {
-            paste(head(sort(candidate_files), 10), collapse = ", ")
-        } else {
-            "none"
-        }
-        stop(glue::glue(
-            "[ERROR] No file matching `{country_code}_routine_outliers*_{data_action}.parquet` found in outliers dataset. ",
-            "Detected outliers-like files for {country_code}: {candidate_preview}"
-        ))
-    }
-
-    matching_files[1]
 }
 
 #' Compute district-year Quality of Care indicators.

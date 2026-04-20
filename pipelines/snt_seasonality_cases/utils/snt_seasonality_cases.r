@@ -168,3 +168,71 @@ compute_start_month <- function(admin_id, block_duration, row_data, admin_col, m
     month_counts <- table(seasonal_months)
     as.integer(names(month_counts)[which.max(month_counts)])
 }
+
+
+#' Add analyst-facing wide metrics to seasonality output.
+#'
+#' Computes CASES_PROPORTION and SEASONAL_BLOCK_START_MONTH, then enforces NA
+#' for non-seasonal units in both derived columns.
+#'
+#' @param seasonality_wide_dt Wide seasonality table (by admin id).
+#' @param row_seasonality_dt Row-level seasonality table.
+#' @param imputed_dt Imputed input table used for annual totals.
+#' @param admin_id_col Admin id column name.
+#' @param year_col Year column name.
+#' @param month_col Month column name.
+#' @param seasonality_col Seasonality binary column name.
+#' @param season_duration_col Block duration column name.
+#' @param season_start_month_col Start month output column name.
+#' @param cases_proportion_col Cases proportion output column name.
+#' @param imputed_col Imputed values column name.
+#' @return Updated data.table.
+cases_add_wide_metrics <- function(
+    seasonality_wide_dt,
+    row_seasonality_dt,
+    imputed_dt,
+    admin_id_col,
+    year_col,
+    month_col,
+    seasonality_col,
+    season_duration_col,
+    season_start_month_col,
+    cases_proportion_col,
+    imputed_col
+) {
+    annual_totals_dt <- imputed_dt[
+        ,
+        .(ANNUAL_TOTAL = sum(get(imputed_col), na.rm = TRUE)),
+        by = c(admin_id_col, year_col)
+    ]
+
+    seasonality_wide_dt[, (cases_proportion_col) := mapply(
+        compute_cases_proportion,
+        admin_id = get(admin_id_col),
+        block_duration = get(season_duration_col),
+        MoreArgs = list(
+            row_data = row_seasonality_dt,
+            annual_data = annual_totals_dt,
+            admin_col = admin_id_col,
+            year_column = year_col
+        )
+    )]
+
+    seasonality_wide_dt[, (season_start_month_col) := mapply(
+        compute_start_month,
+        admin_id = get(admin_id_col),
+        block_duration = get(season_duration_col),
+        MoreArgs = list(
+            row_data = row_seasonality_dt,
+            admin_col = admin_id_col,
+            month_column = month_col
+        )
+    )]
+
+    seasonality_wide_dt[
+        get(seasonality_col) == 0 | is.na(get(seasonality_col)),
+        c(cases_proportion_col, season_start_month_col) := .(NA_real_, NA_integer_)
+    ]
+
+    seasonality_wide_dt
+}

@@ -57,6 +57,15 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
                 "snt_dhs_vaccination_computation.ipynb",
                 "utils/snt_dhs_indicator_tables.r",
                 "utils/snt_dhs_careseeking_computation.r",
+                "utils/snt_dhs_bednets_computation.r",
+                "utils/snt_dhs_prevalence_computation.r",
+                "utils/snt_dhs_mortality_computation.r",
+                "utils/snt_dhs_vaccination_computation.r",
+                "utils/snt_dhs_bednets_report.r",
+                "utils/snt_dhs_careseeking_report.r",
+                "utils/snt_dhs_prevalence_report.r",
+                "utils/snt_dhs_mortality_report.r",
+                "utils/snt_dhs_vaccination_report.r",
             ],
         )
 

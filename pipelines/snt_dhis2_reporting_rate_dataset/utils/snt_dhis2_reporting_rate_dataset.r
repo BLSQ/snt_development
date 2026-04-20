@@ -1,6 +1,5 @@
 # Load base utils
-# Helpers are named so the dataset-method reporting notebook reads like a checklist
-# (same idea as `snt_dhis2_reporting_rate_dataelement` utils).
+# Keep helpers small and reusable; pipeline-specific assignments stay in notebook code.
 source(file.path("~/workspace/code", "snt_utils.r"))
 
 
@@ -90,44 +89,6 @@ stop_if_dataset_reporting_papermill_params_missing <- function() {
 }
 
 
-# Legacy alias.
-assert_papermill_reporting_rate_dataset_params <- stop_if_dataset_reporting_papermill_params_missing
-
-
-#' Country, admins, and product filter from `SNT_config.json` (dataset-method RR).
-read_dataset_reporting_identity_from_config <- function(config_json) {
-    list(
-        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
-        ADMIN_1 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_1),
-        ADMIN_2 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2),
-        REPORTING_RATE_PRODUCT_ID = config_json$SNT_CONFIG$REPORTING_RATE_PRODUCT_UID
-    )
-}
-
-
-#' Column names kept when trimming routine extracts to reporting-rate grain.
-fixed_columns_for_dataset_reporting_rate_routine_slice <- function() {
-    c("YEAR", "MONTH", "ADM2_ID", "REPORTING_RATE")
-}
-
-
-#' Build the named settings list used by the dataset-method reporting-rate notebook.
-#'
-#' Calls `stop_if_dataset_reporting_papermill_params_missing()` first, then reads
-#' country / admins / product UID and the fixed routine column list from `config_json`.
-#'
-#' @export
-build_dataset_method_reporting_settings_from_config <- function(config_json) {
-    stop_if_dataset_reporting_papermill_params_missing()
-    id <- read_dataset_reporting_identity_from_config(config_json)
-    c(id, list(fixed_cols_rr = fixed_columns_for_dataset_reporting_rate_routine_slice()))
-}
-
-
-# Legacy alias (same as removed `parse_reporting_rate_dataset_snt_settings`).
-parse_reporting_rate_dataset_snt_settings <- build_dataset_method_reporting_settings_from_config
-
-
 #' Load Dataset File from OpenHEXA
 #'
 #' @param dataset_id Character. OpenHEXA dataset identifier.
@@ -152,20 +113,3 @@ load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
 }
 
 
-#' Save final dataset-method reporting-rate table as CSV + Parquet under `data/dhis2/reporting_rate/`.
-#' @export
-save_dataset_method_reporting_rate_csv_and_parquet <- function(reporting_rate_tbl, snt_environment, country_code) {
-    output_dir <- file.path(snt_environment$DATA_PATH, "dhis2", "reporting_rate")
-    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-    csv_path <- file.path(output_dir, paste0(country_code, "_reporting_rate_dataset.csv"))
-    pq_path <- file.path(output_dir, paste0(country_code, "_reporting_rate_dataset.parquet"))
-    utils::write.csv(reporting_rate_tbl, csv_path, row.names = FALSE)
-    log_msg(glue::glue("Exported: {csv_path}"))
-    arrow::write_parquet(reporting_rate_tbl, pq_path)
-    log_msg(glue::glue("Exported: {pq_path}"))
-    invisible(list(csv_path = csv_path, parquet_path = pq_path))
-}
-
-
-# Legacy alias.
-write_reporting_rate_dataset_outputs <- save_dataset_method_reporting_rate_csv_and_parquet

@@ -95,29 +95,6 @@ add_quality_of_care_derived_indicators <- function(qoc) {
     qoc
 }
 
-#' Compute district-year Quality of Care indicators.
-#'
-#' @param routine Routine dataframe loaded from outliers dataset.
-#' @return Data table with district-year indicators.
-compute_quality_of_care_indicators <- function(routine) {
-    core_cols <- c("ADM2_ID", "YEAR")
-    core_missing <- setdiff(core_cols, names(routine))
-    if (length(core_missing) > 0) {
-        stop(glue::glue("[ERROR] Missing core columns: {paste(core_missing, collapse = ', ')}"))
-    }
-
-    indicator_cols <- c("TEST", "SUSP", "MALTREAT", "CONF", "MALDTH", "MALADM", "ALLADM", "ALLDTH", "ALLOUT", "PRES")
-    missing_cols <- setdiff(indicator_cols, names(routine))
-    if (length(missing_cols) > 0) {
-        log_msg(glue::glue("[WARNING] Missing indicator columns: {paste(missing_cols, collapse = ', ')}"), level = "warning")
-    }
-
-    routine <- normalize_qoc_routine_types(routine)
-    qoc <- aggregate_qoc_district_year(routine)
-    qoc <- add_quality_of_care_derived_indicators(qoc)
-    qoc
-}
-
 #' Merge ADM2 labels into Quality of Care outputs.
 #'
 #' @param qoc_dt Quality-of-care data table.

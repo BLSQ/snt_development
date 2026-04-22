@@ -174,7 +174,7 @@ validate_quality_of_care_action <- function(data_action) {
 }
 
 
-#' Normalize target indicator columns and keys in routine table.
+#' Coerce `indicator_cols` to numeric; YEAR and ADM2_ID types if those columns exist.
 normalize_qoc_routine_types <- function(routine, indicator_cols) {
     data.table::setDT(routine)
     indicator_cols <- as.character(indicator_cols)
@@ -192,7 +192,7 @@ normalize_qoc_routine_types <- function(routine, indicator_cols) {
 }
 
 
-#' Aggregate QoC routine indicators by district and year.
+#' Sum `indicator_cols` by `group_cols` (default ADM2_ID, YEAR).
 aggregate_qoc_district_year <- function(routine, indicator_cols, group_cols = c("ADM2_ID", "YEAR")) {
     group_cols <- as.character(group_cols)
     indicator_cols <- as.character(indicator_cols)

@@ -8,6 +8,8 @@
 #
 # Reporting-only helpers live in:
 # - snt_dhis2_quality_of_care_report.r
+#
+# Pipeline code notebook sources this file only (not a separate *_code.r).
 
 # Load shared SNT helpers.
 source(file.path("~/workspace", "code", "snt_utils.r"))

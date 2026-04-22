@@ -2,27 +2,22 @@
 source(file.path("~/workspace", "code", "snt_utils.r"))
 
 
-#' Bootstrap context for Quality of Care notebooks.
-#'
-#' Centralizes base path definitions, package loading, and OpenHEXA import.
-#' Base paths follow the same pattern as other SNT pipelines (e.g. population transformation).
-#'
-#' @param SNT_ROOT_PATH Workspace root path. Defaults to `~/workspace`.
-#' @param packages Character vector of packages to install/load.
-#' @return Named list: `paths_to_check` plus top-level `CONFIG_PATH`, `UPLOADS_PATH`,
-#'   `DATA_PATH`, and `PIPELINES_PATH` for use in notebooks.
+#' Load packages, OpenHEXA, and return base workspace paths (one list, four names).
+#' @param SNT_ROOT_PATH Workspace root. Default `~/workspace`.
+#' @param packages R packages to install/load.
+#' @return Named list: `CONFIG_PATH`, `UPLOADS_PATH`, `DATA_PATH`, `PIPELINES_PATH`.
 get_setup_variables <- function(
     SNT_ROOT_PATH = "~/workspace",
     packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
 ) {
-    paths_to_check <- list(
+    base_paths <- list(
         CONFIG_PATH    = file.path(SNT_ROOT_PATH, "configuration"),
         UPLOADS_PATH   = file.path(SNT_ROOT_PATH, "uploads"),
         DATA_PATH      = file.path(SNT_ROOT_PATH, "data"),
         PIPELINES_PATH = file.path(SNT_ROOT_PATH, "pipelines")
     )
 
-    for (p in paths_to_check) {
+    for (p in base_paths) {
         if (!dir.exists(p)) {
             dir.create(p, recursive = TRUE, showWarnings = FALSE)
         }
@@ -34,10 +29,7 @@ get_setup_variables <- function(
     reticulate::py_config()$python
     assign("openhexa", reticulate::import("openhexa.sdk"), envir = .GlobalEnv)
 
-    c(
-        list(paths_to_check = paths_to_check),
-        paths_to_check
-    )
+    return(base_paths)
 }
 
 #' Load dataset file from OpenHEXA.
@@ -130,10 +122,7 @@ add_quality_of_care_derived_indicators <- function(qoc) {
     if ("MALTREAT" %in% names(qoc) && "CONF" %in% names(qoc)) qoc[, treatment_rate := data.table::fifelse(CONF > 0, MALTREAT / CONF, NA_real_)]
     if ("MALDTH" %in% names(qoc) && "MALADM" %in% names(qoc)) qoc[, case_fatality_rate := data.table::fifelse(MALADM > 0, MALDTH / MALADM, NA_real_)]
     if ("MALADM" %in% names(qoc) && "ALLADM" %in% names(qoc)) qoc[, prop_adm_malaria := data.table::fifelse(ALLADM > 0, MALADM / ALLADM, NA_real_)]
-    if ("MALDTH" %in% names(qoc) && "ALLDTH" %in% names(qoc)) {
-        qoc[, prop_malaria_deaths := data.table::fifelse(ALLDTH > 0, MALDTH / ALLDTH, NA_real_)]
-        qoc[, prop_deaths_malaria := prop_malaria_deaths]
-    }
+    if ("MALDTH" %in% names(qoc) && "ALLDTH" %in% names(qoc)) qoc[, prop_malaria_deaths := data.table::fifelse(ALLDTH > 0, MALDTH / ALLDTH, NA_real_)]
     if ("ALLOUT" %in% names(qoc)) qoc[, non_malaria_all_cause_outpatients := ALLOUT]
     if ("PRES" %in% names(qoc)) qoc[, presumed_cases := PRES]
 

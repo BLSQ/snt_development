@@ -26,6 +26,35 @@ get_setup_variables <- function(
     )
 }
 
+#' Load dataset file from OpenHEXA.
+#'
+#' @param dataset_id Character. OpenHEXA dataset identifier.
+#' @param filename Character. Name of file to load.
+#' @param verbose Logical. If TRUE, log dataframe dimensions after a successful load.
+#' @return Dataframe containing the loaded data.
+load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
+    if (!exists("openhexa", inherits = TRUE) || is.null(get("openhexa", inherits = TRUE))) {
+        stop("[ERROR] OpenHEXA SDK is not available. Run `get_setup_variables()` before loading dataset files.")
+    }
+
+    data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_id, filename)
+        },
+        error = function(e) {
+            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
+        }
+    )
+
+    if (verbose) {
+        log_msg(glue::glue(
+            "{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse = ', ')}]"
+        ))
+    }
+
+    return(data)
+}
+
 #' Validate quality-of-care action parameter.
 #'
 #' @param data_action Action string expected to be `imputed` or `removed`.

@@ -113,22 +113,6 @@ aggregate_qoc_district_year <- function(routine, indicator_cols) {
     }
 }
 
-#' Add derived quality-of-care indicators to aggregated district-year data.
-#'
-#' @param qoc Aggregated district-year data table.
-#' @return Data table with derived indicators.
-add_quality_of_care_derived_indicators <- function(qoc) {
-    if ("TEST" %in% names(qoc) && "SUSP" %in% names(qoc)) qoc[, testing_rate := data.table::fifelse(SUSP > 0, TEST / SUSP, NA_real_)]
-    if ("MALTREAT" %in% names(qoc) && "CONF" %in% names(qoc)) qoc[, treatment_rate := data.table::fifelse(CONF > 0, MALTREAT / CONF, NA_real_)]
-    if ("MALDTH" %in% names(qoc) && "MALADM" %in% names(qoc)) qoc[, case_fatality_rate := data.table::fifelse(MALADM > 0, MALDTH / MALADM, NA_real_)]
-    if ("MALADM" %in% names(qoc) && "ALLADM" %in% names(qoc)) qoc[, prop_adm_malaria := data.table::fifelse(ALLADM > 0, MALADM / ALLADM, NA_real_)]
-    if ("MALDTH" %in% names(qoc) && "ALLDTH" %in% names(qoc)) qoc[, prop_malaria_deaths := data.table::fifelse(ALLDTH > 0, MALDTH / ALLDTH, NA_real_)]
-    if ("ALLOUT" %in% names(qoc)) qoc[, non_malaria_all_cause_outpatients := ALLOUT]
-    if ("PRES" %in% names(qoc)) qoc[, presumed_cases := PRES]
-
-    qoc
-}
-
 #' Merge ADM2 labels into Quality of Care outputs.
 #'
 #' @param qoc_dt Quality-of-care data table.

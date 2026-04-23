@@ -180,14 +180,14 @@ save_quality_of_care_maps <- function(qoc_dt, shapes_sf, figures_path) {
             tryCatch(
                 {
                     df_y <- df[YEAR == yr]
-                    if (nrow(df_y) == 0) return(invisible(NULL))
+                    if (nrow(df_y) == 0) next
                     df_y$ADM2_ID <- as.character(df_y$ADM2_ID)
                     map_df <- dplyr::left_join(sf_shapes_local, df_y, by = "ADM2_ID")
-                    if (!(value_col %in% names(map_df))) return(invisible(NULL))
+                    if (!(value_col %in% names(map_df))) next
 
                     vals <- map_df[[value_col]]
                     finite_vals <- vals[is.finite(vals) & !is.na(vals)]
-                    if (length(finite_vals) == 0) return(invisible(NULL))
+                    if (length(finite_vals) == 0) next
 
                     if (is_rate) {
                         cat_vals <- cut(vals, breaks = c(-Inf, 0, 0.2, 0.4, 0.6, 0.8, 1.0, Inf), labels = c("<0", "0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0", ">1.0"), include.lowest = TRUE)
@@ -225,13 +225,13 @@ save_quality_of_care_maps <- function(qoc_dt, shapes_sf, figures_path) {
         }
     }
 
-    if ("testing_rate" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "testing_rate", "Testing rate (TEST / SUSP)", "testing_rate", TRUE)
-    if ("treatment_rate" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "treatment_rate", "Treatment rate (MALTREAT / CONF)", "treatment_rate", TRUE)
-    if ("case_fatality_rate" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "case_fatality_rate", "In-hospital case fatality rate (MALDTH / MALADM)", "case_fatality_rate", TRUE)
-    if ("prop_adm_malaria" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "prop_adm_malaria", "Proportion admitted for malaria (MALADM / ALLADM)", "prop_adm_malaria", TRUE)
-    if ("prop_malaria_deaths" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "prop_malaria_deaths", "Proportion of malaria deaths (MALDTH / ALLDTH)", "prop_malaria_deaths", TRUE)
-    if ("non_malaria_all_cause_outpatients" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "non_malaria_all_cause_outpatients", "Non-malaria all-cause outpatients (ALLOUT)", "allout", FALSE)
-    if ("presumed_cases" %in% names(qoc_dt)) plot_yearly_map(qoc_dt, shapes_sf, "presumed_cases", "Presumed cases (PRES)", "presumed_cases", FALSE)
+    plot_yearly_map(qoc_dt, shapes_sf, "testing_rate","Testing rate (TEST / SUSP)","testing_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "treatment_rate","Treatment rate (MALTREAT / CONF)","treatment_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "case_fatality_rate","In-hospital case fatality rate (MALDTH / MALADM)","case_fatality_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "prop_adm_malaria","Proportion admitted for malaria (MALADM / ALLADM)","prop_adm_malaria",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "prop_malaria_deaths","Proportion of malaria deaths (MALDTH / ALLDTH)","prop_malaria_deaths",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "non_malaria_all_cause_outpatients","Non-malaria all-cause outpatients (ALLOUT)","allout",FALSE)
+    plot_yearly_map(qoc_dt, shapes_sf, "presumed_cases","Presumed cases (PRES)","presumed_cases",FALSE)
 
     log_msg(glue::glue("Saved yearly maps in: {figures_path}"))
     invisible(TRUE)

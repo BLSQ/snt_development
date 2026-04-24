@@ -386,218 +386,225 @@ reporting_summary_adm2_chunked <- function(data_long) {
 }
 
 
-# ---- Chemins Papermill, OpenHEXA, chargements parquet (ordre : source ce fichier, puis
-#     formatting_report_paths_and_outputs(), defaults, formatting_report_source_core_and_helpers()) ----
+# ---- Bootstrap notebook report + chargements parquet ----
 
-.report_nb_assign <- function(name, value, envir = .GlobalEnv) {
-    assign(name, value, envir = envir)
-    invisible(value)
+.report_param_or_default <- function(name, default) {
+    if (!exists(name, envir = .GlobalEnv, inherits = FALSE)) {
+        return(default)
+    }
+    value <- get(name, envir = .GlobalEnv, inherits = FALSE)
+    if (length(value) == 0L || all(is.na(value))) {
+        return(default)
+    }
+    value
 }
 
 
-# Définit chemins workspace, répertoire figures, plafonds plot par défaut.
-formatting_report_paths_and_outputs <- function() {
-    if (!exists("SNT_ROOT_PATH", inherits = TRUE) || length(SNT_ROOT_PATH) == 0L ||
-        !nzchar(as.character(SNT_ROOT_PATH)[1])) {
-        stop("Définir SNT_ROOT_PATH (cellule parameters Papermill) avant formatting_report_paths_and_outputs().")
+formatting_report_build_paths <- function(snt_root_path = "~/workspace") {
+    root <- path.expand(as.character(snt_root_path)[1])
+    paths <- list(
+        SNT_ROOT_PATH = root,
+        CODE_PATH = file.path(root, "code"),
+        CONFIG_PATH = file.path(root, "configuration"),
+        PIPELINE_PATH = file.path(root, "pipelines", "snt_dhis2_formatting"),
+        REPORTING_NB_PATH = file.path(root, "pipelines", "snt_dhis2_formatting", "reporting")
+    )
+    paths$figures_dir <- file.path(paths$REPORTING_NB_PATH, "outputs", "figures")
+    if (!dir.exists(paths$figures_dir)) {
+        dir.create(paths$figures_dir, recursive = TRUE)
+        message("Repertoire figures cree : ", paths$figures_dir)
     }
-    root <- path.expand(as.character(SNT_ROOT_PATH)[1])
-    .report_nb_assign("SNT_ROOT_PATH", root)
-    .report_nb_assign("CODE_PATH", file.path(root, "code"))
-    .report_nb_assign("CONFIG_PATH", file.path(root, "configuration"))
-    .report_nb_assign("PIPELINE_PATH", file.path(root, "pipelines", "snt_dhis2_formatting"))
-    .report_nb_assign("REPORTING_NB_PATH", file.path(root, "pipelines/snt_dhis2_formatting/reporting"))
-    fig_dir <- file.path(REPORTING_NB_PATH, "outputs", "figures")
-    .report_nb_assign("figures_dir", fig_dir)
-    if (!dir.exists(fig_dir)) {
-        dir.create(fig_dir, recursive = TRUE)
-        message("Répertoire figures créé : ", fig_dir)
+    if (!dir.exists(paths$CODE_PATH)) {
+        stop("CODE_PATH introuvable : ", paths$CODE_PATH, " — verifier SNT_ROOT_PATH.")
     }
-    if (!exists("REPORT_MAX_YEARS", inherits = TRUE) || length(REPORT_MAX_YEARS) == 0L ||
-        is.na(REPORT_MAX_YEARS)) {
-        .report_nb_assign("REPORT_MAX_YEARS", 10L)
-    }
-    if (Sys.getenv("SNT_REPORT_PLOT_MAX_ROWS", unset = "") == "") {
-        Sys.setenv(SNT_REPORT_PLOT_MAX_ROWS = "1000000")
-    }
-    if (!dir.exists(CODE_PATH)) {
-        stop("CODE_PATH introuvable : ", CODE_PATH, " — vérifier SNT_ROOT_PATH.")
-    }
-    rep_r <- file.path(PIPELINE_PATH, "utils", "snt_dhis2_formatting_report.r")
+    rep_r <- file.path(paths$PIPELINE_PATH, "utils", "snt_dhis2_formatting_report.r")
     if (!file.exists(rep_r)) {
         stop("Fichier requis introuvable : ", rep_r)
     }
-    fmt_r <- file.path(PIPELINE_PATH, "utils", "snt_dhis2_formatting.r")
+    fmt_r <- file.path(paths$PIPELINE_PATH, "utils", "snt_dhis2_formatting.r")
     if (!file.exists(fmt_r)) {
         stop("Fichier requis introuvable : ", fmt_r)
     }
-    invisible(list(
-        SNT_ROOT_PATH = root,
-        CODE_PATH = CODE_PATH,
-        CONFIG_PATH = CONFIG_PATH,
-        PIPELINE_PATH = PIPELINE_PATH,
-        REPORTING_NB_PATH = REPORTING_NB_PATH,
-        figures_dir = fig_dir
-    ))
+    paths
 }
 
 
-# Source `snt_utils`, paquets, pipeline `snt_dhis2_formatting.r` (ne re-source pas ce fichier).
-formatting_report_source_core_and_helpers <- function(
-    required_packages = c(
-        "dplyr", "tidyr", "ggplot2", "forcats", "lubridate", "stringr", "purrr", "rlang",
-        "scales", "arrow", "sf", "reticulate", "patchwork",
-        "jsonlite", "httr", "IRdisplay"
-    )) {
-    source(file.path(CODE_PATH, "snt_utils.r"))
-    install_and_load(required_packages)
-    source(file.path(PIPELINE_PATH, "utils", "snt_dhis2_formatting.r"))
-    invisible(TRUE)
-}
-
-
-# Reticulate + OpenHEXA (environnement exécution notebook).
-formatting_report_openhexa_sdk <- function() {
-    Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
-    Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    reticulate::py_config()$python
-    .report_nb_assign("openhexa", reticulate::import("openhexa.sdk"))
-    invisible(openhexa)
-}
-
-
-# Charge `SNT_config.json` dans `config_json`.
-formatting_report_read_snt_config <- function() {
-    cfg <- tryCatch(
-        jsonlite::fromJSON(file.path(CONFIG_PATH, "SNT_config.json")),
+formatting_report_read_snt_config <- function(config_path) {
+    tryCatch(
+        jsonlite::fromJSON(file.path(config_path, "SNT_config.json")),
         error = function(e) {
             stop("Erreur chargement configuration : ", conditionMessage(e))
         }
     )
-    .report_nb_assign("config_json", cfg)
-    invisible(cfg)
 }
 
 
-# Identifiants rapport (dont `COUNTRY_CODE_CHR` pour NER / comparaisons).
-formatting_report_assign_ids_from_config <- function() {
-    if (!exists("config_json", inherits = TRUE)) {
-        stop("Exécuter formatting_report_read_snt_config() avant formatting_report_assign_ids_from_config().")
-    }
-    .report_nb_assign("dataset_name", config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED)
-    .report_nb_assign("COUNTRY_CODE", config_json$SNT_CONFIG$COUNTRY_CODE)
-    .report_nb_assign("COUNTRY_NAME", config_json$SNT_CONFIG$COUNTRY_NAME)
-    .report_nb_assign("ADM_2", toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2))
-    .report_nb_assign("COUNTRY_CODE_CHR", toupper(as.character(config_json$SNT_CONFIG$COUNTRY_CODE)[1]))
-    invisible(TRUE)
+formatting_report_assign_ids_from_config <- function(config_json) {
+    list(
+        dataset_name = config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED,
+        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
+        COUNTRY_NAME = config_json$SNT_CONFIG$COUNTRY_NAME,
+        ADM_2 = toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2),
+        COUNTRY_CODE_CHR = toupper(as.character(config_json$SNT_CONFIG$COUNTRY_CODE)[1])
+    )
 }
 
 
-# Défauts Papermill si paramètres absents (fenêtre mois, plafonds, etc.).
-formatting_report_apply_streamlined_defaults <- function() {
-    if (!exists("REPORT_PLOT_MONTHS", inherits = TRUE)) {
-        .report_nb_assign("REPORT_PLOT_MONTHS", 36L)
+# Bootstrap unique du report (paths + packages + SDK + config + IDs).
+snt_setup_report <- function(
+    snt_root_path = "~/workspace",
+    report_max_years = .report_param_or_default("REPORT_MAX_YEARS", 10L),
+    report_plot_months = .report_param_or_default("REPORT_PLOT_MONTHS", 36L),
+    report_max_indicators = .report_param_or_default("REPORT_MAX_INDICATORS", 40L),
+    report_pop_scatter_max_rows = .report_param_or_default("REPORT_POP_SCATTER_MAX_ROWS", 4000L),
+    report_shape_simplify_tol = .report_param_or_default("REPORT_SHAPE_SIMPLIFY_TOL", 0.002),
+    report_fig_dpi = .report_param_or_default("REPORT_FIG_DPI", 120L),
+    required_packages = c(
+        "dplyr", "tidyr", "ggplot2", "forcats", "lubridate", "stringr", "purrr", "rlang",
+        "scales", "arrow", "sf", "reticulate", "patchwork", "jsonlite", "httr", "IRdisplay"
+    )
+) {
+    paths <- formatting_report_build_paths(snt_root_path)
+    source(file.path(paths$CODE_PATH, "snt_utils.r"))
+    source(file.path(paths$PIPELINE_PATH, "utils", "snt_dhis2_formatting.r"))
+    get_setup_variables(
+        SNT_ROOT_PATH = paths$SNT_ROOT_PATH,
+        packages = required_packages
+    )
+    if (Sys.getenv("SNT_REPORT_PLOT_MAX_ROWS", unset = "") == "") {
+        Sys.setenv(SNT_REPORT_PLOT_MAX_ROWS = "800000")
     }
-    if (!exists("REPORT_MAX_INDICATORS", inherits = TRUE)) {
-        .report_nb_assign("REPORT_MAX_INDICATORS", 40L)
+    config_json <- formatting_report_read_snt_config(paths$CONFIG_PATH)
+    ids <- formatting_report_assign_ids_from_config(config_json)
+    sdk_available <- exists("openhexa", inherits = TRUE) && !is.null(get("openhexa", inherits = TRUE))
+    if (!sdk_available) {
+        warning("OpenHEXA SDK is not loaded or available.")
     }
-    if (!exists("REPORT_POP_SCATTER_MAX_ROWS", inherits = TRUE)) {
-        .report_nb_assign("REPORT_POP_SCATTER_MAX_ROWS", 4000L)
-    }
-    if (!exists("REPORT_SHAPE_SIMPLIFY_TOL", inherits = TRUE)) {
-        .report_nb_assign("REPORT_SHAPE_SIMPLIFY_TOL", 0.002)
-    }
-    if (!exists("REPORT_FIG_DPI", inherits = TRUE)) {
-        .report_nb_assign("REPORT_FIG_DPI", 120L)
-    }
-    Sys.setenv(SNT_REPORT_PLOT_MAX_ROWS = "800000")
-    invisible(TRUE)
+    c(
+        paths,
+        list(
+            REPORT_MAX_YEARS = suppressWarnings(as.integer(report_max_years)[1]),
+            REPORT_PLOT_MONTHS = suppressWarnings(as.integer(report_plot_months)[1]),
+            REPORT_MAX_INDICATORS = suppressWarnings(as.integer(report_max_indicators)[1]),
+            REPORT_POP_SCATTER_MAX_ROWS = suppressWarnings(as.integer(report_pop_scatter_max_rows)[1]),
+            REPORT_SHAPE_SIMPLIFY_TOL = suppressWarnings(as.numeric(report_shape_simplify_tol)[1]),
+            REPORT_FIG_DPI = suppressWarnings(as.integer(report_fig_dpi)[1]),
+            config_json = config_json,
+            openhexa_available = sdk_available
+        ),
+        ids
+    )
 }
 
 
-# Simplifie `shapes_data` en place (utilise `REPORT_SHAPE_SIMPLIFY_TOL`).
-formatting_report_simplify_shapes_inplace <- function() {
-    if (!exists("shapes_data", inherits = TRUE) || is.null(shapes_data)) {
-        return(invisible(NULL))
+# Chargement dataset report (copie locale pour garder ce module autonome).
+formatting_report_load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
+    if (!exists("openhexa", inherits = TRUE) || is.null(get("openhexa", inherits = TRUE))) {
+        stop("OpenHEXA SDK is not loaded or available.")
     }
-    tol <- suppressWarnings(as.numeric(REPORT_SHAPE_SIMPLIFY_TOL)[1])
+    data <- tryCatch(
+        get_latest_dataset_file_in_memory(dataset_id, filename),
+        error = function(e) {
+            stop("Error while loading ", filename, " from dataset ", dataset_id, ".")
+        }
+    )
+    if (isTRUE(verbose) && exists("log_msg", mode = "function", inherits = TRUE)) {
+        log_msg(
+            paste0(
+                filename, " data loaded from dataset: ", dataset_id,
+                " dataframe dimensions: [", paste(dim(data), collapse = ", "), "]"
+            )
+        )
+    }
+    data
+}
+
+
+# Simplifie les shapes et retourne l'objet transforme.
+formatting_report_simplify_shapes <- function(shapes_data, simplify_tol = 0.002) {
+    if (is.null(shapes_data)) {
+        return(NULL)
+    }
+    tol <- suppressWarnings(as.numeric(simplify_tol)[1])
     if (!is.finite(tol)) {
         tol <- 0.002
     }
-    out <- tryCatch(
+    tryCatch(
         sf::st_simplify(shapes_data, dTolerance = tol, preserveTopology = TRUE),
         error = function(e) shapes_data
     )
-    .report_nb_assign("shapes_data", out)
-    invisible(out)
 }
 
 
-# Routine parquet + filtre années + printdim.
-formatting_report_load_routine_data <- function() {
-    if (!exists("openhexa", inherits = TRUE)) {
-        stop("Exécuter formatting_report_openhexa_sdk() avant le chargement des données.")
-    }
-    routine_data <- tryCatch(
-        get_latest_dataset_file_in_memory(dataset_name, paste0(COUNTRY_CODE, "_routine.parquet")),
-        error = function(e) {
-            stop(
-                "[WARNING] Erreur chargement routine DHIS2 pour ", COUNTRY_CODE,
-                " — le rapport ne peut pas s'exécuter. ", conditionMessage(e)
-            )
-        }
+# Routine parquet + filtre annees + printdim.
+formatting_report_load_routine_data <- function(setup) {
+    routine_data <- formatting_report_load_dataset_file(
+        setup$dataset_name,
+        paste0(setup$COUNTRY_CODE, "_routine.parquet"),
+        verbose = TRUE
     )
-    if (exists("REPORT_MAX_YEARS", inherits = TRUE) && !is.na(REPORT_MAX_YEARS) && REPORT_MAX_YEARS > 0L) {
+    max_years <- suppressWarnings(as.integer(setup$REPORT_MAX_YEARS)[1])
+    if (is.finite(max_years) && max_years > 0L && "YEAR" %in% names(routine_data)) {
         y_end <- suppressWarnings(max(as.numeric(routine_data$YEAR), na.rm = TRUE))
         routine_data <- dplyr::filter(
             routine_data,
-            suppressWarnings(as.numeric(YEAR)) > y_end - REPORT_MAX_YEARS
+            suppressWarnings(as.numeric(YEAR)) > y_end - max_years
         )
     }
-    .report_nb_assign("routine_data", routine_data)
     printdim(routine_data)
-    invisible(routine_data)
+    routine_data
 }
 
 
 # Population parquet (optionnel) + printdim.
-formatting_report_load_population_data <- function() {
-    if (!exists("openhexa", inherits = TRUE)) {
-        stop("Exécuter formatting_report_openhexa_sdk() avant le chargement des données.")
-    }
+formatting_report_load_population_data <- function(setup) {
     population_data <- tryCatch(
-        get_latest_dataset_file_in_memory(dataset_name, paste0(COUNTRY_CODE, "_population.parquet")),
+        formatting_report_load_dataset_file(
+            setup$dataset_name,
+            paste0(setup$COUNTRY_CODE, "_population.parquet"),
+            verbose = TRUE
+        ),
         error = function(e) {
-            log_msg(
-                paste0(COUNTRY_NAME, " — population indisponible dans le dataset ", dataset_name, " : ", conditionMessage(e)),
-                "warning"
-            )
+            if (exists("log_msg", mode = "function", inherits = TRUE)) {
+                log_msg(
+                    paste0(
+                        setup$COUNTRY_NAME,
+                        " — population indisponible dans le dataset ",
+                        setup$dataset_name, " : ", conditionMessage(e)
+                    ),
+                    "warning"
+                )
+            }
             NULL
         }
     )
-    .report_nb_assign("population_data", population_data)
     printdim(population_data)
-    invisible(population_data)
+    population_data
 }
 
 
 # Shapes geojson (optionnel) + printdim.
-formatting_report_load_shapes_data <- function() {
-    if (!exists("openhexa", inherits = TRUE)) {
-        stop("Exécuter formatting_report_openhexa_sdk() avant le chargement des données.")
-    }
+formatting_report_load_shapes_data <- function(setup) {
     shapes_data <- tryCatch(
-        get_latest_dataset_file_in_memory(dataset_name, paste0(COUNTRY_CODE, "_shapes.geojson")),
+        formatting_report_load_dataset_file(
+            setup$dataset_name,
+            paste0(setup$COUNTRY_CODE, "_shapes.geojson"),
+            verbose = TRUE
+        ),
         error = function(e) {
-            log_msg(
-                paste0(COUNTRY_NAME, " — shapes indisponibles dans le dataset ", dataset_name, " : ", conditionMessage(e)),
-                "warning"
-            )
+            if (exists("log_msg", mode = "function", inherits = TRUE)) {
+                log_msg(
+                    paste0(
+                        setup$COUNTRY_NAME,
+                        " — shapes indisponibles dans le dataset ",
+                        setup$dataset_name, " : ", conditionMessage(e)
+                    ),
+                    "warning"
+                )
+            }
             NULL
         }
     )
-    .report_nb_assign("shapes_data", shapes_data)
     printdim(shapes_data)
-    invisible(shapes_data)
+    shapes_data
 }

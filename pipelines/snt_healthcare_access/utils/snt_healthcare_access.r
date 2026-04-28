@@ -20,8 +20,10 @@ bootstrap_healthcare_access_context <- function(
     data_path <- file.path(root_path, "data")
     output_data_path <- file.path(data_path, "healthcare_access")
     output_plots_path <- file.path(root_path, "pipelines", "snt_healthcare_access", "reporting", "outputs")
+    intermediate_results_path <- file.path(output_data_path, "intermediate_results")
     dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(output_plots_path, recursive = TRUE, showWarnings = FALSE)
+    dir.create(intermediate_results_path, recursive = TRUE, showWarnings = FALSE)
 
     source(file.path(code_path, "snt_utils.r"))
     install_and_load(required_packages)
@@ -41,6 +43,7 @@ bootstrap_healthcare_access_context <- function(
         DATA_PATH = data_path,
         OUTPUT_DATA_PATH = output_data_path,
         OUTPUT_PLOTS_PATH = output_plots_path,
+        INTERMEDIATE_RESULTS_PATH = intermediate_results_path,
         openhexa = openhexa
     )
 }

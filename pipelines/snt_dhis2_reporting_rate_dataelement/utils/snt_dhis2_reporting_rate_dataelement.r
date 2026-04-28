@@ -1,11 +1,8 @@
 # Load base utils
-# Bootstrap matches `snt_dhis2_population_transformation`: fixed-path `source()` of this
-# file, `snt_environment <- get_setup_variables()`, then `load_snt_config()`.
-# Keep helpers small and reusable; pipeline-specific assignments stay in notebooks.
 source(file.path("~/workspace/code", "snt_utils.r"))
 
 
-# JSON reader for this pipeline only (`snt_utils.r` must stay untouched per project rules).
+# JSON reader for this pipeline.
 read_workspace_json_file <- function(json_path, resource_label = "JSON file") {
     json_path <- as.character(json_path)[[1L]]
     tryCatch(
@@ -125,15 +122,21 @@ configure_conda_r_spatial_env <- function() {
 }
 
 
-#' Fail if Papermill did not inject `ROUTINE_FILE` and `DATASET_ID`.
+#' Fail if Papermill did not inject the required pipeline parameters.
 assert_papermill_dataelement_params <- function() {
-    required_pm <- c("ROUTINE_FILE", "DATASET_ID")
+    required_pm <- c(
+        "ROUTINE_FILE",
+        "DATASET_ID",
+        "DATAELEMENT_METHOD_DENOMINATOR",
+        "ACTIVITY_INDICATORS",
+        "VOLUME_ACTIVITY_INDICATORS",
+        "USE_WEIGHTED_REPORTING_RATES"
+    )
     missing_pm <- required_pm[!vapply(required_pm, exists, logical(1), inherits = TRUE)]
     if (length(missing_pm) > 0) {
         stop(
             "[ERROR] Missing pipeline parameters (Papermill): ",
-            paste(missing_pm, collapse = ", "),
-            ". Expected only ROUTINE_FILE and DATASET_ID from `snt_dhis2_reporting_rate_dataelement`."
+            paste(missing_pm, collapse = ", ")
         )
     }
 }

@@ -1,9 +1,8 @@
 # Load base utils
-# Keep helpers small and reusable; pipeline-specific assignments stay in notebook code.
 source(file.path("~/workspace/code", "snt_utils.r"))
 
 
-# JSON reader for this pipeline only (`snt_utils.r` unchanged).
+# JSON reader for this pipeline.
 read_workspace_json_file <- function(json_path, resource_label = "JSON file") {
     json_path <- as.character(json_path)[[1L]]
     tryCatch(
@@ -27,8 +26,7 @@ read_workspace_json_file <- function(json_path, resource_label = "JSON file") {
 #'
 #' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
 #' @param packages Character vector. R packages to install and load.
-#' @return List with `paths_to_check` (CONFIG_PATH, UPLOADS_PATH, DATA_PATH) and the
-#'   same three paths at the top level for backward compatibility (`setup$CONFIG_PATH`, …).
+#' @return List with `paths_to_check`, `CONFIG_PATH`, `UPLOADS_PATH`, and `DATA_PATH`.
 #'
 #' @export
 get_setup_variables <- function(
@@ -82,8 +80,7 @@ stop_if_dataset_reporting_papermill_params_missing <- function() {
     if (length(missing) > 0) {
         stop(
             "[ERROR] Missing pipeline parameters (Papermill): ",
-            paste(missing, collapse = ", "),
-            ". Expected only ROUTINE_FILE and DATASET_ID from `snt_dhis2_reporting_rate_dataset`."
+            paste(missing, collapse = ", ")
         )
     }
 }

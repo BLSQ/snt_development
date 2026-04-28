@@ -1,19 +1,18 @@
-# Quality of Care **reporting** helpers (used by the reporting notebook).
-
-source(
-    file.path(
-        "~/workspace",
-        "pipelines",
-        "snt_dhis2_quality_of_care",
-        "utils",
-        "snt_dhis2_quality_of_care.r"
-    )
-)
+# Load pipeline helpers (common + code-specific functions).
+source(file.path("~/workspace", "pipelines", "snt_dhis2_quality_of_care", "utils", "snt_dhis2_quality_of_care.r"))
 
 
 #' Load latest Quality of Care district-year output.
+#'
+#' @param output_data_path Path to quality-of-care data outputs.
+#' @param country_code Country code.
+#' @return Named list with `qoc` (data table) and `latest_file` (path).
 load_latest_quality_of_care_output <- function(output_data_path, country_code) {
-    files <- list.files(output_data_path, pattern = paste0("^", country_code, "_quality_of_care_district_year_(imputed|removed)\\.parquet$"), full.names = TRUE)
+    files <- list.files(
+        output_data_path,
+        pattern = paste0("^", country_code, "_quality_of_care_district_year_(imputed|removed)\\.parquet$"),
+        full.names = TRUE
+    )
     if (length(files) == 0) {
         stop(glue::glue("[ERROR] No quality_of_care parquet found in {output_data_path}"))
     }
@@ -24,37 +23,53 @@ load_latest_quality_of_care_output <- function(output_data_path, country_code) {
 
 
 #' Build year-level Quality of Care summary table.
+#'
+#' @param qoc_dt Quality-of-care district-year data table.
+#' @return Year-level summary table ordered by YEAR.
 build_quality_of_care_summary <- function(qoc_dt) {
+    mean_cols <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths")
+    sum_cols  <- c("non_malaria_all_cause_outpatients", "presumed_cases")
+
     summary_tbl <- unique(qoc_dt[, .(YEAR)])
 
-    if ("testing_rate" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(testing_rate = mean(testing_rate, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("treatment_rate" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(treatment_rate = mean(treatment_rate, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("case_fatality_rate" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(case_fatality_rate = mean(case_fatality_rate, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("prop_adm_malaria" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(prop_adm_malaria = mean(prop_adm_malaria, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("prop_malaria_deaths" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(prop_malaria_deaths = mean(prop_malaria_deaths, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("non_malaria_all_cause_outpatients" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(non_malaria_all_cause_outpatients = sum(non_malaria_all_cause_outpatients, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
-    if ("presumed_cases" %in% names(qoc_dt)) summary_tbl <- merge(summary_tbl, qoc_dt[, .(presumed_cases = sum(presumed_cases, na.rm = TRUE)), by = .(YEAR)], by = "YEAR", all.x = TRUE)
+    for (col in intersect(mean_cols, names(qoc_dt))) {
+        agg <- qoc_dt[, setNames(list(mean(get(col), na.rm = TRUE)), col), by = .(YEAR)]
+        summary_tbl <- merge(summary_tbl, agg, by = "YEAR", all.x = TRUE)
+    }
+
+    for (col in intersect(sum_cols, names(qoc_dt))) {
+        agg <- qoc_dt[, setNames(list(sum(get(col), na.rm = TRUE)), col), by = .(YEAR)]
+        summary_tbl <- merge(summary_tbl, agg, by = "YEAR", all.x = TRUE)
+    }
 
     summary_tbl[order(YEAR)]
 }
 
 
-#' Save year-level summary outputs for report consumption.
+#' Save year-level summary outputs (parquet and csv only; no Excel — avoids extra deps).
+#'
+#' @param summary_tbl Summary table.
+#' @param report_outputs_path Reporting outputs folder.
+#' @param country_code Country code.
+#' @return Named list with `summary_parquet` and `summary_csv` paths.
 save_quality_of_care_summary_outputs <- function(summary_tbl, report_outputs_path, country_code) {
     summary_parquet <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.parquet"))
-    summary_csv <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.csv"))
-    summary_xlsx <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.xlsx"))
+    summary_csv     <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.csv"))
 
     arrow::write_parquet(summary_tbl, summary_parquet)
     data.table::fwrite(summary_tbl, summary_csv)
-    writexl::write_xlsx(list(summary = as.data.frame(summary_tbl)), summary_xlsx)
 
-    log_msg(glue::glue("Summary data saved to: {summary_parquet}, {summary_csv}, {summary_xlsx}"))
-    list(summary_parquet = summary_parquet, summary_csv = summary_csv, summary_xlsx = summary_xlsx)
+    log_msg(glue::glue("Summary data saved to: {summary_parquet}, {summary_csv}"))
+    list(summary_parquet = summary_parquet, summary_csv = summary_csv)
 }
 
 
 #' Build and save year-level bar chart panel for QoC indicators.
+#'
+#' @param summary_tbl Year-level summary table.
+#' @param figures_path Folder where the combined chart is saved.
+#' @param country_code Country code used in output file name.
+#' @return Path to saved chart, or NULL if no indicator columns are available.
 save_quality_of_care_summary_charts <- function(summary_tbl, figures_path, country_code) {
     plot_data <- data.table::copy(summary_tbl)
     if (nrow(plot_data) == 0) return(NULL)

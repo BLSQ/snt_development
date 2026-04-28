@@ -55,6 +55,17 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
                 "snt_dhs_mortality_computation.ipynb",
                 "snt_dhs_prevalence_computation.ipynb",
                 "snt_dhs_vaccination_computation.ipynb",
+                "utils/snt_dhs_indicator_tables.r",
+                "utils/snt_dhs_careseeking_computation.r",
+                "utils/snt_dhs_bednets_computation.r",
+                "utils/snt_dhs_prevalence_computation.r",
+                "utils/snt_dhs_mortality_computation.r",
+                "utils/snt_dhs_vaccination_computation.r",
+                "utils/snt_dhs_bednets_report.r",
+                "utils/snt_dhs_careseeking_report.r",
+                "utils/snt_dhs_prevalence_report.r",
+                "utils/snt_dhs_mortality_report.r",
+                "utils/snt_dhs_vaccination_report.r",
             ],
         )
 
@@ -223,6 +234,7 @@ def run_dhs_indicator_notebooks(
         computation_notebook_name (str): Filename of the computation notebook.
         reporting_notebook_name (str): Filename of the reporting notebook.
         run_report_only (bool): If True, only the reporting notebook will be executed.
+        country_code (str | None): Country code used for notebook execution context.
 
     """
     computation_notebook_path = pipeline_root_path / "code" / computation_notebook_name

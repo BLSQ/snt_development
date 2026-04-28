@@ -31,7 +31,8 @@ from snt_lib.snt_pipeline_utils import (
     "activity_indicators",
     name="Facility Activity indicators",
     help="Define which data elements will be used to determine the activity of a facility."
-    " A facility is considered 'active' if at least one of these indicators has a non-missing value greater than zero.",
+    " A facility is considered 'active' if at least one of these indicators has a non-missing value"
+    " greater than zero.",
     multiple=True,
     choices=["CONF", "SUSP", "TEST", "PRES"],
     type=str,
@@ -119,6 +120,11 @@ def snt_dhis2_reporting_rate_dataelement(
         routine_file = resolve_routine_filename(
             country_code=country_code, routine_data_choice=routine_data_choice
         )
+        if routine_data_choice == "raw":
+            ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+        else:
+            ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+
         nb_parameters = {
             "SNT_ROOT_PATH": root_path.as_posix(),
             "ROUTINE_FILE": routine_file,
@@ -126,6 +132,7 @@ def snt_dhis2_reporting_rate_dataelement(
             "ACTIVITY_INDICATORS": activity_indicators,
             "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
             "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
+            "DATASET_ID": ds_outliers_id,
         }
         parameters_file = save_pipeline_parameters(
             pipeline_name="snt_dhis2_reporting_rate_dataelement",
@@ -136,11 +143,6 @@ def snt_dhis2_reporting_rate_dataelement(
         current_run.log_info(f"Saved pipeline parameters to {parameters_file}")
 
         if not run_report_only:
-            if routine_data_choice == "raw":
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-            else:
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
-
             # Check the file exists in the dataset
             if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
                 current_run.log_warning(
@@ -171,7 +173,6 @@ def snt_dhis2_reporting_rate_dataelement(
         else:
             current_run.log_info("Skipping calculations, running only the reporting.")
 
-        # Compatible with snt_lib (snt_utils): do not pass nb_parameters
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_dataelement_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
@@ -187,7 +188,14 @@ def snt_dhis2_reporting_rate_dataelement(
 
 
 def resolve_routine_filename(country_code: str, routine_data_choice: str) -> str:
-    """Returns the canonical routine filename for a routine data choice."""
+    """Return the canonical routine Parquet filename for a routine data choice.
+
+    Returns:
+        Filename string (e.g. ``{country_code}_routine_outliers_imputed.parquet``).
+
+    Raises:
+        ValueError: If ``routine_data_choice`` is not one of the supported values.
+    """
     if routine_data_choice == "raw":
         return f"{country_code}_routine.parquet"
 

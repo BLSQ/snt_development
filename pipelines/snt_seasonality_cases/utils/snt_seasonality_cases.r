@@ -18,8 +18,10 @@ bootstrap_seasonality_cases_context <- function(
     code_path <- file.path(root_path, "code")
     config_path <- file.path(root_path, "configuration")
     output_data_path <- file.path(root_path, "data", "seasonality_cases")
+    output_plots_path <- file.path(root_path, "pipelines", "snt_seasonality_cases", "reporting", "outputs", "figures")
     intermediate_results_path <- file.path(output_data_path, "intermediate_results")
     dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
+    dir.create(output_plots_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(intermediate_results_path, recursive = TRUE, showWarnings = FALSE)
 
     source(file.path(code_path, "snt_utils.r"))
@@ -40,6 +42,7 @@ bootstrap_seasonality_cases_context <- function(
         CODE_PATH = code_path,
         CONFIG_PATH = config_path,
         OUTPUT_DATA_PATH = output_data_path,
+        OUTPUT_PLOTS_PATH = output_plots_path,
         INTERMEDIATE_RESULTS_PATH = intermediate_results_path,
         openhexa = openhexa
     )

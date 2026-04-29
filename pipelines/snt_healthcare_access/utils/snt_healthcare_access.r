@@ -19,11 +19,9 @@ bootstrap_healthcare_access_context <- function(
     config_path <- file.path(root_path, "configuration")
     data_path <- file.path(root_path, "data")
     output_data_path <- file.path(data_path, "healthcare_access")
-    outputs_path <- file.path(root_path, "pipelines", "snt_healthcare_access", "reporting", "outputs")
-    output_plots_path <- file.path(outputs_path, "figures")
+    output_plots_path <- file.path(root_path, "pipelines", "snt_healthcare_access", "reporting", "outputs", "figures")
     intermediate_results_path <- file.path(output_data_path, "intermediate_results")
     dir.create(output_data_path, recursive = TRUE, showWarnings = FALSE)
-    dir.create(outputs_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(output_plots_path, recursive = TRUE, showWarnings = FALSE)
     dir.create(intermediate_results_path, recursive = TRUE, showWarnings = FALSE)
 
@@ -44,7 +42,6 @@ bootstrap_healthcare_access_context <- function(
         CONFIG_PATH = config_path,
         DATA_PATH = data_path,
         OUTPUT_DATA_PATH = output_data_path,
-        OUTPUTS_PATH = outputs_path,
         OUTPUT_PLOTS_PATH = output_plots_path,
         INTERMEDIATE_RESULTS_PATH = intermediate_results_path,
         openhexa = openhexa

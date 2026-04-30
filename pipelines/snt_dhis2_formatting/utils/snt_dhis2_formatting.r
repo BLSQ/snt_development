@@ -4,20 +4,18 @@
 source(file.path("~/workspace/code", "snt_utils.r"))   
 
 
-#' Get Setup Variables for SNT Workspace
-#' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
+#' SNT workspace setup (paths, packages, OpenHEXA SDK)
 #'
 #' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
 #' @param packages Character vector. R packages to install and load.
 #' @return List with SNT paths.
 #'
 #' @export
-get_setup_variables <- function(
+snt_setup <- function(
     SNT_ROOT_PATH='~/workspace', 
     packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
 ) {
         
-    # List required pcks
     required_packages <- unique(c(packages, "reticulate"))
     install_and_load(required_packages)
 
@@ -44,6 +42,9 @@ get_setup_variables <- function(
     
     return(paths_to_check)
 }
+
+# Alias (older name in notebooks / docs)
+get_setup_variables <- snt_setup
 
 
 #' Load SNT Configuration File
@@ -74,16 +75,21 @@ load_snt_config <- function(snt_config_path) {
 #' @return Dataframe containing the loaded data.
 #'
 #' @export
-load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
-    data <- tryCatch({ 
-            get_latest_dataset_file_in_memory(dataset_id, filename) 
-        }, error = function(e) {
+load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
+    if (!exists("openhexa", inherits = TRUE) || is.null(get("openhexa", inherits = TRUE))) {
+        stop("OpenHEXA SDK is not loaded or available.")
+    }
+    data <- tryCatch(
+        {
+            get_latest_dataset_file_in_memory(dataset_id, filename)
+        },
+        error = function(e) {
             stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
-    })
-
-    if (verbose) {        
+        }
+    )
+    if (verbose) {
         log_msg(glue::glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
-    }    
+    }
     return(data)
 }
 
@@ -312,7 +318,6 @@ merge_and_format_routine_data <- function(data, metadata, indicator_definitions)
 #'   (default: 4326 for WGS84).
 #'
 #' @return An sf object with the GEOMETRY column converted to sfc geometry.
-#'   Invalid or NA geometries are replaced with empty geometry collections.
 #'
 #' @export
 geojson_to_sf <- function(data, geom_col = "GEOMETRY", crs = 4326) {
@@ -327,24 +332,21 @@ geojson_to_sf <- function(data, geom_col = "GEOMETRY", crs = 4326) {
     # Use the matched column
     geom_col <- geom_col_match[1]
     
+    if (any(is.na(data[[geom_col]]) | !nzchar(as.character(data[[geom_col]])))) {
+        stop(paste0("Error: Column '", geom_col, "' contains missing GeoJSON values"))
+    }
+
     # Convert GeoJSON strings to sfg objects
     geometry_sfc <- lapply(data[[geom_col]], function(g) {
-        if (is.na(g) || is.null(g)) return(sf::st_geometrycollection())
-        tryCatch({
-          geo <- geojsonsf::geojson_sfc(g)
-          geo[[1]]  # extract sfg
-        }, error = function(e) {
-          sf::st_geometrycollection()  # return empty but valid geometry
-        })
+        geo <- geojsonsf::geojson_sfc(g)
+        geo[[1]]
     })
     
     # Convert to sfc
     geometry_sfc <- sf::st_sfc(geometry_sfc, crs = crs)
     
-    # Create sf object (exclude original geometry column)
     cols_to_keep <- setdiff(names(data), geom_col)
     data_no_geom <- data[, cols_to_keep, drop = FALSE]
-    # data_no_geom <- data[, !names(data) %in% geom_col, drop = FALSE]
     shapes_sf <- sf::st_sf(data_no_geom, geometry = geometry_sfc)
     
     return(shapes_sf)
@@ -700,59 +702,22 @@ extract_geo_coords <- function(geom_json) {
 }
 
 
-#' Safely Read GeoJSON File
+#' Read GeoJSON File
 #'
-#' @description Reads a GeoJSON file from a specified path with built-in error handling. 
-#' Checks if the file exists and catches parsing errors if the file is corrupted.
+#' @description Reads a GeoJSON file from a specified path.
 #'
 #' @param file_path A character string specifying the full path to the GeoJSON file.
 #'
-#' @return A spatial dataframe (sf object) if successful, or NULL if the process fails.
+#' @return A spatial dataframe (sf object).
 #' @export
 read_geojson_safe <- function(file_path) {
-  
-    # 1. Check if the file exists in the folder
     if (!file.exists(file_path)) {
-        # If you have a custom log_msg function from earlier, you can swap 'message' for it!
-        log_msg(glue("File does not exist at the specified path: {file_path}"), "error")
-        return(NULL)
+        stop(glue("GeoJSON file does not exist: {file_path}"))
     }
-    
-    # 2. Try to read the file and catch corruption/parsing errors
-    geo_data <- tryCatch({ sf::read_sf(file_path, quiet = TRUE)}, 
-        error = function(e) {
-            log_msg(glue("Failed to parse the GeoJSON file. It may be corrupted. R says: {e$message}"), "error")
-            return(NULL)
-        })
-    
-    return(geo_data)
+    sf::read_sf(file_path, quiet = TRUE)
 }
 
 
-#' Safely Read GeoJSON File
-#'
-#' @description Reads a GeoJSON file from a specified path with built-in error handling. 
-#' Checks if the file exists and catches parsing errors if the file is corrupted.
-#' 
-#' @details This function wraps \code{sf::read_sf()} inside a \code{tryCatch} block. 
-#' It is particularly useful in automated data pipelines where missing or corrupted 
-#' geographic files should be logged but shouldn't crash the entire script.
-#'
-#' @param file_path A character string specifying the full path to the GeoJSON file.
-#'
-#' @return A spatial dataframe (\code{sf} object) if successful, or \code{NULL} if the process fails.
-#' 
-#' @examples
-#' \dontrun{
-#'   # Example of a successful read
-#'   my_geo_data <- read_geojson_safe("data/valid_regions.geojson")
-#'   
-#'   # Example of handling a missing file gracefully (returns NULL)
-#'   missing_data <- read_geojson_safe("data/does_not_exist.geojson")
-#' }
-#' 
-#' @importFrom sf read_sf
-#' @importFrom glue glue
 #' @export
 points_within_country_batch <- function(lon_vec, lat_vec, boundary_sf) {
     out <- rep(FALSE, length(lon_vec))
@@ -791,9 +756,8 @@ prepare_country_boundary <- function(country_shapes_sf) {
         stop("[ERROR] Country shapes must be an sf object.")
     }
     
-    # warn the user if the CRS is missing, but don't guess what it is!
     if (is.na(sf::st_crs(country_shapes_sf))) {
-        warning("CRS is missing from the input shapefile. Proceeding without a defined CRS.")
+        stop("[ERROR] CRS is missing from the input shapefile.")
     }
     
     country_boundary <- sf::st_union(sf::st_geometry(country_shapes_sf))
@@ -801,47 +765,6 @@ prepare_country_boundary <- function(country_shapes_sf) {
     # Return as sf object (st_union automatically preserves the original CRS)
     return(sf::st_sf(GEOMETRY = country_boundary))
 }
-
-
-
-fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2) {
-	if (is.na(lon) || is.na(lat)) {
-		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
-	}
-	
-	candidates <- build_coordinate_candidates(lon, lat, max_shift = max_shift)
-	candidate_names <- names(candidates)
-	
-	m <- matrix(NA_real_, nrow = length(candidate_names), ncol = 2)
-	for (j in seq_along(candidate_names)) {
-		cand <- candidates[[candidate_names[j]]]
-		m[j, 1] <- as.numeric(cand[1])
-		m[j, 2] <- as.numeric(cand[2])
-	}
-	
-	earth_ok <- abs(m[, 1]) <= 180 & abs(m[, 2]) <= 90
-	if (!any(earth_ok)) {
-		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
-	}
-	
-	pts <- sf::st_as_sf(
-		data.frame(LONGITUDE = m[earth_ok, 1], LATITUDE = m[earth_ok, 2]),
-		coords = c("LONGITUDE", "LATITUDE"),
-		crs = 4326
-	)
-	
-	inside <- rep(FALSE, nrow(m))
-	inside[earth_ok] <- as.logical(sf::st_within(pts, boundary_sf, sparse = FALSE)[, 1])
-	ok_idx <- which(earth_ok & inside)
-	
-	if (length(ok_idx) == 0) {
-		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "INVALID_NO_MATCH", VALID = FALSE))
-	}
-	
-	j <- min(ok_idx)
-	list(LONGITUDE = m[j, 1], LATITUDE = m[j, 2], METHOD = candidate_names[j], VALID = TRUE)
-}
-
 
 #' Fix Coordinate Pair within Country Boundary
 #'
@@ -860,10 +783,6 @@ fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2)
 #' @importFrom sf st_as_sf st_crs st_transform st_within
 #' @export
 fix_coordinate_pair_in_country <- function(lon, lat, boundary_sf, max_shift = 2) {
-	if (is.na(lon) || is.na(lat)) {
-		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
-	}
-
 	if (is.na(lon) || is.na(lat)) {
 		return(list(LONGITUDE = NA_real_, LATITUDE = NA_real_, METHOD = "MISSING_COORDINATES", VALID = FALSE))
 	}
@@ -996,8 +915,7 @@ plot_fixed_coordinates <- function(fix_results, shapes_sf_boundary) {
   pts_df <- pts_df[!is.na(pts_df$LONGITUDE) & !is.na(pts_df$LATITUDE), ]
   
   if (nrow(pts_df) == 0) {
-    message("No valid coordinates to plot.")
-    return(NULL)
+    stop("No valid coordinates to plot.")
   }
   
   # 3. Convert the regular dataframe into an 'sf' spatial object (assuming standard 4326 CRS)
@@ -1021,4 +939,303 @@ plot_fixed_coordinates <- function(fix_results, shapes_sf_boundary) {
   
   # Return the plot object in case you want to save it later using ggsave()
   invisible(map_plot)
+}
+
+
+#' Write a ggplot to PNG (prefer this over huge objects kept in-session for notebooks).
+save_ggplot_png <- function(plot, path, width, height, dpi = 120L, bg = "white") {
+  ggplot2::ggsave(
+    filename = path,
+    plot = plot,
+    width = width,
+    height = height,
+    dpi = dpi,
+    limitsize = FALSE,
+    bg = bg
+  )
+  invisible(path)
+}
+
+
+#' Show a PNG in IRkernel / Jupyter after [save_ggplot_png] (frees RAM vs holding ggplot).
+display_saved_png <- function(path) {
+  if (!file.exists(path)) {
+    stop("Missing plot file: ", path)
+  }
+  if (requireNamespace("IRdisplay", quietly = TRUE)) {
+    IRdisplay::display_png(file = path)
+  } else {
+    message("Saved plot (install IRdisplay for inline preview): ", path)
+  }
+  invisible(path)
+}
+
+
+normalize_report_plot_mode <- function(m) {
+  m <- tolower(as.character(m)[1])
+  if (!m %in% c("none", "light", "full")) {
+    return("full")
+  }
+  m
+}
+
+
+#' Plot policy for the formatting report: `full`, `light` (smaller PNG / dpi), or `none` (skip figures).
+#'
+#' Set Papermill parameter `SNT_FORMAT_REPORT_PLOTS` or environment variable of the same name.
+#' Env wins when non-empty so CI / OpenHEXA can force `none` without changing the notebook JSON.
+report_plots_mode <- function() {
+  envv <- Sys.getenv("SNT_FORMAT_REPORT_PLOTS", unset = "")
+  if (nzchar(envv)) {
+    return(normalize_report_plot_mode(envv))
+  }
+  if (exists("SNT_FORMAT_REPORT_PLOTS", envir = .GlobalEnv, inherits = FALSE)) {
+    return(normalize_report_plot_mode(get("SNT_FORMAT_REPORT_PLOTS", envir = .GlobalEnv)))
+  }
+  "full"
+}
+
+
+report_plots_skip <- function() {
+  identical(report_plots_mode(), "none")
+}
+
+
+report_plots_light <- function() {
+  identical(report_plots_mode(), "light")
+}
+
+
+#' Like [save_ggplot_png] but honours `SNT_FORMAT_REPORT_PLOTS`.
+save_report_plot_png <- function(plot, path, width, height, dpi = 120L, bg = "white") {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] Figure omise : ", path)
+    return(invisible(NULL))
+  }
+  if (report_plots_light()) {
+    dpi <- max(50L, as.integer(dpi * 0.6))
+    width <- width * 0.65
+    height <- height * 0.65
+  }
+  save_ggplot_png(plot, path, width = width, height = height, dpi = dpi, bg = bg)
+}
+
+
+#' Like [display_saved_png] unless plots are disabled.
+display_report_png <- function(path) {
+  if (report_plots_skip()) {
+    return(invisible(NULL))
+  }
+  display_saved_png(path)
+}
+
+
+#' `print` a ggplot unless plots are disabled (avoids building draw buffers when `none`).
+maybe_print_ggplot <- function(plot, label = "figure") {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] Affichage omis : ", label)
+    return(invisible(NULL))
+  }
+  print(plot)
+}
+
+
+#' Wrapper around [ggplot2::ggsave] for notebook chunks (NER choropleths, etc.).
+save_report_builtin_ggsave <- function(plot, filename, ...) {
+  if (report_plots_skip()) {
+    message("[SNT_FORMAT_REPORT_PLOTS=none] ggsave omis : ", filename)
+    return(invisible(NULL))
+  }
+  args <- list(filename = filename, plot = plot)
+  dots <- list(...)
+  if (report_plots_light()) {
+    if (!is.null(dots$dpi)) {
+      dots$dpi <- max(48L, as.integer(dots$dpi * 0.55))
+    }
+    if (!is.null(dots$width)) {
+      dots$width <- dots$width * 0.65
+    }
+    if (!is.null(dots$height)) {
+      dots$height <- dots$height * 0.65
+    }
+  }
+  do.call(ggplot2::ggsave, c(args, dots))
+}
+
+
+#' Remove named objects if they exist, then run a light [gc].
+rm_if_exists <- function(names, envir = parent.frame()) {
+  names <- unique(as.character(names))
+  found <- names[names %in% ls(envir = envir, all.names = FALSE)]
+  if (length(found)) {
+    rm(list = found, envir = envir)
+  }
+  invisible(gc(verbose = FALSE, full = FALSE))
+}
+
+
+#' Split a character vector (e.g. indicator column names) into chunks of at most `batch_size`.
+chunk_name_vector <- function(x, batch_size = 12L) {
+  batch_size <- max(1L, as.integer(batch_size))
+  x <- as.character(x)
+  n <- length(x)
+  if (n == 0L) {
+    return(list())
+  }
+  brks <- ceiling(seq_len(n) / batch_size)
+  unname(split(x, brks))
+}
+
+
+#' HF completeness for one wide indicator column (no `pivot_longer` over all indicators).
+summarise_completeness_hf_wide_one <- function(data_chunk, indicator_name) {
+  if (!indicator_name %in% names(data_chunk)) {
+    stop("Unknown indicator column: ", indicator_name)
+  }
+  long_one <- dplyr::transmute(
+    data_chunk,
+    OU = .data$OU_ID,
+    DATE = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"),
+    INDICATOR = indicator_name,
+    VALUE = as.numeric(.data[[indicator_name]])
+  )
+  summarise_completeness_hf_long(long_one)
+}
+
+
+#' ADM2 completeness for one wide indicator (no factorial `crossing` over all indicators).
+summarise_completeness_adm2_wide_one <- function(data_chunk, indicator_name) {
+  if (!indicator_name %in% names(data_chunk)) {
+    stop("Unknown indicator column: ", indicator_name)
+  }
+
+  dc <- data_chunk %>%
+    dplyr::mutate(Date = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"))
+
+  U <- dplyr::distinct(dc, .data$ADM2_ID, .data$Date)
+
+  tmp <- dplyr::transmute(
+    dc,
+    ADM2_ID = .data$ADM2_ID,
+    Date = .data$Date,
+    value = as.numeric(.data[[indicator_name]])
+  )
+
+  rolled <- tmp %>%
+    dplyr::group_by(.data$ADM2_ID, .data$Date) %>%
+    dplyr::summarise(
+      is_missing = all(is.na(.data$value)),
+      is_zero = all(.data$value == 0, na.rm = TRUE),
+      is_positive = any(.data$value > 0, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(Indicator = indicator_name)
+
+  full_one <- U %>%
+    dplyr::mutate(Indicator = indicator_name) %>%
+    dplyr::left_join(rolled, by = c("ADM2_ID", "Date", "Indicator")) %>%
+    dplyr::mutate(
+      is_missing = tidyr::replace_na(.data$is_missing, TRUE),
+      is_zero = tidyr::replace_na(.data$is_zero, FALSE),
+      is_positive = tidyr::replace_na(.data$is_positive, FALSE)
+    )
+
+  out <- full_one %>%
+    dplyr::group_by(.data$Indicator, .data$Date) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$ADM2_ID),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero & !.data$is_missing),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+
+  rm(dc, U, tmp, rolled, full_one)
+  invisible(gc(verbose = FALSE, full = FALSE))
+  out
+}
+
+
+#' Summarise HF-level completeness from long routine (OU × INDICATOR × DATE).
+summarise_completeness_hf_long <- function(long_df) {
+  long_df %>%
+    dplyr::mutate(
+      is_missing = is.na(.data$VALUE),
+      is_zero = !is.na(.data$VALUE) & .data$VALUE == 0,
+      is_positive = !is.na(.data$VALUE) & .data$VALUE > 0
+    ) %>%
+    dplyr::group_by(.data$INDICATOR, .data$DATE) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$OU),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+}
+
+
+#' ADM2-level completeness summary for one year-chunk of wide routine data.
+summarise_completeness_adm2_chunk <- function(data_chunk, indicator_cols) {
+  data_chunk <- data_chunk %>%
+    dplyr::mutate(Date = as.Date(paste0(.data$PERIOD, "01"), format = "%Y%m%d"))
+
+  data_long_chunk <- data_chunk %>%
+    dplyr::select(
+      "ADM2_ID", "OU_ID", "Date",
+      tidyselect::all_of(indicator_cols)
+    ) %>%
+    tidyr::pivot_longer(
+      cols = tidyselect::all_of(indicator_cols),
+      names_to = "Indicator",
+      values_to = "value"
+    ) %>%
+    dplyr::mutate(value = as.numeric(.data$value))
+
+  out <- data_chunk %>%
+    dplyr::distinct(.data$ADM2_ID, .data$Date) %>%
+    tidyr::crossing(Indicator = indicator_cols) %>%
+    dplyr::left_join(
+      data_long_chunk %>%
+        dplyr::group_by(.data$ADM2_ID, .data$Indicator, .data$Date) %>%
+        dplyr::summarise(
+          is_missing = all(is.na(.data$value)),
+          is_zero = all(.data$value == 0, na.rm = TRUE),
+          is_positive = any(.data$value > 0, na.rm = TRUE),
+          .groups = "drop"
+        ),
+      by = c("ADM2_ID", "Indicator", "Date")
+    ) %>%
+    dplyr::mutate(
+      is_missing = tidyr::replace_na(.data$is_missing, TRUE),
+      is_zero = tidyr::replace_na(.data$is_zero, FALSE),
+      is_positive = tidyr::replace_na(.data$is_positive, FALSE)
+    ) %>%
+    dplyr::group_by(.data$Indicator, .data$Date) %>%
+    dplyr::summarise(
+      n_total = dplyr::n_distinct(.data$ADM2_ID),
+      n_missing = sum(.data$is_missing),
+      n_zero = sum(.data$is_zero & !.data$is_missing),
+      n_positive = sum(.data$is_positive),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      pct_missing = ifelse(.data$n_total > 0, 100 * .data$n_missing / .data$n_total, 0),
+      pct_zero = ifelse(.data$n_total > 0, 100 * .data$n_zero / .data$n_total, 0),
+      pct_positive = ifelse(.data$n_total > 0, 100 * .data$n_positive / .data$n_total, 0)
+    )
+
+  rm(data_long_chunk)
+  invisible(gc(verbose = FALSE, full = FALSE))
+  out
 }

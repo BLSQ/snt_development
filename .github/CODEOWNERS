@@ -1,3 +1,3 @@
-# Ensure that @sPuntinG must approve changes to this files
+# @sPuntinG must approve changes to these files:
 /pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb @sPuntinG
 /pipelines/snt_dhis2_reporting_rate_dataelement/code/snt_dhis2_reporting_rate_dataelement.ipynb @sPuntinG

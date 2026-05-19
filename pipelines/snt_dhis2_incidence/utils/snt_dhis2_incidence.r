@@ -162,6 +162,10 @@ return(head(dhis2_population_adm2, 3))
 # --- DISAGGREGATION LOGIC --- --- --- --- --- --- ---
 
 prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELECTION, N1_METHOD) {
+
+  # Initial log msg
+    log_msg(glue::glue("Starting preparation of disaggregated indicators for selection '{DISAGGREGATION_SELECTION}' and N1_METHOD '{N1_METHOD}'."))
+
   # Initialize the flag locally
   DISAGGREGATED_INDICATORS_FOUND <<- FALSE 
 
@@ -171,6 +175,7 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
     prefix_fixed <- c("TEST", "CONF") 
     prefix_all    <- c(prefix_method, prefix_fixed) 
     target_colnames <<- glue::glue("{prefix_all}_{DISAGGREGATION_SELECTION}")
+    log_msg(glue::glue("Looking for disaggregated indicators columns in routine data: {paste(target_colnames, collapse=', ')}"))
     
     if (all(target_colnames %in% colnames(dhis2_routine))) {
       # Map the disaggregated columns (e.g., SUSP_UNDER_5) to generic names (e.g., SUSP) so that 
@@ -178,44 +183,45 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
       dhis2_routine[prefix_all] <- dhis2_routine[target_colnames]
       
       for (col in target_colnames) {
-        log_msg(glue::glue("Population Disaggregation: Successfully mapped indicator: {col}"))
+        log_msg(glue::glue("Indicator Disaggregation: Successfully mapped indicator {col}"))
       }    
       
       # Signal success for the next code block
       DISAGGREGATED_INDICATORS_FOUND <<- TRUE 
     } else {
       missing_cols <- setdiff(target_colnames, colnames(dhis2_routine))
-      log_msg(glue::glue("Population Disaggregation: Disaggregation on '{DISAGGREGATION_SELECTION}' failed."), "warning")
-      log_msg(glue::glue("Population Disaggregation: Missing columns in routine dataset: {paste(missing_cols, collapse = ', ')}"), "warning")
-      msg <- glue::glue("[ERROR] 🛑 Population Disaggregation: Required columns for disaggregation '{DISAGGREGATION_SELECTION}' are missing.")  
+      log_msg(glue::glue("Indicator Disaggregation: Disaggregation on '{DISAGGREGATION_SELECTION}' failed."), "warning")
+      log_msg(glue::glue("Indicator Disaggregation: Missing columns in routine dataset: {paste(missing_cols, collapse = ', ')}"), "warning")
+      msg <- glue::glue("[ERROR] 🛑 Indicator Disaggregation: Required columns for disaggregation '{DISAGGREGATION_SELECTION}' are missing.")  
       stop(msg)
     }
   } else {
     # Print just in nb (not in pipeline logs)
-    print("Population Disaggregation: No disaggregation applied based on the current configuration.")
+    print("Indicator Disaggregation: No disaggregation applied based on the current configuration.")
   }
   # return(dhis2_routine)
     dhis2_routine <<- dhis2_routine
 }
 
+# Rewrote select_population_column() to be mapping the DISAGGREGATION_SELECTION 
+# only if it exists in the population dataset, otherwise log an error and break 
+# (instead of silently using the non-disaggregated population)
 select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICATORS_FOUND, DISAGGREGATION_SELECTION) {
-  # Default value for the selection if the condition isn't met or if it fails
-  POPULATION_SELECTION <<- "POPULATION"
   if (DISAGGREGATED_INDICATORS_FOUND) { 
-      POPULATION_SELECTION <<- paste0("POP_", DISAGGREGATION_SELECTION)    
-      if (!(POPULATION_SELECTION %in% colnames(dhis2_population_adm2))) {
-          log_msg(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset."), "warning")
-          POPULATION_SELECTION <<- "POPULATION"
+      POPULATION_SELECTION <- paste0("POP_", DISAGGREGATION_SELECTION) 
+      if (POPULATION_SELECTION %in% colnames(dhis2_population_adm2)) {   
+        # The selected column is assigned to POPULATION col so that later code can use it generically
+        dhis2_population_adm2$POPULATION <- dhis2_population_adm2[[POPULATION_SELECTION]]
+        log_msg(glue::glue(
+            "Population Disaggregation: Column '{POPULATION_SELECTION}' selected as population values, 
+            and renamed to 'POPULATION'."))
+      } else {
+          log_msg(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset!"), "error")
+          stop(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset!"))
       }
-      # The selected column is assigned to POPULATION col so that later code can use it generically
-      dhis2_population_adm2$POPULATION <- dhis2_population_adm2[[POPULATION_SELECTION]]
-      log_msg(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' selected as population values."))
-  } else {
-    # Print just in nb (not in pipeline logs)
-    print("Population Disaggregation: No disaggregation applied based on the current configuration.")
   }
-    dhis2_population_adm2 <<- dhis2_population_adm2
 }
+
 
 # --- --- --- --- --- --- --- --- ---
 

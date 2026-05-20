@@ -33,9 +33,10 @@ from snt_lib.snt_pipeline_utils import (
     required=True,
 )
 @parameter(
-    "use_adjusted_population",
-    name="Use adjusted population",
-    help="If enabled, use adjusted population data for incidence calculations",
+    "use_transformed_population",
+    name="Use Transformed Population Data",
+    help="If enabled, use population data from pipeline 'A.5 DHIS2 Population Transformation'. "
+    "If disabled, use population data from 'A.2 DHIS2 Formatting'.", 
     type=bool,
     default=False,
     required=True,
@@ -81,7 +82,7 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_incidence(
     n1_method: str,
     routine_data_choice: str,
-    use_adjusted_population: bool,
+    use_transformed_population: bool,
     disaggregation_selection: str,
     careseeking_file_path: File,
     run_report_only: bool,
@@ -118,7 +119,7 @@ def snt_dhis2_incidence(
         notebook_params = {
             "N1_METHOD": n1_method,
             "ROUTINE_DATA_CHOICE": routine_data_choice,
-            "USE_ADJUSTED_POPULATION": use_adjusted_population,
+            "USE_TRANSFORMED_POPULATION": use_transformed_population,
             "DISAGGREGATION_SELECTION": (
                 mapping_dictionary.get(disaggregation_selection) if disaggregation_selection else None
             ),

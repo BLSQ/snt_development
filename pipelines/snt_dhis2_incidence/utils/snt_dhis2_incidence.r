@@ -150,7 +150,7 @@ pres_in_config <- any(DHIS2_INDICATORS == "PRES")
 }
 
 load_population_data <- function() {
-dhis2_pop_dataset <- if (USE_ADJUSTED_POPULATION) config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION else config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
+dhis2_pop_dataset <- if (USE_TRANSFORMED_POPULATION) config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION else config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
 
 dhis2_population_adm2 <<- get_latest_dataset_file_in_memory(dhis2_pop_dataset, paste0(COUNTRY_CODE, "_population.parquet"))
 log_msg(glue::glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))

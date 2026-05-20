@@ -208,7 +208,7 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
 # (instead of silently using the non-disaggregated population)
 select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICATORS_FOUND, DISAGGREGATION_SELECTION) {
   if (DISAGGREGATED_INDICATORS_FOUND) { 
-      POPULATION_SELECTION <- paste0("POP_", DISAGGREGATION_SELECTION) 
+      POPULATION_SELECTION <<- paste0("POP_", DISAGGREGATION_SELECTION) # GP: Make this a global var so it can be used downstream
       if (POPULATION_SELECTION %in% colnames(dhis2_population_adm2)) {   
         # The selected column is assigned to POPULATION col so that later code can use it generically
         dhis2_population_adm2$POPULATION <- dhis2_population_adm2[[POPULATION_SELECTION]]
@@ -220,6 +220,8 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
           stop(glue::glue("Population Disaggregation: Column '{POPULATION_SELECTION}' not found in Population dataset!"))
       }
   }
+  # IMPORTANT: Return the modified dataframe back to the global environment!
+  return(dhis2_population_adm2)
 }
 
 

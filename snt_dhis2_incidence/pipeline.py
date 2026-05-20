@@ -43,9 +43,10 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "disaggregation_selection",
-    name="Disaggregation selection (only if available)",
-    help="Select the disaggregation for incidence computation. "
-    "This option is only available if the data supports it.",
+    name="Analyze by Population Group (only if available)",
+    help="Select the population group. "
+    "Important: both the indicators and the population data must be available for the selected group! "
+    "Else, the pipeline will fail.",
     multiple=False,
     choices=["Children Under 5 Years Old", "Pregnant Women"],
     type=str,

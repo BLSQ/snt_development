@@ -352,7 +352,8 @@ def download_dhis2_reporting_rates(
     rep_datasets = reporting_rates_def.get("REPORTING_DATASETS", [])
     rep_indicators = reporting_rates_def.get("REPORTING_INDICATORS", {})
 
-    if rep_datasets:
+    # Or we download reporting datasets or indicators but not both.
+    if has_reporting_dataset(rep_datasets):
         handle_reporting_datasets(
             reporting_datasets=rep_datasets,
             snt_config=snt_config,
@@ -362,7 +363,7 @@ def download_dhis2_reporting_rates(
             output=output_dir,
             overwrite=overwrite,
         )
-    elif rep_indicators:
+    elif has_reporting_indicator(rep_indicators):
         handle_reporting_indicators(
             reporting_indicators=rep_indicators,
             snt_config=snt_config,
@@ -376,6 +377,30 @@ def download_dhis2_reporting_rates(
         current_run.log_info("No reporting rates to download.")
 
     return True
+
+
+def has_reporting_dataset(reporting_datasets: list) -> bool:
+    """Return True when at least one reporting dataset entry has a non-empty DATASET value.
+
+    Returns
+    -------
+    bool
+         True if at least one reporting dataset entry has a non-empty DATASET value, False otherwise.
+    """
+    return any(
+        isinstance(rate, dict) and str(rate.get("DATASET") or "").strip() for rate in reporting_datasets
+    )
+
+
+def has_reporting_indicator(reporting_indicators: dict) -> bool:
+    """Return True when at least one reporting indicator entry has a non-empty value.
+
+    Returns
+    -------
+    bool
+         True if at least one reporting indicator entry has a non-empty value, False otherwise.
+    """
+    return any(isinstance(value, str) and value.strip() for value in reporting_indicators.values())
 
 
 def handle_reporting_datasets(

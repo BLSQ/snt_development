@@ -1,0 +1,36 @@
+name: Push snt_dhis2_extract
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/push_snt_dhis2_extract.yaml"
+      - "snt_dhis2_extract/pipeline.py"
+      - "snt_dhis2_extract/requirements.txt"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      
+      - name: Configure OpenHEXA CLI
+        uses: blsq/openhexa-cli-action@v1
+        with:
+          workspace: "ds-templates"
+          token: ${{ secrets.OH_TOKEN }}
+
+      - name: Push pipeline to OpenHEXA
+        run: |
+          openhexa pipelines push snt_dhis2_extract \
+            --code "snt_dhis2_extract" \
+            --description "${{ github.event.head_commit.message }}" \
+            --link "https://github.com/BLSQ/snt_development/commit/${{ github.sha }}" \
+            --yes

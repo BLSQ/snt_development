@@ -29,7 +29,6 @@ uv.lock
 *.CSV
 *.xlsx
 *.xls
-*.yaml
 *.yml
 *.ipynb:Zone.Identifier
 *.r:Zone.Identifier

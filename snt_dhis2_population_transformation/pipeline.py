@@ -21,13 +21,13 @@ from snt_lib.snt_pipeline_utils import (
         "Total population used to rescale DHIS2 population data. When provided, "
         "DHIS2 values are adjusted proportionally to match this total."
     ),
-    type=float,
+    type=int,
     default=None,
     required=False,
 )
 @parameter(
     "growth_factor",
-    name="Annual Population Growth Rate",
+    name="Annual population growth rate",
     help="Annual growth rate (e.g. 0.03 for 3%) used to project DHIS2 population figures into future years.",
     type=float,
     default=None,
@@ -35,9 +35,75 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "year_reference",
-    name="Population Reference Year",
+    name="Population reference year",
     help="Base year from which DHIS2 population figures are projected. Defaults to latest year.",
     type=int,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_under_5",
+    name="Proportion population under 5",
+    help=(
+        "Proportion of the total population aged under 5 (e.g. 0.17 for 17%). "
+        "Used to disaggregate population figures into the under-5 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_pregnant_women",
+    name="Proportion population pregnant women",
+    help=(
+        "Proportion of the total population of pregnant women (e.g. 0.05 for 5%). "
+        "Used to disaggregate population figures into the pregnant-women group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_0_1_y",
+    name="Proportion population 0-1 years",
+    help=(
+        "Proportion of the total population aged 0-1 years (e.g. 0.04 for 4%). "
+        "Used to disaggregate population figures into the 0-1 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_1_2_y",
+    name="Proportion population 1-2 years",
+    help=(
+        "Proportion of the total population aged 1-2 years (e.g. 0.03 for 3%). "
+        "Used to disaggregate population figures into the 1-2 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_5_10_y",
+    name="Proportion population 5-10 years",
+    help=(
+        "Proportion of the total population aged 5-10 years (e.g. 0.06 for 6%). "
+        "Used to disaggregate population figures into the 5-10 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_5_36_m",
+    name="Proportion population 5-36 months",
+    help=(
+        "Proportion of the total population aged 5-36 months (e.g. 0.06 for 6%). "
+        "Used to disaggregate population figures into the 5-36 months age group."
+    ),
+    type=float,
     default=None,
     required=False,
 )
@@ -66,7 +132,18 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_population_transformation(
-    adjust_population: bool, disaggregation_file: File, run_report_only: bool, pull_scripts: bool
+    tot_pop_reference: int,
+    growth_factor: float,
+    year_reference: int,
+    pop_under_5: float,
+    pop_pregnant_women: float,
+    pop_0_1_y: float,
+    pop_1_2_y: float,
+    pop_5_10_y: float,
+    pop_5_36_m: float,
+    disaggregation_file: File,
+    run_report_only: bool,
+    pull_scripts: bool,
 ):
     """Write your pipeline orchestration here.
 
@@ -107,8 +184,44 @@ def snt_dhis2_population_transformation(
                 current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
                 raise FileNotFoundError
 
+            if growth_factor and not year_reference:
+                current_run.log_error(
+                    "'Population reference year' year must be provided "
+                    "if 'Annual population growth rate' is specified."
+                )
+                raise ValueError
+
+            if year_reference and not growth_factor:
+                current_run.log_error(
+                    "'Annual population growth rate' must be provided "
+                    "if 'Population reference year' is specified."
+                )
+                raise ValueError
+
+            if not pop_under_5:
+                current_run.log_warning(
+                    "Proportion of population under 5 is not provided. "
+                    "This will limit the disaggregation of population data into age groups."
+                )
+                # raise ValueError
+
+            if not pop_pregnant_women:
+                current_run.log_warning(
+                    "Proportion of population of pregnant women is not provided. "
+                    "This will limit the disaggregation of population data groups."
+                )
+                # raise ValueError
+
             parameters = {
-                "ADJUST_TOTALS": adjust_population,
+                "TOT_POP_REFERENCE": tot_pop_reference,
+                "GROWTH_FACTOR": growth_factor,
+                "YEAR_REFERENCE": year_reference,
+                "POP_UNDER_5": pop_under_5,
+                "POP_PREGNANT_WOMEN": pop_pregnant_women,
+                "POP_0_1_Y": pop_0_1_y,
+                "POP_1_2_Y": pop_1_2_y,
+                "POP_5_10_Y": pop_5_10_y,
+                "POP_5_36_M": pop_5_36_m,
                 "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
             }
 

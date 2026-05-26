@@ -15,11 +15,30 @@ from snt_lib.snt_pipeline_utils import (
 
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
-    "adjust_population",
-    name="Adjust using population totals",
-    help="Adjust the DHIS2 population using TOTAL_POPULATION_REF specified in the config file",
-    type=bool,
-    default=False,
+    "tot_pop_reference",
+    name="Total Population reference",
+    help=(
+        "Total population used to rescale DHIS2 population data. When provided, "
+        "DHIS2 values are adjusted proportionally to match this total."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "growth_factor",
+    name="Annual Population Growth Rate",
+    help="Annual growth rate (e.g. 0.03 for 3%) used to project DHIS2 population figures into future years.",
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "year_reference",
+    name="Population Reference Year",
+    help="Base year from which DHIS2 population figures are projected. Defaults to latest year.",
+    type=int,
+    default=None,
     required=False,
 )
 @parameter(

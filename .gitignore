@@ -38,7 +38,7 @@ uv.lock
 # Config file -----------------
 # ignore .json files unless if SNT_config.json
 *.json
-!SNT_config.json
+!configuration/SNT_config_*.json
 
 # R ----------------------------------------
 *.rds

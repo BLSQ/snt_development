@@ -532,7 +532,7 @@ build_population_indicators <- function(pop_data, ou_data, snt_configuration) {
     
     # Extract configuration
     admin_cols <- get_admin_config(snt_configuration)
-    pop_indicators <- snt_configuration$DHIS2_DATA_DEFINITIONS$POPULATION_DEFINITIONS[["POPULATION_INDICATORS"]]
+    pop_indicators <- snt_configuration$DHIS2_DATA_DEFINITIONS$POPULATION_INDICATOR_DEFINITIONS
     
     # Build organizational units template
     ou_selection <- get_org_units_selection(ou_data, admin_cols)

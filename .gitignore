@@ -33,6 +33,7 @@ uv.lock
 *.ipynb:Zone.Identifier
 *.r:Zone.Identifier
 *.py:Zone.Identifier
+*:Zone.Identifier
 
 # Config file -----------------
 # ignore .json files unless if SNT_config.json

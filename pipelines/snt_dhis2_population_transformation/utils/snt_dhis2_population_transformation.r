@@ -310,7 +310,7 @@ add_population_disaggregations <- function(
     
     # Identify target columns and convert to numeric
     meta_cols <- c("ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID")
-    disagg_cols <- setdiff(colnames(disaggregation_data), meta_cols)
+    disagg_cols <- setdiff(colnames(disaggregation_table), meta_cols)
 
     population_table[["POPULATION"]] <- as.numeric(population_table[["POPULATION"]])    
     disaggregation_table[disagg_cols] <- suppressWarnings(lapply(disaggregation_table[disagg_cols], as.numeric))    
@@ -318,19 +318,22 @@ add_population_disaggregations <- function(
     # create a list of Valid columns
     valid_cols <- c()
     for (col in disagg_cols) {
+        action <- "Creating"
         if (any(!is.na(disaggregation_table[[col]]))) {  # Has at least some non-NA values
-            if (col %in% colnames(population_table)) {                
-                log_msg(glue::glue("The column '{col}' already exists in the population table; it will be overwritten by values from the disaggregation file."), "warning")
+            if (col %in% colnames(population_table)) {
+                action <- "Overwriting"
+                log_msg(glue::glue("Column '{col}' already exists in the population table; it will be overwritten by values from the disaggregation file."), "warning")
             }            
-            log_msg(glue::glue("Creating population disagregation: {col}"))
+            log_msg(glue::glue("{action} population disagregation: {col}"))
             valid_cols <- c(valid_cols, col)
         }         
     }
-    
+     
     # Early exit if no valid columns exist
     if (length(valid_cols) == 0) return(population_table)    
     
     result <- population_table %>% 
+        select(-any_of(valid_cols)) %>% 
         left_join(disaggregation_table[c("ADM2_ID", valid_cols)], by = "ADM2_ID") %>%
         mutate(across(all_of(valid_cols), ~ round(POPULATION * .x)))
     

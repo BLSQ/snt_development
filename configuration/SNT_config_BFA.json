@@ -25,17 +25,8 @@
 		"SNT_RESULTS": "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS": {
-		"POPULATION_DEFINITIONS": {
-			"TOTAL_POPULATION_REF": null,
-			"GROWTH_FACTOR": null,
-			"REFERENCE_YEAR": null,
-			"POPULATION_INDICATORS": {
-				"POPULATION_INDICATORS": {
-					"POPULATION": {"ids": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"], "type" : "dataElement"}
-				}
-			},
-			"POPULATION_DISAGGREGATIONS": {
-			}
+		"POPULATION_INDICATOR_DEFINITIONS": {
+			"POPULATION": {"ids": ["GnuL22VzpPd", "SJKrcCexYJm", "dgRfLQYXTC5", "vxeTzZLjFsO", "xXjlTgt5XCW"], "type" : "dataElement"}		
 		},
 		"DHIS2_INDICATOR_DEFINITIONS": {
 			"SUSP": ["qkhx1DbWUFV", "OhPA8Hq1KYf","nfRYeVm4dCt","YwRi5giAozg"],

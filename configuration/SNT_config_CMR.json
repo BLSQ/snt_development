@@ -1,0 +1,118 @@
+{
+  "SNT_CONFIG": {
+    "COUNTRY_CODE": "CMR",
+    "COUNTRY_NAME": "REPUBLIC OF CAMEROON",
+    "NA_TREATMENT": "SET_0_TO_NA",
+    "DHIS2_ADMINISTRATION_1": "level_2_name",
+    "DHIS2_ADMINISTRATION_2": "level_3_name",
+    "ANALYTICS_ORG_UNITS_LEVEL": 5,
+    "REPORTING_RATE_PRODUCT_UID": []
+  },
+  "SNT_DATASET_IDENTIFIERS": {
+    "DHIS2_DATASET_EXTRACTS": "snt-dhis2-extracts",
+    "DHIS2_DATASET_FORMATTED": "snt-dhis2-formatted",
+    "DHIS2_POPULATION_TRANSFORMATION": "snt-dhis2-pop-transformation",
+    "DHIS2_REPORTING_RATE": "snt-dhis2-reporting-rate",
+    "DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
+    "DHIS2_INCIDENCE": "snt-dhis2-incidence",
+    "DHS_INDICATORS": "snt-dhs-indicators",
+    "WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
+    "SNT_HEALTHCARE_ACCESS": "snt-healthcare-access",
+    "ERA5_DATASET_CLIMATE": "snt-era5-climate",
+    "SNT_SEASONALITY_RAINFALL": "snt-seasonality-rainfall",
+    "SNT_SEASONALITY_CASES": "snt-seasonality-cases",
+    "DHIS2_QUALITY_OF_CARE": "snt-dhis2-quality-of-care",
+    "SNT_MAP_EXTRACTS": "snt-map-extracts",
+    "SNT_RESULTS": "snt-results"
+  },
+  "DHIS2_DATA_DEFINITIONS": {
+    "POPULATION_INDICATOR_DEFINITIONS": {
+        "POPULATION": {"ids": ["leipNkawHrh"],"type": "dataElement"},
+        "POP_UNDER_5": {"ids": ["HgohS9aovXs"],"type": "dataElement"},
+        "POP_PREGNANT_WOMAN": {"ids": ["SK2IYpT71LP"],"type": "dataElement"},
+        "POP_0_1_Y": {"ids": ["XyjqcP0uHmb"],"type": "dataElement"},
+        "POP_1_2_Y": {"ids": ["EaE1RWwv14q"],"type": "dataElement"},        
+        "POP_50_PLUS": {"ids": ["Q2HG3uS88BC"],"type": "dataElement"}
+    },
+    "DHIS2_INDICATOR_DEFINITIONS": {
+      "SUSP": [
+        "Z42AOrmgznI",
+        "lVRTjB2u2of",
+        "UAiMROlz29l",
+        "lCgYt1zGst9",
+        "JNm9eUbZITm"
+      ],
+      "TEST": [
+        "QizgPsDOxB3",
+        "apFHOiAtX4Q",
+        "LOUUTz1oQXD",
+        "CjfJQ4gHjH8"
+      ],
+      "CONF": [
+        "pKtNS4ZROMD",
+        "OvcWhx0bJsj",
+        "C5xbONQQFaY",
+        "Cj0NLRs39tH",
+        "nPdPsbndydf",
+        "eZDTiyCCTVN",
+        "itQfjtLBs4J"
+      ],
+      "PRES": [
+        "M17qCPUAG9v",
+        "hoyFxHA0AH9"
+      ],
+      "PRESSEV": [
+        "hoyFxHA0AH9"
+      ],
+      "MALTREAT": [
+        "K7xZzTZrLu0",
+        "iF7wG5NF4ll",
+        "L1WRKB4cAYG",
+        "J6YSCSv9443",
+        "KMi3W08eMmB",
+        "bMndjchMPhX",
+        "VTUTjMfBG8p",
+        "QuYZrbalRS5",
+        "uKcDtbK9kYl",
+        "wnVGmybzlcy",
+        "m9TqDiFkcwr"
+      ],
+      "MALSIMP": [
+        "pKtNS4ZROMD",
+        "C5xbONQQFaY",
+        "nPdPsbndydf",
+        "itQfjtLBs4J"
+      ],
+      "MALSEV": [
+        "OvcWhx0bJsj",
+        "Cj0NLRs39tH"
+      ],
+      "MALADM": [
+        "OvcWhx0bJsj",
+        "Cj0NLRs39tH"
+      ],
+      "MALDTH": [
+        "eypa3oKzJ53",
+        "ZiPM2d6iBI3"
+      ],
+      "ALLOUT": [
+        "WBMFCAI93Y5",
+        "KYLtdpXaUaS",
+        "lCgYt1zGst9",
+        "kIIqpm2c6ir"
+      ],
+      "ALLDTH": [
+        "QxmrTgZ4RKo",
+        "b1B5p35jVTr"
+      ],
+      "ALLADM": [
+        "MU3eYUK6Ivc",
+        "Ip6yU2K3pJ7"
+      ]
+    },
+    "DHIS2_REPORTING_RATES": {
+      "REPORTING_DATASETS": [],
+      "REPORTING_INDICATORS": {}
+    }
+  }
+}

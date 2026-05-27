@@ -26,19 +26,8 @@
 		"SNT_RESULTS" : "snt-results"
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
-		"POPULATION_DEFINITIONS": {
-			"TOTAL_POPULATION_REF":null,
-			"GROWTH_FACTOR" :null,
-			"REFERENCE_YEAR": null,
-			"POPULATION_INDICATORS": {
-                "POPULATION": {"ids": ["V4Q3q2iBVnh"], "type": "dataElement"}
-			},
-			"POPULATION_DISAGGREGATIONS": {
-                "POP_UNDER_5" : 0.179,
-                "POP_0_1_Y" : 0.37,
-                "POP_1_2_Y" : 0.36,
-                "POP_PREGNANT_WOMAN": 0.05
-			}
+		"POPULATION_INDICATOR_DEFINITIONS": {
+                "POPULATION": {"ids": ["V4Q3q2iBVnh"], "type": "dataElement"}						
 		},	
         "DHIS2_INDICATOR_DEFINITIONS": {
             "SUSP": ["aPWjRzJIRjW", "yumGwFc8UPE", "Zs6XdRvvIrQ", "Uvj83ApugPn", "QivDVbuoLKV"],

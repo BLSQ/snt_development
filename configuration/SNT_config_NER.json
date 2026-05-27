@@ -29,24 +29,10 @@
     "SNT_RESULTS": "snt-results"
   },
   "DHIS2_DATA_DEFINITIONS": {
-    "POPULATION_DEFINITIONS": {
-      "TOTAL_POPULATION_REF": 27032412,
-      "GROWTH_FACTOR": 0.0334,
-      "REFERENCE_YEAR": 2024,
-      "POPULATION_INDICATORS": {
+    "POPULATION_INDICATOR_DEFINITIONS": {
         "POPULATION": { "ids": ["iIS0MGyL3EL"], "type": "dataElement" },
-        "POP_UNDER_5": {
-          "ids": ["tiaX3KnlpRt", "BjCyMF2Thxn"],
-          "type": "dataElement"
-        },
-        "POP_PREGNANT_WOMAN": { "ids": ["mEyVFwBw2QV"], "type": "dataElement" }
-      },
-      "POPULATION_DISAGGREGATIONS": {
-        "POP_UNDER_5": 0.195,
-        "POP_PREGNANT_WOMAN": 0.052,
-        "POP_0_1_Y": 0.04,
-        "POP_1_2_Y": 0.079
-      }
+        "POP_UNDER_5": {"ids": ["tiaX3KnlpRt", "BjCyMF2Thxn"], "type": "dataElement"},
+        "POP_PREGNANT_WOMAN": { "ids": ["mEyVFwBw2QV"], "type": "dataElement" }      
     },
     "DHIS2_INDICATOR_DEFINITIONS": {
       "SUSP": ["SE8vUT7xeWO"],

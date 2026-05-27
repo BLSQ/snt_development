@@ -185,32 +185,28 @@ def snt_dhis2_population_transformation(
                 raise FileNotFoundError
 
             if growth_factor and not year_reference:
-                current_run.log_error(
-                    "'Population reference year' year must be provided "
-                    "if 'Annual population growth rate' is specified."
+                current_run.log_warning(
+                    "'Population reference year' was not provided."
+                    "The latest available year will be set as reference."
                 )
-                raise ValueError
 
             if year_reference and not growth_factor:
-                current_run.log_error(
+                current_run.log_warning(
                     "'Annual population growth rate' must be provided "
                     "if 'Population reference year' is specified."
                 )
-                raise ValueError
 
             if not pop_under_5:
                 current_run.log_warning(
                     "Proportion of population under 5 is not provided. "
                     "This will limit the disaggregation of population data into age groups."
                 )
-                # raise ValueError
 
             if not pop_pregnant_women:
                 current_run.log_warning(
                     "Proportion of population of pregnant women is not provided. "
                     "This will limit the disaggregation of population data groups."
                 )
-                # raise ValueError
 
             parameters = {
                 "TOT_POP_REFERENCE": tot_pop_reference,

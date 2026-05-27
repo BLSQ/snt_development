@@ -1046,10 +1046,9 @@ def download_dhis2_population(
     p2 = period_from_string(str(end)[:4])
     periods = [p1] if p1 == p2 else p1.get_range(p2)
 
-    pop_definitions: dict = snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_DEFINITIONS", {})
-    pop_indicators: dict = pop_definitions.get("POPULATION_INDICATORS", {})
+    pop_indicators: dict = snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_INDICATOR_DEFINITIONS", {})
     if len(pop_indicators) == 0:
-        current_run.log_warning("No population indicators defined under 'POPULATION_INDICATORS'.")
+        current_run.log_warning("No population indicators defined under 'POPULATION_INDICATOR_DEFINITIONS'.")
         return False
 
     try:

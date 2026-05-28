@@ -10,6 +10,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     save_pipeline_parameters,
+    get_file_from_dataset,
 )
 
 
@@ -21,22 +22,6 @@ from snt_lib.snt_pipeline_utils import (
         "Total population used to rescale DHIS2 population data. When provided, "
         "DHIS2 values are adjusted proportionally to match this total."
     ),
-    type=int,
-    default=None,
-    required=False,
-)
-@parameter(
-    "growth_factor",
-    name="Annual population growth rate",
-    help="Annual growth rate (e.g. 0.03 for 3%) used to project DHIS2 population figures into future years.",
-    type=float,
-    default=None,
-    required=False,
-)
-@parameter(
-    "year_reference",
-    name="Population reference year",
-    help="Base year from which DHIS2 population figures are projected. Defaults to latest year.",
     type=int,
     default=None,
     required=False,
@@ -116,6 +101,25 @@ from snt_lib.snt_pipeline_utils import (
     help="Select user-uploaded file with population disaggregations proportions at ADM2 level.",
 )
 @parameter(
+    "growth_factor",
+    name="Projection growth rate",
+    help="Annual growth rate (e.g. 0.03 for 3%) used to project DHIS2 population figures into future years.",
+    type=float,
+    default=None,
+    required=True,
+)
+@parameter(
+    "year_reference",
+    name="Projection reference year",
+    help=(
+        "Base year from which DHIS2 population figures are projected. "
+        "This year must be available in the DHIS2 population data."
+    ),
+    type=int,
+    default=None,
+    required=True,
+)
+@parameter(
     "run_report_only",
     name="Run reporting only",
     help="This will only execute the reporting notebook.",
@@ -184,29 +188,17 @@ def snt_dhis2_population_transformation(
                 current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
                 raise FileNotFoundError
 
-            if growth_factor and not year_reference:
-                current_run.log_warning(
-                    "'Population reference year' was not provided."
-                    "The latest available year will be set as reference."
-                )
+            years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
+            if not years_available:
+                current_run.log_error("No DHIS2 population data available.")
+                raise ValueError
 
-            if year_reference and not growth_factor:
-                current_run.log_warning(
-                    "'Annual population growth rate' must be provided "
-                    "if 'Population reference year' is specified."
+            if year_reference not in years_available:
+                current_run.log_error(
+                    f"Population reference year {year_reference} is not available in population data. "
+                    f"Available years are: {[int(y) for y in years_available]}"
                 )
-
-            if not pop_under_5:
-                current_run.log_warning(
-                    "Proportion of population under 5 is not provided. "
-                    "This will limit the disaggregation of population data into age groups."
-                )
-
-            if not pop_pregnant_women:
-                current_run.log_warning(
-                    "Proportion of population of pregnant women is not provided. "
-                    "This will limit the disaggregation of population data groups."
-                )
+                raise ValueError
 
             parameters = {
                 "TOT_POP_REFERENCE": tot_pop_reference,
@@ -293,6 +285,23 @@ def dhis2_population_transformation(
         )
     except Exception as e:
         raise Exception(f"Error in executing population transformation notebook: {e}") from e
+
+
+def get_available_years_from_dhis2_population_data(snt_config_dict: dict) -> list[int]:
+    """Get the years available in the DHIS2 population data.
+
+    Returns:
+        A sorted list of years available in the population data, or an empty list.
+    """
+    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    pop_data = get_file_from_dataset(
+        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED"),
+        filename=f"{country_code}_population.parquet",
+    )
+
+    if pop_data is not None and not pop_data.empty:
+        return sorted(pop_data.YEAR.unique())
+    return []
 
 
 if __name__ == "__main__":

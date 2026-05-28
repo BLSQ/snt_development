@@ -18,7 +18,7 @@ printdim <- function(df, name = deparse(substitute(df))) {
 #' @return Character vector of category labels.
 create_dynamic_labels <- function(breaks) {
     fmt <- function(x) {
-        format(x / 1000, big.mark = "'", scientific = FALSE, trim = TRUE)
+        format(x/1000, big.mark = "", scientific = FALSE, trim = TRUE)
     }
 
     labels <- c(
@@ -41,6 +41,22 @@ parse_metadata_scale <- function(scale_value) {
         return(jsonlite::fromJSON(scale_value))
     }
     as.numeric(unlist(scale_value, use.names = FALSE))
+}
+
+
+#' Compute rounded choropleth break intervals for population data.
+#'
+#' Rounds breaks to a clean magnitude based on the data scale (e.g. nearest 10k, 100k).
+#' See \code{classInt::classIntervals} for available styles.
+#'
+#' @param pop_values Numeric vector of population values to classify.
+#' @param n_breaks Number of break intervals to generate.
+#' @param style classInt classification style (default: \code{"jenks"}).
+#' @return Numeric vector of \code{n_breaks} rounded upper bounds.
+compute_value_intervals <- function(pop_values, n_breaks, style = "jenks") {
+    breaks <- classInt::classIntervals(pop_values, n = n_breaks, style = style)$brks
+    magnitude <- 10^(floor(log10(max(pop_values))) - 1)
+    return(round(breaks[-1] / magnitude) * magnitude)
 }
 
 
@@ -90,7 +106,7 @@ build_population_choropleth <- function(
         ) +
         ggplot2::labs(
             title = plot_title,
-            subtitle = "Source: NMDR / DHIS2",
+            subtitle = "Source: DHIS2",
             fill = legend_title
         ) +
         ggplot2::scale_fill_manual(values = palette_values, limits = labels, drop = FALSE) +

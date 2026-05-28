@@ -27,7 +27,14 @@
 	},
 	"DHIS2_DATA_DEFINITIONS" : {
 		"POPULATION_INDICATOR_DEFINITIONS": {
-                "POPULATION": {"ids": ["V4Q3q2iBVnh"], "type": "dataElement"}						
+            "POPULATION": {"ids": ["V4Q3q2iBVnh"], "type": "dataElement"},
+            "POP_UNDER_5": {"ids": [], "type": "dataElement"},
+            "POP_PREGNANT_WOMEN": {"ids": [], "type": "dataElement"},
+            "POP_0_1_Y": {"ids": [], "type": "dataElement"},
+            "POP_1_2_Y": {"ids": [], "type": "dataElement"},
+            "POP_5_10_Y": {"ids": [], "type": "dataElement"},
+            "POP_5_36_M": {"ids": [], "type": "dataElement"},
+            "POP_50_PLUS": {"ids": [], "type": "dataElement"}					
 		},	
         "DHIS2_INDICATOR_DEFINITIONS": {
             "SUSP": ["aPWjRzJIRjW", "yumGwFc8UPE", "Zs6XdRvvIrQ", "Uvj83ApugPn", "QivDVbuoLKV"],

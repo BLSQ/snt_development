@@ -29,9 +29,11 @@
     "POPULATION_INDICATOR_DEFINITIONS": {
         "POPULATION": {"ids": ["leipNkawHrh"],"type": "dataElement"},
         "POP_UNDER_5": {"ids": ["HgohS9aovXs"],"type": "dataElement"},
-        "POP_PREGNANT_WOMAN": {"ids": ["SK2IYpT71LP"],"type": "dataElement"},
+        "POP_PREGNANT_WOMEN": {"ids": ["SK2IYpT71LP"],"type": "dataElement"},
         "POP_0_1_Y": {"ids": ["XyjqcP0uHmb"],"type": "dataElement"},
-        "POP_1_2_Y": {"ids": ["EaE1RWwv14q"],"type": "dataElement"},        
+        "POP_1_2_Y": {"ids": ["EaE1RWwv14q"],"type": "dataElement"},
+        "POP_5_10_Y": {"ids": [], "type": "dataElement"},
+        "POP_5_36_M": {"ids": [], "type": "dataElement"},        
         "POP_50_PLUS": {"ids": ["Q2HG3uS88BC"],"type": "dataElement"}
     },
     "DHIS2_INDICATOR_DEFINITIONS": {

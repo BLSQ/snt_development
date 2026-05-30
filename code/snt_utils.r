@@ -387,15 +387,16 @@ match_column_classes <- function(input_dt, reference_dt) {
 }
 
 #############
+#' make a place-time cartesian product, to ensure each possible combination exists, between a minimum period and a maximum period
+#' @param input_dt the original data.table
+#' @param admin_colname place (admin) column
+#' @param year_colname time column 1
+#' @param month_colname time column 2
+#' @return the total number of periods (to check if the data contains enough periods)
+#' @return a new data.table, with the cartesian place-time rows
+
 make_cartesian_admin_period <- function(input_dt, admin_colname, year_colname, month_colname) {
-  #' make a place-time cartesian product, to ensure each possible combination exists, between a minimum period and a maximum period
-  #' @param input_dt the original data.table
-  #' @param admin_colname place (admin) column
-  #' @param year_colname time column 1
-  #' @param month_colname time column 2
-  #' @return the total number of periods (to check if the data contains enough periods)
-  #' @return a new data.table, with the cartesian place-time rows
-  
+
   dt <- copy(as.data.table(input_dt))
   
   # select only relevant columns to work with
@@ -428,13 +429,13 @@ make_cartesian_admin_period <- function(input_dt, admin_colname, year_colname, m
 }
 
 #############
+#' cartesian product of a data table and a vector
+#' @param input_dt data
+#' @param input_vector extra vector to add rows based on
+#' @param new_colname name of the new column (the one which has the values of the vector)
+#' @returns data table with the cartesian product of the two parameters
 make_cartesian_dt_vector <- function(input_dt, input_vector, new_colname){
-  #' cartesian product of a data table and a vector
-  #' @param input_dt data
-  #' @param input_vector extra vector to add rows based on
-  #' @param new_colname name of the new column (the one which has the values of the vector)
-  #' @returns data table with the cartesian product of the two parameters
-  
+
   if (!is.data.table(input_dt)) {
     input_dt <- as.data.table(input_dt)
   }
@@ -456,18 +457,17 @@ make_cartesian_dt_vector <- function(input_dt, input_vector, new_colname){
 }
 
 #############
+#' add missing administrative rows, from a time-place cartesian dataset, into a data table "with holes"
+#'
+#' @param input_dt input data
+#' @param full_rows_dt full set of rows to merge with
+#' @param target_colname the column which will eventually need to be imputed (which will have holes)
+#' @param admin_colname the admin unit id
+#' @param year_colname year
+#' @param month_colname month
+#' @returns data table with merged and imputed administrative unit columns
 make_full_time_space_data <- function(input_dt, full_rows_dt, target_colname, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH') {
-  
-  #' add missing administrative rows, from a time-place cartesian dataset, into a data table "with holes"
-  #'
-  #' @param input_dt input data
-  #' @param full_rows_dt full set of rows to merge with
-  #' @param target_colname the column which will eventually need to be imputed (which will have holes)
-  #' @param admin_colname the admin unit id
-  #' @param year_colname year
-  #' @param month_colname month
-  #' @returns data table with merged and imputed administrative unit columns
-  
+
   common_colnames <- c(admin_colname, year_colname, month_colname)
   
   # make sure data is data table
@@ -492,30 +492,30 @@ make_full_time_space_data <- function(input_dt, full_rows_dt, target_colname, ad
 }
 
 #############
+#' extract the id's of all rows which have missing values on target_colname
+#' @param input_dt the input data.table
+#' @param target_colname the column where missings should be identified
+#' @param id_colname the grouping column (units of observation)
+#' @return a new data.table, which filters only those id's and returns all of the observations associated with them
 extract_dt_with_missings <- function(input_dt, target_colname, id_colname){
-  #' extract the id's of all rows which have missing values on target_colname
-  #' @param input_dt the input data.table
-  #' @param target_colname the column where missings should be identified
-  #' @param id_colname the grouping column (units of observation)
-  #' @return a new data.table, which filters only those id's and returns all of the observations associated with them
-  
+
   ids_with_missings <- input_dt[is.na(get(target_colname)), unique(get(id_colname))]
   dt_with_missings <- input_dt[get(id_colname) %in% ids_with_missings]
   return(dt_with_missings)
 }
 
 #############
+#' SARIMA-based imputation for the values_colname variable of values_colname (generally confirmed malaria cases):
+#'    - fits a seasonal ARIMA model on the values_colname variable
+#'    - generates estimations for the missing values
+#' @param district_data a data.table with the values of a specific admin unit
+#' @param original_values_colname the name of the column which contains the values to be imputed
+#' @param estimated_values_colname the name of the column which will contain the new, imputed values
+#' @param admin_colname the name of the column which contains the administrative unit ids
+#' @param period_colname the name of the column which contains the year-month periods
+#' @param threshold_for_missing a threshold below which values_colname is considered as missing for the imputation purposes; default is 0 and should ideally stay like that
+#' @return a new data.table, with the filled column, called <values_colname>'_EST' added
 fill_missing_cases_ts <- function(district_data, original_values_colname, estimated_values_colname, admin_colname, period_colname, threshold_for_missing = 0.0){
-  #' SARIMA-based imputation for the values_colname variable of values_colname (generally confirmed malaria cases):
-  #'    - fits a seasonal ARIMA model on the values_colname variable
-  #'    - generates estimations for the missing values
-  #' @param district_data a data.table with the values of a specific admin unit
-  #' @param original_values_colname the name of the column which contains the values to be imputed
-  #' @param estimated_values_colname the name of the column which will contain the new, imputed values
-  #' @param admin_colname the name of the column which contains the administrative unit ids
-  #' @param period_colname the name of the column which contains the year-month periods
-  #' @param threshold_for_missing a threshold below which values_colname is considered as missing for the imputation purposes; default is 0 and should ideally stay like that
-  #' @return a new data.table, with the filled column, called <values_colname>'_EST' added
   
   district_id <- district_data[, unique(get(admin_colname))]
   
@@ -555,6 +555,7 @@ fill_missing_cases_ts <- function(district_data, original_values_colname, estima
   return(district_data_filled)
 }
 
+##########
 #' add string versions of selected integer columns
 #' @param input_dt data.frame or data.table to modify
 #' @param input_pattern pattern used to identify columns to convert
@@ -577,6 +578,7 @@ add_str_col_from_int <- function(input_dt, input_pattern, output_pattern, missin
   return(output_dt)
 }
 
+############
 #' Bin a numeric column into categories in a data.table
 #' @param dt dt to be modified
 #' @param breaks vector of cut points defining the bin boundaries
@@ -607,25 +609,24 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 #%% SEASONALITY -------------------------------------------------------------------
    
 #############
+#' compute month-level seasonality indicators using forward-looking month blocks
+#' by default, implements the WHO month-block reasoning for seasonality computation; calendar-year possible using parameter
+#' @param input_dt an input data table (or data frame)
+#' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
+#' @param values_colname the indicator column, on which the computations are made
+#' @param vector_of_durations the vector with the number of months in a block (3/4/5)
+#' @param admin_colname the administrative units to group
+#' @param year_colname year grouping column
+#' @param month_colname month grouping column
+#' @param proportion_threshold the proportion of indicator which needs to occur in a block, to qualify for seasonality
+#' @param use_calendar_year_denominator logical; if TRUE, uses the total accumulated value of the current 
+#'        calendar year (Jan-Dec) as the denominator. If FALSE (default), uses the 12-month forward-looking 
+#'        sliding window as denominator (WHO approach)
+#' @return an output data table with the additional columns for seasonality indicators
 compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, 
                                       admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', 
                                       proportion_threshold = 0.6, 
                                       use_calendar_year_denominator = FALSE) {
-  #' Compute month-level seasonality indicators using forward-looking month blocks.
-  #' This function implements the WHO month-block reasoning for seasonality computation.
-  #' 
-  #' @param input_dt an input data table (or data frame)
-  #' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
-  #' @param values_colname the indicator column, on which the computations are made
-  #' @param vector_of_durations the vector with the number of months in a block (3/4/5)
-  #' @param admin_colname the administrative units to group
-  #' @param year_colname year grouping column
-  #' @param month_colname month grouping column
-  #' @param proportion_threshold the proportion of indicator which needs to occur in a block, to qualify for seasonality
-  #' @param use_calendar_year_denominator Logical. If TRUE, uses the total accumulated value of the current 
-  #'        calendar year (Jan-Dec) as the denominator. If FALSE (default), uses the 12-month forward-looking 
-  #'        sliding window as denominator (WHO approach).
-  #' @return an output data table with the additional columns for seasonality indicators
 
   indicator <- toupper(indicator)
   dt <- copy(as.data.table(input_dt))
@@ -683,18 +684,17 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
 }
 
 #############
+#' compute whether or not an admin unit is "seasonal", based on WHO guidelines
+#' @param input_dt the input data table/frame
+#' @param indicator the type of indicator
+#' @param vector_of_durations the block sizes to check
+#' @param admin_colname the place column
+#' @param year_colname the year grouping column
+#' @param month_colname the month grouping column
+#' @param proportion_seasonal_years_threshold the minimum number of seasonal years, for the admin unit to qualify as seasonal
+#' @return the output data table, with extra dichotomous variables (seasonal/non-seasonal for each size of month-blocks)
+
 process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_seasonal_years_threshold = 0.5){
-  #' compute whether or not an admin unit is "seasonal", based on WHO guidelines
-  #' TODO: I'm passing all columns as arguments (needs resetting column names after each summarizing; to see if the data may have different column names; if not, no need to pass these as arguments and would make the code lighter)
-  #' @param input_dt the input data table/frame
-  #' @param indicator the type of indicator
-  #' @param vector_of_durations the block sizes to check
-  #' @param admin_colname the place column
-  #' @param year_colname the year grouping column
-  #' @param month_colname the month grouping column
-  #' @param proportion_seasonal_years_threshold the minimum number of seasonal years, for the admin unit to qualify as seasonal
-  #' @return the output data table, with extra dichotomous variables (seasonal/non-seasonal for each size of month-blocks)
-  
   
   indicator <- toupper(indicator)
   
@@ -761,6 +761,13 @@ process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_
 }
 
 #############
+#' retrieve the minimum number of months which constitute a seasonality block
+#' @param input_dt input data.table
+#' @param seasonality_column_pattern pattern for seasonality columns
+#' @param vector_of_possible_month_block_sizes numeric vector of block sizes
+#' @param seasonal_blocksize_colname name of output column
+#' @param valid_value value indicating seasonality
+#' @return data.table with added blocksize column (NA if none)
 compute_min_seasonality_block <- function(
   input_dt,
   seasonality_column_pattern,
@@ -768,13 +775,6 @@ compute_min_seasonality_block <- function(
   seasonal_blocksize_colname,
   valid_value = 1
 ){
-  #' retrieve the minimum number of months which constitute a seasonality block
-  #' @param input_dt input data.table
-  #' @param seasonality_column_pattern pattern for seasonality columns
-  #' @param vector_of_possible_month_block_sizes numeric vector of block sizes
-  #' @param seasonal_blocksize_colname name of output column
-  #' @param valid_value value indicating seasonality
-  #' @return data.table with added blocksize column (NA if none)
   
   # column names which match pattern
   seasonality_cols <- grep(
@@ -811,15 +811,128 @@ compute_min_seasonality_block <- function(
 }
 
 #############
+#' filter groups where all unique values of a column are present
+#' @param input_dt input data.table/frame
+#' @param upper_colname name of the grouping column
+#' @param lower_colname name of the column containing values to check for completeness
+#' @return data.table containing only groups where all unique values from the original lower_colname are present
+filter_complete_groups <- function(input_dt, upper_colname, lower_colname) {
+  all_vals <- unique(input_dt[[lower_colname]])
+
+  output_dt <- copy(as.data.table(input_dt)) 
+  
+  output_dt[, if (all(all_vals %in% get(lower_colname))) .SD, by = upper_colname]
+}
+
+#############
+#' make year_month column by combining year and month columns
+#' convert to a factor ordered chronologically
+#' @param input_dt data.table/frame
+#' @param year_colname name of the year column
+#' @param month_colname name of the month column
+#' @return modified data table with new year_month factor column
+add_year_month <- function(input_dt, year_colname, month_colname) {
+  output_dt <- copy(as.data.table(input_dt))
+  output_dt[, year_month := paste0(
+    get(year_colname), "-", sprintf("%02d", get(month_colname))
+  )]
+  output_dt[, year_month := factor(
+    year_month,
+    levels = unique(year_month[order(get(year_colname), get(month_colname))])
+  )]
+  return(output_dt)
+}
+
+#############
+#' convert a string to title case
+#' @param text string of uppercase words separated by spaces
+#' @return string with each word in title case
+to_title_case <- function(text) {
+  words <- strsplit(text, " ")[[1]]
+  titled <- paste(
+    toupper(substring(words, 1, 1)),
+    tolower(substring(words, 2)),
+    sep = ""
+  )
+  paste(titled, collapse = " ")
+}
+
+#############
+#' sum a target indicator by group to get the group(s) with the highest total
+#' @param dt input data.table
+#' @param target_indicator_colname column to sum
+#' @param grouping_colname column to group by
+#' @return list with:
+#'  1. a vector of top group names
+#'  2. their aggregated value
+#'  3. the count of possibly tied groups
+get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname) {
+  agg <- dt[, .(total = sum(get(target_indicator_colname), na.rm = TRUE)), by = grouping_colname]
+  max_val <- max(agg[["total"]])
+  top_groups <- agg[total == max_val][[grouping_colname]]
+  list(
+    top_groups = top_groups,
+    top_value  = max_val,
+    n_top      = length(top_groups)
+  )
+}
+
+#############
+#' make ridgeline plot sorting y-axis categories by amount/height and set x-axis labels to show only the beginning of each year (1st month)
+#' @param dt data.table with the plotting data
+#' @param x_colname column for x-axis values (period)
+#' @param y_colname column for y-axis categories
+#' @param height_colname column which gives the ridge height (the values)
+#' @param year_colname column for x-axis labels
+#' @param month_colname column to filter for 1st month/January labels
+#' @param title plot title
+#' @param scale_constant divisor to limit the heights of the ridges
+#' @param ridge_color ridgeline fill
+#' @return ggplot object
+make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, title, scale_constant = 15000, ridge_color = "#008080") {
+    p <- ggplot(
+      dt,
+      aes(
+        x = .data[[x_colname]],
+        y = fct_reorder(.data[[y_colname]], .data[[height_colname]]),
+        height = .data[[height_colname]] / scale_constant,
+        group = .data[[y_colname]],
+        scale = 2
+      )
+    ) +
+      geom_ridgeline(
+        alpha = 0.4, scale = 4.5, linewidth = 0.3,
+        fill = ridge_color, color = "white"
+      ) +
+      scale_x_discrete(
+        breaks = dt[get(month_colname) == 1, get(x_colname)],
+        labels = dt[get(month_colname) == 1, get(year_colname)]
+      ) +
+      labs(title = title, y = "", x = "") +
+      theme_minimal() +
+      theme(
+        axis.ticks.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.border = element_blank()
+      )
+
+    return(p)
+    }
+  
+
+#############
+#' map seasonality with predefined colors
+#' areas are categorized as "Seasonal" or "Not seasonal"
+#'
+#' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
+#' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
+#' @param title_label string to customize the legend title
+#'
+#' @return a ggplot object of the seasonality map
 make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, title_label){
-  #' map seasonality with predefined colors
-  #' areas are categorized as "Seasonal" or "Not seasonal"
-  #'
-  #' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
-  #' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
-  #' @param title_label string to customize the legend title
-  #'
-  #' @return a ggplot object of the seasonality map
+
   seasonality_plot <- ggplot(spatial_seasonality_df) +
     geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
     scale_fill_manual(values = c("1" = "chartreuse2", "0" = "#1E2044"),

@@ -608,9 +608,11 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 
 #%% SEASONALITY -------------------------------------------------------------------
    
-#############
+#' @description
 #' compute month-level seasonality indicators using forward-looking month blocks
+#' 
 #' by default, implements the WHO month-block reasoning for seasonality computation; calendar-year possible using parameter
+#'
 #' @param input_dt an input data table (or data frame)
 #' @param indicator a string to specify the type of indicator (case/rainfall/etc. - will be added to the output variable name)
 #' @param values_colname the indicator column, on which the computations are made
@@ -622,6 +624,7 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 #' @param use_calendar_year_denominator logical; if TRUE, uses the total accumulated value of the current 
 #'        calendar year (Jan-Dec) as the denominator. If FALSE (default), uses the 12-month forward-looking 
 #'        sliding window as denominator (WHO approach)
+#' 
 #' @return an output data table with the additional columns for seasonality indicators
 compute_month_seasonality <- function(input_dt, indicator, values_colname, vector_of_durations, 
                                       admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', 
@@ -683,8 +686,10 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
   dt[]
 }
 
-#############
+
+#' @description
 #' compute whether or not an admin unit is "seasonal", based on WHO guidelines
+#' 
 #' @param input_dt the input data table/frame
 #' @param indicator the type of indicator
 #' @param vector_of_durations the block sizes to check
@@ -692,8 +697,8 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
 #' @param year_colname the year grouping column
 #' @param month_colname the month grouping column
 #' @param proportion_seasonal_years_threshold the minimum number of seasonal years, for the admin unit to qualify as seasonal
+#' 
 #' @return the output data table, with extra dichotomous variables (seasonal/non-seasonal for each size of month-blocks)
-
 process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', proportion_seasonal_years_threshold = 0.5){
   
   indicator <- toupper(indicator)
@@ -760,13 +765,16 @@ process_seasonality <- function(input_dt, indicator, vector_of_durations, admin_
   return(output_dt)
 }
 
-#############
+
+#' @description
 #' retrieve the minimum number of months which constitute a seasonality block
+#' 
 #' @param input_dt input data.table
 #' @param seasonality_column_pattern pattern for seasonality columns
 #' @param vector_of_possible_month_block_sizes numeric vector of block sizes
 #' @param seasonal_blocksize_colname name of output column
 #' @param valid_value value indicating seasonality
+#' 
 #' @return data.table with added blocksize column (NA if none)
 compute_min_seasonality_block <- function(
   input_dt,
@@ -810,11 +818,14 @@ compute_min_seasonality_block <- function(
   return(output_dt)
 }
 
-#############
+
+#' @description
 #' filter groups where all unique values of a column are present
+#' 
 #' @param input_dt input data.table/frame
 #' @param upper_colname name of the grouping column
 #' @param lower_colname name of the column containing values to check for completeness
+#' 
 #' @return data.table containing only groups where all unique values from the original lower_colname are present
 filter_complete_groups <- function(input_dt, upper_colname, lower_colname) {
   all_vals <- unique(input_dt[[lower_colname]])
@@ -824,12 +835,16 @@ filter_complete_groups <- function(input_dt, upper_colname, lower_colname) {
   output_dt[, if (all(all_vals %in% get(lower_colname))) .SD, by = upper_colname]
 }
 
-#############
+
+#' @description
 #' make year_month column by combining year and month columns
+#' 
 #' convert to a factor ordered chronologically
+#' 
 #' @param input_dt data.table/frame
 #' @param year_colname name of the year column
 #' @param month_colname name of the month column
+#' 
 #' @return modified data table with new year_month factor column
 add_year_month <- function(input_dt, year_colname, month_colname) {
   output_dt <- copy(as.data.table(input_dt))
@@ -843,9 +858,12 @@ add_year_month <- function(input_dt, year_colname, month_colname) {
   return(output_dt)
 }
 
-#############
+
+#' @description
 #' convert a string to title case
+#' 
 #' @param text string of uppercase words separated by spaces
+#' 
 #' @return string with each word in title case
 to_title_case <- function(text) {
   words <- strsplit(text, " ")[[1]]
@@ -857,15 +875,15 @@ to_title_case <- function(text) {
   paste(titled, collapse = " ")
 }
 
-#############
+
+#' @description
 #' sum a target indicator by group to get the group(s) with the highest total
+#' 
 #' @param dt input data.table
 #' @param target_indicator_colname column to sum
 #' @param grouping_colname column to group by
-#' @return list with:
-#'  1. a vector of top group names
-#'  2. their aggregated value
-#'  3. the count of possibly tied groups
+#' 
+#' @return list with: 1. a vector of top group names; 2. their aggregated value; 3. the count of possibly tied groups
 get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname) {
   agg <- dt[, .(total = sum(get(target_indicator_colname), na.rm = TRUE)), by = grouping_colname]
   max_val <- max(agg[["total"]])
@@ -877,8 +895,10 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
   )
 }
 
-#############
+
+#' @description
 #' make ridgeline plot sorting y-axis categories by amount/height and set x-axis labels to show only the beginning of each year (1st month)
+#' 
 #' @param dt data.table with the plotting data
 #' @param x_colname column for x-axis values (period)
 #' @param y_colname column for y-axis categories
@@ -888,6 +908,7 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 #' @param title plot title
 #' @param scale_constant divisor to limit the heights of the ridges
 #' @param ridge_color ridgeline fill
+#' 
 #' @return ggplot object
 make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, title, scale_constant = 15000, ridge_color = "#008080") {
     p <- ggplot(
@@ -922,21 +943,24 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
     }
   
 
-#############
+#' @description 
 #' map seasonality with predefined colors
+#' 
 #' areas are categorized as "Seasonal" or "Not seasonal"
 #'
 #' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
 #' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
 #' @param title_label string to customize the legend title
-#'
+#' @param seasonal_color color for areas which are seasonal
+#' @param not_seasonal_color color for areas which are not seasonal
+#' 
 #' @return a ggplot object of the seasonality map
-make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, title_label){
+make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, title_label, seasonal_color="#F9A98E", not_seasonal_color="#D4E8CE"){
 
   seasonality_plot <- ggplot(spatial_seasonality_df) +
     geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
-    scale_fill_manual(values = c("1" = "chartreuse2", "0" = "#1E2044"),
-                      labels = c("1" = "Seasonal", "0" = "Not seasonal")) +  # Custom labels
+    scale_fill_manual(values = c("1" = seasonal_color, "0" = not_seasonal_color),
+                      labels = c("1" = "Saisonnier", "0" = "Non saisonnierl")) +  # Custom labels
     coord_sf() + # map projection
     # guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
     guides(fill=guide_legend(title=title_label, nrow = 2)) +
@@ -949,43 +973,56 @@ make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, t
   return(seasonality_plot)
 }
 
-#############
-make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, palette_name = 'BrBG', none_label="No seasonality"){
-  #' map the duration of seasonality (in how many months x% of annual rain falls)
-  #'
-  #' @param spatial_seasonality_df sf data with spatial and seasonality columns
-  #' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
-  #' @param title_label string for the legend title
-  #' @param palette_name colorbrewer palette (default is 'BrBG')
-  #' @param none_label legend label when there is no seasonality (defaults to "Not seasonal")
-  #' 
-  #' @return ggplot object
-  #' 
-  duration_plot <- ggplot(spatial_seasonality_df) +
-    geom_sf(aes(fill = as.character(get(seasonality_duration_colname))))+
-    coord_sf() + # map projection
-    # scale_fill_discrete(
-    #   # values = sort(unique(as.character(plot_df[['seasonality_duration_colname']]))),  # custom colors
-    #   labels = function(x) {
-    #     ifelse(x == "Inf", none_label, x) # custom labels
-    #     }
-    #   )    +
-    # 
-    scale_fill_brewer(palette = palette_name, labels = function(x) {
-      ifelse(is.na(x), none_label, x) # custom labels
-    }
-    ) +
-    # guides(fill=guide_legend(title= paste0("Number of months (", title_label, ")" ), nrow = 2)) +
-    guides(fill=guide_legend(title=title_label, nrow = 2)) +
-    theme_classic() +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5),
-          legend.position = "bottom", legend.key.width = unit(2,"cm"), legend.text=element_text(size=10))
+
+#' @description
+#' map the duration of seasonality (in how many months x% of annual rain falls)
+#'
+#' @param spatial_seasonality_df sf data with spatial and seasonality columns
+#' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
+#' @param title_label string for the legend title
+#' @param color_vector vector of colors for the plot
+#' @param none_label legend label when there is no seasonality
+#' 
+#' @return ggplot object
+make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, color_vector = c("#FDDECE", "#F07A58", "#A8381E"), none_label="Pas saisonnier"){
   
+  # get the possible values of the duration; decreasing order, so that the most intense color is the shortest (most dramatic) type of seasonality
+  unique_values <- sort(unique(as.character(spatial_seasonality_df[[seasonality_duration_colname]])), decreasing = TRUE)
+
+  # check that they matche the number of colors
+  if (length(color_vector) < length(unique_values)) {
+    stop("The number of colors provided in 'color_vector' must be at least equal to the number of unique values in the data.")
+  }
+
+  # map colors to values
+  color_mapping <- setNames(color_vector[1:length(unique_values)], unique_values)
+
+  duration_plot <- ggplot(spatial_seasonality_df) +
+    geom_sf(aes(fill = as.character(get(seasonality_duration_colname)))) +
+    coord_sf() + # map projection
+    scale_fill_manual(
+      values = color_mapping,
+      labels = function(x) {
+        ifelse(is.na(x) | x == "Inf", none_label, x) # custom labels
+      },
+      na.value="#D3D3D3"
+    ) +
+    guides(fill = guide_legend(title = title_label, nrow = 2)) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0.5),
+      legend.position = "bottom",
+      legend.key.width = unit(2, "cm"),
+      legend.text = element_text(size = 10)
+    )
+
   print(duration_plot)
   return(duration_plot)
 }
 
+#' @description
 #' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
+#' 
 #' @param input_dt an input data table (or data frame)
 #' @param values_colname the indicator column, on which the computations are made
 #' @param vector_of_durations the vector with the number of months in a block (3/4/5)
@@ -993,6 +1030,7 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
 #' @param year_colname year grouping column
 #' @param month_colname month grouping column
 #' @param percentage_threshold the percentage which needs to occur in a block, to qualify for seasonality
+#' 
 #' @return an output data table with the additional column
 compute_block_percentage <- function(input_dt, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', percentage_threshold = 0.6) {
 
@@ -1050,7 +1088,9 @@ filter_cycles_data <- function(input_dt, pattern_cycle_colnames, id_colnames, ye
   return(output_dt)
 }
 
-#' Transform a wide-format data table containing cycle coverage columns into a cleaned long-format table, extract coverage percentages from column names and keep the maximum percentage covered per group
+#' @description
+#' transform a wide-format data table containing cycle coverage columns into a cleaned long-format table, extract coverage percentages from column names and keep the maximum percentage covered per group
+#' 
 #' @param input_dt dt in wide format containing:
 #' @param space_colname name of the spatial grouping column
 #' @param time_colname name of the temporalgrouping column
@@ -1084,7 +1124,9 @@ prep_cycles_long <- function(input_dt, space_colname, time_colname){
   return(output_dt)
 }
 
-#' Fill missing values in long-format cycles data
+#' @description
+#' fill missing values in long-format cycles data
+#' 
 #' @param input_dt df/dt in long format containing spatial, temporal, ordering and value columns
 #' @param spatial_colname name of the spatial grouping column
 #' @param temporal_colname name of the temporal grouping column
@@ -1106,7 +1148,8 @@ fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, ord
 
 }
 
-#' Make a choropleth map from an sf object
+#' @description
+#' make a choropleth map from an sf object
 #'
 #' @param spatial_df sf object containing geometries and the variable map
 #' @param target_colname name of the column to use for the fill aesthetic

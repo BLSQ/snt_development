@@ -151,3 +151,25 @@ get_range_from_count <- function(count) {
 # # [1] "#A2CAEA" "#ACDF9B" "#F5F1A0" "#F2B16E" "#E4754F" "#A93A42"
 
 
+
+#' @description
+#' make k-means based breaks for binning the distributions (for maps)
+#'
+#' @param x vector (numeric)
+#' @param num_categories number of clusters to create
+#' @return the vector of breakpoints for binning
+make_k_means_breaks <- function(x, num_categories) {
+  km <- kmeans(x[!is.na(x)], centers = num_categories, nstart = 25)
+  centers <- sort(as.numeric(km$centers))
+  midpoints <- (centers[-length(centers)] + centers[-1]) / 2
+  c(min(x, na.rm = TRUE), midpoints, max(x, na.rm = TRUE))
+}
+
+
+
+
+
+
+
+
+

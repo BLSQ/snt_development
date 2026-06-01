@@ -142,11 +142,11 @@ make_rainfall_proportion_plot <- function(
     plot_subtitle,
     plot_caption,
     color_vector = c(
-        "<20%" = "#C8DDD9",
-        "20 - 40%" = "#9DBFBB",
-        "40 - 60%" = "#5E9490",
-        "60 - 80%" = "#2E6460",
-        ">80%" = "#264A48"
+        "#C8DDD9",
+        "#9DBFBB",
+        "#5E9490",
+        "#2E6460",
+        "#264A48"
     )
 ) {
  
@@ -164,12 +164,6 @@ make_rainfall_proportion_plot <- function(
  
   if (!is.numeric(prop_vals)) {
     stop("The rainfall proportion column must be numeric.")
-  }
- 
-  # rescale 0–100 to 0–1 if needed
-  valid_vals <- prop_vals[!is.na(prop_vals)]
-  if (any(valid_vals > 1)) {
-    prop_vals <- prop_vals / 100
   }
  
   # bin into five ordered categories

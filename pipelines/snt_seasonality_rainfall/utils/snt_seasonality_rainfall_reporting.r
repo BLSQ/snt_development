@@ -59,7 +59,7 @@ make_rainfall_start_month_plot <- function(
   scale_labels <- color_labels[present_months]
  
   # make the plot
-  p <- ggplot2::ggplot(data = plot_data) +
+  seasonality_start_plot <- ggplot2::ggplot(data = plot_data) +
  
     # geo layer
     ggplot2::geom_sf(
@@ -92,7 +92,7 @@ make_rainfall_start_month_plot <- function(
     ) +
  
     # map theme
-    ggplot2::theme_void(base_size = 11) +
+    ggplot2::theme_void() +
     ggplot2::theme(
         plot.title = ggplot2::element_text(
             face = "bold", size = 10,
@@ -115,15 +115,16 @@ make_rainfall_start_month_plot <- function(
  
   # append NA note to caption if any missing values exist in the data, so they also appear in the legend
   if (anyNA(month_vals)) {
-    p <- p + ggplot2::labs(
+    seasonality_start_plot <- seasonality_start_plot + ggplot2::labs(
       caption = paste0(plot_caption,
         if (nchar(plot_caption) > 0) "\n" else "",
         "\u25A0 : ", missing_label)
       )
   }
  
-  return(p)
+  return(seasonality_start_plot)
 }
+
 
 #' @description
 #' rainfall proportion plot with custom color palette
@@ -131,55 +132,125 @@ make_rainfall_start_month_plot <- function(
 #' @param plot_data a data frame containingwith spatial data and a column for rainfall proportion
 #' @param subtitle_text text for the plot subtitle
 #' @param data_source source of the data for the plot caption
-#' @param proportion_col column of the rainfall proportion values; default is RAIN_PROPORTION
+#' @param proportion_colname column of the rainfall proportion values; default is RAIN_PROPORTION
 #'
 #' @return a ggplot object or NULL if proportion_col is not found in plot_data
 make_rainfall_proportion_plot <- function(
     plot_data,
-    subtitle_text,
-    data_source,
-    proportion_col = "RAIN_PROPORTION"
-) {
-    if (!proportion_col %in% names(plot_data)) {
-        return(NULL)
-    }
-
-    proportion_values <- suppressWarnings(as.numeric(plot_data[[proportion_col]]))
-    plot_data$PROPORTION_CAT <- cut(
-        proportion_values,
-        breaks = c(-Inf, 0.2, 0.4, 0.6, 0.8, Inf),
-        labels = c("<20%", "20 - 40%", "40 - 60%", "60 - 80%", ">80%"),
-        include.lowest = TRUE
-    )
-
-    proportion_palette <- c(
+    proportion_colname,
+    plot_title,
+    plot_subtitle,
+    plot_caption,
+    color_vector = c(
         "<20%" = "#C8DDD9",
         "20 - 40%" = "#9DBFBB",
         "40 - 60%" = "#5E9490",
         "60 - 80%" = "#2E6460",
         ">80%" = "#264A48"
     )
-  
-    ggplot2::ggplot(plot_data) +
-        ggplot2::geom_sf(ggplot2::aes(fill = .data$PROPORTION_CAT), color = "black", size = 0.1) +
-        ggplot2::scale_fill_manual(
-            values = proportion_palette,
-            na.value="#D3D3D3",
-            limits = names(proportion_palette),
-            drop = FALSE
-        ) +
-        ggplot2::theme_void() +
-        ggplot2::labs(
-            title = "Précipitations durant la saison pluvieuse (%)",
-            subtitle = subtitle_text,
-            caption = paste("Données:", data_source),
-            fill = NULL
-        ) +
-        ggplot2::theme(
-            legend.position = "bottom",
-            plot.title = ggplot2::element_text(size = 10, face = "bold"),
-            plot.subtitle = ggplot2::element_text(size = 6),
-            legend.text = ggplot2::element_text(size = 8)
-        ) +
-        ggplot2::guides(fill = ggplot2::guide_legend(ncol = 3))
+) {
+ 
+  #validate inputs
+  if (!inherits(plot_data, "sf")) {
+    stop("plot_data must be an sf object.")
+  }
+ 
+  if (!proportion_colname %in% names(plot_data)) {
+    warning("The rainfall proportion column not found in plot_data. Returning NULL.")
+    return(NULL)
+  }
+ 
+  prop_vals <- plot_data[[proportion_colname]]
+ 
+  if (!is.numeric(prop_vals)) {
+    stop("The rainfall proportion column must be numeric.")
+  }
+ 
+  # rescale 0–100 to 0–1 if needed
+  valid_vals <- prop_vals[!is.na(prop_vals)]
+  if (any(valid_vals > 1)) {
+    prop_vals <- prop_vals / 100
+  }
+ 
+  # bin into five ordered categories
+  bin_breaks <- c(-Inf, 0.20, 0.40, 0.60, 0.80, Inf)
+  bin_labels <- c("<20%", "20 - 40%", "40 - 60%", "60 - 80%", ">80%")
+ 
+  plot_data <- plot_data |>
+    dplyr::mutate(
+      .prop_rescaled = prop_vals,
+      .rain_category = cut(
+        .prop_rescaled,
+        breaks         = bin_breaks,
+        labels         = bin_labels,
+        include.lowest = TRUE,
+        right          = FALSE
+      )
+    )
+ 
+  # make plot
+  rain_proportion_plot <- ggplot2::ggplot(data = plot_data) +
+ 
+    # geo layer
+    ggplot2::geom_sf(
+      ggplot2::aes(fill = .rain_category),
+      colour    = "white",
+      linewidth = 0.15
+    ) +
+ 
+    # discrete colors and handle missings
+    ggplot2::scale_fill_manual(
+      values   = color_vector,
+      breaks   = bin_labels,
+      na.value = "#D3D3D3",
+      name     = NULL,
+      drop     = TRUE,
+      guide    = ggplot2::guide_legend(
+        title          = NULL,
+        override.aes   = list(colour = "white", linewidth = 0.3),
+        label.position = "right",
+        keywidth       = ggplot2::unit(0.9, "lines"),
+        keyheight      = ggplot2::unit(0.9, "lines")
+      )
+    ) +
+ 
+    # titles
+    ggplot2::labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+ 
+  # add NA note to caption if any missing values in data
+  if (anyNA(prop_vals)) {
+    rain_proportion_plot <- rain_proportion_plot + ggplot2::labs(
+      caption = paste0(data_source,
+        if (nchar(data_source) > 0) "\n" else "",
+        "\u25A0 Non saisonnier")
+    )
+  }
+ 
+  return(rain_proportion_plot)
 }

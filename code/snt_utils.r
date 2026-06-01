@@ -1028,12 +1028,22 @@ make_seasonality_plot <- function(
 #'
 #' @param spatial_seasonality_df sf data with spatial and seasonality columns
 #' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
-#' @param title_label string for the legend title
+#' @param plot_title title of the plot
+#' @param plot_subtitle subtitle of the plot
+#' @param plot_caption caption of the plot
 #' @param color_vector vector of colors for the plot
 #' @param none_label legend label when there is no seasonality
 #' 
 #' @return ggplot object
-make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, color_vector = c("#FDDECE", "#F07A58", "#A8381E"), none_label="Pas saisonnier"){
+make_seasonality_duration_plot <- function(
+  spatial_seasonality_df,
+  seasonality_duration_colname,
+  plot_title,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  color_vector = c("#FDDECE", "#F07A58", "#A8381E"),
+  none_label="Pas saisonnier"
+){
   
   # get the possible values of the duration; decreasing order, so that the most intense color is the shortest (most dramatic) type of seasonality
   unique_values <- sort(unique(as.character(spatial_seasonality_df[[seasonality_duration_colname]])), decreasing = TRUE)
@@ -1056,16 +1066,38 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
       },
       na.value="#D3D3D3"
     ) +
-    guides(fill = guide_legend(title = title_label, nrow = 2)) +
-    theme_classic() +
-    theme(
-      plot.title = element_text(face = "bold", hjust = 0.5),
-      legend.position = "bottom",
-      legend.key.width = unit(2, "cm"),
-      legend.text = element_text(size = 10)
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+    
+    guides(fill = guide_legend(title = NULL, nrow = 2)) +
+
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
     )
 
-  print(duration_plot)
   return(duration_plot)
 }
 

@@ -1,110 +1,129 @@
 # Helpers for rainfall seasonality reporting notebook.
 
-#' @description make English language labels for month numbers
-rainfall_month_labels_en <- function() {
-    c(
-        "1" = "January", "2" = "February", "3" = "March", "4" = "April",
-        "5" = "May", "6" = "June", "7" = "July", "8" = "August",
-        "9" = "September", "10" = "October", "11" = "November", "12" = "December"
-    )
-}
-
-#' @description make French language labels for month numbers
-rainfall_month_labels_fr <- function() {
-    c(
-        "1" = "Janvier", "2" = "Février", "3" = "Mars", "4" = "Avril",
-        "5" = "Mai", "6" = "Juin", "7" = "Juillet", "8" = "Août",
-        "9" = "Septembre", "10" = "Octobre", "11" = "Novembre", "12" = "Décembre"
-    )
-}
-
-#' @description make a palette for month names in French
-rainfall_month_palette_fr <- function() {
-    c(
-        "Janvier" = "#1E90FF",
-        "Février" = "#2060E8",
-        "Mars" = "#5030D0",
-        "Avril" = "#8020B8",
-        "Mai" = "#B01890",
-        "Juin" = "#D41E55",
-        "Juillet" = "#E83020",
-        "Août" = "#F56800",
-        "Septembre" = "#F5A800",
-        "Octobre" = "#C8C800",
-        "Novembre" = "#60C820",
-        "Décembre" = "#20B860"
-    )
-}
-
-#' @description make a palette for month names in English
-rainfall_month_palette_en <- function() {
-    c(
-        "January" = "#9E0142",
-        "February" = "#D53E4F",
-        "March" = "#F46D43",
-        "April" = "#FDAE61",
-        "May" = "#FEE08B",
-        "June" = "#E6F598",
-        "July" = "#ABDDA4",
-        "August" = "#66C2A5",
-        "September" = "#3288BD",
-        "October" = "#5E4FA2",
-        "November" = "#C51B7D",
-        "December" = "#8E0152"
-    )
-}
-
 #' @description
 #' plot the start month of the rainy season with custom color palette
 #'
 #' @param plot_data a data frame with spatial data and a column for the start month of the rainy season
 #' @param season_start_month_col column that gives the start month values
-#' @param subtitle_text text for the plot subtitle
-#' @param data_source source of the data for the plot caption
+#' @param color_vector vector of colors to be used for January-December
+#' @param plot_title text for the plot main title
+#' @param plot_subtitle text for the plot subtitle
+#' @param plot_caption text for the plot caption
+#' @param missing_label label for the missing values (non seasonal areas)
 #'
 #' @return a ggplot object or NULL if season_start_month_col is not found in plot_data
 make_rainfall_start_month_plot <- function(
     plot_data,
     season_start_month_col,
-    subtitle_text,
-    data_source
+    color_vector,
+    color_labels,
+    plot_title,
+    plot_subtitle,
+    plot_caption,
+    missing_label = "Non saisonnier"
 ) {
-    if (!season_start_month_col %in% names(plot_data)) {
-        return(NULL)
-    }
-
-    month_labels <- rainfall_month_labels_fr()
-    month_colors <- rainfall_month_palette_fr()
-    plot_data$START_MONTH_FACTOR <- factor(
-        as.character(plot_data[[season_start_month_col]]),
-        levels = as.character(1:12),
-        labels = month_labels
+  
+  # validate inputs
+  stopifnot(
+    "seasonality start plot_data must be an sf object" = inherits(plot_data, "sf"),
+    "seasonality start month column must be a single string" = is.character(season_start_month_col) && length(season_start_month_col) == 1,
+    "seasonality start month column not found in plot_data" = season_start_month_col %in% names(plot_data),
+    "seasonality start color_vector must have exactly 12 elements" = length(color_vector) == 12,
+    "seasonality start color_labels must have exactly 12 elements" = length(color_labels) == 12
+  )
+ 
+  month_vals <- plot_data[[season_start_month_col]]
+  valid_vals <- month_vals[!is.na(month_vals)]
+  if (!all(valid_vals %in% 1:12)) {
+    stop("Column '", season_start_month_col,
+        "' contains values outside 1–12: ",
+        paste(sort(unique(valid_vals[!valid_vals %in% 1:12])), collapse = ", "))
+  }
+ 
+  # make a factor column with ordered levels 1–12 for the months
+  # NA stays NA so it gets the na.value color in scale_fill_manual
+  plot_data <- plot_data |>
+    dplyr::mutate(
+      .month_factor = factor(.data[[season_start_month_col]], levels = 1:12)
     )
-
-    ggplot2::ggplot(plot_data) +
-        ggplot2::geom_sf(ggplot2::aes(fill = .data$START_MONTH_FACTOR), color = "black", size = 0.1) +
-        ggplot2::scale_fill_manual(
-            values = month_colors,
-            na.value="#D3D3D3",
-            drop = FALSE,
-            guide = ggplot2::guide_legend(nrow = 1)
-        ) +
-        ggplot2::theme_void() +
-        ggplot2::labs(
-            title = "Début de la saison pluvieuse",
-            subtitle = subtitle_text,
-            caption = paste("Données:", data_source),
-            fill = NULL
-        ) +
-        ggplot2::theme(
-            plot.title = ggplot2::element_text(face = "bold", size = 10),
-            plot.subtitle = ggplot2::element_text(size = 6),
-            legend.position = "bottom",
-            legend.text = ggplot2::element_text(size = 8)
-        ) +
-        guides(fill=guide_legend(nrow = 2))
+ 
+  # make color / label scales including only the months that are in the data
+  present_months <- sort(unique(as.integer(
+    levels(droplevels(plot_data$.month_factor))
+  )))
+  present_months <- present_months[present_months %in% 1:12]
+ 
+  scale_values <- stats::setNames(color_vector[present_months],
+                                  as.character(present_months))
+  scale_breaks <- as.character(present_months)
+  scale_labels <- color_labels[present_months]
+ 
+  # make the plot
+  p <- ggplot2::ggplot(data = plot_data) +
+ 
+    # geo layer
+    ggplot2::geom_sf(
+      ggplot2::aes(fill = .month_factor),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+ 
+    # discrete color scale with NA handling
+    ggplot2::scale_fill_manual(
+      values = scale_values,
+      breaks = scale_breaks,
+      labels = scale_labels,
+      na.value = "#D3D3D3",
+      name = NULL,
+      guide = ggplot2::guide_legend(
+        title = NULL,
+        override.aes = list(colour = "white", linewidth = 0.3),
+        label.position = "right",
+        keywidth = ggplot2::unit(0.9, "lines"),
+        keyheight = ggplot2::unit(0.9, "lines")
+      )
+    ) +
+ 
+    # labels
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void(base_size = 11) +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+ 
+  # append NA note to caption if any missing values exist in the data, so they also appear in the legend
+  if (anyNA(month_vals)) {
+    p <- p + ggplot2::labs(
+      caption = paste0(plot_caption,
+        if (nchar(plot_caption) > 0) "\n" else "",
+        "\u25A0 : ", missing_label)
+      )
+  }
+ 
+  return(p)
 }
-
 
 #' @description
 #' rainfall proportion plot with custom color palette

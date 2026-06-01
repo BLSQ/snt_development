@@ -150,4 +150,31 @@ get_range_from_count <- function(count) {
 # get_range_from_count(5)
 # # [1] "#A2CAEA" "#ACDF9B" "#F5F1A0" "#F2B16E" "#E4754F" "#A93A42"
 
+make_month_colors <- function(){
+  month_colors <- c(
+    "#18a7e0e8",   # Janvier
+    "#2060E8",     # Février
+    "#5030D0",     # Mars
+    "#8020B8",     # Avril
+    "#B01890",     # Mai
+    "#D41E55",     # Juin
+    "#E83020",     # Juillet
+    "#F56800",     # Août
+    "#F5A800",     # Septembre
+    "#C8C800",     # Octobre
+    "#60C820",     # Novembre
+    "#20b883"      # Décembre
+  )
 
+  return(month_colors)
+}
+
+make_month_labels_fr <- function(){
+  month_labels_fr <- c(
+    "Janvier", "Février", "Mars", "Avril",
+    "Mai", "Juin", "Juillet", "Août",
+    "Septembre", "Octobre", "Novembre", "Décembre"
+  )
+
+  return(month_labels_fr)
+}

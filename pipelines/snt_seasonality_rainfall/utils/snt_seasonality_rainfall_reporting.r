@@ -84,7 +84,7 @@ make_rainfall_start_month_plot <- function(
       )
     ) +
  
-    # labels
+    # titles
     ggplot2::labs(
       title = plot_title,
       subtitle = plot_subtitle,

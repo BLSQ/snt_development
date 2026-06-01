@@ -956,25 +956,68 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
 #'
 #' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
 #' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
-#' @param title_label string to customize the legend title
+#' @param plot_title title of the plot
+#' @param plot_subtitle subtitle of the plot
+#' @param plot_caption caption of the plot
 #' @param seasonal_color color for areas which are seasonal
+#' @param seasonal_label legend label for areas which are seasonal
 #' @param not_seasonal_color color for areas which are not seasonal
+#' @param not_seasonal_label legend label for areas which are not seasonal
 #' 
 #' @return a ggplot object of the seasonality map
-make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, title_label, seasonal_color="#F9A98E", not_seasonal_color="#D4E8CE"){
+make_seasonality_plot <- function(
+  spatial_seasonality_df,
+  seasonality_colname,
+  plot_title,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  seasonal_color = "#F9A98E",
+  seasonal_label = "Saisonnier",
+  not_seasonal_color = "#D4E8CE",
+  not_seasonal_label = "Non saisonnier"
+){
 
   seasonality_plot <- ggplot(spatial_seasonality_df) +
     geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
-    scale_fill_manual(values = c("1" = seasonal_color, "0" = not_seasonal_color),
-                      labels = c("1" = "Saisonnier", "0" = "Non saisonnier")) +  # Custom labels
+
+    scale_fill_manual(
+        name = NULL,
+        # specific labels and colors
+        values = c("1" = seasonal_color, "0" = not_seasonal_color),
+        labels = c("1" = seasonal_label, "0" = not_seasonal_label)
+    ) +
     coord_sf() + # map projection
-    # guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
-    guides(fill=guide_legend(title=title_label, nrow = 2)) +
-    theme_classic() +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5),
-          legend.position = "bottom", legend.key.width = unit(2,"cm"), legend.text=element_text(size=10))
-  
-  print(seasonality_plot)
+
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+
+    guides(fill=guide_legend(title=NULL, nrow = 2)) +
+    
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
   
   return(seasonality_plot)
 }

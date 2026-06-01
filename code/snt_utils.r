@@ -1788,51 +1788,7 @@ make_coverage_radii_terra <- function(
   
   return(coverage_radii_degrees)
 }
-
-########################
-make_overlaid_sf_plot <- function(
-  #' plot overlaying a) administrative boundaries, b) location of healthcare units, c) buffers around each healthcare unit
-  
-  admin_unit_vect,
-  points_sf_vect,
-  buffer_vect,
-  epsg_value_degrees,
-  plot_title
-){
-
-  #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
-  #'
-  #' @param admin_unit_vect: sf vector of administrative boundaries
-  #' @param points_sf_vect: sf vector with coordinate columns of healthcare units
-  #' @param buffer_vect: sf vector of buffer zones around healthcare units
-  #' @param epsg_value_degrees: EPSG code (in degrees) for CRS
-  #' @param plot_title: title of plot
-  #'
-  #' @return ggplot object showing the spatial overlay
-
-  # get all 3 data objects to the same projection
-
-  # a) ensure the healthcare locations have the proper projection
-  points_sf_vect <- reproject_epsg(points_sf_vect, epsg_value_degrees)
-
-  # b) ensure the admin geo data has the proper projection
-  admin_unit_vect <- reproject_epsg(admin_unit_vect, epsg_value_degrees)
-
-  # c) ensure the buffer data has the proper projection
-  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
-
-  plot <- ggplot() +
-    geom_sf(data = admin_unit_vect, fill = "gray95", color = "black") +
-    geom_sf(data = buffer_vect, fill = "dodgerblue", alpha = 0.3) +
-    geom_sf(data = points_sf_vect, color = "dodgerblue4", size = 0.5) +
-    theme_minimal() +
-    ggtitle(plot_title)
-
-  # print(plot)  # do not print
-
-  return(plot)
-}
-           
+          
 
 ########################
 make_rasterized_inclusion_data <- function(

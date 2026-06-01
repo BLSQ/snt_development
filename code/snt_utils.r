@@ -960,7 +960,7 @@ make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, t
   seasonality_plot <- ggplot(spatial_seasonality_df) +
     geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
     scale_fill_manual(values = c("1" = seasonal_color, "0" = not_seasonal_color),
-                      labels = c("1" = "Saisonnier", "0" = "Non saisonnierl")) +  # Custom labels
+                      labels = c("1" = "Saisonnier", "0" = "Non saisonnier")) +  # Custom labels
     coord_sf() + # map projection
     # guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
     guides(fill=guide_legend(title=title_label, nrow = 2)) +

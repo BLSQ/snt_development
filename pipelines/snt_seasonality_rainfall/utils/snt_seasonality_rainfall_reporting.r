@@ -101,7 +101,8 @@ make_rainfall_start_month_plot <- function(
             plot.subtitle = ggplot2::element_text(size = 6),
             legend.position = "bottom",
             legend.text = ggplot2::element_text(size = 8)
-        )
+        ) +
+        guides(fill=guide_legend(nrow = 2))
 }
 
 

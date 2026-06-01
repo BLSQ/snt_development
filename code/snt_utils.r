@@ -905,12 +905,13 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 #' @param height_colname column which gives the ridge height (the values)
 #' @param year_colname column for x-axis labels
 #' @param month_colname column to filter for 1st month/January labels
-#' @param title plot title
+#' @param plot_title plot title
+#' @param plot_caption plot caption
 #' @param scale_constant divisor to limit the heights of the ridges
 #' @param ridge_color ridgeline fill
 #' 
 #' @return ggplot object
-make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, title, scale_constant = 15000, ridge_color = "#008080") {
+make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, plot_title, plot_caption = NULL, scale_constant = 15000, ridge_color = "#008080") {
     p <- ggplot(
       dt,
       aes(
@@ -929,7 +930,12 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
         breaks = dt[get(month_colname) == 1, get(x_colname)],
         labels = dt[get(month_colname) == 1, get(year_colname)]
       ) +
-      labs(title = title, y = "", x = "") +
+      labs(
+          title = plot_title,
+          y = "",
+          x = "",
+          caption = plot_caption
+      ) +
       theme_minimal() +
       theme(
         axis.ticks.y = element_blank(),

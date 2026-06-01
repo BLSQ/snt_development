@@ -150,13 +150,23 @@ get_range_from_count <- function(count) {
 # get_range_from_count(5)
 # # [1] "#A2CAEA" "#ACDF9B" "#F5F1A0" "#F2B16E" "#E4754F" "#A93A42"
 
+#' @description
+#' make equal frequency breaks for binning the distributions (for maps)
+#'
+#' @param x vector (numeric)
+#' @param num_categories number of groups to make
+#' @return the vector of breakpoints for binning
+make_equal_frequency_breaks <- function(x, num_categories) {
+  probs <- seq(0, 1, length.out = num_categories + 1)
+  as.numeric(quantile(x, probs = probs, na.rm = TRUE))
+}
 
 
 #' @description
 #' make k-means based breaks for binning the distributions (for maps)
 #'
 #' @param x vector (numeric)
-#' @param num_categories number of clusters to create
+#' @param num_categories number of groups to make
 #' @return the vector of breakpoints for binning
 make_k_means_breaks <- function(x, num_categories) {
   km <- kmeans(x[!is.na(x)], centers = num_categories, nstart = 25)

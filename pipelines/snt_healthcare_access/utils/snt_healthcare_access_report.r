@@ -104,7 +104,7 @@ plot_raster_with_boundaries <- function(
     ggplot2::scale_fill_gradient(
       low = low_color,
       high = high_color,
-      name = NULL
+      name = NULL,
       na.value = "#D3D3D3"
     ) +
 

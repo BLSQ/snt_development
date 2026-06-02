@@ -10,8 +10,8 @@
 bootstrap_healthcare_access_context <- function(
     root_path = "~/workspace",
     required_packages = c(
-        "jsonlite", "dplyr", "data.table", "ggplot2", "arrow", "glue",
-        "sf", "terra", "httr", "reticulate", "stringr", "RColorBrewer"
+        "jsonlite", "dplyr", "tidyr", "scales", "ggplot2", "data.table", "arrow", "glue",
+        "sf", "terra", "tidyterra", "httr", "reticulate", "stringr", "RColorBrewer"
     ),
     load_openhexa = TRUE
 ) {

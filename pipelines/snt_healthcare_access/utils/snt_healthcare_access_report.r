@@ -41,52 +41,73 @@ make_overlaid_sf_plot <- function(
 }
 
 #' @description
-#' choropleth map of population
+#' choropleth map of raster data with polygon borders
 #'
-#' @param input_data sf object with the geometries and data to plot
-#' @param target_colname name of column to map
-#' @param low_color color for the low end of the gradient (defaults to "#f7fbff")
-#' @param high_color color for the high end of the gradient (defaults to"#08306b")
-#' @param plot_title title of the plot
-#' @param plot_subtitle subtitle of the plot
-#' @param plot_caption caption of the plot
+#' @param input_raster spatraster with object to plot
+#' @param input_vector sf polygon to overlay as boundaries
+#' @param epsg_value_degrees CRS for the map (defaults to 4326)
+#' @param low_color color for the low end of the gradient (defaults to "#f7f4f9")
+#' @param high_color color for the high end of the gradient (defaults to "#49006a")
+#' @param plot_title title of the map (defaults to NULL).
+#' @param plot_subtitle subtitle of the map (defaults to NULL).
+#' @param plot_caption plot caption (defaults to NULL).
 #'
-#' @return ggplot object
-make_population_choropleth_map <- function(
-    input_data,
-    target_colname,
-    low_color    = "#f7fbff",
-    high_color   = "#08306b",
-    plot_title   = NULL,
+#' @return ggplot plot
+plot_raster_with_boundaries <- function(
+    input_raster,
+    input_vector,
+    epsg_value_degrees = 4326,
+    low_color = "#f7fbff",
+    high_color = "#08306b",
+    plot_title = NULL,
     plot_subtitle = NULL,
     plot_caption = NULL
 ) {
+
   # validate inputs
-  if (!inherits(input_data, "sf")) {
-    stop("The data to plot must be an sf object")
+  if (!inherits(input_raster, "SpatRaster")) {
+    stop("The input_raster must be a terra SpatRaster object.")
   }
-  if (!target_colname %in% names(input_data)) {
-    stop("Population column is not part of the data")
+  if (!inherits(input_vector, "sf")) {
+    stop("The input_vector must be an sf object.")
   }
-  if (!is.numeric(input_data[[target_colname]])) {
-    stop("Population column must be numeric")
+  if (!is.numeric(epsg_value_degrees) || length(epsg_value_degrees) != 1) {
+    stop("The CRS value (epsg_value_degrees) must be a single numeric EPSG code (e.g. 4326).")
   }
- 
-  # plot
-  ggplot(data = input_data) +
-    geom_sf(
-      aes(fill = .data[[target_colname]]),
-      color = "white",
-      linewidth = 0.2
+
+  target_crs <- paste0("EPSG:", epsg_value_degrees)
+
+  # reproject the raster if needed
+  if (!terra::same.crs(input_raster, target_crs)) {
+    message("Reprojecting raster to EPSG:", epsg_value_degrees)
+    input_raster <- terra::project(input_raster, target_crs)
+  }
+
+  # reproject the sf object if needed
+  if (sf::st_crs(input_vector)$epsg != epsg_value_degrees) {
+    message("Reprojecting vector to EPSG:", epsg_value_degrees)
+    input_vector <- sf::st_transform(input_vector, epsg_value_degrees)
+  }
+
+  # get the raster layer name
+  layer_name <- names(input_raster)[1]
+
+  # plot the map
+  raster_plot <- ggplot2::ggplot() +
+    tidyterra::geom_spatraster(data = input_raster) +
+    ggplot2::geom_sf(
+      data = input_vector,
+      fill = NA,
+      color = "black",
+      linewidth = 0.5
     ) +
-    
-    scale_fill_gradient(
-      low  = low_color,
+    ggplot2::scale_fill_gradient(
+      low = low_color,
       high = high_color,
-      name = NULL,
+      name = NULL
       na.value = "#D3D3D3"
     ) +
-    
+
     # titles
     ggplot2::labs(
       title = plot_title,
@@ -115,6 +136,8 @@ make_population_choropleth_map <- function(
         legend.text = ggplot2::element_text(size = 8),
         plot.margin = ggplot2::margin(10, 10, 10, 10)
     )
+
+  return(raster_plot)
 }
 
 #' @description
@@ -166,7 +189,84 @@ make_fosa_choropleth_map <- function(
     ggplot2::aes(fill = fosa_count) +
     ggplot2::geom_sf(colour = "white", linewidth = 0.3) +
     ggplot2::scale_fill_gradient(
-      low  = low_color,
+      low = low_color,
+      high = high_color,
+      name = NULL,
+      na.value = "#D3D3D3"
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+}
+
+#' @description
+#' choropleth map of population
+#'
+#' @param input_data  sf object with the geometries and data to plot
+#' @param target_colname name of the numeric column to map
+#' @param low_color color for the low end of the gradient (defaults to "#f7fbff").
+#' @param high_color color for the high end of the gradient (defaults to "#08306b").
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#'
+#' @return ggplot object
+make_population_choropleth_map <- function(
+    input_data,
+    target_colname,
+    low_color = "#f7fbff",
+    high_color = "#08306b",
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL
+) {
+  # validate inputs
+  if (!inherits(input_data, "sf")) {
+    stop("The data to plot must be an sf object")
+  }
+  if (!target_colname %in% names(input_data)) {
+    stop("Population column is not part of the data")
+  }
+  if (!is.numeric(input_data[[target_colname]])) {
+    stop("Population column must be numeric")
+  }
+ 
+  # plot
+  ggplot(data = input_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    
+    scale_fill_gradient(
+      low = low_color,
       high = high_color,
       name = NULL,
       na.value = "#D3D3D3"

@@ -46,19 +46,19 @@ make_overlaid_sf_plot <- function(
 #' @param input_raster spatraster with object to plot
 #' @param input_vector sf polygon to overlay as boundaries
 #' @param epsg_value_degrees CRS for the map (defaults to 4326)
-#' @param low_color color for the low end of the gradient (defaults to "#f7f4f9")
-#' @param high_color color for the high end of the gradient (defaults to "#49006a")
-#' @param plot_title title of the map (defaults to NULL).
-#' @param plot_subtitle subtitle of the map (defaults to NULL).
-#' @param plot_caption plot caption (defaults to NULL).
+#' @param low_color color for the low end of the gradient (defaults to "#ead7f8")
+#' @param high_color color for the high end of the gradient (defaults to "#2e0044")
+#' @param plot_title title of the map (defaults to NULL)
+#' @param plot_subtitle subtitle of the map (defaults to NULL)
+#' @param plot_caption plot caption (defaults to NULL)
 #'
 #' @return ggplot plot
 plot_raster_with_boundaries <- function(
     input_raster,
     input_vector,
     epsg_value_degrees = 4326,
-    low_color = "#f7fbff",
-    high_color = "#08306b",
+    low_color = "#ead7f8",
+    high_color = "#2e0044",
     plot_title = NULL,
     plot_subtitle = NULL,
     plot_caption = NULL
@@ -98,8 +98,8 @@ plot_raster_with_boundaries <- function(
     ggplot2::geom_sf(
       data = input_vector,
       fill = NA,
-      color = "black",
-      linewidth = 0.5
+      color = "white",
+      linewidth = 0.2
     ) +
     ggplot2::scale_fill_gradient(
       low = low_color,

@@ -1965,7 +1965,7 @@ make_snt_choropleth_map <- function(
     plot_title = NULL,
     plot_subtitle = NULL,
     plot_caption = NULL,
-    legend_title
+    legend_title = NULL
 ) {
   # validate inputs
   if (!inherits(input_data, "sf")) {

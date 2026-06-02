@@ -1954,6 +1954,7 @@ get_updated_children <- function(new_level_table, group_table, level, target_lev
 #' @param plot_title map title (defaults to NULL)
 #' @param plot_subtitle map subtitle (defaults to NULL)
 #' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #'
 #' @return ggplot object
 make_snt_choropleth_map <- function(
@@ -1987,7 +1988,7 @@ make_snt_choropleth_map <- function(
     scale_fill_gradient(
       low = low_color,
       high = high_color,
-      name = NULL,
+      name = legend_title,
       na.value = "#D3D3D3"
     ) +
     

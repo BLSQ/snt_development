@@ -1642,8 +1642,10 @@ reproject_epsg <- function(x, epsg_value) {
     target_epsg  <- epsg_value
     
     if (is.na(current_epsg) || current_epsg != target_epsg) {
-      message(glue::glue("Info: reprojecting sf object to EPSG:{target_epsg}."))
+      print(glue::glue("Info: reprojecting sf object to EPSG:{target_epsg}."))
       x <- sf::st_transform(x, target_epsg)
+    } else {
+      print("Info: no reprojection needed for sf object.")
     }
     
   # check if input is terra vector
@@ -1652,8 +1654,10 @@ reproject_epsg <- function(x, epsg_value) {
     target_crs  <- epsg_value
     
     if (is.na(current_crs) || current_crs != target_crs) {
-      message(glue::glue("Info: reprojecting terra vector to EPSG:{target_crs}."))
+      print(glue::glue("Info: reprojecting terra vector to EPSG:{target_crs}."))
       x <- terra::project(x, paste0("EPSG:", target_crs))
+    } else {
+      print("Info: no reprojection needed for terra vector.")
     }
     
   } else {

@@ -17,9 +17,9 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
     "tot_pop_reference",
-    name="Total Population reference",
+    name="Part 1: Population reference",
     help=(
-        "Total population used to rescale DHIS2 population data. When provided, "
+        "Total population used to scale DHIS2 population data. When provided, "
         "DHIS2 values are adjusted proportionally to match this total."
     ),
     type=int,
@@ -28,7 +28,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_under_5",
-    name="Proportion population under 5",
+    name="Part 2: Proportion population under 5",
     help=(
         "Proportion of the total population aged under 5 (e.g. 0.17 for 17%). "
         "Used to disaggregate population figures into the under-5 age group."
@@ -39,7 +39,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_pregnant_women",
-    name="Proportion population pregnant women",
+    name="Part 2: Proportion population pregnant women",
     help=(
         "Proportion of the total population of pregnant women (e.g. 0.05 for 5%). "
         "Used to disaggregate population figures into the pregnant-women group."
@@ -50,7 +50,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_0_1_y",
-    name="Proportion population 0-1 years",
+    name="Part 2: Proportion population 0-1 years",
     help=(
         "Proportion of the total population aged 0-1 years (e.g. 0.04 for 4%). "
         "Used to disaggregate population figures into the 0-1 age group."
@@ -61,7 +61,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_1_2_y",
-    name="Proportion population 1-2 years",
+    name="Part 2: Proportion population 1-2 years",
     help=(
         "Proportion of the total population aged 1-2 years (e.g. 0.03 for 3%). "
         "Used to disaggregate population figures into the 1-2 age group."
@@ -72,7 +72,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_5_10_y",
-    name="Proportion population 5-10 years",
+    name="Part 2: Proportion population 5-10 years",
     help=(
         "Proportion of the total population aged 5-10 years (e.g. 0.06 for 6%). "
         "Used to disaggregate population figures into the 5-10 age group."
@@ -83,7 +83,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "pop_5_36_m",
-    name="Proportion population 5-36 months",
+    name="Part 2: Proportion population 5-36 months",
     help=(
         "Proportion of the total population aged 5-36 months (e.g. 0.06 for 6%). "
         "Used to disaggregate population figures into the 5-36 months age group."
@@ -94,7 +94,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "disaggregation_file",
-    name="Use disaggregation proportions (.csv)",
+    name="Part 2: Use disaggregation proportions (.csv)",
     type=File,
     required=False,
     default=None,
@@ -102,18 +102,22 @@ from snt_lib.snt_pipeline_utils import (
 )
 @parameter(
     "growth_factor",
-    name="Projection growth rate",
-    help="Annual growth rate (e.g. 0.03 for 3%) used to project DHIS2 population figures into future years.",
+    name="Part 3: Projection growth rate",
+    help=(
+        "Annual growth rate (e.g. 0.03 for 3%) used to project "
+        "DHIS2 population figures into past and future years."
+    ),
     type=float,
     default=None,
     required=True,
 )
 @parameter(
     "year_reference",
-    name="Projection reference year",
+    name="Part 3: Projection reference year",
     help=(
         "Base year from which DHIS2 population figures are projected. "
-        "This year must be available in the DHIS2 population data."
+        "This year must be available in the population data. "
+        "Defaults to the latest year available"
     ),
     type=int,
     default=None,

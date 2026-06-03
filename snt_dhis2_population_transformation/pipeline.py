@@ -20,7 +20,21 @@ from snt_lib.snt_pipeline_utils import (
     name="Part 1: Population reference",
     help=(
         "Total population used to scale DHIS2 population data. When provided, "
-        "DHIS2 values are adjusted proportionally to match this total."
+        "population values are adjusted proportionally to match this total."
+        "(e.g. 1000000 for a total population of 1 million people)."
+    ),
+    type=int,
+    default=None,
+    required=False,
+)
+@parameter(
+    "tot_pop_reference_year",
+    name="Part 1: Population year reference",
+    help=(
+        "Year corresponding to the total population reference. "
+        "This year must be available in the population data."
+        "Defaults to the latest year available in the population data."
+        "(e.g. 2025)."
     ),
     type=int,
     default=None,
@@ -141,6 +155,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_dhis2_population_transformation(
     tot_pop_reference: int,
+    tot_pop_reference_year: int,
     growth_factor: float,
     year_reference: int,
     pop_under_5: float,
@@ -206,6 +221,7 @@ def snt_dhis2_population_transformation(
 
             parameters = {
                 "TOT_POP_REFERENCE": tot_pop_reference,
+                "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year,
                 "GROWTH_FACTOR": growth_factor,
                 "YEAR_REFERENCE": year_reference,
                 "POP_UNDER_5": pop_under_5,

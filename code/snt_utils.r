@@ -2024,3 +2024,82 @@ make_snt_choropleth_map <- function(
 
   return(output_plot)
 }
+
+#' @description
+#' categorical map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the factor column to map
+#' @param color_vector vector of colors to 
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_categorical_map <- function(input_data,
+                                 target_colname,
+                                 color_vector,
+                                     plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL) {
+ 
+  # validation
+ 
+  if (!is.data.frame(input_data)) {
+    stop("Data to plot must be a sf data frame.")
+  }
+ 
+  if (!target_colname %in% names(input_data)) {
+    stop("Target column should be part of the data to plot.")
+  }
+  
+  if(!is.factor(input_data[[target_colname]])){
+	stop("Target column should be an ordered factor.")
+  }
+ 
+  if (!is.character(color_vector)) {
+    stop("The vector of colors is not valid.")
+  }
+ 
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(aes(fill = .data[[target_colname]]), color = "white", linewidth = 0.2) +
+    scale_fill_manual(
+      values  = color_vector,
+      na.value = "#D3D3D3",
+      name    = legend_title,
+      drop    = FALSE # show all levels
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+  
+  return(output_plot)
+}

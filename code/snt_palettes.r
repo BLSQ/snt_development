@@ -181,19 +181,31 @@ make_k_means_breaks <- function(x, num_categories) {
   c(min(x, na.rm = TRUE), midpoints, max(x, na.rm = TRUE))
 }
 
-cut_to_categories <- function(input_dt, input_colname, output_colname, breaks, num_decimals = 1, suffix = "%") {
+#' @description
+#' cut numeric values into categorical bins based on a vector of breaks
+#' 
+#' return a data.table with the new category column
+#' 
+#' @param input_dt input data.table/frame with the data to process
+#' @param input_colname the numeric column to categorize
+#' @param output_colname nthe new column to create with category labels
+#' @param input_breaks vector with the bin boundaries
+#' @param num_decimals number of decimal places for rounding in labels (defaults to 1)
+#' @param suffix string to add to the end of each label (defaults to "%" for percentages)
+#' 
+#' @returns data.table with original columns plus new category column
+cut_to_categories <- function(input_dt, input_colname, output_colname, input_breaks, num_decimals = 1, suffix = "%") {
 
   if (!input_colname %in% names(input_dt)) {
       stop(paste("Input numeric column to cut not found in the input data"))
   }
     
-  if (length(breaks) < 2) {
+  if (length(input_breaks) < 2) {
       stop("At least 2 breaks required to cut the input data")
   }
-    
-  if (!all(diff(breaks) > 0)) {
-      stop("Breaks to cut the input data, must be sorted in ascending order")
-  }
+  
+  # sort the input breaks
+  breaks <- sort(input_breaks)
 
   output_dt <- copy(as.data.table(input_dt)) 
   
@@ -225,22 +237,16 @@ cut_to_categories <- function(input_dt, input_colname, output_colname, breaks, n
   }
     
   # cut and assign
-  output_dt[, (output_colname) := cut(
+  output_dt[, (output_colname) := := factor(cut(
       get(input_colname),
       breaks = breaks,
       labels = labels,
       include.lowest = TRUE,
       right = FALSE
-  )]
+  ),
+  levels = labels  # to keep the same order as the labels (in ascending order, matching the breaks)
+]
 
   return(output_dt)
 }
-
-
-
-
-
-
-
-
 

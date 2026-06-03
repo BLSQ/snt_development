@@ -181,6 +181,61 @@ make_k_means_breaks <- function(x, num_categories) {
   c(min(x, na.rm = TRUE), midpoints, max(x, na.rm = TRUE))
 }
 
+cut_to_categories <- function(input_dt, input_colname, output_colname, breaks, num_decimals = 1, suffix = "%") {
+
+  if (!input_colname %in% names(input_dt)) {
+      stop(paste("Input numeric column to cut not found in the input data"))
+  }
+    
+  if (length(breaks) < 2) {
+      stop("At least 2 breaks required to cut the input data")
+  }
+    
+  if (!all(diff(breaks) > 0)) {
+      stop("Breaks to cut the input data, must be sorted in ascending order")
+  }
+
+  output_dt <- copy(as.data.table(input_dt)) 
+  
+  # make the labels from breaks
+  low  <- breaks[-length(breaks)] # remove last value from labels
+  high <- breaks[-1] # remove first value from labels 
+    
+  labels <- character(length(low))
+
+  # first label (strictly smaller than x)
+  labels[1] <- paste0("< ", round(high[1], num_decimals), suffix)
+
+  # last label (greater or equal than x)
+  labels[length(labels)] <- paste0(">= ", round(low[length(low)], num_decimals), suffix)
+  
+  # all middle intervals
+  if (length(low) > 2) {
+
+      mid_idx <- seq(2, length(low) - 1)
+
+      labels[mid_idx] <- paste0(
+        "[",
+        round(low[mid_idx], num_decimals),
+        "-",
+        round(high[mid_idx], num_decimals),
+        ")",
+        suffix
+      )
+  }
+    
+  # cut and assign
+  output_dt[, (output_colname) := cut(
+      get(input_colname),
+      breaks = breaks,
+      labels = labels,
+      include.lowest = TRUE,
+      right = FALSE
+  )]
+
+  return(output_dt)
+}
+
 
 
 

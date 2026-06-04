@@ -6,9 +6,10 @@
 #' @param plot_data a data frame with spatial data and a column for the start month of the rainy season
 #' @param season_start_month_col column that gives the start month values
 #' @param color_vector vector of colors to be used for January-December
-#' @param plot_title text for the plot main title
-#' @param plot_subtitle text for the plot subtitle
-#' @param plot_caption text for the plot caption
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #' @param missing_label label for the missing values (non seasonal areas)
 #'
 #' @return a ggplot object or NULL if season_start_month_col is not found in plot_data
@@ -17,9 +18,10 @@ make_rainfall_start_month_plot <- function(
     season_start_month_col,
     color_vector,
     color_labels,
-    plot_title,
-    plot_subtitle,
-    plot_caption,
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL,
     missing_label = "Non saisonnier"
 ) {
   
@@ -74,9 +76,9 @@ make_rainfall_start_month_plot <- function(
       breaks = scale_breaks,
       labels = scale_labels,
       na.value = "#D3D3D3",
-      name = NULL,
+      name = legend_title,
       guide = ggplot2::guide_legend(
-        title = NULL,
+        title = legend_title,
         override.aes = list(colour = "white", linewidth = 0.3),
         label.position = "right",
         keywidth = ggplot2::unit(0.9, "lines"),
@@ -129,9 +131,12 @@ make_rainfall_start_month_plot <- function(
 #' @description
 #' rainfall proportion plot with custom color palette
 #' 
-#' @param plot_data a data frame containingwith spatial data and a column for rainfall proportion
-#' @param subtitle_text text for the plot subtitle
-#' @param data_source source of the data for the plot caption
+#' @param plot_data a data frame containing the spatial data and a column for rainfall proportion
+#' @param proportion_colname column containing the proportion of rainfall during the seasonal block
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #' @param proportion_colname column of the rainfall proportion values; default is RAIN_PROPORTION
 #'
 #' @return a ggplot object or NULL if proportion_col is not found in plot_data
@@ -141,6 +146,7 @@ make_rainfall_proportion_plot <- function(
     plot_title,
     plot_subtitle,
     plot_caption,
+    legend_title,
     color_vector = c(
         "#C8DDD9",
         "#9DBFBB",
@@ -197,7 +203,7 @@ make_rainfall_proportion_plot <- function(
       values   = color_vector,
       breaks   = bin_labels,
       na.value = "#D3D3D3",
-      name     = NULL,
+      name     = legend_title,
       drop     = TRUE,
       guide    = ggplot2::guide_legend(
         title          = NULL,

@@ -905,14 +905,27 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 #' @param height_colname column which gives the ridge height (the values)
 #' @param year_colname column for x-axis labels
 #' @param month_colname column to filter for 1st month/January labels
-#' @param plot_title plot title
-#' @param plot_caption plot caption
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
 #' @param scale_constant divisor to limit the heights of the ridges
 #' @param ridge_color ridgeline fill
 #' 
 #' @return ggplot object
-make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, plot_title, plot_caption = NULL, scale_constant = 15000, ridge_color = "#008080") {
-    p <- ggplot(
+make_ridgeline_plot <- function(
+  dt,
+  x_colname,
+  y_colname,
+  height_colname,
+  year_colname,
+  month_colname,
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  scale_constant = 15000,
+  ridge_color = "#008080"
+) {
+    ridge_plot <- ggplot(
       dt,
       aes(
         x = .data[[x_colname]],
@@ -922,31 +935,57 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
         scale = 2
       )
     ) +
-      geom_ridgeline(
-        alpha = 0.4, scale = 4.5, linewidth = 0.3,
-        fill = ridge_color, color = "white"
-      ) +
-      scale_x_discrete(
-        breaks = dt[get(month_colname) == 1, get(x_colname)],
-        labels = dt[get(month_colname) == 1, get(year_colname)]
-      ) +
-      labs(
-          title = plot_title,
-          y = "",
-          x = "",
-          caption = plot_caption
-      ) +
-      theme_minimal() +
-      theme(
-        axis.ticks.y = element_blank(),
-        panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.border = element_blank()
-      )
 
-    return(p)
-    }
+  
+    geom_ridgeline(
+      alpha = 0.4, scale = 4.5, linewidth = 0.2,
+      fill = ridge_color, color = "white"
+    ) +
+    scale_x_discrete(
+      breaks = dt[get(month_colname) == 1, get(x_colname)],
+      labels = dt[get(month_colname) == 1, get(year_colname)]
+    ) +
+    
+    # titles
+    labs(
+        title = plot_title,
+        subtitle = plot_subtitle,
+        y = "",
+        x = "",
+        caption = plot_caption
+    ) +
+
+    # map theme
+    theme_minimal() +
+    theme(
+      axis.ticks.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.border = element_blank()
+    ) +
+
+    theme(
+      plot.title = ggplot2::element_text(
+          face = "bold", size = 10,
+          margin = ggplot2::margin(b = 4)
+      ),
+      plot.subtitle = ggplot2::element_text(
+          size = 8, colour = "grey40",
+          margin = ggplot2::margin(b = 8)
+      ),
+      plot.caption = ggplot2::element_text(
+          size = 8,
+          colour = "grey55",
+          hjust = 1,
+          margin = ggplot2::margin(t = 8)
+      ),
+      plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
+    return(ridge_plot)
+  
+  }
   
 
 #' @description 
@@ -956,9 +995,10 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
 #'
 #' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
 #' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
-#' @param plot_title title of the plot
-#' @param plot_subtitle subtitle of the plot
-#' @param plot_caption caption of the plot
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #' @param seasonal_color color for areas which are seasonal
 #' @param seasonal_label legend label for areas which are seasonal
 #' @param not_seasonal_color color for areas which are not seasonal
@@ -968,9 +1008,10 @@ make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_c
 make_seasonality_plot <- function(
   spatial_seasonality_df,
   seasonality_colname,
-  plot_title,
+  plot_title = NULL,
   plot_subtitle = NULL,
   plot_caption = NULL,
+  legend_title = NULL,
   seasonal_color = "#F9A98E",
   seasonal_label = "Saisonnier",
   not_seasonal_color = "#D4E8CE",
@@ -981,7 +1022,7 @@ make_seasonality_plot <- function(
     geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
 
     scale_fill_manual(
-        name = NULL,
+        name = legend_title,
         # specific labels and colors
         values = c("1" = seasonal_color, "0" = not_seasonal_color),
         labels = c("1" = seasonal_label, "0" = not_seasonal_label)
@@ -995,7 +1036,7 @@ make_seasonality_plot <- function(
       caption = plot_caption
     ) +
 
-    guides(fill=guide_legend(title=NULL, nrow = 2)) +
+    guides(fill=guide_legend(nrow = 2)) +
     
     # map theme
     ggplot2::theme_void() +
@@ -1028,9 +1069,10 @@ make_seasonality_plot <- function(
 #'
 #' @param spatial_seasonality_df sf data with spatial and seasonality columns
 #' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
-#' @param plot_title title of the plot
-#' @param plot_subtitle subtitle of the plot
-#' @param plot_caption caption of the plot
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #' @param color_vector vector of colors for the plot
 #' @param none_label legend label when there is no seasonality
 #' 
@@ -1038,9 +1080,10 @@ make_seasonality_plot <- function(
 make_seasonality_duration_plot <- function(
   spatial_seasonality_df,
   seasonality_duration_colname,
-  plot_title,
+  plot_title = NULL,
   plot_subtitle = NULL,
   plot_caption = NULL,
+  legend_title = NULL,
   color_vector = c("#FDDECE", "#F07A58", "#A8381E"),
   none_label="Pas saisonnier"
 ){
@@ -1060,6 +1103,7 @@ make_seasonality_duration_plot <- function(
     geom_sf(aes(fill = as.character(get(seasonality_duration_colname)))) +
     coord_sf() + # map projection
     scale_fill_manual(
+      name = legend_title,
       values = color_mapping,
       labels = function(x) {
         ifelse(is.na(x) | x == "Inf", none_label, x) # custom labels
@@ -1074,7 +1118,7 @@ make_seasonality_duration_plot <- function(
       caption = plot_caption
     ) +
     
-    guides(fill = guide_legend(title = NULL, nrow = 2)) +
+    guides(fill = guide_legend(nrow = 2)) +
 
     # map theme
     ggplot2::theme_void() +

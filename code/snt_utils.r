@@ -910,6 +910,7 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 #' @param plot_caption map caption (defaults to NULL)
 #' @param scale_constant divisor to limit the heights of the ridges
 #' @param ridge_color ridgeline fill
+#' @reorder_fun the statistic to use for assigning the order on the y axis (defaults to mean, but median and max are also possible)
 #' 
 #' @return ggplot object
 make_ridgeline_plot <- function(
@@ -923,13 +924,14 @@ make_ridgeline_plot <- function(
   plot_subtitle = NULL,
   plot_caption = NULL,
   scale_constant = 15000,
-  ridge_color = "#008080"
+  ridge_color = "#008080",
+  reorder_fun = mean
 ) {
     ridge_plot <- ggplot(
       dt,
       aes(
         x = .data[[x_colname]],
-        y = fct_reorder(.data[[y_colname]], .data[[height_colname]]),
+        y = fct_reorder(.data[[y_colname]], .data[[height_colname]], reorder_fun),
         height = .data[[height_colname]] / scale_constant,
         group = .data[[y_colname]],
         scale = 2

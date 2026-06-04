@@ -123,10 +123,10 @@ from snt_lib.snt_pipeline_utils import (
     ),
     type=float,
     default=None,
-    required=True,
+    required=False,
 )
 @parameter(
-    "year_reference",
+    "growth_reference_year",
     name="Part 3: Projection reference year",
     help=(
         "Base year from which DHIS2 population figures are projected. "
@@ -135,7 +135,7 @@ from snt_lib.snt_pipeline_utils import (
     ),
     type=int,
     default=None,
-    required=True,
+    required=False,
 )
 @parameter(
     "run_report_only",
@@ -156,8 +156,6 @@ from snt_lib.snt_pipeline_utils import (
 def snt_dhis2_population_transformation(
     tot_pop_reference: int,
     tot_pop_reference_year: int,
-    growth_factor: float,
-    year_reference: int,
     pop_under_5: float,
     pop_pregnant_women: float,
     pop_0_1_y: float,
@@ -165,6 +163,8 @@ def snt_dhis2_population_transformation(
     pop_5_10_y: float,
     pop_5_36_m: float,
     disaggregation_file: File,
+    growth_factor: float,
+    growth_reference_year: int,
     run_report_only: bool,
     pull_scripts: bool,
 ):
@@ -212,18 +212,23 @@ def snt_dhis2_population_transformation(
                 current_run.log_error("No DHIS2 population data available.")
                 raise ValueError
 
-            if year_reference not in years_available:
-                current_run.log_error(
-                    f"Population reference year {year_reference} is not available in population data. "
-                    f"Available years are: {[int(y) for y in years_available]}"
+            tot_pop_reference_year_res = None
+            if tot_pop_reference:
+                tot_pop_reference_year_res = resolve_reference_year(
+                    years_available, tot_pop_reference_year, var_name="Total population"
                 )
-                raise ValueError
+
+            growth_reference_year_res = None
+            if growth_factor:
+                growth_reference_year_res = resolve_reference_year(
+                    years_available, growth_reference_year, var_name="Growth projection"
+                )
 
             parameters = {
                 "TOT_POP_REFERENCE": tot_pop_reference,
-                "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year,
+                "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
                 "GROWTH_FACTOR": growth_factor,
-                "YEAR_REFERENCE": year_reference,
+                "GROWTH_REFERENCE_YEAR": growth_reference_year_res,
                 "POP_UNDER_5": pop_under_5,
                 "POP_PREGNANT_WOMEN": pop_pregnant_women,
                 "POP_0_1_Y": pop_0_1_y,
@@ -322,6 +327,36 @@ def get_available_years_from_dhis2_population_data(snt_config_dict: dict) -> lis
     if pop_data is not None and not pop_data.empty:
         return sorted(pop_data.YEAR.unique())
     return []
+
+
+def resolve_reference_year(
+    years_available: list[int], reference_year: int | None, var_name: str = "Total population"
+) -> int:
+    """Resolve the reference year to use for population scaling or growth projections.
+
+    Args:
+        years_available: A list of years available in the population data.
+        reference_year: The user-provided reference year.
+        var_name: The name of the variable for which the reference year is being resolved (used for logging).
+
+    Returns:
+        The resolved reference year to use for population transformations.
+    """
+    latest_year = years_available[-1]
+    if reference_year is None:
+        current_run.log_warning(
+            f"No {var_name} reference year provided. Defaulting to latest available year {latest_year}."
+        )
+        return latest_year
+
+    if reference_year not in years_available:
+        current_run.log_warning(
+            f"{var_name} reference year {reference_year} not available in population data. "
+            f"Defaulting to latest available year {latest_year}."
+        )
+        return latest_year
+
+    return reference_year
 
 
 if __name__ == "__main__":

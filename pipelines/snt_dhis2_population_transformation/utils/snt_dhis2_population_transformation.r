@@ -127,29 +127,23 @@ load_csv_file <- function(csv_file_path) {
 #' @return A numeric or string representing the resolved reference year.
 #' 
 #' @export
-resolve_reference_year <- function(dhis2_population, reference_year = NULL) {
-    
-    # 1. Check if the provided year exists in the dataset
-    year_exists <- !is.null(reference_year) && (reference_year %in% dhis2_population$YEAR)
-    
-    if (!year_exists) {
-        not_found <- reference_year
-        # Default to the most recent year available
-        resolved_year <- max(dhis2_population$YEAR, na.rm = TRUE)
+resolve_reference_year <- function(available_years, reference_year = NULL) {
         
-        # 2. Log warning if a non-NULL year was provided but not found
-        if (!is.null(not_found)) {
-            log_msg(
-                glue::glue("Reference year {not_found} is not present in the population data, using last year: {resolved_year}."), 
-                "warning"
-            )
-        } else {
-            log_msg(glue::glue("No reference year provided, defaulting to: {resolved_year}."))
-        }
-        
-        return(resolved_year)
+    latest_year <- max(available_years, na.rm = TRUE)
+    
+    # No year provided — default to latest
+    if (is.null(reference_year)) {
+        log_msg(glue("No reference year provided, defaulting to: {latest_year}."))
+        return(latest_year)
     }
     
+    # Year provided but not found in data — fallback to latest
+    if (!reference_year %in% available_years) {
+        log_msg(glue("Reference year {reference_year} not found in population data, falling back to: {latest_year}."), "warning")
+        return(latest_year)
+    }
+    
+    # Year found — use it
     return(reference_year)
 }
 

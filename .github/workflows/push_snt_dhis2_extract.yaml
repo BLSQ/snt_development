@@ -32,7 +32,7 @@ jobs:
       - name: Push pipeline to OpenHEXA
         run: |
           openhexa pipelines push snt_dhis2_extract \
-            --code "snt_dhis2_extract" \
+            --code "snt-dhis2-extract" \
             --description "${{ github.event.head_commit.message }}" \
             --link "https://github.com/BLSQ/snt_development/commit/${{ github.sha }}" \
             --yes

@@ -14,9 +14,6 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-# Testing deployment
-
-
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
     "tot_pop_reference",

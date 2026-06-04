@@ -8,6 +8,7 @@ on:
       - ".github/workflows/push_snt_dhis2_extract.yaml"
       - "snt_dhis2_extract/pipeline.py"
       - "snt_dhis2_extract/requirements.txt"
+      - "snt_dhis2_extract/readme.txt"
 
 jobs:
   deploy:

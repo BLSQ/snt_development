@@ -138,7 +138,7 @@ cut_to_categories <- function(input_dt, input_colname, output_colname, input_bre
 #' @param plot_title map title (defaults to NULL)
 #' @param plot_subtitle map subtitle (defaults to NULL)
 #' @param plot_caption map caption (defaults to NULL)
-#' @param scale_constant divisor to limit the heights of the ridges
+#' @param scale_constant scale for the divisor, to limit the heights of the ridges
 #' @param ridge_color ridgeline fill
 #' @reorder_fun the statistic to use for assigning the order on the y axis (defaults to mean, but median and max are also possible)
 #' 
@@ -153,69 +153,72 @@ make_ridgeline_plot <- function(
   plot_title = NULL,
   plot_subtitle = NULL,
   plot_caption = NULL,
-  scale_constant = 15000,
+  scale_constant = 2,
   ridge_color = "#008080",
   reorder_fun = mean
 ) {
-    ridge_plot <- ggplot(
-      dt,
-      aes(
-        x = .data[[x_colname]],
-        y = fct_reorder(.data[[y_colname]], .data[[height_colname]], reorder_fun),
-        height = .data[[height_colname]] / scale_constant,
-        group = .data[[y_colname]],
-        scale = 2
-      )
-    ) +
 
-  
-    geom_ridgeline(
-      alpha = 0.4, scale = 4.5, linewidth = 0.2,
-      fill = ridge_color, color = "white"
-    ) +
-    scale_x_discrete(
-      breaks = dt[get(month_colname) == 1, get(x_colname)],
-      labels = dt[get(month_colname) == 1, get(year_colname)]
-    ) +
-    
-    # titles
-    labs(
-        title = plot_title,
-        subtitle = plot_subtitle,
-        y = "",
-        x = "",
-        caption = plot_caption
-    ) +
+  # prep vectors of breaks and labels
+  x_breaks <- dt[get(month_colname) == 1, get(x_colname)]
+  x_labels <- dt[get(month_colname) == 1, get(year_colname)]
 
-    # map theme
-    theme_minimal() +
-    theme(
-      axis.ticks.y = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor.x = element_blank(),
-      panel.grid.major.y = element_blank(),
-      panel.border = element_blank()
-    ) +
-
-    theme(
-      plot.title = ggplot2::element_text(
-          face = "bold", size = 10,
-          margin = ggplot2::margin(b = 4)
-      ),
-      plot.subtitle = ggplot2::element_text(
-          size = 8, colour = "grey40",
-          margin = ggplot2::margin(b = 8)
-      ),
-      plot.caption = ggplot2::element_text(
-          size = 8,
-          colour = "grey55",
-          hjust = 1,
-          margin = ggplot2::margin(t = 8)
-      ),
-      plot.margin = ggplot2::margin(10, 10, 10, 10)
+  # make the plot
+  ridge_plot <- ggplot(
+    dt,
+    aes(
+      x = .data[[x_colname]],
+      y = fct_reorder(.data[[y_colname]], .data[[height_colname]], reorder_fun),
+      height = .data[[height_colname]] / (max(.data[[height_colname]]) * scale_constant),
+      group = .data[[y_colname]]
     )
+  ) +
+  geom_ridgeline(
+    alpha = 0.4, scale = 4.5, linewidth = 0.2,
+    fill = ridge_color, color = "white"
+  ) +
+  scale_x_discrete(
+    breaks = x_breaks,
+    labels = x_labels
+  ) +
+  
+  # titles
+  labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      y = "",
+      x = "",
+      caption = plot_caption
+  ) +
 
-    return(ridge_plot)
+  # map theme
+  theme_minimal() +
+  theme(
+    axis.ticks.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank()
+  ) +
+
+  theme(
+    plot.title = ggplot2::element_text(
+        face = "bold", size = 10,
+        margin = ggplot2::margin(b = 4)
+    ),
+    plot.subtitle = ggplot2::element_text(
+        size = 8, colour = "grey40",
+        margin = ggplot2::margin(b = 8)
+    ),
+    plot.caption = ggplot2::element_text(
+        size = 8,
+        colour = "grey55",
+        hjust = 1,
+        margin = ggplot2::margin(t = 8)
+    ),
+    plot.margin = ggplot2::margin(10, 10, 10, 10)
+  )
+
+  return(ridge_plot)
   
   }
   

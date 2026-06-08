@@ -1147,6 +1147,136 @@ make_season_duration_plot <- function(
   return(duration_plot)
 }
 
+
+
+#' @description
+#' case/rainfall proportion plot with custom color palette
+#' 
+#' @param plot_data a data frame containing the spatial data and a column for rainfall proportion
+#' @param proportion_colname column containing the proportion of rainfall during the seasonal block
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param proportion_colname column of the cases/rainfall proportion values; default is RAIN_PROPORTION
+#'
+#' @return a ggplot object or NULL if proportion_col is not found in plot_data
+make_season_proportion_plot <- function(
+    plot_data,
+    proportion_colname,
+    plot_title,
+    plot_subtitle,
+    plot_caption,
+    legend_title,
+    color_vector = c(
+        "#C8DDD9",
+        "#9DBFBB",
+        "#5E9490",
+        "#2E6460",
+        "#264A48"
+    )
+) {
+ 
+  #validate inputs
+  if (!inherits(plot_data, "sf")) {
+    stop("plot_data must be an sf object.")
+  }
+ 
+  if (!proportion_colname %in% names(plot_data)) {
+    warning("The cases/rainfall proportion column not found in plot_data. Returning NULL.")
+    return(NULL)
+  }
+ 
+  prop_vals <- plot_data[[proportion_colname]]
+ 
+  if (!is.numeric(prop_vals)) {
+    stop("The cases/rainfall proportion column must be numeric.")
+  }
+ 
+  # bin into five ordered categories
+  bin_breaks <- c(-Inf, 0.20, 0.40, 0.60, 0.80, Inf)
+  bin_labels <- c("<20%", "20 - 40%", "40 - 60%", "60 - 80%", ">80%")
+ 
+  plot_data <- plot_data |>
+    dplyr::mutate(
+      .prop_rescaled = prop_vals,
+      .rain_category = cut(
+        .prop_rescaled,
+        breaks         = bin_breaks,
+        labels         = bin_labels,
+        include.lowest = TRUE,
+        right          = FALSE
+      )
+    )
+ 
+  # make plot
+  season_proportion_plot <- ggplot2::ggplot(data = plot_data) +
+ 
+    # geo layer
+    ggplot2::geom_sf(
+      ggplot2::aes(fill = .rain_category),
+      colour    = "white",
+      linewidth = 0.15
+    ) +
+ 
+    # discrete colors and handle missings
+    ggplot2::scale_fill_manual(
+      values   = color_vector,
+      breaks   = bin_labels,
+      na.value = "#D3D3D3",
+      name     = legend_title,
+      drop     = TRUE,
+      guide    = ggplot2::guide_legend(
+        title          = NULL,
+        override.aes   = list(colour = "white", linewidth = 0.3),
+        label.position = "right",
+        keywidth       = ggplot2::unit(0.9, "lines"),
+        keyheight      = ggplot2::unit(0.9, "lines")
+      )
+    ) +
+ 
+    # titles
+    ggplot2::labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+ 
+  # add NA note to caption if any missing values in data
+  if (anyNA(prop_vals)) {
+    season_proportion_plot <- season_proportion_plot + ggplot2::labs(
+      caption = paste0(data_source,
+        if (nchar(data_source) > 0) "\n" else "",
+        "\u25A0 Non saisonnier")
+    )
+  }
+ 
+  return(season_proportion_plot)
+}
+
+
 #' @description
 #' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
 #' 

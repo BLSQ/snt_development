@@ -606,7 +606,7 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 }
 
 
-#%% SEASONALITY -------------------------------------------------------------------
+#%% SEASONALITY COMPUTATION -------------------------------------------------------------------
    
 #' @description
 #' compute month-level seasonality indicators using forward-looking month blocks
@@ -632,58 +632,54 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
                                       use_calendar_year_denominator = FALSE) {
 
   indicator <- toupper(indicator)
-  dt <- copy(as.data.table(input_dt))
+  output_dt <- copy(as.data.table(input_dt))
    
   # ensure correct order
-  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
+  output_dt <- output_dt[order(get(admin_colname), get(year_colname), get(month_colname))]
    
-  # ---------------------------------------------------------
-  # DENOMINATOR CALCULATION
-  # ---------------------------------------------------------
+  # compute denominator
   if (use_calendar_year_denominator) {
-    # Alternative Approach: Total accumulated value for the current calendar year (Jan-Dec)
+    # alternative approach (calendar): per calendar year
     denominator_colname <- paste(indicator, "SUM_CALENDAR_YEAR", sep = "_")
     
-    dt[, (denominator_colname) := sum(get(values_colname), na.rm = TRUE), 
+    output_dt[, (denominator_colname) := sum(get(values_colname), na.rm = TRUE), 
        by = c(admin_colname, year_colname)]
        
   } else {
-    # Original Approach (WHO): 12-month forward-looking sliding sum (left-aligned)
+    # default approach (WHO): 12-month forward-looking sliding sum (left-aligned)
     denominator_colname <- paste(indicator, "SUM", 12, "MTH", "FW", sep = "_")
     
-    dt[, (denominator_colname) := frollsum(get(values_colname),
+    output_dt[, (denominator_colname) := frollsum(get(values_colname),
                                            n = 12,
                                            align = "left",
                                            na.rm = TRUE),
        by = admin_colname]
   }
    
-  # ---------------------------------------------------------
-  # NUMERATOR & RATIO CALCULATIONS
-  # ---------------------------------------------------------
+  # numerator and proportions
   for (n in vector_of_durations) {
     numerator_colname  <- paste(indicator, "SUM", n, "MTH", "FW", sep = "_")
     prop_name <- paste(indicator, n, "MTH", "ROW", "PROP", sep = "_")
     seasonality_colname <- paste(indicator, n, "MTH", "ROW", "SEASONALITY", sep = "_")
      
-    # Calculate numerator: Rolling sum of next n months
-    dt[, (numerator_colname) := frollsum(get(values_colname),
+    # numerator: sliding window sum of next n months
+    output_dt[, (numerator_colname) := frollsum(get(values_colname),
                                          n = n,
                                          align = "left",
                                          na.rm = TRUE),
        by = admin_colname]
      
-    # Calculate Proportion: Numerator / Denominator
-    dt[, (prop_name) := 
+    # proportion: numerator / denominator
+    output_dt[, (prop_name) := 
           fifelse(get(denominator_colname) > 0, get(numerator_colname) / get(denominator_colname), NA_real_)]
      
-    # Calculate Seasonality Flag
-    dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
+    # flag for seasonality
+    output_dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
                                              get(prop_name) >= proportion_threshold)]
   }
    
   # return the data
-  dt[]
+  return(output_dt)
 }
 
 
@@ -897,6 +893,139 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 
 
 #' @description
+#' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
+#' 
+#' @param input_dt an input data table (or data frame)
+#' @param values_colname the indicator column, on which the computations are made
+#' @param vector_of_durations the vector with the number of months in a block (3/4/5)
+#' @param admin_colname the administrative units to group 
+#' @param year_colname year grouping column
+#' @param month_colname month grouping column
+#' @param percentage_threshold the percentage which needs to occur in a block, to qualify for seasonality
+#' 
+#' @return an output data table with the additional column
+compute_block_percentage <- function(input_dt, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', percentage_threshold = 0.6) {
+
+  dt <- copy(as.data.table(input_dt))
+  
+  # ensure correct order
+  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
+  
+  # denominator: annual (calendar year) sum
+  denominator_colname <- toupper("sum_calendar_year")
+  dt[
+    ,
+    (denominator_colname) := sum(get(values_colname), na.rm = TRUE),
+    by = c(admin_colname, year_colname)
+  ]
+  
+  # numerators for each of the durations (forward-looking)
+  for (n in vector_of_durations) {
+    numerator_colname  <- toupper(glue("sum_{n}_mth_fw"))
+    pct_colname <- toupper(glue("pct_{n}_mth_row"))
+    target_colname <- toupper(glue("attained_{percentage_threshold}_cases_{n}_mth"))
+    
+    dt[, (numerator_colname) := frollsum(get(values_colname),
+                                n = n,
+                                align = "left",
+                                na.rm = TRUE),
+       by = c(admin_colname)]
+    
+    dt[, (pct_colname) := 
+          # make NA's where it would be division by zero
+          fifelse(get(denominator_colname) > 0, get(numerator_colname)*100 / get(denominator_colname), NA_real_)]
+    
+    dt[, (target_colname) := as.integer(get(denominator_colname) > 0 &
+                                   get(pct_colname) >= percentage_threshold)]
+  }
+  
+  return(dt)
+}
+
+
+filter_cycles_data <- function(input_dt, pattern_cycle_colnames, id_colnames, year_colname, reference_years_vector, month_colname, target_month_num=8){
+  #' Filter data on cycles, to only the relevant beginning month
+  #' Keep only the useful columns for plotting/presentation
+  output_dt <- input_dt[
+    get(month_colname) == target_month_num,
+    .SD,
+    .SDcols=c(id_colnames, grep(pattern_cycle_colnames, names(input_dt), value=TRUE))
+  ]
+
+  output_dt[, (month_colname) := NULL]
+
+  output_dt <- output_dt[
+  get(year_colname) %in% reference_years_vector
+]
+
+  return(output_dt)
+}
+
+#' @description
+#' transform a wide-format data table containing cycle coverage columns into a cleaned long-format table, extract coverage percentages from column names and keep the maximum percentage covered per group
+#' 
+#' @param input_dt dt in wide format containing:
+#' @param space_colname name of the spatial grouping column
+#' @param time_colname name of the temporalgrouping column
+#' @return dt in long format with columns space_colname}{Spatial identifier column.}
+#'   \item{time_colname}{Temporal identifier column.}
+#'   \item{num_cycles}{Number of cycles (non-missing values only).}
+#'   \item{max_pct_covered}{Maximum extracted percentage per group.}
+#' }
+prep_cycles_long <- function(input_dt, space_colname, time_colname){
+  output_dt <- melt(
+    data=input_dt,
+    id.vars=c(space_colname, time_colname),
+    variable.name="category",
+    value.name="num_cycles"
+  )
+
+  # extract the number covered as integer, from the "category" column
+  output_dt[,max_pct_covered:= as.integer(sub(".*?(\\d+).*", "\\1", category))]
+
+  # remove the original "category" column
+  output_dt[, category :=NULL]
+
+  # remove rows with missing number of cycles
+  output_dt <- output_dt[
+    !is.na(num_cycles)
+  ]
+
+  # keep only the maximum number of cases covered, for each number of cycles
+  output_dt <- output_dt[, .(max_pct_covered = max(max_pct_covered)), by=c(space_colname, time_colname, "num_cycles")]
+
+  return(output_dt)
+}
+
+#' @description
+#' fill missing values in long-format cycles data
+#' 
+#' @param input_dt df/dt in long format containing spatial, temporal, ordering and value columns
+#' @param spatial_colname name of the spatial grouping column
+#' @param temporal_colname name of the temporal grouping column
+#' @param order_colname column for within-group ordering (determines the sequence for LOCF filling)
+#' @param value_colname column containing values to be filled
+#'
+#' @return dt with missing values in value_colname, filled using last observation carried forward within groups
+fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, order_colname, value_colname){
+	output_dt <- copy(as.data.table(input_dt))
+	
+	# ensure correct order before filling
+	setorderv(
+	  output_dt,
+	  c(spatial_colname, temporal_colname, order_colname),
+	  c(1L, 1L, 1L)
+	)
+
+	output_dt[, (value_colname) := nafill(get(value_colname), type = "locf"), by = c(spatial_colname, temporal_colname)]
+
+}
+
+
+
+#%% SEASONALITY PLOTS -------------------------------------------------------------------
+
+#' @description
 #' make ridgeline plot sorting y-axis categories by amount/height and set x-axis labels to show only the beginning of each year (1st month)
 #' 
 #' @param dt data.table with the plotting data
@@ -1063,6 +1192,134 @@ make_seasonality_plot <- function(
     )
   
   return(seasonality_plot)
+}
+
+
+#' @description
+#' plot the start month of the high case/rainfall season with custom color palette
+#'
+#' @param plot_data a data frame with spatial data and a column for the start month of the season
+#' @param season_start_month_col column that gives the start month values
+#' @param color_vector vector of colors to be used for January-December
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param missing_label label for the missing values (non seasonal areas)
+#'
+#' @return a ggplot object or NULL if season_start_month_col is not found in plot_data
+make_season_start_month_plot <- function(
+    plot_data,
+    season_start_month_col,
+    color_vector,
+    color_labels,
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL,
+    missing_label = "Non saisonnier"
+) {
+  
+  # validate inputs
+  stopifnot(
+    "seasonality start plot_data must be an sf object" = inherits(plot_data, "sf"),
+    "seasonality start month column must be a single string" = is.character(season_start_month_col) && length(season_start_month_col) == 1,
+    "seasonality start month column not found in plot_data" = season_start_month_col %in% names(plot_data),
+    "seasonality start color_vector must have exactly 12 elements" = length(color_vector) == 12,
+    "seasonality start color_labels must have exactly 12 elements" = length(color_labels) == 12
+  )
+ 
+  month_vals <- plot_data[[season_start_month_col]]
+  valid_vals <- month_vals[!is.na(month_vals)]
+  if (!all(valid_vals %in% 1:12)) {
+    stop("Column '", season_start_month_col,
+        "' contains values outside 1–12: ",
+        paste(sort(unique(valid_vals[!valid_vals %in% 1:12])), collapse = ", "))
+  }
+ 
+  # make a factor column with ordered levels 1–12 for the months
+  # NA stays NA so it gets the na.value color in scale_fill_manual
+  plot_data <- plot_data |>
+    dplyr::mutate(
+      .month_factor = factor(.data[[season_start_month_col]], levels = 1:12)
+    )
+ 
+  # make color / label scales including only the months that are in the data
+  present_months <- sort(unique(as.integer(
+    levels(droplevels(plot_data$.month_factor))
+  )))
+  present_months <- present_months[present_months %in% 1:12]
+ 
+  scale_values <- stats::setNames(color_vector[present_months],
+                                  as.character(present_months))
+  scale_breaks <- as.character(present_months)
+  scale_labels <- color_labels[present_months]
+ 
+  # make the plot
+  season_first_month <- ggplot2::ggplot(data = plot_data) +
+ 
+    # geo layer
+    ggplot2::geom_sf(
+      ggplot2::aes(fill = .month_factor),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+ 
+    # discrete color scale with NA handling
+    ggplot2::scale_fill_manual(
+      values = scale_values,
+      breaks = scale_breaks,
+      labels = scale_labels,
+      na.value = "#D3D3D3",
+      name = legend_title,
+      guide = ggplot2::guide_legend(
+        title = legend_title,
+        override.aes = list(colour = "white", linewidth = 0.3),
+        label.position = "right",
+        keywidth = ggplot2::unit(0.9, "lines"),
+        keyheight = ggplot2::unit(0.9, "lines")
+      )
+    ) +
+ 
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+ 
+  # append NA note to caption if any missing values exist in the data, so they also appear in the legend
+  if (anyNA(month_vals)) {
+    season_first_month <- season_first_month + ggplot2::labs(
+      caption = paste0(plot_caption,
+        if (nchar(plot_caption) > 0) "\n" else "",
+        "\u25A0 : ", missing_label)
+      )
+  }
+ 
+  return(season_first_month)
 }
 
 
@@ -1278,265 +1535,6 @@ make_season_proportion_plot <- function(
 
 
 #' @description
-#' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
-#' 
-#' @param input_dt an input data table (or data frame)
-#' @param values_colname the indicator column, on which the computations are made
-#' @param vector_of_durations the vector with the number of months in a block (3/4/5)
-#' @param admin_colname the administrative units to group 
-#' @param year_colname year grouping column
-#' @param month_colname month grouping column
-#' @param percentage_threshold the percentage which needs to occur in a block, to qualify for seasonality
-#' 
-#' @return an output data table with the additional column
-compute_block_percentage <- function(input_dt, values_colname, vector_of_durations, admin_colname = 'ADM2_ID', year_colname = 'YEAR', month_colname = 'MONTH', percentage_threshold = 0.6) {
-
-  dt <- copy(as.data.table(input_dt))
-  
-  # ensure correct order
-  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
-  
-  # denominator: annual (calendar year) sum
-  denominator_colname <- toupper("sum_calendar_year")
-  dt[
-    ,
-    (denominator_colname) := sum(get(values_colname), na.rm = TRUE),
-    by = c(admin_colname, year_colname)
-  ]
-  
-  # numerators for each of the durations (forward-looking)
-  for (n in vector_of_durations) {
-    numerator_colname  <- toupper(glue("sum_{n}_mth_fw"))
-    pct_colname <- toupper(glue("pct_{n}_mth_row"))
-    target_colname <- toupper(glue("attained_{percentage_threshold}_cases_{n}_mth"))
-    
-    dt[, (numerator_colname) := frollsum(get(values_colname),
-                                n = n,
-                                align = "left",
-                                na.rm = TRUE),
-       by = c(admin_colname)]
-    
-    dt[, (pct_colname) := 
-          # make NA's where it would be division by zero
-          fifelse(get(denominator_colname) > 0, get(numerator_colname)*100 / get(denominator_colname), NA_real_)]
-    
-    dt[, (target_colname) := as.integer(get(denominator_colname) > 0 &
-                                   get(pct_colname) >= percentage_threshold)]
-  }
-  
-  return(dt)
-}
-
-
-#' @description
-#' plot the start month of the high case/rainfall season with custom color palette
-#'
-#' @param plot_data a data frame with spatial data and a column for the start month of the season
-#' @param season_start_month_col column that gives the start month values
-#' @param color_vector vector of colors to be used for January-December
-#' @param plot_title map title (defaults to NULL)
-#' @param plot_subtitle map subtitle (defaults to NULL)
-#' @param plot_caption map caption (defaults to NULL)
-#' @param legend_title title of the legend (defaults to NULL)
-#' @param missing_label label for the missing values (non seasonal areas)
-#'
-#' @return a ggplot object or NULL if season_start_month_col is not found in plot_data
-make_season_start_month_plot <- function(
-    plot_data,
-    season_start_month_col,
-    color_vector,
-    color_labels,
-    plot_title = NULL,
-    plot_subtitle = NULL,
-    plot_caption = NULL,
-    legend_title = NULL,
-    missing_label = "Non saisonnier"
-) {
-  
-  # validate inputs
-  stopifnot(
-    "seasonality start plot_data must be an sf object" = inherits(plot_data, "sf"),
-    "seasonality start month column must be a single string" = is.character(season_start_month_col) && length(season_start_month_col) == 1,
-    "seasonality start month column not found in plot_data" = season_start_month_col %in% names(plot_data),
-    "seasonality start color_vector must have exactly 12 elements" = length(color_vector) == 12,
-    "seasonality start color_labels must have exactly 12 elements" = length(color_labels) == 12
-  )
- 
-  month_vals <- plot_data[[season_start_month_col]]
-  valid_vals <- month_vals[!is.na(month_vals)]
-  if (!all(valid_vals %in% 1:12)) {
-    stop("Column '", season_start_month_col,
-        "' contains values outside 1–12: ",
-        paste(sort(unique(valid_vals[!valid_vals %in% 1:12])), collapse = ", "))
-  }
- 
-  # make a factor column with ordered levels 1–12 for the months
-  # NA stays NA so it gets the na.value color in scale_fill_manual
-  plot_data <- plot_data |>
-    dplyr::mutate(
-      .month_factor = factor(.data[[season_start_month_col]], levels = 1:12)
-    )
- 
-  # make color / label scales including only the months that are in the data
-  present_months <- sort(unique(as.integer(
-    levels(droplevels(plot_data$.month_factor))
-  )))
-  present_months <- present_months[present_months %in% 1:12]
- 
-  scale_values <- stats::setNames(color_vector[present_months],
-                                  as.character(present_months))
-  scale_breaks <- as.character(present_months)
-  scale_labels <- color_labels[present_months]
- 
-  # make the plot
-  seasonality_start_plot <- ggplot2::ggplot(data = plot_data) +
- 
-    # geo layer
-    ggplot2::geom_sf(
-      ggplot2::aes(fill = .month_factor),
-      colour = "white",
-      linewidth = 0.15
-    ) +
- 
-    # discrete color scale with NA handling
-    ggplot2::scale_fill_manual(
-      values = scale_values,
-      breaks = scale_breaks,
-      labels = scale_labels,
-      na.value = "#D3D3D3",
-      name = legend_title,
-      guide = ggplot2::guide_legend(
-        title = legend_title,
-        override.aes = list(colour = "white", linewidth = 0.3),
-        label.position = "right",
-        keywidth = ggplot2::unit(0.9, "lines"),
-        keyheight = ggplot2::unit(0.9, "lines")
-      )
-    ) +
- 
-    # titles
-    ggplot2::labs(
-      title = plot_title,
-      subtitle = plot_subtitle,
-      caption = plot_caption
-    ) +
- 
-    # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
-            face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
-        ),
-        plot.subtitle = ggplot2::element_text(
-            size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
-        ),
-        plot.caption = ggplot2::element_text(
-            size = 8,
-            colour = "grey55",
-            hjust = 1,
-            margin = ggplot2::margin(t = 8)
-        ),
-        legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
-    )
- 
-  # append NA note to caption if any missing values exist in the data, so they also appear in the legend
-  if (anyNA(month_vals)) {
-    seasonality_start_plot <- seasonality_start_plot + ggplot2::labs(
-      caption = paste0(plot_caption,
-        if (nchar(plot_caption) > 0) "\n" else "",
-        "\u25A0 : ", missing_label)
-      )
-  }
- 
-  return(seasonality_start_plot)
-}
-
-
-
-
-filter_cycles_data <- function(input_dt, pattern_cycle_colnames, id_colnames, year_colname, reference_years_vector, month_colname, target_month_num=8){
-  #' Filter data on cycles, to only the relevant beginning month
-  #' Keep only the useful columns for plotting/presentation
-  output_dt <- input_dt[
-    get(month_colname) == target_month_num,
-    .SD,
-    .SDcols=c(id_colnames, grep(pattern_cycle_colnames, names(input_dt), value=TRUE))
-  ]
-
-  output_dt[, (month_colname) := NULL]
-
-  output_dt <- output_dt[
-  get(year_colname) %in% reference_years_vector
-]
-
-  return(output_dt)
-}
-
-#' @description
-#' transform a wide-format data table containing cycle coverage columns into a cleaned long-format table, extract coverage percentages from column names and keep the maximum percentage covered per group
-#' 
-#' @param input_dt dt in wide format containing:
-#' @param space_colname name of the spatial grouping column
-#' @param time_colname name of the temporalgrouping column
-#' @return dt in long format with columns space_colname}{Spatial identifier column.}
-#'   \item{time_colname}{Temporal identifier column.}
-#'   \item{num_cycles}{Number of cycles (non-missing values only).}
-#'   \item{max_pct_covered}{Maximum extracted percentage per group.}
-#' }
-prep_cycles_long <- function(input_dt, space_colname, time_colname){
-  output_dt <- melt(
-    data=input_dt,
-    id.vars=c(space_colname, time_colname),
-    variable.name="category",
-    value.name="num_cycles"
-  )
-
-  # extract the number covered as integer, from the "category" column
-  output_dt[,max_pct_covered:= as.integer(sub(".*?(\\d+).*", "\\1", category))]
-
-  # remove the original "category" column
-  output_dt[, category :=NULL]
-
-  # remove rows with missing number of cycles
-  output_dt <- output_dt[
-    !is.na(num_cycles)
-  ]
-
-  # keep only the maximum number of cases covered, for each number of cycles
-  output_dt <- output_dt[, .(max_pct_covered = max(max_pct_covered)), by=c(space_colname, time_colname, "num_cycles")]
-
-  return(output_dt)
-}
-
-#' @description
-#' fill missing values in long-format cycles data
-#' 
-#' @param input_dt df/dt in long format containing spatial, temporal, ordering and value columns
-#' @param spatial_colname name of the spatial grouping column
-#' @param temporal_colname name of the temporal grouping column
-#' @param order_colname column for within-group ordering (determines the sequence for LOCF filling)
-#' @param value_colname column containing values to be filled
-#'
-#' @return dt with missing values in value_colname, filled using last observation carried forward within groups
-fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, order_colname, value_colname){
-	output_dt <- copy(as.data.table(input_dt))
-	
-	# ensure correct order before filling
-	setorderv(
-	  output_dt,
-	  c(spatial_colname, temporal_colname, order_colname),
-	  c(1L, 1L, 1L)
-	)
-
-	output_dt[, (value_colname) := nafill(get(value_colname), type = "locf"), by = c(spatial_colname, temporal_colname)]
-
-}
-
-#' @description
 #' make a choropleth map from an sf object
 #'
 #' @param spatial_df sf object containing geometries and the variable map
@@ -1573,6 +1571,7 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
   return(output_plot)
  }
 
+ 
 
 #%% DHS ------------------------------
 

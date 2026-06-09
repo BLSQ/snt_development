@@ -35,6 +35,10 @@ uv.lock
 *.py:Zone.Identifier
 *:Zone.Identifier
 
+# Claude Code -----------------
+CLAUDE.md
+.claude/
+
 # Config file -----------------
 # ignore .json files unless if SNT_config.json
 *.json

@@ -9,6 +9,8 @@
 
 ## OpenHEXA WebApp SNT default color palettes -----------------------------------
 
+na_color <- "#D3D3D3"
+
 FOUR_SHADES = c(
   "#A2CAEA",
   "#ACDF9B",
@@ -155,6 +157,13 @@ get_range_from_count <- function(count) {
 # # Example usage:
 # get_range_from_count(5)
 # # [1] "#A2CAEA" "#ACDF9B" "#F5F1A0" "#F2B16E" "#E4754F" "#A93A42"
+
+
+cat_healthcare_covered_palette <- c(
+  "#f4b5d0",
+  "#f5efa5",
+  "#a5e9c8"
+)
 
 #' @description
 #' make equal frequency breaks for binning the distributions (for maps)

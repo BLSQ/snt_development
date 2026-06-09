@@ -981,10 +981,11 @@ make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, t
 #' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
 #' @param title_label string for the legend title
 #' @param color_vector vector of colors for the plot
-#' @param none_label legend label when there is no seasonality
+#' @param na_label legend label when there is no seasonality
+#' @param na_color olor for missing values
 #' 
 #' @return ggplot object
-make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, color_vector = c("#FDDECE", "#F07A58", "#A8381E"), none_label="Pas saisonnier"){
+make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, color_vector = c("#FDDECE", "#F07A58", "#A8381E"), na_color = "#D3D3D3", na_label="Pas saisonnier"){
   
   # get the possible values of the duration; decreasing order, so that the most intense color is the shortest (most dramatic) type of seasonality
   unique_values <- sort(unique(as.character(spatial_seasonality_df[[seasonality_duration_colname]])), decreasing = TRUE)
@@ -1003,9 +1004,9 @@ make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_d
     scale_fill_manual(
       values = color_mapping,
       labels = function(x) {
-        ifelse(is.na(x) | x == "Inf", none_label, x) # custom labels
+        ifelse(is.na(x) | x == "Inf", na_label, x) # custom labels
       },
-      na.value="#D3D3D3"
+      na.value = na_color
     ) +
     guides(fill = guide_legend(title = title_label, nrow = 2)) +
     theme_classic() +
@@ -1951,6 +1952,7 @@ get_updated_children <- function(new_level_table, group_table, level, target_lev
 #' @param target_colname name of the numeric column to map
 #' @param low_color color for the low end of the gradient (defaults to "#f7fbff").
 #' @param high_color color for the high end of the gradient (defaults to "#08306b").
+#' @param na_color color for missing values
 #' @param plot_title map title (defaults to NULL)
 #' @param plot_subtitle map subtitle (defaults to NULL)
 #' @param plot_caption map caption (defaults to NULL)
@@ -1962,6 +1964,7 @@ make_snt_choropleth_map <- function(
     target_colname,
     low_color = "#f7fbff",
     high_color = "#08306b",
+    na_color = "#D3D3D3",
     plot_title = NULL,
     plot_subtitle = NULL,
     plot_caption = NULL,
@@ -1990,7 +1993,7 @@ make_snt_choropleth_map <- function(
       low = low_color,
       high = high_color,
       name = legend_title,
-      na.value = "#D3D3D3"
+      na.value = na_color
     ) +
     
     # titles
@@ -2030,20 +2033,24 @@ make_snt_choropleth_map <- function(
 #'
 #' @param input_data sf object with the geometries and data to plot
 #' @param target_colname name of the factor column to map
-#' @param color_vector vector of colors to 
+#' @param color_vector vector of colors to use
+#' @param na_color color for missing values
 #' @param plot_title map title (defaults to NULL)
 #' @param plot_subtitle map subtitle (defaults to NULL)
 #' @param plot_caption map caption (defaults to NULL)
 #' @param legend_title title of the legend (defaults to NULL)
 #'
 #' @return ggplot object
-make_snt_categorical_map <- function(input_data,
-                                 target_colname,
-                                 color_vector,
-                                     plot_title = NULL,
-    plot_subtitle = NULL,
-    plot_caption = NULL,
-    legend_title = NULL) {
+make_snt_categorical_map <- function(
+  input_data,
+  target_colname,
+  color_vector,
+  na_color = "#D3D3D3",
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  legend_title = NULL,
+) {
  
   # validation
  
@@ -2067,7 +2074,7 @@ make_snt_categorical_map <- function(input_data,
     geom_sf(aes(fill = .data[[target_colname]]), color = "white", linewidth = 0.2) +
     scale_fill_manual(
       values  = color_vector,
-      na.value = "#D3D3D3",
+      na.value = na_color,
       name    = legend_title,
       drop    = FALSE # show all levels
     ) +

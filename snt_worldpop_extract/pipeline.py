@@ -191,13 +191,15 @@ def retrieve_population_data(
         raise Exception(f"Error retrieving WorldPop data for {country} {year}: {e}") from e
 
 
-def run_spatial_aggregation(tif_file_path: Path, year: str, snt_config: dict, output_dir: Path) -> Path:
+def run_spatial_aggregation(
+    tif_file_path: Path, year: str, snt_config: dict, output_dir: Path
+) -> Path | None:
     """Run spatial aggregation on the worldpop population data (tif file).
 
     Returns
     -------
-        Path
-            The full path to the saved aggregated population data file (parquet).
+        Path | None
+            The full path to the saved aggregated population data file (parquet), or None if skipped.
     """
     if not tif_file_path or not tif_file_path.exists():
         current_run.log_warning(f"Population file not found: {tif_file_path}. Skipping aggregation.")

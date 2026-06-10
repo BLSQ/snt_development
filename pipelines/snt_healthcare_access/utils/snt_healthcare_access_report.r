@@ -48,6 +48,7 @@ make_overlaid_sf_plot <- function(
 #' @param epsg_value_degrees CRS for the map (defaults to 4326)
 #' @param low_color color for the low end of the gradient (defaults to "#ead7f8")
 #' @param high_color color for the high end of the gradient (defaults to "#2e0044")
+#' @param na_color color for missing values
 #' @param plot_title title of the map (defaults to NULL)
 #' @param plot_subtitle subtitle of the map (defaults to NULL)
 #' @param plot_caption plot caption (defaults to NULL)
@@ -59,6 +60,7 @@ plot_raster_with_boundaries <- function(
     epsg_value_degrees = 4326,
     low_color = "#ead7f8",
     high_color = "#2e0044",
+    na_color = "#D3D3D3",
     plot_title = NULL,
     plot_subtitle = NULL,
     plot_caption = NULL
@@ -105,7 +107,7 @@ plot_raster_with_boundaries <- function(
       low = low_color,
       high = high_color,
       name = NULL,
-      na.value = "#D3D3D3"
+      na.value = na_color
     ) +
 
     # titles
@@ -149,6 +151,7 @@ plot_raster_with_boundaries <- function(
 #' @param spatial_data_id_colname column which is the unique identifier of the polygons
 #' @param low_color color for the low end of the gradient (defaults to "#5db4ff")
 #' @param high_color color for the high end of the gradient (defaults to"#ffd852")
+#' @param na_color color for missing values
 #' @param plot_title title of the plot
 #' @param plot_subtitle subtitle of the plot
 #' @param plot_caption caption of the plot
@@ -161,6 +164,7 @@ make_fosa_choropleth_map <- function(
   spatial_data_id_colname,
   low_color = "#5db4ff",
   high_color = "#ffd852",
+  na_color = "#D3D3D3",
   plot_title = NULL,
   plot_subtitle = NULL,
   plot_caption = NULL
@@ -192,7 +196,7 @@ make_fosa_choropleth_map <- function(
       low = low_color,
       high = high_color,
       name = NULL,
-      na.value = "#D3D3D3"
+      na.value = na_color
     ) +
     
     # titles

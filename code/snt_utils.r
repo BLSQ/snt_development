@@ -606,7 +606,7 @@ bin_column_dt <- function(dt, breaks, labels,col_in, col_out, include.lowest = T
 }
 
 
-#%% SEASONALITY -------------------------------------------------------------------
+#%% SEASONALITY COMPUTATION -------------------------------------------------------------------
    
 #' @description
 #' compute month-level seasonality indicators using forward-looking month blocks
@@ -632,58 +632,54 @@ compute_month_seasonality <- function(input_dt, indicator, values_colname, vecto
                                       use_calendar_year_denominator = FALSE) {
 
   indicator <- toupper(indicator)
-  dt <- copy(as.data.table(input_dt))
+  output_dt <- copy(as.data.table(input_dt))
    
   # ensure correct order
-  dt <- dt[order(get(admin_colname), get(year_colname), get(month_colname))]
+  output_dt <- output_dt[order(get(admin_colname), get(year_colname), get(month_colname))]
    
-  # ---------------------------------------------------------
-  # DENOMINATOR CALCULATION
-  # ---------------------------------------------------------
+  # compute denominator
   if (use_calendar_year_denominator) {
-    # Alternative Approach: Total accumulated value for the current calendar year (Jan-Dec)
+    # alternative approach (calendar): per calendar year
     denominator_colname <- paste(indicator, "SUM_CALENDAR_YEAR", sep = "_")
     
-    dt[, (denominator_colname) := sum(get(values_colname), na.rm = TRUE), 
+    output_dt[, (denominator_colname) := sum(get(values_colname), na.rm = TRUE), 
        by = c(admin_colname, year_colname)]
        
   } else {
-    # Original Approach (WHO): 12-month forward-looking sliding sum (left-aligned)
+    # default approach (WHO): 12-month forward-looking sliding sum (left-aligned)
     denominator_colname <- paste(indicator, "SUM", 12, "MTH", "FW", sep = "_")
     
-    dt[, (denominator_colname) := frollsum(get(values_colname),
+    output_dt[, (denominator_colname) := frollsum(get(values_colname),
                                            n = 12,
                                            align = "left",
                                            na.rm = TRUE),
        by = admin_colname]
   }
    
-  # ---------------------------------------------------------
-  # NUMERATOR & RATIO CALCULATIONS
-  # ---------------------------------------------------------
+  # numerator and proportions
   for (n in vector_of_durations) {
     numerator_colname  <- paste(indicator, "SUM", n, "MTH", "FW", sep = "_")
     prop_name <- paste(indicator, n, "MTH", "ROW", "PROP", sep = "_")
     seasonality_colname <- paste(indicator, n, "MTH", "ROW", "SEASONALITY", sep = "_")
      
-    # Calculate numerator: Rolling sum of next n months
-    dt[, (numerator_colname) := frollsum(get(values_colname),
+    # numerator: sliding window sum of next n months
+    output_dt[, (numerator_colname) := frollsum(get(values_colname),
                                          n = n,
                                          align = "left",
                                          na.rm = TRUE),
        by = admin_colname]
      
-    # Calculate Proportion: Numerator / Denominator
-    dt[, (prop_name) := 
+    # proportion: numerator / denominator
+    output_dt[, (prop_name) := 
           fifelse(get(denominator_colname) > 0, get(numerator_colname) / get(denominator_colname), NA_real_)]
      
-    # Calculate Seasonality Flag
-    dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
+    # flag for seasonality
+    output_dt[, (seasonality_colname) := as.integer(get(denominator_colname) > 0 &
                                              get(prop_name) >= proportion_threshold)]
   }
    
   # return the data
-  dt[]
+  return(output_dt)
 }
 
 
@@ -897,131 +893,6 @@ get_top_summed_group <- function(dt, target_indicator_colname, grouping_colname)
 
 
 #' @description
-#' make ridgeline plot sorting y-axis categories by amount/height and set x-axis labels to show only the beginning of each year (1st month)
-#' 
-#' @param dt data.table with the plotting data
-#' @param x_colname column for x-axis values (period)
-#' @param y_colname column for y-axis categories
-#' @param height_colname column which gives the ridge height (the values)
-#' @param year_colname column for x-axis labels
-#' @param month_colname column to filter for 1st month/January labels
-#' @param title plot title
-#' @param scale_constant divisor to limit the heights of the ridges
-#' @param ridge_color ridgeline fill
-#' 
-#' @return ggplot object
-make_ridgeline_plot <- function(dt, x_colname, y_colname, height_colname, year_colname, month_colname, title, scale_constant = 15000, ridge_color = "#008080") {
-    p <- ggplot(
-      dt,
-      aes(
-        x = .data[[x_colname]],
-        y = fct_reorder(.data[[y_colname]], .data[[height_colname]]),
-        height = .data[[height_colname]] / scale_constant,
-        group = .data[[y_colname]],
-        scale = 2
-      )
-    ) +
-      geom_ridgeline(
-        alpha = 0.4, scale = 4.5, linewidth = 0.3,
-        fill = ridge_color, color = "white"
-      ) +
-      scale_x_discrete(
-        breaks = dt[get(month_colname) == 1, get(x_colname)],
-        labels = dt[get(month_colname) == 1, get(year_colname)]
-      ) +
-      labs(title = title, y = "", x = "") +
-      theme_minimal() +
-      theme(
-        axis.ticks.y = element_blank(),
-        panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.border = element_blank()
-      )
-
-    return(p)
-    }
-  
-
-#' @description 
-#' map seasonality with predefined colors
-#' 
-#' areas are categorized as "Seasonal" or "Not seasonal"
-#'
-#' @param spatial_seasonality_df sf data frame with spatial geometry and seasonality data
-#' @param seasonality_colname string with the name of the column indicating seasonality (values should be 0 or 1)
-#' @param title_label string to customize the legend title
-#' @param seasonal_color color for areas which are seasonal
-#' @param not_seasonal_color color for areas which are not seasonal
-#' 
-#' @return a ggplot object of the seasonality map
-make_seasonality_plot <- function(spatial_seasonality_df, seasonality_colname, title_label, seasonal_color="#F9A98E", not_seasonal_color="#D4E8CE"){
-
-  seasonality_plot <- ggplot(spatial_seasonality_df) +
-    geom_sf(aes(fill = as.factor(get(seasonality_colname))))+
-    scale_fill_manual(values = c("1" = seasonal_color, "0" = not_seasonal_color),
-                      labels = c("1" = "Saisonnier", "0" = "Non saisonnierl")) +  # Custom labels
-    coord_sf() + # map projection
-    # guides(fill=guide_legend(title= paste0("Seasonality (", title_label, ")"), nrow = 2)) +
-    guides(fill=guide_legend(title=title_label, nrow = 2)) +
-    theme_classic() +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5),
-          legend.position = "bottom", legend.key.width = unit(2,"cm"), legend.text=element_text(size=10))
-  
-  print(seasonality_plot)
-  
-  return(seasonality_plot)
-}
-
-
-#' @description
-#' map the duration of seasonality (in how many months x% of annual rain falls)
-#'
-#' @param spatial_seasonality_df sf data with spatial and seasonality columns
-#' @param seasonality_duration_colname column name (string) for seasonality duration (number of months)
-#' @param title_label string for the legend title
-#' @param color_vector vector of colors for the plot
-#' @param na_label legend label when there is no seasonality
-#' @param na_color olor for missing values
-#' 
-#' @return ggplot object
-make_seasonality_duration_plot <- function(spatial_seasonality_df, seasonality_duration_colname, title_label, color_vector = c("#FDDECE", "#F07A58", "#A8381E"), na_color = "#D3D3D3", na_label="Pas saisonnier"){
-  
-  # get the possible values of the duration; decreasing order, so that the most intense color is the shortest (most dramatic) type of seasonality
-  unique_values <- sort(unique(as.character(spatial_seasonality_df[[seasonality_duration_colname]])), decreasing = TRUE)
-
-  # check that they matche the number of colors
-  if (length(color_vector) < length(unique_values)) {
-    stop("The number of colors provided in 'color_vector' must be at least equal to the number of unique values in the data.")
-  }
-
-  # map colors to values
-  color_mapping <- setNames(color_vector[1:length(unique_values)], unique_values)
-
-  duration_plot <- ggplot(spatial_seasonality_df) +
-    geom_sf(aes(fill = as.character(get(seasonality_duration_colname)))) +
-    coord_sf() + # map projection
-    scale_fill_manual(
-      values = color_mapping,
-      labels = function(x) {
-        ifelse(is.na(x) | x == "Inf", na_label, x) # custom labels
-      },
-      na.value = na_color
-    ) +
-    guides(fill = guide_legend(title = title_label, nrow = 2)) +
-    theme_classic() +
-    theme(
-      plot.title = element_text(face = "bold", hjust = 0.5),
-      legend.position = "bottom",
-      legend.key.width = unit(2, "cm"),
-      legend.text = element_text(size = 10)
-    )
-
-  print(duration_plot)
-  return(duration_plot)
-}
-
-#' @description
 #' create forward-looking month blocks summing values and divide them by the annual (calendar year) sum of values
 #' 
 #' @param input_dt an input data table (or data frame)
@@ -1070,6 +941,7 @@ compute_block_percentage <- function(input_dt, values_colname, vector_of_duratio
   
   return(dt)
 }
+
 
 filter_cycles_data <- function(input_dt, pattern_cycle_colnames, id_colnames, year_colname, reference_years_vector, month_colname, target_month_num=8){
   #' Filter data on cycles, to only the relevant beginning month
@@ -1148,43 +1020,6 @@ fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, ord
 	output_dt[, (value_colname) := nafill(get(value_colname), type = "locf"), by = c(spatial_colname, temporal_colname)]
 
 }
-
-#' @description
-#' make a choropleth map from an sf object
-#'
-#' @param spatial_df sf object containing geometries and the variable map
-#' @param target_colname name of the column to use for the fill aesthetic
-#' @param map_colors vector of colors to scale_fill_manual with names that match the levels of the target variable
-#' @param plot_title plot title
-#' @param legend_title legend title
-#' @return map
-make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title, legend_title){
-  output_plot <- ggplot(spatial_df) +
-    geom_sf(aes(fill = get(target_colname)))+
-    coord_sf() +
-    scale_fill_manual(
-      legend_title,
-      values=map_colors
-    ) +
-    guides(fill=guide_legend(nrow = 2)) +
-    theme_void() +
-    theme(
-      plot.title = element_text(
-        family = "Helvetica",
-        # face = "bold",
-        hjust = 0.5
-      ),
-      legend.position = "bottom", legend.key.width = unit(2,"cm"),
-      legend.text=element_text(
-        family = "Helvetica",
-        size=10
-      )
-    ) +
-    labs(title=plot_title)
-
-  print(output_plot)
-  return(output_plot)
- }
 
 
 #%% DHS ------------------------------
@@ -1789,7 +1624,52 @@ make_coverage_radii_terra <- function(
   
   return(coverage_radii_degrees)
 }
-          
+      
+
+########################
+make_overlaid_sf_plot <- function(
+  #' plot overlaying a) administrative boundaries, b) location of healthcare units, c) buffers around each healthcare unit
+  
+  admin_unit_vect,
+  points_sf_vect,
+  buffer_vect,
+  epsg_value_degrees,
+  plot_title
+){
+
+  #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
+  #'
+  #' @param admin_unit_vect: sf vector of administrative boundaries
+  #' @param points_sf_vect: sf vector with coordinate columns of healthcare units
+  #' @param buffer_vect: sf vector of buffer zones around healthcare units
+  #' @param epsg_value_degrees: EPSG code (in degrees) for CRS
+  #' @param plot_title: title of plot
+  #'
+  #' @return ggplot object showing the spatial overlay
+
+  # get all 3 data objects to the same projection
+
+  # a) ensure the healthcare locations have the proper projection
+  points_sf_vect <- reproject_epsg(points_sf_vect, epsg_value_degrees)
+
+  # b) ensure the admin geo data has the proper projection
+  admin_unit_vect <- reproject_epsg(admin_unit_vect, epsg_value_degrees)
+
+  # c) ensure the buffer data has the proper projection
+  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
+
+  plot <- ggplot() +
+    geom_sf(data = admin_unit_vect, fill = "gray95", color = "black") +
+    geom_sf(data = buffer_vect, fill = "dodgerblue", alpha = 0.3) +
+    geom_sf(data = points_sf_vect, color = "dodgerblue4", size = 0.5) +
+    theme_minimal() +
+    ggtitle(plot_title)
+
+  # print(plot)  # do not print
+
+  return(plot)
+}
+
 
 ########################
 make_rasterized_inclusion_data <- function(
@@ -2049,7 +1929,7 @@ make_snt_categorical_map <- function(
   plot_title = NULL,
   plot_subtitle = NULL,
   plot_caption = NULL,
-  legend_title = NULL,
+  legend_title = NULL
 ) {
  
   # validation

@@ -5,7 +5,8 @@ import pandas as pd
 from datetime import datetime
 
 import logging
-from openhexa.sdk import current_run, parameter, pipeline, workspace, File
+from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.toolbox.dhis2.periods import period_from_string
 import rasterio
 from rasterio.warp import reproject, Resampling
 from affine import Affine
@@ -31,23 +32,22 @@ from malariaAtlasProject.map_utils import (
 # https://bluesquare.atlassian.net/browse/SNT25-143 (old pipeline)
 # https://bluesquare.atlassian.net/browse/SNT25-259 (old pipeline)
 # https://bluesquare.atlassian.net/browse/SNT25-284
+# https://bluesquare.atlassian.net/browse/SNT25-518 (include periods)
 
 
 @pipeline("snt_map_extracts")
 @parameter(
-    code="pop_raster_selection",
-    name="Population raster selection (.tif)",
-    type=File,
-    help="Select the population raster (.tif) used for population-weighted calculations.",
-    required=False,
+    code="year_start",
+    name="Year start",
+    help="Start year of indicators selection (e.g. 2022).",
+    type=str,
     default=None,
+    required=True,
 )
 @parameter(
-    code="target_year",
-    name="Target Year",
-    help=(
-        "Target year for indicator selection (e.g. 2022). Defaults to latest if unavailable or not specified."
-    ),
+    code="year_end",
+    name="Year end",
+    help="End year of indicators selection (e.g. 2022).",
     type=str,
     default=None,
     required=True,
@@ -67,9 +67,7 @@ from malariaAtlasProject.map_utils import (
     default=False,
     required=False,
 )
-def snt_map_extracts(
-    pop_raster_selection: File, target_year: str, run_report_only: bool, pull_scripts: bool
-) -> None:
+def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull_scripts: bool) -> None:
     """Main function to get raster data for a dhis2 country."""
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extracts"
@@ -99,25 +97,17 @@ def snt_map_extracts(
             code_scripts=[],
         )
 
-    try:
-        # Load configuration
-        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
-        validate_config(snt_config)
-        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
+    # Load configuration
+    snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+    validate_config(snt_config)
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
 
-        if not run_report_only:
-            output_path = root_path / "data" / "map"
-            output_path.mkdir(parents=True, exist_ok=True)
+    if not run_report_only:
+        output_path = root_path / "data" / "map"
+        output_path.mkdir(parents=True, exist_ok=True)
 
-            # Validate population raster (optional)
-            if pop_raster_selection:
-                log_message(logger, f"Population raster selected: {pop_raster_selection.path}")
-                if not Path(pop_raster_selection.path).exists():
-                    raise FileNotFoundError(f"Population raster file not found: {pop_raster_selection.path}")
-                if Path(pop_raster_selection.path).suffix.lower() != ".tif":
-                    raise ValueError("Population raster must be a '.tif' file.")
-
+        for year in periods:
             make_table(
                 coverage_categories=snt_indicators,
                 snt_config=snt_config,
@@ -130,8 +120,8 @@ def snt_map_extracts(
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_map_extracts",
                 parameters={
-                    "pop_raster_selection": pop_raster_selection.path if pop_raster_selection else None,
-                    "target_year": target_year,
+                    "year_start": year_start,
+                    "year_end": year_end,
                     "run_report_only": run_report_only,
                     "pull_scripts": pull_scripts,
                 },
@@ -139,30 +129,26 @@ def snt_map_extracts(
                 country_code=country_code,
             )
 
-            add_files_to_dataset(
-                dataset_id=dataset_id,
-                country_code=country_code,
-                file_paths=[
-                    output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
-                    output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
-                    parameters_file,
-                ],
-            )
-
-        else:
-            log_message(logger, "Skipping calculations, running only the reporting.")
-
-        run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
-            nb_output_path=pipeline_path / "reporting" / "outputs",
+        add_files_to_dataset(
+            dataset_id=dataset_id,
             country_code=country_code,
+            file_paths=[
+                output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
+                output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
+                parameters_file,
+            ],
         )
 
-        log_message(logger, "Pipeline completed successfully!")
+    else:
+        log_message(logger, "Skipping calculations, running only the reporting.")
 
-    except Exception as e:
-        log_message(logger, f"Pipeline error: {e}", level="error")
-        raise e
+    run_report_notebook(
+        nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
+        nb_output_path=pipeline_path / "reporting" / "outputs",
+        country_code=country_code,
+    )
+
+    log_message(logger, "Pipeline completed successfully!")
 
 
 def make_table(
@@ -765,6 +751,24 @@ def log_message(
     except Exception:
         # Never let UI logging break the pipeline
         pass
+
+
+def get_extract_periods(start: str, end: str) -> list[str]:
+    """Generates a list of periods between start and end.
+
+    Returns
+    -------
+    list[str]
+        List of periods as strings (e.g. "2020", "202501").
+    """
+    try:
+        # Get periods
+        p1 = period_from_string(start)
+        p2 = period_from_string(end)
+        periods = [p1] if p1 == p2 else p1.get_range(p2)
+        return [str(p) for p in periods]
+    except Exception as e:
+        raise Exception(f"Error in start/end date configuration: {e!s}") from e
 
 
 if __name__ == "__main__":

@@ -298,25 +298,21 @@ def snt_worldpop_format(pop_data_path: Path, year: str, country_code: str, outpu
 
 
 def get_extract_periods(start: str, end: str) -> list[str]:
-    """Generates a list of periods between start and end in YYYYMM format.
+    """Generates a list of periods between start and end.
 
     Returns
     -------
     list[str]
-        List of periods in YYYYMM format.
+        List of periods as strings (e.g. "2020", "202501").
     """
     try:
         # Get periods
-        start_period = period_from_string(start)
-        end_period = period_from_string(end)
-        extract_periods = (
-            [str(p) for p in start_period.get_range(end_period)]
-            if str(start_period) < str(end_period)
-            else [str(start_period)]
-        )
+        p1 = period_from_string(start)
+        p2 = period_from_string(end)
+        periods = [p1] if p1 == p2 else p1.get_range(p2)
+        return [str(p) for p in periods]
     except Exception as e:
         raise Exception(f"Error in start/end date configuration: {e!s}") from e
-    return extract_periods
 
 
 def validate_periods(start: int, end: int) -> None:

@@ -50,7 +50,7 @@ from worlpopclient import WorldPopClient
     default=False,
     required=False,
 )
-def snt_worldpop_extract(year_start: bool, year_end: int, run_report_only: bool, pull_scripts: bool) -> None:
+def snt_worldpop_extract(year_start: int, year_end: int, run_report_only: bool, pull_scripts: bool) -> None:
     """Write your pipeline orchestration here."""
     # set paths
     snt_root_path = Path(workspace.files_path)

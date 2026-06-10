@@ -24,7 +24,7 @@ class WorldPopClient:
             A logger instance to use for logging messages. If None, a default logger will be created
         """
         self.base_url = url
-        self.logger = logger
+        self.logger = logger or logging.getLogger(__name__)
 
     def download_data_for_country(
         self,

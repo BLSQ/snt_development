@@ -249,7 +249,7 @@ cut_to_categories <- function(input_dt, input_colname, output_colname, input_bre
       include.lowest = TRUE,
       right = FALSE
   ),
-  levels = labels  # to keep the same order as the labels (in ascending order, matching the breaks)
+  levels = labels)  # to keep the same order as the labels (in ascending order, matching the breaks)
 ]
 
   return(output_dt)

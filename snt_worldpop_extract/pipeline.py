@@ -272,7 +272,7 @@ def run_spatial_aggregation(
     return output_path
 
 
-def snt_worldpop_format(pop_data_path: Path, year: str, country_code: str, output_dir: Path) -> Path:
+def snt_worldpop_format(pop_data_path: Path, year: str, country_code: str, output_dir: Path) -> Path | None:
     """Format aggregated WorldPop population data for SNT.
 
     Returns
@@ -327,10 +327,16 @@ def validate_periods(start: int, end: int) -> None:
     ValueError
         If start or end are not valid integers or if start is greater than end.
     """
-    if not (2000 <= start <= 2030):
-        raise ValueError(f"Start year {start} is out of range. Must be between 2000 and 2030.")
-    if not (2000 <= end <= 2030):
-        raise ValueError(f"End year {end} is out of range. Must be between 2000 and 2030.")
+    if not (2015 <= start <= 2030):
+        raise ValueError(
+            f"Start year {start} is out of range. "
+            "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"
+        )
+    if not (2015 <= end <= 2030):
+        raise ValueError(
+            f"End year {end} is out of range. "
+            "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"
+        )
     if start > end:
         raise ValueError("Start period must be less than or equal to end period.")
 

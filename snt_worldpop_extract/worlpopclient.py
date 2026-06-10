@@ -29,9 +29,9 @@ class WorldPopClient:
     def download_data_for_country(
         self,
         country_iso3: str,
-        output_dir: Path,
         year: str | None,
-        un_adj: bool = False,
+        output_dir: Path,
+        overwrite: bool = False,
         filename: str | None = None,
     ) -> Path:
         """Download and save the WorldPop raster dataset for a given country and year.
@@ -43,15 +43,15 @@ class WorldPopClient:
         ----------
         country_iso3 : str
             3-letter ISO code of the country (e.g., "COD", "BFA").
+        year : str
+            Year to filter the dataset (e.g., "2020").
         output_dir : Path
             Directory to save the GeoTIFF file.
+        overwrite : bool, optional
+            Whether to overwrite the file if it already exists. Defaults to False.
         filename : str, optional
             Filename to save the raster data. If None, defaults to
             "{country_iso3}_worldpop_population_{year}.tif".
-        year : str
-            Year to filter the dataset (e.g., "2020").
-        un_adj : bool
-            Whether to download the "unadjuvanted" (constrained) version. Defaults to False.
 
         Returns
         -------
@@ -68,8 +68,14 @@ class WorldPopClient:
         if not (isinstance(country_iso3, str) and len(country_iso3) == 3):
             raise ValueError("country_iso3 must be a 3-letter string.")
 
+        if int(year) < 2015 or int(year) > 2030:  # NOTE: We might want to change the url repo in the future.
+            raise ValueError(
+                f"WorldPop data not available for {year} "
+                "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"
+            )
+
         country_iso3 = country_iso3.upper()
-        candidate_url = self._build_url(country_iso3, year, un_adj)
+        candidate_url = self._build_url(country_iso3, year)
 
         # Determine the filename to save as
         if filename:
@@ -79,14 +85,14 @@ class WorldPopClient:
 
         destination_path = output_dir / fname
 
-        if destination_path.exists():
+        if not overwrite and destination_path.exists():
             self._log(f"File {destination_path.name} already exists. Skipping download.", level="info")
             return destination_path
 
         self._download_file(candidate_url, destination_path)
         return destination_path
 
-    def _build_url(self, country_iso3: str, year: str, un_adj: bool = False) -> Path:
+    def _build_url(self, country_iso3: str, year: str) -> Path:
         """Build download URL candidates.
 
         Parameters
@@ -95,33 +101,12 @@ class WorldPopClient:
             Country ISO A3 code.
         year : str, optional
             Year of interest.
-        un_adj : bool, optional
-            Use UN adjusted population counts. Default=False.
 
         Returns
         -------
         Path
             download URL candidate.
         """
-        year_int = int(year)
-
-        if un_adj and year_int > 2020:
-            self._log(f"UN-adjusted WorldPop data not available for {year}.", level="warning")
-
-        # WorldPop (2000-2020) uses the Global_2000_2020 structure.
-        if year_int <= 2020 and un_adj:
-            self._log(f"Downloading UN-adjusted WorldPop data for {country_iso3} {year}.")
-            return (
-                f"{self.base_url}/Global_2000_2020/{year}/{country_iso3.upper()}/"
-                f"{country_iso3.lower()}_ppp_{year}_UNadj.tif"
-            )
-
-        if year_int > 2000 and year_int < 2015:
-            return (
-                f"{self.base_url}/Global_2000_2020/{year}/{country_iso3.upper()}/"
-                f"{country_iso3.lower()}_ppp_{year}_UNadj.tif"
-            )
-
         # select latest release available
         latest_release = self._list_remote_directories(url=f"{self.base_url}/Global_2015_2030/")[0]
         return (

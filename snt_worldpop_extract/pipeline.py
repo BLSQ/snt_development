@@ -1,21 +1,21 @@
 from pathlib import Path
 
 import geopandas as gpd
-import pandas as pd
+import polars as pl
 import rasterio
 from openhexa.sdk import current_run, parameter, pipeline, workspace
+from openhexa.toolbox.dhis2.periods import period_from_string
 from rasterstats import zonal_stats
 from snt_lib.snt_pipeline_utils import (
-    pull_scripts_from_repository,
     add_files_to_dataset,
     get_file_from_dataset,
     load_configuration_snt,
+    pull_scripts_from_repository,
     run_report_notebook,
-    validate_config,
     save_pipeline_parameters,
+    validate_config,
 )
 from worlpopclient import WorldPopClient
-from openhexa.toolbox.dhis2.periods import period_from_string
 
 
 @pipeline("snt_worldpop_extract")
@@ -24,7 +24,7 @@ from openhexa.toolbox.dhis2.periods import period_from_string
     name="Year start",
     help="Start year period for WorldPop population rasters extraction (e.g. 2020)",
     type=int,
-    default=2020,  #######" Change this
+    default=2014,
     required=True,
 )
 @parameter(
@@ -32,15 +32,8 @@ from openhexa.toolbox.dhis2.periods import period_from_string
     name="Year end",
     help="End year period for WorldPop population rasters extraction (e.g. 2025)",
     type=int,
-    default=2021,  #######" Change this
+    default=2015,
     required=True,
-)
-@parameter(
-    "un_adj",
-    name="UN adjusted",
-    help="Retrieve UN adjusted WorldPop rasters. Note: only available for years <= 2020.",
-    type=bool,
-    default=False,
 )
 @parameter(
     "run_report_only",
@@ -57,9 +50,7 @@ from openhexa.toolbox.dhis2.periods import period_from_string
     default=False,
     required=False,
 )
-def snt_worldpop_extract(
-    year_start: bool, year_end: int, un_adj: bool, run_report_only: bool, pull_scripts: bool
-) -> None:
+def snt_worldpop_extract(year_start: bool, year_end: int, run_report_only: bool, pull_scripts: bool) -> None:
     """Write your pipeline orchestration here."""
     # set paths
     snt_root_path = Path(workspace.files_path)
@@ -101,7 +92,6 @@ def snt_worldpop_extract(
         parameters={
             "year_start": year_start,
             "year_end": year_end,
-            "un_adj": un_adj,
             "pull_scripts": pull_scripts,
         },
         output_path=data_path,
@@ -109,16 +99,19 @@ def snt_worldpop_extract(
     )
 
     periods = get_extract_periods(start=str(year_start), end=str(year_end))
-    files_to_publish = []
+    ready_files = []
     for year in periods:
         current_run.log_info(f"Processing WorldPop population data for year {year}.")
-        raster_path = retrieve_population_data(
-            country_code=country_code,
-            year=year,
-            un_adj=un_adj,
-            output_path=data_path / "rasters",
-            overwrite=False,
-        )
+        try:
+            raster_path = retrieve_population_data(
+                country_code=country_code,
+                year=year,
+                output_path=data_path / "rasters",
+                overwrite=False,
+            )
+        except Exception as e:
+            current_run.log_warning(f"{e!s}")
+            continue
 
         pop_agg_path = run_spatial_aggregation(
             tif_file_path=raster_path,
@@ -129,18 +122,24 @@ def snt_worldpop_extract(
 
         pop_formatted_path = snt_worldpop_format(
             pop_data_path=pop_agg_path,
-            snt_config=snt_config_dict,
             year=year,
+            country_code=country_code,
             output_dir=data_path / "population",
         )
 
         if pop_formatted_path:
-            files_to_publish.append(pop_formatted_path)
+            ready_files.append(pop_formatted_path)
+
+    # Concatenate processed years into a single file
+    files_to_publish = concat_files(ready_files, country_code, data_path / "population")
+    if not files_to_publish:
+        current_run.log_warning("No population data files processed. Skipping dataset publication.")
+        return
 
     add_files_to_dataset(
         dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("WORLDPOP_DATASET_EXTRACT"),
         country_code=country_code,
-        file_paths=files_to_publish + parameters_file,
+        file_paths=files_to_publish + [parameters_file],
     )
 
     run_report_notebook(
@@ -151,7 +150,7 @@ def snt_worldpop_extract(
 
 
 def retrieve_population_data(
-    country_code: str, year: str, un_adj: bool, output_path: Path, overwrite: bool = False
+    country_code: str, year: str, output_path: Path, overwrite: bool = False
 ) -> Path:
     """Retrieve raster population data from worldpop.
 
@@ -161,9 +160,6 @@ def retrieve_population_data(
         The 3-letter ISO code of the country (e.g.: "COD", "BFA").
     year : str, optional
         The year for which to retrieve the population data. (e.g.: "2020").
-    un_adj : bool
-        Whether to retrieve the UN adjusted (unconstrained) WorldPop raster.
-        Note: only available for years <= 2020.
     overwrite : bool, optional
         Whether to overwrite existing files. Defaults to False.
     output_path : Path
@@ -177,7 +173,6 @@ def retrieve_population_data(
     """
     current_run.log_info("Retrieving population data grid from WorldPop.")
     wpop_client = WorldPopClient()
-    current_run.log_info(f"Downloading data from : {wpop_client.base_url}")
 
     # Create output directory (and parents e.g. data/worldpop/) if missing
     output_path.mkdir(parents=True, exist_ok=True)
@@ -187,13 +182,13 @@ def retrieve_population_data(
         pop_file_path = wpop_client.download_data_for_country(
             country_iso3=country,
             year=year,
-            un_adj=un_adj,
             output_dir=output_path,
+            overwrite=overwrite,
         )
         current_run.log_info(f"Population raster successfully downloaded under: {pop_file_path}.")
         return pop_file_path
     except Exception as e:
-        raise Exception(f"Error retrieving WorldPop population data for {country} {year}: {e}") from e
+        raise Exception(f"Error retrieving WorldPop data for {country} {year}: {e}") from e
 
 
 def run_spatial_aggregation(tif_file_path: Path, year: str, snt_config: dict, output_dir: Path) -> Path:
@@ -204,7 +199,7 @@ def run_spatial_aggregation(tif_file_path: Path, year: str, snt_config: dict, ou
         Path
             The full path to the saved aggregated population data file (parquet).
     """
-    if not tif_file_path.exists():
+    if not tif_file_path or not tif_file_path.exists():
         current_run.log_warning(f"Population file not found: {tif_file_path}. Skipping aggregation.")
         return None
 
@@ -257,43 +252,25 @@ def run_spatial_aggregation(tif_file_path: Path, year: str, snt_config: dict, ou
     # Formats
     result_gdf = gpd.GeoDataFrame.from_features(pop_stats)
     result_gdf = result_gdf.drop(columns=["geometry"])
-    result_pd = pd.DataFrame(result_gdf)
-    result_pd = result_pd.rename(columns={"sum": "population", "count": "pixel_count"})
-    result_pd["population"] = result_pd["population"].round(0).astype(int)
-    result_pd.columns = result_pd.columns.str.upper()
+    result_df = pl.DataFrame(result_gdf).rename({"sum": "population", "count": "pixel_count"})
+    result_df = result_df.with_columns(pl.col("population").round(0).cast(pl.Int64))
+    result_df.columns = [c.upper() for c in result_df.columns]
 
     # Log any administrative levels with no population data
-    no_data = result_pd[result_pd["POPULATION"] == 0]
-    if not no_data.empty:
-        for _, row in no_data.iterrows():
-            current_run.log_warning(
-                f"Administrative level 2 : {row['ADM2_NAME']} ({row['ADM2_ID']}) has no population data."
-            )
+    no_data = result_df.filter(pl.col("POPULATION") == 0)
+    for row in no_data.iter_rows(named=True):
+        current_run.log_warning(
+            f"Administrative level 2 : {row['ADM2_NAME']} ({row['ADM2_ID']}) has no population data."
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    agg_fname = resolve_aggregated_filename(tif_file_path.as_posix(), country_code, year)
-    output_path = output_dir / agg_fname
-    result_pd.to_parquet(output_path, index=False)
+    output_path = output_dir / f"{country_code}_worldpop_agg_{year}.parquet"
+    result_df.write_parquet(output_path)
     current_run.log_info(f"Aggregated population data saved under: {output_path}")
     return output_path
 
 
-def resolve_aggregated_filename(filename: str, country_code: str, year: str) -> str:
-    """Resolve the expected filename for the aggregated population data based on input parameters.
-
-    Returns
-    -------
-        str
-            The expected filename for the aggregated population data.
-    """
-    if "pop" in filename:
-        return f"{country_code}_worldpop_constrained_{year}_agg.parquet"
-    if "unadj" in filename.lower():
-        return f"{country_code}_worldpop_ppp_{year}_agg_unadj.parquet"
-    return f"{country_code}_worldpop_ppp_{year}_agg.parquet"
-
-
-def snt_worldpop_format(pop_data_path: Path, year: str, snt_config: dict, output_dir: Path) -> Path:
+def snt_worldpop_format(pop_data_path: Path, year: str, country_code: str, output_dir: Path) -> Path:
     """Format aggregated WorldPop population data for SNT.
 
     Returns
@@ -301,26 +278,20 @@ def snt_worldpop_format(pop_data_path: Path, year: str, snt_config: dict, output
         Path
             The full path to the saved formatted population data file (parquet).
     """
-    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-
-    if not pop_data_path.exists():
+    if not pop_data_path or not pop_data_path.exists():
         current_run.log_warning(
             f"No aggregated population data found for {country_code}. Skipping formatting."
         )
         return None
 
-    pop_data = pd.read_parquet(pop_data_path)
-    if "UNadj" in pop_data_path.name:
-        df = pop_data.rename(columns={"POPULATION": "POPULATION_UNADJ"})
-    else:
-        df = pop_data.copy()
-        df["POPULATION_UNADJ"] = pd.NA
+    pop_data = pl.read_parquet(pop_data_path)
+    df = pop_data.with_columns(pl.lit(year).alias("YEAR"))
+    df = df.select(["YEAR", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID", "POPULATION"])
 
-    df["YEAR"] = year  # Add year column (reference)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_fpath = output_dir / f"{country_code}_worldpop_population_{year}.parquet"
-    df.to_parquet(output_fpath, index=False)
-    current_run.log_info(f"Aggregated population data saved under: {output_fpath}")
+    df.write_parquet(output_fpath)
+    current_run.log_info(f"Formatted population data saved under: {output_fpath}")
     return output_fpath
 
 
@@ -360,6 +331,40 @@ def validate_periods(start: int, end: int) -> None:
         raise ValueError(f"End year {end} is out of range. Must be between 2000 and 2030.")
     if start > end:
         raise ValueError("Start period must be less than or equal to end period.")
+
+
+def concat_files(file_paths: list[Path], country_code: str, output_dir: Path) -> list[Path]:
+    """Concatenate multiple parquet files into a single file.
+
+    Returns
+    -------
+        list[Path]
+            The full path to the saved concatenated population data file (csv and parquet).
+    """
+    if not file_paths:
+        current_run.log_warning("No files to concatenate.")
+        return []
+
+    current_run.log_info(f"Concatenating {len(file_paths)} population data files.")
+    dfs = []
+    for file_path in file_paths:
+        if file_path and file_path.exists():
+            dfs.append(pl.read_parquet(file_path))
+        else:
+            current_run.log_warning(f"File not found and will be skipped in concatenation: {file_path}")
+
+    if not dfs:
+        current_run.log_warning("No valid files found for concatenation.")
+        return []
+
+    concat_df = pl.concat(dfs)
+    concat_df.write_csv(output_dir / f"{country_code}_worldpop_population.csv")
+    concat_df.write_parquet(output_dir / f"{country_code}_worldpop_population.parquet")
+    current_run.log_info(f"Concatenated population data saved under: {output_dir}")
+    return [
+        output_dir / f"{country_code}_worldpop_population.csv",
+        output_dir / f"{country_code}_worldpop_population.parquet",
+    ]
 
 
 if __name__ == "__main__":

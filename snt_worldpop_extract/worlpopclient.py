@@ -93,7 +93,7 @@ class WorldPopClient:
         self._download_file(candidate_url, destination_path)
         return destination_path
 
-    def _build_url(self, country_iso3: str, year: str) -> Path:
+    def _build_url(self, country_iso3: str, year: str) -> str:
         """Build download URL candidates.
 
         Parameters

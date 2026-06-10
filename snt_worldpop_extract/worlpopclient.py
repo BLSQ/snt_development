@@ -68,7 +68,8 @@ class WorldPopClient:
         if not (isinstance(country_iso3, str) and len(country_iso3) == 3):
             raise ValueError("country_iso3 must be a 3-letter string.")
 
-        if int(year) < 2015 or int(year) > 2030:  # NOTE: We might want to change the url repo in the future.
+        year_int = int(year)
+        if year_int < 2015 or year_int > 2030:  # NOTE: We might want to change the url repo in the future.
             raise ValueError(
                 f"WorldPop data not available for {year} "
                 "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"

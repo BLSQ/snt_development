@@ -24,7 +24,7 @@ from worlpopclient import WorldPopClient
     name="Year start",
     help="Start year period for WorldPop population rasters extraction (e.g. 2020)",
     type=int,
-    default=2014,
+    default=None,
     required=True,
 )
 @parameter(
@@ -32,7 +32,7 @@ from worlpopclient import WorldPopClient
     name="Year end",
     help="End year period for WorldPop population rasters extraction (e.g. 2025)",
     type=int,
-    default=2015,
+    default=None,
     required=True,
 )
 @parameter(

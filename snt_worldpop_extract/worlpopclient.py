@@ -109,8 +109,10 @@ class WorldPopClient:
             download URL candidate.
         """
         # select latest release available
-        latest_release = self._list_remote_directories(url=f"{self.base_url}/Global_2015_2030/")[0]
-        return (
+        releases = self._list_remote_directories(url=f"{self.base_url}/Global_2015_2030/")
+        if not releases:
+            raise ValueError(f"No releases found at {self.base_url}/Global_2015_2030/")
+        latest_release = releases[0]
             f"{self.base_url}/Global_2015_2030/{latest_release}/{year}/{country_iso3.upper()}/"
             f"v1/100m/constrained/{country_iso3.lower()}_pop_{year}_CN_100m_{latest_release}_v1.tif"
         )

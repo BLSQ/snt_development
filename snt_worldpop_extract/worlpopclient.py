@@ -29,7 +29,7 @@ class WorldPopClient:
     def download_data_for_country(
         self,
         country_iso3: str,
-        year: str | None,
+        year: str,
         output_dir: Path,
         overwrite: bool = False,
         filename: str | None = None,

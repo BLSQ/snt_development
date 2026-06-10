@@ -328,19 +328,18 @@ class MAPRasterExtractor:
         if bbox is None:
             raise ValueError("Either bbox or shapes must be provided to define the area of interest.")
 
+        # Avoid downloading the same file in the provided folder
+        raster_fname = output_path / f"{latest_coverage_id}_{target_year}.tif"
+        if raster_fname.exists():
+            if replace_file:
+                raster_fname.unlink()  # delete existing file
+                self._log_message(
+                    f"Raster exists, deleting and re-downloading: {raster_fname.name}", level="warning"
+                )
+            else:
+                self._log_message(f"Raster already exists: {raster_fname.name}, skipping download.")
+                return raster_fname
         try:
-            # Avoid downloading the same file in the provided folder
-            raster_fname = output_path / f"{latest_coverage_id}_{target_year}.tif"
-            if raster_fname.exists():
-                if replace_file:
-                    raster_fname.unlink()  # delete existing file
-                    self._log_message(
-                        f"Raster exists, deleting and re-downloading: {raster_fname.name}", level="warning"
-                    )
-                else:
-                    self._log_message(f"Raster already exists: {raster_fname.name}, skipping download.")
-                    return raster_fname
-
             raster_path = self._download_raster(
                 coverage_id=latest_coverage_id,
                 bbox=bbox,

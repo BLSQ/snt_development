@@ -85,7 +85,7 @@ def snt_worldpop_extract(year_start: int, year_end: int, run_report_only: bool, 
     try:
         validate_periods(year_start, year_end)
     except ValueError as e:
-        raise ValueError(f"Invalid period configuration: {e!s}") from e
+        current_run.log_error(f"Invalid period configuration: {e}")
 
     parameters_file = save_pipeline_parameters(
         pipeline_name="snt_worldpop_extract",

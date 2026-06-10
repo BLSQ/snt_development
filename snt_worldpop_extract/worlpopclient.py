@@ -113,6 +113,7 @@ class WorldPopClient:
         if not releases:
             raise ValueError(f"No releases found at {self.base_url}/Global_2015_2030/")
         latest_release = releases[0]
+        return (
             f"{self.base_url}/Global_2015_2030/{latest_release}/{year}/{country_iso3.upper()}/"
             f"v1/100m/constrained/{country_iso3.lower()}_pop_{year}_CN_100m_{latest_release}_v1.tif"
         )

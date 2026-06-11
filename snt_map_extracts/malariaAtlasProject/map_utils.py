@@ -41,21 +41,20 @@ def load_tiff_bands(
     bands = {}
 
     try:
-        with rasterio.open(tif_path) as src:
-            count = src.count
-            transform = src.transform
-            crs = src.crs
-            nodata = src.nodata
-
-            for idx in range(1, count + 1):
-                if band_names and idx <= len(band_names):
-                    name = band_names[idx - 1]
-                else:
-                    name = f"band_{idx}"
-                bands[name] = src.read(idx)
-
+        src = rasterio.open(tif_path)
     except rasterio.errors.RasterioIOError as e:
-        raise RuntimeError(f"Failed to read TIFF file: {tif_file}") from e
+        raise RuntimeError(f"Failed to read TIFF file: {tif_file}. Details: {e}") from e
+
+    with src:
+        count = src.count
+        transform = src.transform
+        crs = src.crs
+        nodata = src.nodata
+        data = src.read()
+
+    for idx in range(1, count + 1):
+        name = band_names[idx - 1] if band_names and idx <= len(band_names) else f"band_{idx}"
+        bands[name] = data[idx - 1]
 
     return bands, transform, crs, nodata
 

@@ -1,25 +1,15 @@
-import logging
-from datetime import datetime
 from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
-
-# import pandas as pd
 import polars as pl
-import rasterio
-from affine import Affine
 from malariaAtlasProject.map import MAPExtractorError, MAPRasterExtractor
 from malariaAtlasProject.map_utils import (
     load_tiff_bands,
     parse_raster_filename_vars,
 )
 from openhexa.sdk import current_run, parameter, pipeline, workspace
-from openhexa.toolbox.dhis2.periods import period_from_string
-from rasterio.warp import Resampling, reproject
 from rasterstats import zonal_stats
-
-# from owslib.wcs import WebCoverageService
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     get_file_from_dataset,
@@ -28,6 +18,12 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     save_pipeline_parameters,
     validate_config,
+)
+from utils import (
+    compute_population_weighted_metric,
+    generate_population_table_from_raster,
+    get_extract_periods,
+    load_raw_population_raster,
 )
 from worlpopclient import WorldPopClient
 
@@ -43,7 +39,7 @@ from worlpopclient import WorldPopClient
     code="year_start",
     name="Year start",
     help="Start year of indicators selection (e.g. 2022).",
-    type=str,
+    type=int,
     default=None,
     required=True,
 )
@@ -51,7 +47,7 @@ from worlpopclient import WorldPopClient
     code="year_end",
     name="Year end",
     help="End year of indicators selection (e.g. 2023).",
-    type=str,
+    type=int,
     default=None,
     required=True,
 )
@@ -113,7 +109,12 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
     snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
     validate_config(snt_config)
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
+
+    # Retrieve shapes
+    shapes = retrieve_shapes(snt_config=snt_config)
+    if shapes is None:
+        current_run.log_error("No valid shapes available. Processing stopped.")
+        raise ValueError
 
     if not run_report_only:
         output_path = root_path / "data" / "map"
@@ -132,47 +133,34 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
         )
 
         periods = get_extract_periods(start=str(year_start), end=str(year_end))
+        files_to_dataset = []
         for year in periods:
-            # check in the worldpop folder for matching raster
-            # if it doesn't exist , download and save it in the worldpop folder.
-            shapes = retrieve_shapes(snt_config=snt_config)
-
-            if not shapes:
-                current_run.log_error("No valid shapes found. Skipping processing.")
-                raise ValueError
-
-            pop_raster_path = try_build_population_table(
+            pop_table, pop_raster_path = get_or_download_population_table(
                 year=year,
                 country_code=country_code,
                 shapes=shapes,
-                wpop_pipeline_path=root_path / "pipelines" / "worldpop",
-                output_path=pipeline_path / "aggregated_populations",
+                wpop_repo_path=root_path / "data" / "worldpop",
+                output_path=root_path / "data" / "map" / "aggregated_populations",
             )
 
-            # get rasters from Map
-
-            # make table
-
-            make_table(
+            files_to_dataset += build_map_statistics_table(
                 coverage_categories=snt_indicators,
-                snt_config=snt_config,
+                population_totals=pop_table,
                 pop_raster_path=pop_raster_path,
+                shapes=shapes,
                 target_year=year,
+                country_code=country_code,
                 output_path=output_path,
             )
 
         add_files_to_dataset(
-            dataset_id=dataset_id,
+            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS"),
             country_code=country_code,
-            file_paths=[
-                output_path / "formatted" / country_code / f"{country_code}_map_data.parquet",
-                output_path / "formatted" / country_code / f"{country_code}_map_data.csv",
-                parameters_file,
-            ],
+            file_paths=files_to_dataset + [parameters_file],
         )
 
     else:
-        current_run.log_info("Skipping calculations, running only the reporting.")
+        current_run.log_info("Skipping calculations, running reporting.")
 
     run_report_notebook(
         nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
@@ -183,9 +171,9 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
     current_run.log_info("Pipeline completed successfully!")
 
 
-def try_build_population_table(
-    year: str, country_code: str, shapes: gpd.GeoDataFrame, wpop_pipeline_path: Path, output_path: Path
-) -> Path | None:
+def get_or_download_population_table(
+    year: str, country_code: str, shapes: gpd.GeoDataFrame, wpop_repo_path: Path, output_path: Path
+) -> tuple[pl.DataFrame | None, Path | None]:
     """Check if population raster exists for the given year and country, if not, download it.
 
     Parameters
@@ -196,36 +184,29 @@ def try_build_population_table(
         The 3-letter ISO code of the country (e.g.: "COD", "BFA").
     shapes : gpd.GeoDataFrame
         GeoDataFrame containing the shapes for zonal statistics.
-    wpop_pipeline_path : Path
+    wpop_repo_path : Path
         Path to the worldpop pipeline directory where rasters and population tables are stored.
     output_path : Path
         Path to save the generated population table if it needs to be created.
 
     Returns
     -------
-    Path | None
-        The path to the population raster file if it exists or was downloaded, otherwise None.
+    Tuple[pl.DataFrame | None, Path | None]
+        A tuple containing:
+        - The population table as a Polars DataFrame if it was generated successfully, otherwise None.
+        - The path to the population raster used for generating the table, or None if not retrieved.
     """
-    pop_raster_path = list((wpop_pipeline_path / "rasters").glob(f"{country_code}_pop_{year}_*.tif"))
+    pop_raster_path = list((wpop_repo_path / "rasters").glob(f"{country_code.lower()}_pop_{year}_*.tif"))
     if pop_raster_path:
         current_run.log_info(f"Population raster found for {year}: {pop_raster_path[0]}.")
         pop_raster_path = pop_raster_path[0]
 
-        # check if the table for that year already exists
-        pop_raster_table = list(
-            (wpop_pipeline_path / "population").glob(f"{country_code}_worldpop_population_{year}.parquet")
-        )
-        if pop_raster_table:
-            current_run.log_info(f"Population table already exists for {year}: {pop_raster_table[0]}.")
-            return pl.read_parquet(pop_raster_table[0])
-
     else:
         current_run.log_info(f"No population raster found for {year}. Attempting to download.")
-        # Here you would implement the logic to download the population raster for the given year and country.
         pop_raster_path = retrieve_population_data(
             country_code=country_code,
             year=year,
-            output_path=wpop_pipeline_path / "rasters",
+            output_path=wpop_repo_path / "rasters",
             overwrite=False,
         )
 
@@ -233,16 +214,22 @@ def try_build_population_table(
         current_run.log_warning(
             f"Population raster could not be retrieved for {year}. Skipping population table generation."
         )
-        return None
+        return None, None
 
     current_run.log_info(f"Generating population table for {year} from raster: {pop_raster_path}.")
     pop_table = generate_population_table_from_raster(raster_path=pop_raster_path, shapes=shapes)
+
+    if pop_table is None:
+        current_run.log_warning(f"Population table could not be generated for {year}.")
+        return None, None
+
+    output_path.mkdir(parents=True, exist_ok=True)
     pop_table.write_parquet(output_path / f"{country_code}_worldpop_population_{year}.parquet")
     current_run.log_info(
         f"Population table generated and saved for {year} at "
         f"{output_path / f'{country_code}_worldpop_population_{year}.parquet'}."
     )
-    return pop_table
+    return pop_table, pop_raster_path
 
 
 def retrieve_population_data(
@@ -292,7 +279,7 @@ def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
 
     Parameters
     ----------
-    snt_config : str
+    snt_config : dict
         SNT configuration file.
 
     Returns
@@ -304,17 +291,20 @@ def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_shapes_id = snt_config.get("SNT_DATASET_IDENTIFIERS", {}).get("DHIS2_DATASET_FORMATTED")
     shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
+
+    if shapes is None or shapes.shape[0] == 0:
+        current_run.log_warning("No shapes found in dataset.")
+        return None
+
     current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
-    # Check shapes: drop rows with null or None geometry (zonal_stats fails on None).
-    # Dropped ADM2 will not appear in map_data.parquet; in assemble_results they get NA for map
-    # indicators (left join on ADM2_ID). The shapes file in the dataset is not modified.
-    invalid_shapes = shapes[shapes.geometry.isna() | shapes.geometry.apply(lambda g: g is None)]
+    # Drop None geometries — zonal_stats fails on None.
+    invalid_shapes = shapes[shapes.geometry.isna()]
     if len(invalid_shapes) > 0:
         current_run.log_warning(f"Dropping {len(invalid_shapes)} organisation units without geometry.")
     shapes = shapes[shapes.geometry.notna() & shapes.geometry.apply(lambda g: g is not None)]
 
-    # Drop empty geometries so rasterstats/shapely don't get invalid geometries
+    # Drop empty geometries (geometry not None but empty)
     empty_shapes = shapes[shapes.geometry.is_empty]
     if len(empty_shapes) > 0:
         current_run.log_warning(f"Dropping {len(empty_shapes)} organisation units with empty geometry.")
@@ -326,65 +316,40 @@ def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
     return shapes
 
 
-def generate_population_table_from_raster(raster_path: Path, shapes: gpd.GeoDataFrame) -> pl.DataFrame:
-    """Generate a population table from the given raster and shapes.
-
-    Parameters
-    ----------
-    raster_path : Path
-        Path to the population raster file.
-    shapes : gpd.GeoDataFrame
-        GeoDataFrame containing the shapes for zonal statistics.
-
-    Returns
-    -------
-    pl.DataFrame
-        Polars DataFrame containing the population data for each shape.
-    """
-    # Load raster data (this is a placeholder, implement as needed)
-    with rasterio.open(raster_path) as src:
-        pop_data = src.read(1)
-        pop_transform = src.transform
-        pop_crs = src.crs
-        pop_nodata = src.nodata
-
-    # Compute total populations for each shape using zonal statistics
-    return compute_total_populations(
-        shapes=shapes,
-        data=pop_data,
-        transform=pop_transform,
-        crs=pop_crs,
-        nodata=pop_nodata,
-    )
-
-
-def make_table(
+def build_map_statistics_table(
     coverage_categories: dict,
-    snt_config: str,
-    pop_raster_path: Path,
+    population_totals: pl.DataFrame | None,
+    pop_raster_path: Path | None,
     shapes: gpd.GeoDataFrame,
     target_year: str,
+    country_code: str,
     output_path: Path,
-) -> None:
+) -> list[Path]:
     """Generate a table of zonal statistics for given coverage indicators and save the results.
 
     Parameters
     ----------
     coverage_categories : dict
         Dictionary mapping categories to indicator layer names.
-    snt_config : str
-        SNT configuration file.
+    population_totals : pl.DataFrame | None
+        DataFrame containing total population values for each shape, or None if not available.
     pop_raster_path : Path
         Path to the selected raster directory.
+    shapes : gpd.GeoDataFrame
+        GeoDataFrame containing the shapes for zonal statistics.
     target_year : str
         Target year for selecting indicator versions.
+    country_code : str
+        The 3-letter ISO code of the country (e.g.: "COD", "BFA").
     output_path : Path
         Path to save the output files.
-    logger : logging.Logger
-        Logger for logging messages.
+
+    Returns
+    -------
+    list[Path]
+        List of paths to the generated output files (parquet and csv).
     """
-    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    rasters_path = output_path / "raster_files" / country_code
+    rasters_path = output_path / "raster_files"
     rasters_path.mkdir(parents=True, exist_ok=True)
 
     raster_files = retrieve_rasters(
@@ -395,16 +360,36 @@ def make_table(
     )
 
     if len(raster_files) == 0:
-        current_run.log_warning("No raster files were downloaded. Exiting table generation.")
-        return
+        current_run.log_warning(
+            f"No raster files were downloaded for year {target_year}. Exiting table generation."
+        )
+        return []
 
-    run_aggregations(
-        raster_files=raster_files,
-        shapes=shapes,
-        pop_raster_path=pop_raster_path,
-        snt_config=snt_config,
-        output_path=output_path / "formatted" / country_code,
-    )
+    try:
+        map_indicators = compute_zonal_statistics(
+            raster_files=raster_files,
+            shapes=shapes,
+            population_totals=population_totals,
+            pop_raster_path=pop_raster_path,
+        )
+    except Exception as e:
+        current_run.log_error(f"Error during aggregation: {e}")
+        return []
+
+    if map_indicators.is_empty():
+        current_run.log_warning(f"No valid statistics were computed for year {target_year}.")
+        return []
+
+    # Save file
+    out_dir = output_path / "formatted"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    file_parquet = out_dir / f"{country_code}_map_data_{target_year}.parquet"
+    file_csv = out_dir / f"{country_code}_map_data_{target_year}.csv"
+    map_indicators.write_parquet(file_parquet)
+    map_indicators.write_csv(file_csv)
+    current_run.log_info(f"Output file saved under : {file_csv}")
+
+    return [file_parquet, file_csv]
 
 
 def retrieve_rasters(
@@ -440,45 +425,38 @@ def retrieve_rasters(
     return downloaded_rasters
 
 
-def run_aggregations(
+def compute_zonal_statistics(
     raster_files: list[Path],
     shapes: gpd.GeoDataFrame,
+    population_totals: pl.DataFrame | None,
     pop_raster_path: Path | None,
-    snt_config: str,
-    output_path: Path,
-):
-    """Run zonal statistics aggregations on the downloaded rasters."""
-    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+) -> pl.DataFrame:
+    """Run zonal statistics aggregations on the downloaded rasters.
 
+    Returns:
+        A Polars DataFrame containing the aggregated statistics for each indicator and shape.
+    """
     # 1. Load population raster (if available)
-    if not pop_raster_path:
+    if pop_raster_path is None:
         current_run.log_warning("Population raster file not provided.")
-        pop_data = None
     else:
         pop_data, pop_transform, pop_crs, pop_nodata = load_raw_population_raster(
-            file_pattern=pop_raster_path.name,
-            raster_path=pop_raster_path.parent,
+            raster_path=pop_raster_path,
         )
-        pop_total = compute_total_populations(
-            shapes, data=pop_data, transform=pop_transform, crs=pop_crs, nodata=pop_nodata
-        )
-
         # Set nodata to np.nan
         if pop_data is not None:
             pop_data = pop_data.astype(float)
             pop_data[pop_data == pop_nodata] = np.nan
 
     # 2. Process each raster file
-    final_df = pd.DataFrame()
+    final_df = pl.DataFrame()
     for raster_file in raster_files:
         file_vars = parse_raster_filename_vars(raster_file)
         coverage_id = (
             f"{file_vars['category']}__{file_vars['version']}_{file_vars['region']}_{file_vars['indicator']}"
         )
 
-        bands = MAPRasterExtractor(category=file_vars["category"], logger=logger).get_band_names(
-            coverage_id=coverage_id
-        )
+        bands = MAPRasterExtractor(category=file_vars["category"]).get_band_names(coverage_id=coverage_id)
         raster_data, raster_transform, raster_crs, raster_nodata = load_tiff_bands(
             raster_file, band_names=bands
         )
@@ -520,26 +498,36 @@ def run_aggregations(
                         pop_data=pop_data,
                         pop_transform=pop_transform,
                         pop_crs=pop_crs,
-                        total_population=pop_total,
+                        population_totals=population_totals,
                         shapes=shapes,
                         indicator=file_vars["indicator"],
-                        logger=logger,
                     )
                     if weighted_metric is not None:
-                        # We can add population if we need it 'total_population'
-                        melt_df = melt_df.merge(
-                            weighted_metric[["ADM2_ID", "population_weighted"]],
-                            on="ADM2_ID",
-                            how="left",
+                        melt_df = (
+                            pl.from_pandas(melt_df)
+                            .join(
+                                weighted_metric.select(["ADM2_ID", "population_weighted"]),
+                                on="ADM2_ID",
+                                how="left",
+                            )
+                            .with_columns(
+                                pl.col("population_weighted").cast(pl.Float64, strict=False),
+                                pl.col("value").cast(pl.Float64, strict=False),
+                            )
                         )
                     else:
-                        melt_df["population_weighted"] = None  # default
+                        melt_df = pl.from_pandas(melt_df).with_columns(
+                            pl.lit(None).cast(pl.Float64).alias("population_weighted")
+                        )
+
                 else:
-                    melt_df["population_weighted"] = None  # default
+                    melt_df = pl.from_pandas(melt_df).with_columns(
+                        pl.lit(None).cast(pl.Float64).alias("population_weighted")
+                    )
 
                 stats_results.append(melt_df)
 
-        # Log missing bands
+        # Log missing bands for raster_file
         # NOTE: This is not an error, just info about the available layers per coverage,
         # some of them only have a GRAY_INDEX band
         missing = [s for s in ["Data", "LCI", "UCI"] if s not in bands]
@@ -555,337 +543,24 @@ def run_aggregations(
 
         if len(stats_results) > 0:
             # Format results, add metadata
-            stats = pd.concat(stats_results, ignore_index=True)
-            stats["metric_category"] = file_vars["category"]
-            stats["metric_name"] = file_vars["indicator"]
-            stats["version"] = file_vars["version"]
-            stats["year"] = int(file_vars["year"])
-            stats["value"] = pd.to_numeric(stats["value"], errors="coerce")
+            stats = pl.concat(stats_results)
+            stats = stats.with_columns(
+                [
+                    pl.lit(file_vars["category"]).alias("metric_category"),
+                    pl.lit(file_vars["indicator"]).alias("metric_name"),
+                    pl.lit(file_vars["version"]).alias("version"),
+                    pl.lit(int(file_vars["year"])).alias("year"),
+                    pl.col("value").cast(pl.Float64, strict=False),
+                ]
+            )
+            final_df = pl.concat([final_df, stats])  # concat final table
 
-            # concat final table
-            final_df = pd.concat([final_df, stats], ignore_index=True)
+    if final_df.shape[0] == 0:
+        return pl.DataFrame()  # No valid statistics computed, return empty DataFrame
 
     # SNT format
-    final_df.columns = [col.strip().upper() for col in final_df.columns]
-    final_df["METRIC_NAME"] = final_df["METRIC_NAME"].str.strip()
-
-    # Save Output
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # Save file
-    final_df.to_parquet(output_path / f"{country_code}_map_data.parquet", index=False)
-    final_df.to_csv(output_path / f"{country_code}_map_data.csv", index=False)
-    current_run.log_info(f"Output file saved under : {output_path / f'{country_code}_map_data.csv'}")
-
-
-def align_raster_to_reference(
-    data: np.ndarray,
-    crs: str,
-    transform: Affine,
-    reference_data: np.ndarray,
-    reference_crs: str,
-    reference_transform: Affine,
-    resampling: Resampling = Resampling.bilinear,
-) -> np.ndarray:
-    """Align a metric raster to match a reference raster (CRS and shape).
-
-    Parameters
-    ----------
-    data : np.ndarray
-        2D array of the metric raster.
-    crs : rasterio.crs.CRS or str
-        CRS of the metric raster.
-    transform : Affine
-        Affine transform of the metric raster.
-    reference_data : np.ndarray
-        2D array of the reference raster.
-    reference_crs : rasterio.crs.CRS or str
-        CRS of the reference raster.
-    reference_transform : Affine
-        Affine transform of the reference raster.
-    resampling : rasterio.enums.Resampling
-        Resampling method (default: bilinear).
-
-    Returns
-    -------
-    np.ndarray
-        Metric raster reprojected and resampled to reference grid.
-    """
-    reference_shape = reference_data.shape
-    aligned = np.empty(reference_shape, dtype=data.dtype)
-
-    # Only reproject if CRS or shape/transform differ
-    if (crs != reference_crs) or (data.shape != reference_shape):
-        reproject(
-            source=data,
-            destination=aligned,
-            src_transform=transform,
-            src_crs=crs,
-            dst_transform=reference_transform,
-            dst_crs=reference_crs,
-            resampling=resampling,
-        )
-    else:
-        # Already aligned
-        aligned[:] = data
-
-    return aligned
-
-
-def compute_population_weighted_metric(
-    metric_data: np.ndarray,
-    metric_transform: Affine,
-    metric_crs: str,
-    metric_nodata: float,
-    pop_data: np.ndarray,
-    pop_transform: Affine,
-    pop_crs: str,
-    total_population: pd.DataFrame,
-    shapes: gpd.GeoDataFrame,
-    indicator: str,
-    logger: logging.Logger,
-) -> pd.Series:
-    """Compute weighted metric values for given shapes using population data.
-
-    Parameters
-    ----------
-    metric_data : np.ndarray
-        2D array of the metric raster, nodata values set to np.nan.
-    metric_transform : Affine
-        Affine transform of the metric raster.
-    metric_crs : str
-        CRS of the metric raster.
-    metric_nodata : float
-        NoData value of the metric raster.
-    pop_data:
-        2D array of the population raster, nodata values set to np.nan.
-    pop_transform:
-        Affine transform of the population raster.
-    pop_crs:
-        CRS of the population raster.
-    total_population:
-        DataFrame containing total populations for each shape.
-    shapes : gpd.GeoDataFrame
-        GeoDataFrame containing the shapes for zonal statistics.
-    indicator : str
-        Name of the indicator being processed.
-    logger : logging.Logger
-        Logger for logging messages.
-
-    Returns
-    -------
-    pd.Series
-        Series containing the weighted metric values for each shape or None if population data is unavailable.
-    """
-    if any(
-        x is None
-        for x in (shapes, metric_data, metric_transform, metric_crs, pop_data, pop_transform, pop_crs)
-    ):
-        log_message(
-            logger, f"Population-weighted computation skipped for metric: {indicator}.", level="warning"
-        )
-        return None
-
-    log_message(logger, f"Computing population-weighted for metric: {indicator}.")
-    # Align metric raster to population raster (resolution and CRS)
-    metric_aligned = align_raster_to_reference(
-        data=metric_data,
-        crs=metric_crs,
-        transform=metric_transform,
-        reference_data=pop_data,
-        reference_crs=pop_crs,
-        reference_transform=pop_transform,
-        resampling=Resampling.nearest,  # nearest repeats metric values
-    )
-
-    metric_aligned = metric_aligned.astype(float)
-    metric_aligned[metric_aligned == metric_nodata] = np.nan
-
-    # Multiply
-    weighted_raster = pop_data * metric_aligned
-    zstats_w = zonal_stats(
-        vectors=shapes,
-        raster=weighted_raster,
-        affine=pop_transform,
-        stats=["sum"],
-        geojson_out=True,
-        nodata=np.nan,
-    )
-    result_w = pd.DataFrame(
-        [
-            {
-                "ADM2_ID": f["properties"].get("ADM2_ID"),
-                "weighted_sum": f["properties"]["sum"],
-            }
-            for f in zstats_w
-        ]
-    )
-    result_w["ADM2_ID"] = result_w["ADM2_ID"].astype(str)
-    result = result_w.merge(total_population, on="ADM2_ID", how="left")
-    result["population_weighted"] = result["weighted_sum"] / result["total_population"]
-    return result
-
-
-def load_raw_population_raster(file_pattern: str, raster_path: Path, logger: logging.Logger) -> tuple:
-    """Load raw population raster from the specified path.
-
-    Parameters
-    ----------
-    file_pattern : str
-        Pattern to match the population raster file.
-    raster_path : Path
-        Path to the population raster file.
-    logger : logging.Logger
-        Logger for logging messages.
-
-    Returns
-    -------
-    tuple | None
-        The loaded raster dataset or None if loading fails.
-    """
-    raster_file = list(raster_path.glob(file_pattern))
-    if not raster_file:
-        current_run.log_warning(f"Population raster not found: {raster_path}.")
-        return None, None, None, None
-
-    if len(raster_file) > 1:
-        current_run.log_warning(
-            f"Expected 1 file but found {len(raster_file)}: {raster_file}. Using first match.",
-        )
-
-    try:
-        with rasterio.open(raster_file[0]) as src:
-            raster = src.read(1)
-            transform = src.transform  # affine
-            crs = src.crs
-            nodata = src.nodata
-    except Exception as e:
-        current_run.log_warning(f"Could not load population raster {raster_file[0]}. Error: {e}")
-        return None, None, None, None
-
-    current_run.log_info(logger, f"Population raster loaded: {raster_file[0]}.")
-    return raster, transform, crs, nodata
-
-
-def compute_total_populations(
-    shapes: gpd.GeoDataFrame,
-    data: np.ndarray,
-    transform: Affine,
-    crs: str,
-    nodata: float,
-) -> pl.DataFrame | None:
-    """Compute total populations for given shapes using population data.
-
-    Parameters
-    ----------
-    shapes : gpd.GeoDataFrame
-        GeoDataFrame containing the shapes for zonal statistics.
-    data : np.ndarray
-        2D array of the population raster.
-    transform : Affine
-        Affine transform of the population raster.
-    crs : str
-        CRS of the population raster.
-    nodata : float
-        NoData value of the population raster.
-
-    Returns
-    -------
-    pl.DataFrame
-        DataFrame with ADM2_ID (Utf8) and total_population (Int64, nullable) columns.
-    """
-    if any(x is None for x in (shapes, data, crs)):
-        return None
-
-    # Ensure CRS matches the raster & reproject if necessary
-    if shapes.crs is None:
-        raise ValueError("Shapes GeoDataFrame must have a defined CRS.")
-    # Reproject shapes if CRS is different (consistent to wpop pipeline calculation check)
-    if shapes.crs.to_string() != crs:
-        current_run.log_warning(
-            f"The CRS data differs from the provided shapes file. Reprojecting shapes with {crs}",
-        )
-        shapes = shapes.to_crs(crs)
-
-    # get statistics
-    current_run.log_info(f"Computing ADM2 spatial aggregation for {len(shapes)} shapes.")
-    pop_total = zonal_stats(
-        vectors=shapes,
-        raster=data,
-        affine=transform,
-        stats=["sum"],
-        geojson_out=True,
-        nodata=nodata,
-    )
-    result = pl.DataFrame(
-        [
-            {"ADM2_ID": f["properties"].get("ADM2_ID"), "total_population": f["properties"].get("sum")}
-            for f in pop_total
-        ],
-        schema={"ADM2_ID": pl.Utf8, "total_population": pl.Float64},
-    )
-
-    return result.with_columns(
-        pl.col("total_population").round(0).cast(pl.Int64, strict=False),
-    )
-
-
-def create_file_logger(log_path: Path, level: int = logging.INFO) -> logging.Logger:
-    """Create a logger that writes messages to a file.
-
-    Args:
-        log_path: Path to the log file.
-        level: Logging level (default INFO).
-
-    Returns:
-        Configured logger.
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_path / f"map_extractor_{timestamp}.log"
-    logger = logging.getLogger(str(log_file))  # unique name per file
-    logger.setLevel(level)
-
-    # Avoid adding multiple handlers if logger already exists
-    if not logger.handlers:
-        # Ensure parent folder exists
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create file handler
-        fh = logging.FileHandler(log_file, mode="a", encoding="utf-8")
-        fh.setLevel(level)
-
-        # Optional: also log to console
-        ch = logging.StreamHandler()
-        ch.setLevel(level)
-
-        # Formatter
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        fh.setFormatter(formatter)
-        ch.setFormatter(formatter)
-
-        # Add handlers
-        logger.addHandler(fh)
-        logger.addHandler(ch)
-
-    return logger
-
-
-def get_extract_periods(start: str, end: str) -> list[str]:
-    """Generates a list of periods between start and end.
-
-    Returns
-    -------
-    list[str]
-        List of periods as strings (e.g. "2020", "202501").
-    """
-    try:
-        # Get periods
-        p1 = period_from_string(start)
-        p2 = period_from_string(end)
-        periods = [p1] if p1 == p2 else p1.get_range(p2)
-        return [str(p) for p in periods]
-    except Exception as e:
-        raise Exception(f"Error in start/end date configuration: {e!s}") from e
+    final_df = final_df.rename({col: col.strip().upper() for col in final_df.columns})
+    return final_df.with_columns(pl.col("METRIC_NAME").str.strip_chars())
 
 
 def validate_worldpop_periods(start: int, end: int) -> None:

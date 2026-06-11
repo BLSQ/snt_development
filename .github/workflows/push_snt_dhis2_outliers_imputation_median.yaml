@@ -1,0 +1,39 @@
+name: Push snt_dhis2_outliers_imputation_median
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/push_snt_dhis2_outliers_imputation_median.yaml"
+      - "snt_dhis2_outliers_imputation_median/pipeline.py"
+      - "snt_dhis2_outliers_imputation_median/requirements.txt"
+      - "snt_dhis2_outliers_imputation_median/readme.md"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: "pip"
+          cache-dependency-path: "snt_dhis2_outliers_imputation_median/requirements.txt"
+
+      - name: Configure OpenHEXA CLI
+        uses: blsq/openhexa-cli-action@v1
+        with:
+          workspace: "snt-development"
+          token: ${{ secrets.OH_TOKEN }}
+
+      - name: Push pipeline to OpenHEXA
+        run: |
+          openhexa pipelines push snt_dhis2_outliers_imputation_median \
+            --code "snt-dhis2-outliers-imputation-median" \
+            --description "${{ github.event.head_commit.message }}" \
+            --link "https://github.com/BLSQ/snt_development/commit/${{ github.sha }}" \
+            --yes

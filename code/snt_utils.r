@@ -397,6 +397,16 @@ match_column_classes <- function(input_dt, reference_dt) {
 
 make_cartesian_admin_period <- function(input_dt, admin_colname, year_colname, month_colname) {
 
+#' make a place-time cartesian product, to ensure each possible combination exists, between a minimum period and a maximum period
+#' @param input_dt the original data.table
+#' @param admin_colname place (admin) column
+#' @param year_colname time column 1
+#' @param month_colname time column 2
+#' @return the total number of periods (to check if the data contains enough periods)
+#' @return a new data.table, with the cartesian place-time rows
+
+make_cartesian_admin_period <- function(input_dt, admin_colname, year_colname, month_colname) {
+
   dt <- copy(as.data.table(input_dt))
   
   # select only relevant columns to work with
@@ -1021,6 +1031,8 @@ fill_long_cycles_dt <- function(input_dt, spatial_colname, temporal_colname, ord
 
 }
 
+
+ 
 
 #%% DHS ------------------------------
 

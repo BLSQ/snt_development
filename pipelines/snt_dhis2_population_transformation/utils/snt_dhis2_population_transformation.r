@@ -114,81 +114,6 @@ load_csv_file <- function(csv_file_path) {
 # -----------------------------------------------------------------------------------------
 
 
-#' Compute Yearly Population Scaling Factors
-#'
-#' @description Calculates the total population per year from the input data and 
-#' derives a scaling factor by dividing a reference value by those annual totals. 
-#'
-#' @param data A dataframe or tibble containing at least \code{YEAR} and \code{POPULATION} columns.
-#' @param reference A numeric value representing the target population (numerator) 
-#' used to calculate the scaling factor.
-#'
-#' @return A tibble with three columns: \code{YEAR}, \code{total_year_pop}, and \code{scaling_factor}.
-#' @importFrom dplyr group_by summarise mutate
-#' @export
-compute_yearly_scaling <- function(data, reference, pop_column="POPULATION") {
-    
-    # Compute totals per DHIS2 year
-    totals <- data %>%
-            group_by(YEAR) %>%
-            summarise(total_year_pop = sum(.data[[pop_column]], na.rm = TRUE))
-    
-    # Compute scaling factor per year
-    result <- totals %>%
-      mutate(scaling_factor = reference / total_year_pop)
-    
-    return(result)
-}
-
-
-#' Compute Adjusted Population
-#'
-#' @description Merges yearly scaling factors into a dataset, calculates rounded 
-#' adjusted population values, and logs verification totals for each year.
-#'
-#' @param data A dataframe containing \code{YEAR} and \code{POPULATION} columns.
-#' @param year_scales A dataframe containing \code{YEAR}, \code{total_year_pop}, 
-#' and \code{scaling_factor}.
-#' @param source_column Character string. The name of the existing population column.
-#' @param target_column Character string. The name for the new adjusted column.
-#'
-#' @return A dataframe with an added \code{POPULATION_SCALED} column and 
-#' intermediate scaling columns removed.
-#' 
-#' @export
-compute_adjusted_population <- function(data, year_scales, source_column="POPULATION", target_column="POPULATION_SCALED") {
-    
-    cols_in_data <- colnames(data)
-    pop_column_sel <- cols_in_data[toupper(cols_in_data) == toupper(source_column)]
-    
-    if (length(pop_column_sel) == 0) {
-        stop(glue::glue("[ERROR] Column: {source_column} not found in population data."))
-    }
-    
-    # Compute adjusted population
-    data_merged <- data %>%
-      left_join(year_scales, by = "YEAR") %>%
-      mutate(!!target_column := round(.data[[pop_column_sel]] * scaling_factor))
-
-    if (any(is.na(data_merged$scaling_factor))) {
-        log_msg("Some years in the data do not have scaling factors!", "warning")
-    }
-    
-    # util logs
-    for (i in seq_len(nrow(year_scales))) {
-        row <- year_scales[i, ]       
-        dhis2_total <- sum(data_merged[[pop_column_sel]][data_merged$YEAR == row$YEAR], na.rm = TRUE)
-        dhis2_total_scd <- sum(data_merged[[target_column]][data_merged$YEAR == row$YEAR], na.rm = TRUE)        
-        log_msg(glue("DHIS2 population year {row$YEAR} ({dhis2_total}) scaled: {dhis2_total_scd} (scaling_factor={round(row$scaling_factor, 3)})."))
-    }
-    
-    # Cleanup: Drop the helper columns
-    data_merged <- data_merged %>% select(-any_of(c("total_year_pop", "scaling_factor")))
-    
-    return(data_merged)
-} 
-
-
 #' Validate and Resolve Reference Year
 #'
 #' @description 
@@ -202,29 +127,23 @@ compute_adjusted_population <- function(data, year_scales, source_column="POPULA
 #' @return A numeric or string representing the resolved reference year.
 #' 
 #' @export
-resolve_reference_year <- function(dhis2_population, reference_year = NULL) {
-    
-    # 1. Check if the provided year exists in the dataset
-    year_exists <- !is.null(reference_year) && (reference_year %in% dhis2_population$YEAR)
-    
-    if (!year_exists) {
-        not_found <- reference_year
-        # Default to the most recent year available
-        resolved_year <- max(dhis2_population$YEAR, na.rm = TRUE)
+resolve_reference_year <- function(available_years, reference_year = NULL) {
         
-        # 2. Log warning if a non-NULL year was provided but not found
-        if (!is.null(not_found)) {
-            log_msg(
-                glue::glue("Reference year {not_found} is not present in the population data, using last year: {resolved_year}."), 
-                "warning"
-            )
-        } else {
-            log_msg(glue::glue("No reference year provided, defaulting to: {resolved_year}."))
-        }
-        
-        return(resolved_year)
+    latest_year <- max(available_years, na.rm = TRUE)
+    
+    # No year provided — default to latest
+    if (is.null(reference_year)) {
+        log_msg(glue("No reference year provided, defaulting to: {latest_year}."))
+        return(latest_year)
     }
     
+    # Year provided but not found in data — fallback to latest
+    if (!reference_year %in% available_years) {
+        log_msg(glue("Reference year {reference_year} not found in population data, falling back to: {latest_year}."), "warning")
+        return(latest_year)
+    }
+    
+    # Year found — use it
     return(reference_year)
 }
 
@@ -310,7 +229,7 @@ add_population_disaggregations <- function(
     
     # Identify target columns and convert to numeric
     meta_cols <- c("ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID")
-    disagg_cols <- setdiff(colnames(disaggregation_data), meta_cols)
+    disagg_cols <- setdiff(colnames(disaggregation_table), meta_cols)
 
     population_table[["POPULATION"]] <- as.numeric(population_table[["POPULATION"]])    
     disaggregation_table[disagg_cols] <- suppressWarnings(lapply(disaggregation_table[disagg_cols], as.numeric))    
@@ -318,19 +237,22 @@ add_population_disaggregations <- function(
     # create a list of Valid columns
     valid_cols <- c()
     for (col in disagg_cols) {
+        action <- "Creating"
         if (any(!is.na(disaggregation_table[[col]]))) {  # Has at least some non-NA values
-            if (col %in% colnames(population_table)) {                
-                log_msg(glue::glue("The column '{col}' already exists in the population table; it will be overwritten by values from the disaggregation file."), "warning")
+            if (col %in% colnames(population_table)) {
+                action <- "Overwriting"
+                log_msg(glue::glue("Column '{col}' already exists in the population table; it will be overwritten by values from the disaggregation file."), "warning")
             }            
-            log_msg(glue::glue("Creating population disagregation: {col}"))
+            log_msg(glue::glue("{action} population disagregation: {col}"))
             valid_cols <- c(valid_cols, col)
         }         
     }
-    
+     
     # Early exit if no valid columns exist
     if (length(valid_cols) == 0) return(population_table)    
     
     result <- population_table %>% 
+        select(-any_of(valid_cols)) %>% 
         left_join(disaggregation_table[c("ADM2_ID", valid_cols)], by = "ADM2_ID") %>%
         mutate(across(all_of(valid_cols), ~ round(POPULATION * .x)))
     

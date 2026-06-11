@@ -25,22 +25,16 @@
     "SNT_RESULTS": "snt-results"
   },
   "DHIS2_DATA_DEFINITIONS": {
-    "POPULATION_DEFINITIONS": {
-      "TOTAL_POPULATION_REF": 113600000,
-      "GROWTH_FACTOR": 0.033,
-      "REFERENCE_YEAR": 2024,
-      "POPULATION_INDICATORS": {
-        "POPULATION": { "ids": ["WLSKVyA8LoY"], "type": "dataElement" }
-      },
-      "POPULATION_DISAGGREGATIONS": {
-        "POP_UNDER_5": 0.189,
-        "POP_0_1_Y": 0.04,
-        "POP_1_2_Y": 0.04,
-        "POP_5_10_Y": 0.135,
-        "POP_5_36_M": 0.038,
-        "POP_PREGNANT_WOMAN": 0.05
-      }
-    },
+    "POPULATION_INDICATOR_DEFINITIONS": {
+        "POPULATION": { "ids": ["WLSKVyA8LoY"], "type": "dataElement" },
+        "POP_UNDER_5": {"ids": [], "type": "dataElement"},
+        "POP_PREGNANT_WOMEN": {"ids": [], "type": "dataElement"},
+        "POP_0_1_Y": {"ids": [], "type": "dataElement"},
+        "POP_1_2_Y": {"ids": [], "type": "dataElement"},
+        "POP_5_10_Y": {"ids": [], "type": "dataElement"},
+        "POP_5_36_M": {"ids": [], "type": "dataElement"},
+        "POP_50_PLUS": {"ids": [], "type": "dataElement"}	
+    },      
     "DHIS2_INDICATOR_DEFINITIONS": {
       "SUSP": ["aZwnLALknnj"],
       "TEST": ["CIzQAR8IWH1", "sRbXNrdKvyl", "uIqmxJcTuub"],

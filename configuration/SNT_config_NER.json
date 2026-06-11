@@ -15,8 +15,7 @@
     "DHIS2_OUTLIERS_DETECTION": "snt-dhis2-outliers-detection",
     "DHIS2_OUTLIERS_REMOVAL_IMPUTATION": "snt-dhis2-outliers-removal-imputation",
     "DHIS2_OUTLIERS_IMPUTATION": "snt-dhis2-outliers-imputation",
-    "DHIS2_INCIDENCE": "snt-dhis2-incidence",
-    "DHIS2_QUALITY_OF_CARE": "snt-dhis2-quality-of-care",
+    "DHIS2_INCIDENCE": "snt-dhis2-incidence",    
     "DHS_INDICATORS": "snt-dhs-indicators",
     "MIS_INDICATORS": "snt-mis-indicators",
     "WORLDPOP_DATASET_EXTRACT": "snt-worldpop-extract",
@@ -30,24 +29,15 @@
     "SNT_RESULTS": "snt-results"
   },
   "DHIS2_DATA_DEFINITIONS": {
-    "POPULATION_DEFINITIONS": {
-      "TOTAL_POPULATION_REF": 27032412,
-      "GROWTH_FACTOR": 0.0334,
-      "REFERENCE_YEAR": 2024,
-      "POPULATION_INDICATORS": {
-        "POPULATION": { "ids": ["iIS0MGyL3EL"], "type": "dataElement" },
-        "POP_UNDER_5": {
-          "ids": ["tiaX3KnlpRt", "BjCyMF2Thxn"],
-          "type": "dataElement"
-        },
-        "POP_PREGNANT_WOMAN": { "ids": ["mEyVFwBw2QV"], "type": "dataElement" }
-      },
-      "POPULATION_DISAGGREGATIONS": {
-        "POP_UNDER_5": 0.195,
-        "POP_PREGNANT_WOMAN": 0.052,
-        "POP_0_1_Y": 0.04,
-        "POP_1_2_Y": 0.079
-      }
+    "POPULATION_INDICATOR_DEFINITIONS": {
+        "POPULATION": { "ids": ["iIS0MGyL3EL"], "type": "dataElement"},
+        "POP_UNDER_5": {"ids": ["tiaX3KnlpRt", "BjCyMF2Thxn"], "type": "dataElement"},
+        "POP_PREGNANT_WOMEN": { "ids": ["mEyVFwBw2QV"], "type": "dataElement"},
+        "POP_0_1_Y": {"ids": [], "type": "dataElement"},
+        "POP_1_2_Y": {"ids": [], "type": "dataElement"},
+        "POP_5_10_Y": {"ids": [], "type": "dataElement"},
+        "POP_5_36_M": {"ids": [], "type": "dataElement"},
+        "POP_50_PLUS": {"ids": [], "type": "dataElement"}	 
     },
     "DHIS2_INDICATOR_DEFINITIONS": {
       "SUSP": ["SE8vUT7xeWO"],

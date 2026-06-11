@@ -29,16 +29,16 @@ uv.lock
 *.CSV
 *.xlsx
 *.xls
-*.yaml
 *.yml
 *.ipynb:Zone.Identifier
 *.r:Zone.Identifier
 *.py:Zone.Identifier
+*:Zone.Identifier
 
 # Config file -----------------
 # ignore .json files unless if SNT_config.json
 *.json
-!SNT_config.json
+!configuration/SNT_config_*.json
 
 # R ----------------------------------------
 *.rds

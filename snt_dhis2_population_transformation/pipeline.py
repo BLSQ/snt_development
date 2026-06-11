@@ -10,25 +10,132 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     save_pipeline_parameters,
+    get_file_from_dataset,
 )
 
 
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
-    "adjust_population",
-    name="Adjust using population totals",
-    help="Adjust the DHIS2 population using TOTAL_POPULATION_REF specified in the config file",
-    type=bool,
-    default=False,
+    "tot_pop_reference",
+    name="Part 1: Population reference",
+    help=(
+        "Total population used to scale DHIS2 population data. When provided, "
+        "population values are adjusted proportionally to match this total."
+        "(e.g. 1000000 for a total population of 1 million people)."
+    ),
+    type=int,
+    default=None,
+    required=False,
+)
+@parameter(
+    "tot_pop_reference_year",
+    name="Part 1: Population year reference",
+    help=(
+        "Year corresponding to the total population reference. "
+        "This year must be available in the population data."
+        "Defaults to the latest year available in the population data."
+        "(e.g. 2025)."
+    ),
+    type=int,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_under_5",
+    name="Part 2: Proportion population under 5",
+    help=(
+        "Proportion of the total population aged under 5 (e.g. 0.17 for 17%). "
+        "Used to disaggregate population figures into the under-5 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_pregnant_women",
+    name="Part 2: Proportion population pregnant women",
+    help=(
+        "Proportion of the total population of pregnant women (e.g. 0.05 for 5%). "
+        "Used to disaggregate population figures into the pregnant-women group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_0_1_y",
+    name="Part 2: Proportion population 0-1 years",
+    help=(
+        "Proportion of the total population aged 0-1 years (e.g. 0.04 for 4%). "
+        "Used to disaggregate population figures into the 0-1 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_1_2_y",
+    name="Part 2: Proportion population 1-2 years",
+    help=(
+        "Proportion of the total population aged 1-2 years (e.g. 0.03 for 3%). "
+        "Used to disaggregate population figures into the 1-2 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_5_10_y",
+    name="Part 2: Proportion population 5-10 years",
+    help=(
+        "Proportion of the total population aged 5-10 years (e.g. 0.06 for 6%). "
+        "Used to disaggregate population figures into the 5-10 age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "pop_5_36_m",
+    name="Part 2: Proportion population 5-36 months",
+    help=(
+        "Proportion of the total population aged 5-36 months (e.g. 0.06 for 6%). "
+        "Used to disaggregate population figures into the 5-36 months age group."
+    ),
+    type=float,
+    default=None,
     required=False,
 )
 @parameter(
     "disaggregation_file",
-    name="Use disaggregation proportions (.csv)",
+    name="Part 2: Use disaggregation proportions (.csv)",
     type=File,
     required=False,
     default=None,
     help="Select user-uploaded file with population disaggregations proportions at ADM2 level.",
+)
+@parameter(
+    "growth_factor",
+    name="Part 3: Projection growth rate",
+    help=(
+        "Annual growth rate (e.g. 0.03 for 3%) used to project "
+        "DHIS2 population figures into past and future years."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
+    "growth_reference_year",
+    name="Part 3: Projection reference year",
+    help=(
+        "Base year from which DHIS2 population figures are projected. "
+        "This year must be available in the population data. "
+        "Defaults to the latest year available"
+    ),
+    type=int,
+    default=None,
+    required=False,
 )
 @parameter(
     "run_report_only",
@@ -47,7 +154,19 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_population_transformation(
-    adjust_population: bool, disaggregation_file: File, run_report_only: bool, pull_scripts: bool
+    tot_pop_reference: int,
+    tot_pop_reference_year: int,
+    pop_under_5: float,
+    pop_pregnant_women: float,
+    pop_0_1_y: float,
+    pop_1_2_y: float,
+    pop_5_10_y: float,
+    pop_5_36_m: float,
+    disaggregation_file: File,
+    growth_factor: float,
+    growth_reference_year: int,
+    run_report_only: bool,
+    pull_scripts: bool,
 ):
     """Write your pipeline orchestration here.
 
@@ -88,8 +207,34 @@ def snt_dhis2_population_transformation(
                 current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
                 raise FileNotFoundError
 
+            years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
+            if not years_available:
+                current_run.log_error("No DHIS2 population data available.")
+                raise ValueError
+
+            tot_pop_reference_year_res = None
+            if tot_pop_reference:
+                tot_pop_reference_year_res = resolve_reference_year(
+                    years_available, tot_pop_reference_year, var_name="Total population"
+                )
+
+            growth_reference_year_res = None
+            if growth_factor:
+                growth_reference_year_res = resolve_reference_year(
+                    years_available, growth_reference_year, var_name="Growth projection"
+                )
+
             parameters = {
-                "ADJUST_TOTALS": adjust_population,
+                "TOT_POP_REFERENCE": tot_pop_reference,
+                "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
+                "GROWTH_FACTOR": growth_factor,
+                "GROWTH_REFERENCE_YEAR": growth_reference_year_res,
+                "POP_UNDER_5": pop_under_5,
+                "POP_PREGNANT_WOMEN": pop_pregnant_women,
+                "POP_0_1_Y": pop_0_1_y,
+                "POP_1_2_Y": pop_1_2_y,
+                "POP_5_10_Y": pop_5_10_y,
+                "POP_5_36_M": pop_5_36_m,
                 "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
             }
 
@@ -165,6 +310,53 @@ def dhis2_population_transformation(
         )
     except Exception as e:
         raise Exception(f"Error in executing population transformation notebook: {e}") from e
+
+
+def get_available_years_from_dhis2_population_data(snt_config_dict: dict) -> list[int]:
+    """Get the years available in the DHIS2 population data.
+
+    Returns:
+        A sorted list of years available in the population data, or an empty list.
+    """
+    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    pop_data = get_file_from_dataset(
+        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED"),
+        filename=f"{country_code}_population.parquet",
+    )
+
+    if pop_data is not None and not pop_data.empty:
+        return sorted(pop_data.YEAR.unique())
+    return []
+
+
+def resolve_reference_year(
+    years_available: list[int], reference_year: int | None, var_name: str = "Total population"
+) -> int:
+    """Resolve the reference year to use for population scaling or growth projections.
+
+    Args:
+        years_available: A list of years available in the population data.
+        reference_year: The user-provided reference year.
+        var_name: The name of the variable for which the reference year is being resolved (used for logging).
+
+    Returns:
+        The resolved reference year to use for population transformations.
+    """
+    latest_year = years_available[-1]
+    if reference_year is None:
+        current_run.log_warning(
+            f"No {var_name} reference year provided. Defaulting to latest available year {latest_year}."
+        )
+        return latest_year
+
+    if reference_year not in years_available:
+        current_run.log_warning(
+            f"{var_name} reference year {reference_year} not available in population data. "
+            f"Defaulting to latest available year {latest_year}."
+        )
+        return latest_year
+
+    return reference_year
 
 
 if __name__ == "__main__":

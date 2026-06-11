@@ -352,7 +352,8 @@ def download_dhis2_reporting_rates(
     rep_datasets = reporting_rates_def.get("REPORTING_DATASETS", [])
     rep_indicators = reporting_rates_def.get("REPORTING_INDICATORS", {})
 
-    if rep_datasets:
+    # Or we download reporting datasets or indicators but not both.
+    if has_reporting_dataset(rep_datasets):
         handle_reporting_datasets(
             reporting_datasets=rep_datasets,
             snt_config=snt_config,
@@ -362,7 +363,7 @@ def download_dhis2_reporting_rates(
             output=output_dir,
             overwrite=overwrite,
         )
-    elif rep_indicators:
+    elif has_reporting_indicator(rep_indicators):
         handle_reporting_indicators(
             reporting_indicators=rep_indicators,
             snt_config=snt_config,
@@ -376,6 +377,30 @@ def download_dhis2_reporting_rates(
         current_run.log_info("No reporting rates to download.")
 
     return True
+
+
+def has_reporting_dataset(reporting_datasets: list) -> bool:
+    """Return True when at least one reporting dataset entry has a non-empty DATASET value.
+
+    Returns
+    -------
+    bool
+         True if at least one reporting dataset entry has a non-empty DATASET value, False otherwise.
+    """
+    return any(
+        isinstance(rate, dict) and str(rate.get("DATASET") or "").strip() for rate in reporting_datasets
+    )
+
+
+def has_reporting_indicator(reporting_indicators: dict) -> bool:
+    """Return True when at least one reporting indicator entry has a non-empty value.
+
+    Returns
+    -------
+    bool
+         True if at least one reporting indicator entry has a non-empty value, False otherwise.
+    """
+    return any(isinstance(value, str) and value.strip() for value in reporting_indicators.values())
 
 
 def handle_reporting_datasets(
@@ -1021,10 +1046,9 @@ def download_dhis2_population(
     p2 = period_from_string(str(end)[:4])
     periods = [p1] if p1 == p2 else p1.get_range(p2)
 
-    pop_definitions: dict = snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_DEFINITIONS", {})
-    pop_indicators: dict = pop_definitions.get("POPULATION_INDICATORS", {})
+    pop_indicators: dict = snt_config["DHIS2_DATA_DEFINITIONS"].get("POPULATION_INDICATOR_DEFINITIONS", {})
     if len(pop_indicators) == 0:
-        current_run.log_warning("No population indicators defined under 'POPULATION_INDICATORS'.")
+        current_run.log_warning("No population indicators defined under 'POPULATION_INDICATOR_DEFINITIONS'.")
         return False
 
     try:

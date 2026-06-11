@@ -1,6 +1,8 @@
 from pathlib import Path
-
+import re
 import requests
+from openhexa.sdk import current_run
+import logging
 
 
 class WorldPopClient:
@@ -9,23 +11,28 @@ class WorldPopClient:
     Source: https://data.worldpop.org/GIS/Population
     """
 
-    def __init__(self, url: str = "https://data.worldpop.org/GIS/Population"):
+    def __init__(
+        self, url: str = "https://data.worldpop.org/GIS/Population", logger: logging.Logger | None = None
+    ) -> None:
         """Initialize the client.
 
         Parameters
         ----------
         url : str
             The base URL for the WorldPop data download.
+        logger : logging.Logger, optional
+            A logger instance to use for logging messages. If None, a default logger will be created
         """
         self.base_url = url
+        self.logger = logger or logging.getLogger(__name__)
 
     def download_data_for_country(
         self,
         country_iso3: str,
+        year: str,
         output_dir: Path,
-        fname: str | None = None,
-        year: str = "2020",
-        un_adj: bool = False,
+        overwrite: bool = False,
+        filename: str | None = None,
     ) -> Path:
         """Download and save the WorldPop raster dataset for a given country and year.
 
@@ -36,15 +43,15 @@ class WorldPopClient:
         ----------
         country_iso3 : str
             3-letter ISO code of the country (e.g., "COD", "BFA").
-        output_dir : Path
-            Directory to save the GeoTIFF file.
-        fname : str, optional
-            Filename to save the raster data. If None, defaults to
-            "{country_iso3}_worldpop_population_{year}.tif".
         year : str
             Year to filter the dataset (e.g., "2020").
-        un_adj : bool
-            Whether to download the "unadjuvanted" (constrained) version. Defaults to False.
+        output_dir : Path
+            Directory to save the GeoTIFF file.
+        overwrite : bool, optional
+            Whether to overwrite the file if it already exists. Defaults to False.
+        filename : str, optional
+            Filename to save the raster data. If None, defaults to
+            "{country_iso3}_worldpop_population_{year}.tif".
 
         Returns
         -------
@@ -61,20 +68,32 @@ class WorldPopClient:
         if not (isinstance(country_iso3, str) and len(country_iso3) == 3):
             raise ValueError("country_iso3 must be a 3-letter string.")
 
-        country_iso3 = country_iso3.upper()
-        try:
-            candidate_urls = self._build_urls(country_iso3, year, un_adj)
-            if fname is None:
-                adj_suffix = "_UNadj" if un_adj else ""
-                fname = f"{country_iso3.upper()}_worldpop_ppp_{year}{adj_suffix}.tif"
-            destination_path = output_dir / fname
-        except Exception as e:
-            raise ValueError(f"Could not determine download details for {country_iso3} {year}: {e}") from e
+        year_int = int(year)
+        if year_int < 2015 or year_int > 2030:  # NOTE: We might want to change the url repo in the future.
+            raise ValueError(
+                f"WorldPop data not available for {year} "
+                "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"
+            )
 
-        self._download_with_fallbacks(candidate_urls, destination_path)
+        country_iso3 = country_iso3.upper()
+        candidate_url = self._build_url(country_iso3, year)
+
+        # Determine the filename to save as
+        if filename:
+            fname = filename
+        else:
+            fname = Path(candidate_url).name
+
+        destination_path = output_dir / fname
+
+        if not overwrite and destination_path.exists():
+            self._log(f"File {destination_path.name} already exists. Skipping download.", level="info")
+            return destination_path
+
+        self._download_file(candidate_url, destination_path)
         return destination_path
 
-    def _build_urls(self, country_iso3: str, year: str = "2020", un_adj: bool = False) -> list[str]:
+    def _build_url(self, country_iso3: str, year: str) -> str:
         """Build download URL candidates.
 
         Parameters
@@ -83,53 +102,46 @@ class WorldPopClient:
             Country ISO A3 code.
         year : str, optional
             Year of interest.
-        un_adj : bool, optional
-            Use UN adjusted population counts. Default=False.
+
+        Returns
+        -------
+        Path
+            download URL candidate.
+        """
+        # select latest release available
+        releases = self._list_remote_directories(url=f"{self.base_url}/Global_2015_2030/")
+        if not releases:
+            raise ValueError(f"No releases found at {self.base_url}/Global_2015_2030/")
+        latest_release = releases[0]
+        return (
+            f"{self.base_url}/Global_2015_2030/{latest_release}/{year}/{country_iso3.upper()}/"
+            f"v1/100m/constrained/{country_iso3.lower()}_pop_{year}_CN_100m_{latest_release}_v1.tif"
+        )
+
+    def _list_remote_directories(self, url: str) -> list[str]:
+        """List folder names available at an HTTP directory listing URL.
 
         Returns
         -------
         list[str]
-            Ordered download URL candidates.
+            Directory names found at the URL, sorted in reverse alphabetical order.
         """
-        year_int = int(year)
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return sorted(set(re.findall(r'href="([^/"]+)/"', response.text)), reverse=True)
 
-        # Legacy WorldPop (2000-2020) uses the Global_2000_2020 structure.
-        if year_int <= 2020:
-            return [
-                (
-                    f"{self.base_url}/Global_2000_2020/{year}/{country_iso3.upper()}/"
-                    f"{country_iso3.lower()}_ppp_{year}{'_UNadj' if un_adj else ''}.tif"
-                )
-            ]
-
-        # New releases (2015-2030, 100m constrained) do not expose UN-adjusted rasters.
-        if un_adj:
-            raise ValueError("UN-adjusted WorldPop rasters are not available for years > 2020.")
-
-        releases = ["R2025A", "R2024B"]
-        return [
-            (
-                f"{self.base_url}/Global_2015_2030/{release}/{year}/{country_iso3.upper()}/"
-                f"v1/100m/constrained/{country_iso3.lower()}_pop_{year}_CN_100m_{release}_v1.tif"
-            )
-            for release in releases
-        ]
-
-    def _download_with_fallbacks(self, urls: list[str], destination_path: Path) -> None:
+    def _download_file(self, url: list[str], destination_path: Path) -> None:
         """Try multiple WorldPop URLs until one succeeds."""
-        errors = []
-        for url in urls:
-            try:
-                self._atomic_download(url, destination_path)
-                return
-            except OSError as err:
-                errors.append(f"{url} -> {err}")
+        try:
+            self._log(f"Download WorldPop raster data from URL: {url}")
+            self._atomic_download(url, destination_path)
+            return
+        except OSError as err:
+            raise OSError(f"WorldPop URL '{url}' failed to download. Details: {err}") from err
 
-        joined_errors = "; ".join(errors)
-        raise OSError(f"All candidate WorldPop URLs failed: {joined_errors}")
-
-    @staticmethod
-    def _atomic_download(url: str, destination_path: Path, session: requests.Session | None = None) -> None:
+    def _atomic_download(
+        self, url: str, destination_path: Path, session: requests.Session | None = None
+    ) -> None:
         """Downloads a file from a URL to a destination path atomically.
 
         It downloads to a temporary file first and renames it upon success,
@@ -173,3 +185,20 @@ class WorldPopClient:
                     temp_path.unlink()
                 except OSError as e:
                     raise OSError(f"Error removing partial file {temp_path}: {e}") from e
+
+    def _log(self, message: str, level: str = "info") -> None:
+        """Log a message using the Python logger and/or the OpenHEXA current_run, if available."""
+        if self.logger:
+            log_method = getattr(self.logger, level, self.logger.info)
+            log_method(message)
+        if current_run is not None:
+            if level == "info":
+                current_run.log_info(message)
+            elif level == "warning":
+                current_run.log_warning(message)
+            elif level == "error":
+                current_run.log_error(message)
+            elif level == "debug":
+                current_run.log_debug(message)
+            elif level == "critical":
+                current_run.log_critical(message)

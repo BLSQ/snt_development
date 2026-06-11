@@ -9,6 +9,8 @@
 
 ## OpenHEXA WebApp SNT default color palettes -----------------------------------
 
+na_color <- "#D3D3D3"
+
 FOUR_SHADES = c(
   "#A2CAEA",
   "#ACDF9B",
@@ -116,6 +118,12 @@ palette_incidence_ner_cg7 <- c(
   "#C10534"
 )
 
+# BDI AHADI categorical palette for access to healthcare
+bdi_cat_healthcare_access_ahadi_palette <- c(
+  "#8B0020", # 0-95%
+  "#E8E8A0", # 95-99%
+  "#1A6B2A" # 99-100%
+)
 
 
 # Functions (related to palettes) ------------------------------------------------------
@@ -149,4 +157,7 @@ get_range_from_count <- function(count) {
 # # Example usage:
 # get_range_from_count(5)
 # # [1] "#A2CAEA" "#ACDF9B" "#F5F1A0" "#F2B16E" "#E4754F" "#A93A42"
+
+
+cat_healthcare_covered_palette <- c("#f4b5d0", "#f5efa5", "#a5e9c8")
 

@@ -387,6 +387,7 @@ match_column_classes <- function(input_dt, reference_dt) {
 }
 
 #############
+
 #' make a place-time cartesian product, to ensure each possible combination exists, between a minimum period and a maximum period
 #' @param input_dt the original data.table
 #' @param admin_colname place (admin) column
@@ -1480,10 +1481,10 @@ reproject_epsg <- function(x, epsg_value) {
     target_epsg  <- epsg_value
     
     if (is.na(current_epsg) || current_epsg != target_epsg) {
-      message(glue::glue("Info: reprojecting sf object to EPSG:{target_epsg}."))
+      print(glue::glue("Info: reprojecting sf object to EPSG:{target_epsg}."))
       x <- sf::st_transform(x, target_epsg)
     } else {
-      message("Info: no reprojection needed for sf object.")
+      print("Info: no reprojection needed for sf object.")
     }
     
   # check if input is terra vector
@@ -1492,10 +1493,10 @@ reproject_epsg <- function(x, epsg_value) {
     target_crs  <- epsg_value
     
     if (is.na(current_crs) || current_crs != target_crs) {
-      message(glue::glue("Info: reprojecting terra vector to EPSG:{target_crs}."))
+      print(glue::glue("Info: reprojecting terra vector to EPSG:{target_crs}."))
       x <- terra::project(x, paste0("EPSG:", target_crs))
     } else {
-      message("Info: no reprojection needed for terra vector.")
+      print("Info: no reprojection needed for terra vector.")
     }
     
   } else {
@@ -1626,6 +1627,7 @@ make_coverage_radii_terra <- function(
   
   return(coverage_radii_degrees)
 }
+      
 
 ########################
 make_overlaid_sf_plot <- function(
@@ -1670,7 +1672,7 @@ make_overlaid_sf_plot <- function(
 
   return(plot)
 }
-           
+
 
 ########################
 make_rasterized_inclusion_data <- function(
@@ -1823,4 +1825,171 @@ get_updated_children <- function(new_level_table, group_table, level, target_lev
         }
     }
     return(child_updated)
+}
+
+
+#' @description
+#' choropleth map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the numeric column to map
+#' @param low_color color for the low end of the gradient (defaults to "#f7fbff").
+#' @param high_color color for the high end of the gradient (defaults to "#08306b").
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_choropleth_map <- function(
+    input_data,
+    target_colname,
+    low_color = "#f7fbff",
+    high_color = "#08306b",
+    na_color = "#D3D3D3",
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL
+) {
+  # validate inputs
+  if (!inherits(input_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(input_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(input_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+ 
+  # plot
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    
+    scale_fill_gradient(
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
+  return(output_plot)
+}
+
+#' @description
+#' categorical map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the factor column to map
+#' @param color_vector vector of colors to use
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_categorical_map <- function(
+  input_data,
+  target_colname,
+  color_vector,
+  na_color = "#D3D3D3",
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  legend_title = NULL
+) {
+ 
+  # validation
+ 
+  if (!is.data.frame(input_data)) {
+    stop("Data to plot must be a sf data frame.")
+  }
+ 
+  if (!target_colname %in% names(input_data)) {
+    stop("Target column should be part of the data to plot.")
+  }
+  
+  if(!is.factor(input_data[[target_colname]])){
+	stop("Target column should be an ordered factor.")
+  }
+ 
+  if (!is.character(color_vector)) {
+    stop("The vector of colors is not valid.")
+  }
+ 
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(aes(fill = .data[[target_colname]]), color = "white", linewidth = 0.2) +
+    scale_fill_manual(
+      values  = color_vector,
+      na.value = na_color,
+      name    = legend_title,
+      drop    = FALSE # show all levels
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+  
+  return(output_plot)
 }

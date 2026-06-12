@@ -130,8 +130,8 @@ class WorldPopClient:
         response.raise_for_status()
         return sorted(set(re.findall(r'href="([^/"]+)/"', response.text)), reverse=True)
 
-    def _download_file(self, url: list[str], destination_path: Path) -> None:
-        """Try multiple WorldPop URLs until one succeeds."""
+    def _download_file(self, url: str, destination_path: Path) -> None:
+        """Download a WorldPop raster from URL."""
         try:
             self._log(f"Download WorldPop raster data from URL: {url}")
             self._atomic_download(url, destination_path)
@@ -184,7 +184,7 @@ class WorldPopClient:
                 try:
                     temp_path.unlink()
                 except OSError as e:
-                    raise OSError(f"Error removing partial file {temp_path}: {e}") from e
+                    self._log(f"Failed to remove partial file {temp_path}: {e}", level="warning")
 
     def _log(self, message: str, level: str = "info") -> None:
         """Log a message using the Python logger and/or the OpenHEXA current_run, if available."""

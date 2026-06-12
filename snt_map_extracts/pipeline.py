@@ -71,16 +71,16 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
     root_path = Path(workspace.files_path)
     pipeline_path = root_path / "pipelines" / "snt_map_extracts"
     pipeline_path.mkdir(parents=True, exist_ok=True)
-    # logger = create_file_logger(log_path=pipeline_path / "logs")
 
     if year_start > year_end:
-        current_run.log_warning("Start period must be less than or equal to end period.")
-        raise ValueError
+        msg = f"Start period ({year_start}) must be less than or equal to end period ({year_end})."
+        current_run.log_warning(msg)
+        raise ValueError(msg)
 
     try:
         validate_worldpop_periods(year_start, year_end)
     except ValueError as e:
-        current_run.log_warning(f"Invalid period configuration: {e}")
+        current_run.log_warning(f"Invalid period configuration: {e}")  # pop is optional
 
     # Define indicators to download
     snt_indicators = {
@@ -110,7 +110,6 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
     validate_config(snt_config)
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
-    # Retrieve shapes
     shapes = retrieve_shapes(snt_config=snt_config)
     if shapes is None:
         current_run.log_error("No valid shapes available. Processing stopped.")
@@ -255,9 +254,8 @@ def retrieve_population_data(
 
     """
     current_run.log_info("Retrieving population data grid from WorldPop.")
-    wpop_client = WorldPopClient()
 
-    # Create output directory (and parents e.g. data/worldpop/) if missing
+    wpop_client = WorldPopClient()
     output_path.mkdir(parents=True, exist_ok=True)
     country = country_code.upper()
 
@@ -437,6 +435,7 @@ def compute_zonal_statistics(
         A Polars DataFrame containing the aggregated statistics for each indicator and shape.
     """
     # 1. Load population raster (if available)
+    pop_data = pop_transform = pop_crs = pop_nodata = None
     if pop_raster_path is None:
         current_run.log_warning("Population raster file not provided.")
     else:

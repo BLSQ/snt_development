@@ -129,7 +129,7 @@ def align_raster_to_reference(
     aligned = np.empty(reference_shape, dtype=data.dtype)
 
     # Only reproject if CRS or shape/transform differ
-    if (crs != reference_crs) or (data.shape != reference_shape):
+    if (crs != reference_crs) or (data.shape != reference_shape) or (transform != reference_transform):
         reproject(
             source=data,
             destination=aligned,

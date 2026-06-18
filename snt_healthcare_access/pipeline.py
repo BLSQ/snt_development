@@ -1,9 +1,6 @@
 #%% imports
 
-import os
-import re
 from pathlib import Path
-import polars as pl
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
 
 from snt_lib.snt_pipeline_utils import (
@@ -14,10 +11,6 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
     pull_scripts_from_repository,
     save_pipeline_parameters
-)
-
-from utils import (
-    load_raw_population_raster
 )
 
 #%% pipeline definition
@@ -68,7 +61,7 @@ def snt_healthcare_access(
     # paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_healthcare_access"
-    wpop_raster_path = snt_root_path / "data" / "worldpop" / "rasters"
+    wpop_raster_path = snt_root_path / "data" / "worldpop" / "raw"
     data_output_path = snt_root_path / "data" / "healthcare_access"
     data_intermediate_path = data_output_path / "intermediate_results"
     # ensure necessary directories exist
@@ -76,7 +69,6 @@ def snt_healthcare_access(
     (pipeline_path / "reporting" / "outputs" / "figures").mkdir(parents=True, exist_ok=True)
     data_output_path.mkdir(parents=True, exist_ok=True)
     data_intermediate_path.mkdir(parents=True, exist_ok=True)
-    wpop_raster_path.mkdir(parents=True, exist_ok=True)
 
     # validate input parameter values
     if input_fosa_file is not None:
@@ -108,6 +100,7 @@ def snt_healthcare_access(
             current_run.log_error("No valid shapes available. Processing stopped.")
             raise ValueError
 
+        # if user chooses to run the computation notebook
         if not run_report_only:
 
             # save the input parameter values to file
@@ -147,13 +140,6 @@ def snt_healthcare_access(
                 country_code=country_code,
             )
 
-            parameters_file = save_pipeline_parameters(
-                pipeline_name="snt_healthcare_access",
-                parameters=input_params,
-                output_path=data_output_path,
-                country_code=country_code,
-            )
-
             # add files to a new dataset version
             add_files_to_dataset(
                 dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS", None),
@@ -168,6 +154,7 @@ def snt_healthcare_access(
         else:
             current_run.log_info("Skipping calculations, running only the reporting.")
 
+        # in all cases, run the reporting notebook
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_healthcare_access_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
@@ -187,23 +174,26 @@ def get_or_download_population_raster(country_code: str, ref_year: int, raster_d
     """Return the path to the population raster for the given country and year.
     Uses an existing file if found, otherwise downloads it from WorldPop.
     """
+
+    raster_dir.mkdir(parents=True, exist_ok=True)
+    
     existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif"))
     if existing:
         current_run.log_info(f"Population raster found: {existing[0]}.")
         return existing[0]
 
     current_run.log_info(f"No raster found for {ref_year}. Downloading from WorldPop.")
-    raster_dir.mkdir(parents=True, exist_ok=True)
+
     try:
-        client = WorldPopClient()
-        path = client.download_data_for_country(
+        wpop_client = WorldPopClient()
+        wpop_output_raster_path = wpop_client.download_data_for_country(
             country_iso3=country_code.upper(),
             year=str(ref_year),
             output_dir=raster_dir,
             overwrite=False,
         )
         current_run.log_info(f"Raster downloaded: {path}.")
-        return path
+        return wpop_output_raster_path
     except Exception as e:
         current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")
         return None

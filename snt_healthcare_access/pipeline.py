@@ -1,6 +1,9 @@
+#%% imports
+
+import os
 import re
 from pathlib import Path
-
+import polars as pl
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
 
 from snt_lib.snt_pipeline_utils import (
@@ -10,65 +13,30 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     pull_scripts_from_repository,
-    save_pipeline_parameters,
+    save_pipeline_parameters
 )
 
+from utils import (
+    load_raw_population_raster
+)
 
-def _find_latest_worldpop_raster(root_path: Path, country_code: str) -> tuple[Path | None, int | None]:
-    """Find the most recent WorldPop PPP raster for a country in data/worldpop/raw/.
-
-    Looks for files {COUNTRY}_worldpop_ppp_*.tif (excluding _UNadj). Returns (path, year)
-    for the file with the highest year, or (None, None) if none found.
-    """
-    raw_dir = root_path / "data" / "worldpop" / "raw"
-    if not raw_dir.is_dir():
-        return None, None
-    country_upper = country_code.upper()
-    pattern = re.compile(rf"^{re.escape(country_upper)}_worldpop_ppp_(\d+)\.tif$")
-    candidates: list[tuple[Path, int]] = []
-    for p in raw_dir.iterdir():
-        if not p.is_file() or p.suffix.lower() != ".tif" or "_UNadj" in p.name:
-            continue
-        m = pattern.match(p.name)
-        if m:
-            candidates.append((p, int(m.group(1))))
-    if not candidates:
-        return None, None
-    best = max(candidates, key=lambda x: x[1])
-    return best[0], best[1]
-
+#%% pipeline definition
 
 @pipeline("snt_healthcare_access")
 @parameter(
-    "input_fosa_file",
-    name="FOSA location file (.csv)",
+    code="input_fosa_file",
+    name="Optional FOSA location file (.csv)",
     type=File,
     required=False,
     default=None,
     help="If not provided, the DHIS2 pyramid metadata file will be used.",
 )
 @parameter(
-    "input_radius_meters",
-    name="Radius around FOSA (meters)",
+    code="wpop_year",
+    name="Year",
+    help="Reference year for population data.",
     type=int,
-    default=5000,
-    required=False,
-)
-@parameter(
-    "input_pop_file",
-    name="Population raster file (.tif)",
-    type=File,
-    required=False,
-    default=None,
-    help="If not provided, the default WorldPop raster will be used.",
-)
-@parameter(
-    "input_shapes_file",
-    name="Shapes file (.geojson)",
-    type=File,
-    required=False,
-    default=None,
-    help="If not provided, the default HMIS/NMDR shapes file will be used.",
+    required=True,
 )
 @parameter(
     "run_report_only",
@@ -88,51 +56,37 @@ def _find_latest_worldpop_raster(root_path: Path, country_code: str) -> tuple[Pa
 )
 def snt_healthcare_access(
     input_fosa_file: File,
-    input_radius_meters: int,
-    input_pop_file: File,
-    input_shapes_file: File,
+    wpop_year: int,
     run_report_only: bool,
     pull_scripts: bool,
 ):
     """Pipeline to run computation and report notebooks for healthcare access.
 
-    Determining the percentage of population which is within a given radius of at
-    least one FOrmation SAnitaire.
+    Determining the percentage of population which is within 5 km of at
+    least one FOrmation SAnitaire (FOSA).
     """
     # paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_healthcare_access"
+    wpop_raster_path = snt_root_path / "data" / "worldpop" / "rasters"
     data_output_path = snt_root_path / "data" / "healthcare_access"
-    # ensure directories exist
+    data_intermediate_path = data_output_path / "intermediate_results"
+    # ensure necessary directories exist
     pipeline_path.mkdir(parents=True, exist_ok=True)
-    (pipeline_path / "reporting" / "outputs").mkdir(parents=True, exist_ok=True)
+    (pipeline_path / "reporting" / "outputs" / "figures").mkdir(parents=True, exist_ok=True)
     data_output_path.mkdir(parents=True, exist_ok=True)
+    data_intermediate_path.mkdir(parents=True, exist_ok=True)
+    wpop_raster_path.mkdir(parents=True, exist_ok=True)
 
-    num_km = input_radius_meters / 1000
-    shapes_file_path: str | None = None
+    # validate input parameter values
     if input_fosa_file is not None:
-        current_run.log_info(f"Coordinates file: {input_fosa_file.path}")
-    current_run.log_info(f"Using radii of {num_km} km around each FOSA.")
-    if input_pop_file is not None:
-        current_run.log_info(f"Population raster: {input_pop_file.path}")
-    if input_shapes_file is not None:
-        shapes_path_obj = Path(input_shapes_file.path)
-        if shapes_path_obj.suffix.lower() != ".geojson":
-            error_msg = (
-                f"Invalid custom shapes file extension: {shapes_path_obj.suffix or '<none>'}. "
-                "Expected a .geojson file."
-            )
-            current_run.log_error(error_msg)
-            raise ValueError(error_msg)
-        shapes_file_path = str(shapes_path_obj)
-        current_run.log_info(f"Custom shapes file: {shapes_file_path}")
-        current_run.log_warning(
-            "Custom shapefile provided: hierarchy may not align with the extracted DHIS2 pyramid. "
-            "During data assembly, this can cause missing values for some organizational units "
-            "(especially at ADM2) when IDs do not match across files."
-        )
+        current_run.log_info(f"FOSA coordinates file: {input_fosa_file.path}")
+    if not (2015 <= wpop_year <= 2030):
+        msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015–2030."
+        current_run.log_warning(msg)
+        raise ValueError(msg)
     else:
-        current_run.log_info("No custom shapes file selected; using default HMIS/NMDR shapes.")
+        current_run.log_info(f"Year for raster population data: {wpop_year}.")
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -143,38 +97,48 @@ def snt_healthcare_access(
         )
 
     try:
-        # Load configuration
-        snt_config_dict = load_configuration_snt(
-            config_path=Path(snt_root_path, "configuration", "SNT_config.json")
-        )
+ 
+        # Load & validate configuration file
+        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        validate_config(snt_config)
+        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
-        # Validate configuration
-        validate_config(snt_config_dict)
-
-        # get country identifier for naming
-        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
-
-        # Population raster: use selected file, or by default the most recent WorldPop (by year) in data/worldpop/raw/
-        if input_pop_file is not None:
-            pop_file_path = input_pop_file.path
-        else:
-            path_found, year_found = _find_latest_worldpop_raster(snt_root_path, country_code)
-            if path_found is not None:
-                pop_file_path = str(path_found)
-                current_run.log_info(
-                    f"No raster selected; using latest WorldPop: {path_found.name} (year {year_found})"
-                )
-            else:
-                # No dataset fallback: we only use data/worldpop/raw/ (from WorldPop extract in this workspace).
-                pop_file_path = None
+        shapes = retrieve_shapes(snt_config=snt_config)
+        if shapes is None:
+            current_run.log_error("No valid shapes available. Processing stopped.")
+            raise ValueError
 
         if not run_report_only:
+
+            # save the input parameter values to file
+            parameters_file = save_pipeline_parameters(
+            pipeline_name="snt_healthcare_access",
+            parameters={
+                "input_fosa_file": input_fosa_file,
+                "wpop_year": wpop_year,
+                "run_report_only": run_report_only,
+                "pull_scripts": pull_scripts,
+            },
+            output_path=data_output_path,
+            country_code=country_code
+            )
+
+            # the params to use in the computation notebook
             input_params = {
                 "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
-                "RADIUS_METERS": input_radius_meters,
-                "POP_FILE": pop_file_path,
-                "SHAPES_FILE": shapes_file_path,
-            }
+                "WORLDPOP_YEAR": wpop_year
+                }
+
+            # download worldpop data if it doesn't already exist in the folder
+            pop_path = get_or_download_population_raster(
+                    country_code=country_code,
+                    ref_year=str(wpop_year),
+                    raster_dir=wpop_raster_path,
+                )
+            if pop_path is None:
+                current_run.log_error(f"Could not retrieve population raster for {wpop_year}. Stopping.")
+                raise ValueError(f"Population raster unavailable for {wpop_year}.")
+            
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -192,7 +156,7 @@ def snt_healthcare_access(
 
             # add files to a new dataset version
             add_files_to_dataset(
-                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS", None),
+                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS", None),
                 country_code=country_code,
                 file_paths=[
                     data_output_path / f"{country_code}_population_covered_health.parquet",
@@ -211,10 +175,38 @@ def snt_healthcare_access(
             country_code=country_code,
         )
 
-        current_run.log_info("Pipeline finished!")
+        current_run.log_info("Pipeline executed successfully!")
     except Exception as e:
         current_run.log_error(f"Error occurred while executing the pipeline: {e}")
         raise
+
+
+#%% functions used in pipeline
+
+def get_or_download_population_raster(country_code: str, ref_year: int, raster_dir: Path) -> Path | None:
+    """Return the path to the population raster for the given country and year.
+    Uses an existing file if found, otherwise downloads it from WorldPop.
+    """
+    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif"))
+    if existing:
+        current_run.log_info(f"Population raster found: {existing[0]}.")
+        return existing[0]
+
+    current_run.log_info(f"No raster found for {ref_year}. Downloading from WorldPop.")
+    raster_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        client = WorldPopClient()
+        path = client.download_data_for_country(
+            country_iso3=country_code.upper(),
+            year=str(ref_year),
+            output_dir=raster_dir,
+            overwrite=False,
+        )
+        current_run.log_info(f"Raster downloaded: {path}.")
+        return path
+    except Exception as e:
+        current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")
+        return None
 
 
 if __name__ == "__main__":

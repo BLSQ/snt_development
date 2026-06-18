@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
-
+from worlpopclient import WorldPopClient
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
@@ -61,7 +61,7 @@ def snt_healthcare_access(
     # paths
     snt_root_path = Path(workspace.files_path)
     pipeline_path = snt_root_path / "pipelines" / "snt_healthcare_access"
-    wpop_raster_path = snt_root_path / "data" / "worldpop" / "raw"
+    wpop_raster_path = snt_root_path / "data" / "worldpop" / "rasters"
     data_output_path = snt_root_path / "data" / "healthcare_access"
     data_intermediate_path = data_output_path / "intermediate_results"
     # ensure necessary directories exist
@@ -177,7 +177,7 @@ def get_or_download_population_raster(country_code: str, ref_year: int, raster_d
 
     raster_dir.mkdir(parents=True, exist_ok=True)
     
-    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif"))
+    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif")) # the MAP pipeline saves extractions using lowercase for the country name => using the same here
     if existing:
         current_run.log_info(f"Population raster found: {existing[0]}.")
         return existing[0]
@@ -192,7 +192,7 @@ def get_or_download_population_raster(country_code: str, ref_year: int, raster_d
             output_dir=raster_dir,
             overwrite=False,
         )
-        current_run.log_info(f"Raster downloaded: {path}.")
+        current_run.log_info(f"Raster downloaded: {wpop_output_raster_path}.")
         return wpop_output_raster_path
     except Exception as e:
         current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")

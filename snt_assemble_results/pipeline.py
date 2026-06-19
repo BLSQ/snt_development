@@ -646,13 +646,13 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
     current_run.log_debug(f"map selection: {map_selection}")
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS")
-    try:
-        map_indicators = get_file_from_dataset(
-            dataset_id=dataset_id,
-            filename=f"{country_code}_map_data.parquet",
-        )
-    except Exception as e:
-        current_run.log_warning(f"Error while loading MAP data: {e}")
+
+    map_indicators = load_map_files(
+        dataset_id=dataset_id,
+        country_code=country_code,
+    )
+
+    if map_indicators is None:
         return table
 
     col_mappings = {
@@ -712,6 +712,44 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             current_run.log_warning(f"The column {col} was not found in results while updating MAP data.")
 
     return table
+
+
+def load_map_files(dataset_id: str, country_code: str) -> pd.DataFrame | None:
+    """Load MAP data files for the specified country code from the given dataset.
+
+    Returns
+    -------
+    pd.DataFrame | None
+        A DataFrame containing the concatenated MAP data, or None if no files could be loaded.
+    """
+    try:
+        match_names = get_matching_filename_from_dataset_last_version(
+            dataset_id=dataset_id, filename_pattern=f"{country_code}_map_data_*.parquet"
+        )
+    except Exception as e:
+        current_run.log_warning(f"Error loading MAP data: {e}")
+        return None
+
+    if not match_names:
+        current_run.log_warning(
+            f"No MAP data files found for country {country_code} in dataset {dataset_id}."
+        )
+        return None
+
+    map_files = []
+    for file_year in match_names:
+        current_run.log_debug(f"Loading MAP data file: {file_year}")
+        try:
+            map_files.append(get_file_from_dataset(dataset_id=dataset_id, filename=file_year))
+        except Exception as e:
+            current_run.log_warning(f"Error while loading MAP data: {e}")
+            continue
+
+    if not map_files:
+        current_run.log_warning(f"No MAP data files could be loaded for country {country_code}.")
+        return None
+
+    return pd.concat(map_files, ignore_index=True)
 
 
 def add_seasonality_indicators_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:

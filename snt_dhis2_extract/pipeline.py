@@ -1138,11 +1138,15 @@ def download_data_elements(
         Path to save the downloaded data as a parquet file.
     """
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    population_values = dhis2_client.analytics.get(
-        data_elements=data_elements,
-        periods=[period],
-        org_units=org_units,
-    )
+    try:
+        population_values = dhis2_client.analytics.get(
+            data_elements=data_elements,
+            periods=[period],
+            org_units=org_units,
+        )
+    except Exception as e:
+        current_run.log_warning(f"Error while downloading population data elements for period {period}: {e}")
+        return
 
     if len(population_values) == 0:
         current_run.log_warning(f"No population data found for period {period}.")
@@ -1179,12 +1183,17 @@ def download_indicators(
         Path to save the downloaded data as a parquet file.
     """
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    population_values = dhis2_client.analytics.get(
-        indicators=indicators,
-        periods=[period],
-        org_units=org_units,
-        include_cocs=False,
-    )
+    try:
+        population_values = dhis2_client.analytics.get(
+            indicators=indicators,
+            periods=[period],
+            org_units=org_units,
+            include_cocs=False,
+        )
+    except Exception as e:
+        current_run.log_warning(f"Error while downloading population indicator data for period {period}: {e}")
+        return
+
     if len(population_values) == 0:
         current_run.log_warning(f"No population indicator data found for period {period}.")
         return

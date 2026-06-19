@@ -25,7 +25,7 @@ from utils import (
     get_extract_periods,
     load_raw_population_raster,
 )
-from worlpopclient import WorldPopClient
+from worldpopclient import WorldPopClient
 
 # Ticket:
 # https://bluesquare.atlassian.net/browse/SNT25-143 (old pipeline)

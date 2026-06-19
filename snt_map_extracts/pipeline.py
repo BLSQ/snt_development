@@ -347,7 +347,7 @@ def build_map_statistics_table(
     list[Path]
         List of paths to the generated output files (parquet and csv).
     """
-    rasters_path = output_path / "raster_files"
+    rasters_path = output_path / "raster_files" / f"{country_code}"
     rasters_path.mkdir(parents=True, exist_ok=True)
 
     raster_files = retrieve_rasters(

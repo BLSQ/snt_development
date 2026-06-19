@@ -183,8 +183,8 @@ def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir
     except Exception as e:
         current_run.log_warning(f"Failed to create directory {raster_dir}: {e}")
         return None
-    
-    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif")) # the MAP pipeline saves extractions using lowercase for the country name => using the same here
+
+    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_CN_100m_*.tif")) # the MAP pipeline saves extractions using lowercase for the country name => using the same here
     if existing:
         current_run.log_info(f"Population raster found: {existing[0]}.")
         return existing[0]

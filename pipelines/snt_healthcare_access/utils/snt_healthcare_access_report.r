@@ -1,5 +1,6 @@
 # Helpers for the access to healthcare pipeline report
 
+
 #' @description
 #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
 #'
@@ -39,6 +40,7 @@ make_overlaid_sf_plot <- function(
 
   return(plot)
 }
+
 
 #' @description
 #' choropleth map of raster data with polygon borders

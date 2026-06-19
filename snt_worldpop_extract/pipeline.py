@@ -247,7 +247,7 @@ def run_spatial_aggregation(
         nodata = src.nodata  # No data value
 
     # get statistics
-    current_run.log_info(f"Computing ADM2 spacial aggregation for {len(shapes)} shapes.")
+    current_run.log_info(f"Computing ADM2 spatial aggregation for {len(shapes)} shapes.")
     pop_stats = zonal_stats(
         shapes,
         tif_file_path,
@@ -264,7 +264,7 @@ def run_spatial_aggregation(
     result_df.columns = [c.upper() for c in result_df.columns]
 
     # Log any administrative levels with no population data
-    no_data = result_df.filter(pl.col("POPULATION") == 0)
+    no_data = result_df.filter(pl.col("POPULATION").is_null())
     for row in no_data.iter_rows(named=True):
         current_run.log_warning(
             f"Administrative level 2 : {row['ADM2_NAME']} ({row['ADM2_ID']}) has no population data."

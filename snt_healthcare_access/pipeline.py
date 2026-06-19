@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
-from worlpopclient import WorldPopClient
+from worldpopclient import WorldPopClient
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     load_configuration_snt,
@@ -73,6 +73,9 @@ def snt_healthcare_access(
     # validate input parameter values
     if input_fosa_file is not None:
         current_run.log_info(f"FOSA coordinates file: {input_fosa_file.path}")
+    else:
+        current_run.log_info(f"Using default FOSA data.")
+
     if not (2015 <= wpop_year <= 2030):
         msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015–2030."
         current_run.log_warning(msg)
@@ -123,7 +126,7 @@ def snt_healthcare_access(
                 }
 
             # download worldpop data if it doesn't already exist in the folder
-            pop_path = get_or_download_population_raster(
+            pop_path = get_or_download_worldpop_raster(
                     country_code=country_code,
                     ref_year=str(wpop_year),
                     raster_dir=wpop_raster_path,
@@ -170,12 +173,16 @@ def snt_healthcare_access(
 
 #%% functions used in pipeline
 
-def get_or_download_population_raster(country_code: str, ref_year: int, raster_dir: Path) -> Path | None:
+def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir: Path) -> Path | None:
     """Return the path to the population raster for the given country and year.
     Uses an existing file if found, otherwise downloads it from WorldPop.
     """
 
-    raster_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        raster_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        current_run.log_warning(f"Failed to create directory {raster_dir}: {e}")
+        return None
     
     existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_*.tif")) # the MAP pipeline saves extractions using lowercase for the country name => using the same here
     if existing:

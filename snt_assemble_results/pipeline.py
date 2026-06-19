@@ -118,14 +118,22 @@ def snt_assemble_results(
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    except Exception as e:
+        current_run.log_error(f"Validation error: {e}")
+        raise Exception from e
 
+    try:
         # Get metadata file
         copy_file(
             source_folder=root_path / "configuration",
             destination_folder=pipeline_path / "data",
             filename="SNT_metadata.json",
         )
+    except Exception as e:
+        current_run.log_error(f"{e}")
+        raise Exception from e
 
+    try:
         assemble_snt_results(
             snt_config=snt_config,
             output_path=results_path,
@@ -678,16 +686,18 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             current_run.log_warning(f"No metric {metric} data found in MAP dataset, skipping.")
             continue
 
+        latest_period = indicator_data["YEAR"].max()
+        indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
+
+        current_run.log_info(f"{metric.upper()} latest period : {latest_period}")
+        indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
+        indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
+        merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
+        table.update(merged[[col_mappings[metric]]])
+        columns_mapped.append(col_mappings[metric])
+
         try:
-            latest_period = indicator_data["YEAR"].max()
-            indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
             update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))
-            current_run.log_info(f"{metric.upper()} latest period : {latest_period}")
-            indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
-            indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
-            merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
-            table.update(merged[[col_mappings[metric]]])
-            columns_mapped.append(col_mappings[metric])
         except Exception as e:
             current_run.log_warning(f"Error while updating MAP data for metric {metric}: {e}")
             continue

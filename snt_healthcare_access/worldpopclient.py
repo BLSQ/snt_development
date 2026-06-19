@@ -1,9 +1,12 @@
+#%% imports
+
 from pathlib import Path
 import re
 import requests
 from openhexa.sdk import current_run
 import logging
 
+#%% client definition
 
 class WorldPopClient:
     """Mini client for the WorldPop REST API.
@@ -44,14 +47,14 @@ class WorldPopClient:
         country_iso3 : str
             3-letter ISO code of the country (e.g., "COD", "BFA").
         year : int
-            Year to filter the dataset (e.g. 2020).
+            Year to filter the dataset (e.g., 2020).
         output_dir : Path
             Directory to save the GeoTIFF file.
         overwrite : bool, optional
             Whether to overwrite the file if it already exists. Defaults to False.
         filename : str, optional
             Filename to save the raster data. If None, defaults to
-            "{country_iso3}_worldpop_population_{year}.tif".
+            "{country_iso3 (lower case)}_pop_{year}_CN_100m_R2025A_v1.tif" (depending on the latest release).
 
         Returns
         -------

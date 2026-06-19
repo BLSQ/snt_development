@@ -27,7 +27,7 @@ class MAPRasterExtractor:
     ):
         """Initialize the MAPRasterExtractor."""
         if category not in self.SUPPORTED_CATEGORIES:
-            raise ValueError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
+            raise MAPExtractorError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
         self.logger = logger
         self.base_url = base_url
         self.category = category
@@ -79,7 +79,7 @@ class MAPRasterExtractor:
         }
 
         if level not in logger_methods:
-            raise ValueError(f"Unsupported logging level: {level}")
+            raise MAPExtractorError(f"Unsupported logging level: {level}")
 
         # Log to standard logger
         if self.logger:
@@ -178,16 +178,16 @@ class MAPRasterExtractor:
         """Retrieve the band names (mean, mask, LCI, UCI) of a WCS coverage via DescribeCoverage.
 
         Args:
-            coverage_id: Coverage ID to query. If None, raises ValueError.
+            coverage_id: Coverage ID to query. If None, raises MAPExtractorError.
             category: Category name ('Malaria' or 'Interventions').
 
         Returns:
             List of band names/layers available for the coverage id.
         """
         if coverage_id is None:
-            raise ValueError("coverage_id must be provided.")
+            raise MAPExtractorError("coverage_id must be provided.")
         if category not in self.SUPPORTED_CATEGORIES:
-            raise ValueError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
+            raise MAPExtractorError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
         if category:
             url = f"{self.base_url}/{category}/ows"
         else:
@@ -233,9 +233,9 @@ class MAPRasterExtractor:
             Path to the downloaded raster file.
         """
         if output_fname is None:
-            raise ValueError("output_fname must be provided.")
+            raise MAPExtractorError("output_fname must be provided.")
         if not output_fname.parent.exists():
-            raise ValueError("Provided output_fname's parent directory does not exist.")
+            raise MAPExtractorError("Provided output_fname's parent directory does not exist.")
 
         year = time_position.split("-", maxsplit=1)[0]
         params = self._build_raster_query(coverage_id, bbox, time_position)
@@ -262,14 +262,14 @@ class MAPRasterExtractor:
         """Public: Retrieve the band names (mean, mask, LCI, UCI) of a WCS coverage via DescribeCoverage.
 
         Args:
-            coverage_id: Coverage ID to query. If None, raises ValueError.
+            coverage_id: Coverage ID to query. If None, raises MAPExtractorError.
             category: Category name ('Malaria' or 'Interventions').
 
         Returns:
             List of band names/layers available for the coverage id.
         """
         if coverage_id is None:
-            raise ValueError("coverage_id must be provided.")
+            raise MAPExtractorError("coverage_id must be provided.")
         if category is None:
             category = self.category
         return self._get_band_names(coverage_id=coverage_id, category=category)
@@ -300,25 +300,28 @@ class MAPRasterExtractor:
             Path to the downloaded raster file.
         """
         if output_path is None:
-            raise ValueError("output_path must be provided.")
+            raise MAPExtractorError("output_path must be provided.")
 
         if category and category != self.category:
             if category not in self.SUPPORTED_CATEGORIES:
-                raise ValueError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
+                raise MAPExtractorError(f"Supported categories: {self.SUPPORTED_CATEGORIES}.")
             self._log_message(f"Switching category from '{self.category}' to '{category}'")
             self.category = category
             self.coverage_ids = self._list_coverage_ids_for_category()
 
         latest_coverage_id = self._latest_version_for_indicator(indicator)
         if latest_coverage_id is None:
-            raise ValueError(f"No coverage found for indicator '{indicator}' in category '{category}'.")
+            raise MAPExtractorError(
+                f"No coverage found for indicator '{indicator}' in category '{category}'."
+            )
         self._log_message(f"Latest coverage ID for indicator '{indicator}': {latest_coverage_id}")
 
         available_times: dict = self._get_time_positions_for_coverage(latest_coverage_id)
         if target_year not in available_times:
-            raise ValueError(
-                f"Year {target_year} is not available for indicator '{indicator}'."
-                f" Available years: {available_times if available_times else 'No years available!'}"
+            years_present = sorted(available_times.keys(), reverse=True) if available_times else []
+            raise MAPExtractorError(
+                f"Year {target_year} not available for indicator '{indicator}'. "
+                f"Available years: {years_present or 'No years available!'}"
             )
 
         if shapes is not None:
@@ -326,21 +329,20 @@ class MAPRasterExtractor:
             minx, miny, maxx, maxy = shapes.total_bounds
             bbox = [minx, miny, maxx, maxy]
         if bbox is None:
-            raise ValueError("Either bbox or shapes must be provided to define the area of interest.")
+            raise MAPExtractorError("Either bbox or shapes must be provided to define the area of interest.")
 
+        # Avoid downloading the same file in the provided folder
+        raster_fname = output_path / f"{latest_coverage_id}_{target_year}.tif"
+        if raster_fname.exists():
+            if replace_file:
+                raster_fname.unlink()  # delete existing file
+                self._log_message(
+                    f"Raster exists, deleting and re-downloading: {raster_fname.name}", level="warning"
+                )
+            else:
+                self._log_message(f"Raster already exists: {raster_fname.name}, skipping download.")
+                return raster_fname
         try:
-            # Avoid downloading the same file in the provided folder
-            raster_fname = output_path / f"{latest_coverage_id}_{target_year}.tif"
-            if raster_fname.exists():
-                if replace_file:
-                    raster_fname.unlink()  # delete existing file
-                    self._log_message(
-                        f"Raster exists, deleting and re-downloading: {raster_fname.name}", level="warning"
-                    )
-                else:
-                    self._log_message(f"Raster already exists: {raster_fname.name}, skipping download.")
-                    return raster_fname
-
             raster_path = self._download_raster(
                 coverage_id=latest_coverage_id,
                 bbox=bbox,

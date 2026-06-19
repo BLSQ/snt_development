@@ -3,6 +3,7 @@ SNT Process/
 .vscode/
 venv/
 uv.lock
+__pycache__/
 
 # Jupyter stuff -------------------------
 

@@ -1547,7 +1547,7 @@ make_coverage_radii_sf <- function(
   coordinate_colnames,
   epsg_value_degrees,
   epsg_value_meters,
-  radius_meters
+  radius_meters = 5000
 ){
 
   #' make circles of a given radius around each point (longitude/latitude) in the sf vector input data

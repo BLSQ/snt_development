@@ -29,7 +29,7 @@ class WorldPopClient:
     def download_data_for_country(
         self,
         country_iso3: str,
-        year: str,
+        year: int,
         output_dir: Path,
         overwrite: bool = False,
         filename: str | None = None,
@@ -43,15 +43,15 @@ class WorldPopClient:
         ----------
         country_iso3 : str
             3-letter ISO code of the country (e.g., "COD", "BFA").
-        year : str
-            Year to filter the dataset (e.g., "2020").
+        year : int
+            Year to filter the dataset (e.g., 2020).
         output_dir : Path
             Directory to save the GeoTIFF file.
         overwrite : bool, optional
             Whether to overwrite the file if it already exists. Defaults to False.
         filename : str, optional
             Filename to save the raster data. If None, defaults to
-            "{country_iso3}_worldpop_population_{year}.tif".
+            "{country_iso3 (lower case)}_pop_{year}_CN_100m_R2025A_v1.tif" (depending on the latest release).
 
         Returns
         -------
@@ -68,8 +68,7 @@ class WorldPopClient:
         if not (isinstance(country_iso3, str) and len(country_iso3) == 3):
             raise ValueError("country_iso3 must be a 3-letter string.")
 
-        year_int = int(year)
-        if year_int < 2015 or year_int > 2030:  # NOTE: We might want to change the url repo in the future.
+        if year < 2015 or year > 2030:  # NOTE: We might want to change the url repo in the future.
             raise ValueError(
                 f"WorldPop data not available for {year} "
                 "(see: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/)"
@@ -93,14 +92,14 @@ class WorldPopClient:
         self._download_file(candidate_url, destination_path)
         return destination_path
 
-    def _build_url(self, country_iso3: str, year: str) -> str:
+    def _build_url(self, country_iso3: str, year: int) -> str:
         """Build download URL candidates.
 
         Parameters
         ----------
         country_iso3 : str
             Country ISO A3 code.
-        year : str, optional
+        year : int, optional
             Year of interest.
 
         Returns

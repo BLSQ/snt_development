@@ -113,12 +113,16 @@ def snt_worldpop_extract(year_start: int, year_end: int, run_report_only: bool, 
             current_run.log_warning(f"{e!s}")
             continue
 
-        pop_agg_path = run_spatial_aggregation(
-            tif_file_path=raster_path,
-            year=year,
-            snt_config=snt_config_dict,
-            output_dir=data_path / "aggregations",
-        )
+        try:
+            pop_agg_path = run_spatial_aggregation(
+                tif_file_path=raster_path,
+                year=year,
+                snt_config=snt_config_dict,
+                output_dir=data_path / "aggregations",
+            )
+        except Exception as e:
+            current_run.log_warning(f"{e!s}")
+            continue
 
         pop_formatted_path = snt_worldpop_format(
             pop_data_path=pop_agg_path,
@@ -181,7 +185,7 @@ def retrieve_population_data(
     try:
         pop_file_path = wpop_client.download_data_for_country(
             country_iso3=country,
-            year=year,
+            year=int(year),
             output_dir=output_path,
             overwrite=overwrite,
         )

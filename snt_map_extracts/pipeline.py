@@ -262,7 +262,7 @@ def retrieve_population_data(
     try:
         pop_file_path = wpop_client.download_data_for_country(
             country_iso3=country,
-            year=year,
+            year=int(year),
             output_dir=output_path,
             overwrite=overwrite,
         )

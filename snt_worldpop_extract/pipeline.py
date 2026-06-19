@@ -15,7 +15,7 @@ from snt_lib.snt_pipeline_utils import (
     save_pipeline_parameters,
     validate_config,
 )
-from worlpopclient import WorldPopClient
+from worldpopclient import WorldPopClient
 
 
 @pipeline("snt_worldpop_extract")

@@ -1,10 +1,12 @@
 #%% imports
 
 from pathlib import Path
+import geopandas as gpd
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
 from worldpopclient import WorldPopClient
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
+    get_file_from_dataset,
     load_configuration_snt,
     run_notebook,
     run_report_notebook,
@@ -94,7 +96,7 @@ def snt_healthcare_access(
     try:
  
         # Load & validate configuration file
-        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        snt_config = load_configuration_snt(config_path=snt_root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
 
@@ -128,7 +130,7 @@ def snt_healthcare_access(
             # download worldpop data if it doesn't already exist in the folder
             pop_path = get_or_download_worldpop_raster(
                     country_code=country_code,
-                    ref_year=str(wpop_year),
+                    ref_year=wpop_year,
                     raster_dir=wpop_raster_path,
                 )
             if pop_path is None:
@@ -195,7 +197,7 @@ def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir
         wpop_client = WorldPopClient()
         wpop_output_raster_path = wpop_client.download_data_for_country(
             country_iso3=country_code.upper(),
-            year=str(ref_year),
+            year=ref_year,
             output_dir=raster_dir,
             overwrite=False,
         )
@@ -204,6 +206,28 @@ def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir
     except Exception as e:
         current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")
         return None
+
+def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
+    """Retrieve and validate shapes for the specified country."""
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    dataset_shapes_id = snt_config.get("SNT_DATASET_IDENTIFIERS", {}).get("DHIS2_DATASET_FORMATTED")
+    shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")
+
+    if shapes is None or shapes.shape[0] == 0:
+        current_run.log_warning("No shapes found in dataset.")
+        return None
+
+    invalid = shapes[shapes.geometry.isna()]
+    if len(invalid) > 0:
+        current_run.log_warning(f"Dropping {len(invalid)} units without geometry.")
+    shapes = shapes[shapes.geometry.notna() & shapes.geometry.apply(lambda g: g is not None)]
+
+    empty = shapes[shapes.geometry.is_empty]
+    if len(empty) > 0:
+        current_run.log_warning(f"Dropping {len(empty)} units with empty geometry.")
+    shapes = shapes[~shapes.geometry.is_empty]
+
+    return shapes if len(shapes) > 0 else None
 
 
 if __name__ == "__main__":

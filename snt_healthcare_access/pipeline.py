@@ -123,7 +123,7 @@ def snt_healthcare_access(
 
             # the params to use in the computation notebook
             input_params = {
-                "FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
+                "INPUT_FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
                 "WORLDPOP_YEAR": wpop_year
                 }
 

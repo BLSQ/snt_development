@@ -1,5 +1,6 @@
 #%% imports
 
+import os
 from pathlib import Path
 import geopandas as gpd
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
@@ -20,7 +21,7 @@ from snt_lib.snt_pipeline_utils import (
 @pipeline("snt_healthcare_access")
 @parameter(
     code="input_fosa_file",
-    name="Optional FOSA location file (.csv)",
+    name="Optional FOrmation SAnitaire (FOSA) location file (.csv)",
     type=File,
     required=False,
     default=None,
@@ -29,14 +30,14 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     code="wpop_year",
     name="Year",
-    help="Reference year for population data.",
+    help="Reference year for WorldPop population data.",
     type=int,
     required=True,
 )
 @parameter(
     "run_report_only",
     name="Run reporting only",
-    help="This will only execute the reporting notebook",
+    help="Only execute the reporting notebook?",
     type=bool,
     default=False,
     required=False,
@@ -44,7 +45,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "pull_scripts",
     name="Pull scripts",
-    help="Pull the latest scripts from the repository",
+    help="Pull the latest scripts from the repository?",
     type=bool,
     default=False,
     required=False,
@@ -76,7 +77,10 @@ def snt_healthcare_access(
     if input_fosa_file is not None:
         current_run.log_info(f"FOSA coordinates file: {input_fosa_file.path}")
     else:
-        current_run.log_info(f"Using default FOSA data.")
+        current_run.log_info(f"Using default FOSA data (DHIS2).")
+
+    if not has_allowed_extension(input_fosa_file):
+        current_run.log_warning(f"FOSA location file should be a .csv file. Using default FOSA data instead.")
 
     if not (2015 <= wpop_year <= 2030):
         msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015–2030."
@@ -134,7 +138,7 @@ def snt_healthcare_access(
                     raster_dir=wpop_raster_path,
                 )
             if pop_path is None:
-                current_run.log_error(f"Could not retrieve population raster for {wpop_year}. Stopping.")
+                current_run.log_error(f"Could not retrieve population raster for {wpop_year}. Processing stopped.")
                 raise ValueError(f"Population raster unavailable for {wpop_year}.")
             
             run_notebook(
@@ -157,7 +161,7 @@ def snt_healthcare_access(
             )
 
         else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
+            current_run.log_info("Skipping calculations, running reporting only.")
 
         # in all cases, run the reporting notebook
         run_report_notebook(
@@ -174,6 +178,11 @@ def snt_healthcare_access(
 
 
 #%% functions used in pipeline
+
+def has_allowed_extension(file) -> bool:
+    allowed_extensions = {'.csv'}
+    _, ext = os.path.splitext(file.name)
+    return ext.lower() in allowed_extensions
 
 def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir: Path) -> Path | None:
     """Return the path to the population raster for the given country and year.
@@ -201,7 +210,7 @@ def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir
             output_dir=raster_dir,
             overwrite=False,
         )
-        current_run.log_info(f"Raster downloaded: {wpop_output_raster_path}.")
+        current_run.log_info(f"WorldPop raster downloaded: {wpop_output_raster_path}.")
         return wpop_output_raster_path
     except Exception as e:
         current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")

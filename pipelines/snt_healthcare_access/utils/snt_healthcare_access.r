@@ -127,6 +127,83 @@ prepare_spatial_admin_objects <- function(spatial_units_data, country_epsg_degre
 }
 
 
+#' make circles of a given radius around each point (longitude/latitude) in the sf vector input data
+#'
+#' @param input_vect: sf vector of spatial points (in any CRS)
+#' @param coordinate_colnames: names of the longitude and latitude columns
+#' @param epsg_value_degrees: EPSG code for the geographic (degree-based) CRS (eg, for Burkina 4326)
+#' @param epsg_value_meters: EPSG code for the projected (meter-based) CRS (eg, for Burkina 3857)
+#' @param radius_meters: radius (in meters) of the  coverage area to create around each point, defaults to 5000 (5 km or approx. 60' walk)
+#'
+#' @return: sf vector of the circle coverages in the degree CRS
+#'
+#' @details 
+#' 1. check that input is in the correct degree CRS (reproject if needed)
+#' 2. project it to a meter CRS for distance calculations
+#' 3. create circular buffers (coverage radii) around each point
+#' 4. reproject the buffer geometries back to the original degree CRS
+make_coverage_radii_sf <- function(
+  input_vect,
+  coordinate_colnames,
+  epsg_value_degrees,
+  epsg_value_meters,
+  radius_meters = 5000
+){
+
+  # check CRS and reproject to degree CRS if necessary
+  input_vect <- reproject_epsg(input_vect, epsg_value_degrees)
+  
+  # reproject to a meter CRS
+  vect_meters <- st_transform(input_vect, epsg_value_meters)
+  
+  # create the circles/buffers around each point
+  coverage_radii_meters <- st_buffer(vect_meters, dist = radius_meters)
+  
+  # reproject back to degree CRS for mapping
+  coverage_radii_degrees <- st_transform(coverage_radii_meters, epsg_value_degrees)
+  
+  return(coverage_radii_degrees)
+}
+
+
+#' make a new raster layer aligned with the original raster, where each cell is a specific value if it intersects any buffer in the vector data and another specific value if not
+#'
+#' @param buffer_vect: vector with the buffer geometries to rasterize
+#' @param raster_data: raster to use as the template for resolution and extent
+#' @param epsg_value_degrees: EPSG of the target CRS in degrees
+#' @param value_inside: value to assign to raster cells that intersect any buffer
+#' @param value_outside: value to assign to raster cells that do not intersect any buffer
+#'
+#' @return raster with cells assigned values based on intersection with the buffer vector
+make_rasterized_inclusion_data <- function(
+  buffer_vect, 
+  raster_data,
+  epsg_value_degrees,
+  value_inside = 1,
+  value_outside = 0
+){
+
+  # reproject raster to the correct CRS (degrees)
+  raster_data <- project(raster_data, glue("epsg:{epsg_value_degrees}"))
+  
+  # if buffer CRS differs, reproject buffer to raster CRS
+  buffer_vect <- reproject_epsg(buffer_vect, epsg_value_degrees)
+  
+  # convert sf to terra SpatVector for rasterization
+  buffer_vect_terra <- terra::vect(buffer_vect)
+  
+  # rasterize the buffer: cells inside = value_inside, outside = value_outside
+  inclusion_data <- terra::rasterize(
+    buffer_vect_terra,
+    raster_data,
+    field = value_inside,
+    background = value_outside
+  )
+  
+  return(inclusion_data)
+}
+
+
 #' Compute total and covered population by administrative unit.
 #'
 #' Aggregates raster-based total and covered populations over admin polygons,

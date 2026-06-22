@@ -1,5 +1,6 @@
 # Helpers for the access to healthcare pipeline report
 
+
 #' @description
 #' map overlaying a) healthcare unit locations, b) administrative boundaries, and c) buffer zones around healthcare units, projected to a common CRS
 #'
@@ -8,6 +9,9 @@
 #' @param buffer_vect: sf vector of buffer zones around healthcare units
 #' @param epsg_value_degrees: EPSG code (in degrees) for CRS
 #' @param plot_title: title of plot
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
 #'
 #' @return ggplot object showing the spatial overlay
 make_overlaid_sf_plot <- function(  
@@ -15,7 +19,10 @@ make_overlaid_sf_plot <- function(
   points_sf_vect,
   buffer_vect,
   epsg_value_degrees,
-  plot_title
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  legend_title = NULL
 ){
 
   # get all 3 data objects to the same projection
@@ -33,12 +40,41 @@ make_overlaid_sf_plot <- function(
     geom_sf(data = admin_unit_vect, fill = "gray95", color = "black") +
     geom_sf(data = buffer_vect, fill = "dodgerblue", alpha = 0.3) +
     geom_sf(data = points_sf_vect, color = "dodgerblue4", size = 0.7) +
-    theme_minimal() +
-    ggtitle(plot_title)
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
 
+    guides(fill=guide_legend(nrow = 3)) +
+    
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
 
   return(plot)
 }
+
 
 #' @description
 #' choropleth map of raster data with polygon borders

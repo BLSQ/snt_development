@@ -5,29 +5,22 @@ This pipeline estimates, for each **ADM2**, the share of the population living w
 ## Parameters
 
 * **`input_fosa_file`** (File, Optional):
-  * **Name:** FOSA location file (.csv)
-  * **Description:** Optional upload of facility coordinates. When omitted, the notebook uses DHIS2 pyramid coordinates from the configured formatted dataset.
+  * **Name:** Optional FOrmation SAnitaire (FOSA) location file (.csv)
+  * **Description:** Optional upload of health facility coordinate file (.csv). When omitted, the notebook uses DHIS2 pyramid coordinates from the configured formatted dataset.
   * **Choices/Default:** Default: **`None`**.
 
-* **`input_radius_meters`** (Integer, Optional):
-  * **Name:** Radius around FOSA (meters)
-  * **Description:** Buffer distance for access calculations (converted to kilometres in logs).
-  * **Choices/Default:** Default: **`5000`**.
-
-* **`input_pop_file`** (File, Optional):
-  * **Name:** Population raster file (.tif)
-  * **Description:** Optional population GeoTIFF. When omitted, **`pipeline.py`** searches **`data/worldpop/raw/`** for the newest **`{COUNTRY_CODE}_worldpop_ppp_{YEAR}.tif`** (excluding **`_UNadj`** variants).
+* **`wpop_year`** (Integer, Mandatory):
+  * **Name:** Reference year for WorldPop population data.
+  * **Description:** Year for the population raster data to download from WorldPop. Should be between 2015 and 2030.
   * **Choices/Default:** Default: **`None`**.
 
-* **`input_shapes_file`** (File, Optional):
-  * **Name:** Shapes file (.geojson)
-  * **Description:** Optional **ADM2** polygons. When omitted, the notebook loads **`{COUNTRY_CODE}_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`**.
-  * **Choices/Default:** Default: **`None`**.
 
 ## Functionality Overview
 
-1. Resolve population raster path (user upload versus latest WorldPop candidate) and validate custom shape extensions (must be **`.geojson`**).
-2. Load **`configuration/SNT_config.json`**, determine **`COUNTRY_CODE`**, and run **`pipelines/snt_healthcare_access/code/snt_healthcare_access.ipynb`** via Papermill with **`FOSA_FILE`**, **`RADIUS_METERS`**, **`POP_FILE`**, and **`SHAPES_FILE`**.
+1. Validation:
+  - If an **`input_fosa_file`** exists: validate custom extension (must be **`.csv`**).
+  - Validate the **`wpop_year`** to download WorldPop population raster data.
+2. Load **`configuration/SNT_config.json`**, determine **`COUNTRY_CODE`**, and run **`pipelines/snt_healthcare_access/code/snt_healthcare_access.ipynb`** via Papermill with **`FOSA_FILE`** and **`wpop_year`**.
 3. Inside the notebook: load **ADM2** polygons, facility coordinates, population raster, build buffers in the metric CRS used in the notebook (see notebook for EPSG), rasterize inclusion masks, and compute zonal sums of total versus covered population per **`ADM2_ID`**.
 4. Save parameter JSON and upload **`{COUNTRY_CODE}_population_covered_health`** parquet and CSV plus parameters to **`SNT_HEALTHCARE_ACCESS`** when the dataset identifier is present.
 5. Execute **`snt_healthcare_access_report.ipynb`**.
@@ -36,8 +29,8 @@ This pipeline estimates, for each **ADM2**, the share of the population living w
 
 * **`configuration/SNT_config.json`**: Country code and dataset identifiers for DHIS2 extracts.
 * **Facility coordinates**: Either **`input_fosa_file`** or **`{COUNTRY_CODE}_pyramid.parquet`** (and related tables as implemented in the notebook).
-* **Population raster**: **`input_pop_file`** or the latest **`{COUNTRY_CODE}_worldpop_ppp_*.tif`** under **`data/worldpop/raw/`**.
-* **ADM2 polygons**: **`input_shapes_file`** or **`{COUNTRY_CODE}_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`**.
+* **Population raster**: The corresponding population data, **`{country_code.lower()}_pop_{wpop_year}_CN_100m_*.tif`**, under **`data/worldpop/rasters/`**.
+* **ADM2 polygons**: **`{COUNTRY_CODE}_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`**.
 
 ## Outputs
 
@@ -48,7 +41,6 @@ This pipeline estimates, for each **ADM2**, the share of the population living w
 > **Notes for the Data Analyst:**
 >
 > - **`Spatial resolution`**: Analyses inherit the **native cell size** of the population GeoTIFF; **ADM2** summaries come from **zonal statistics** on that grid.
-> - **`input_radius_meters`**: Describes **Euclidean** buffers around facility points; results are not network travel times.
-> - **`input_shapes_file`**: Custom boundaries risk **`ADM2_ID`** mismatches versus DHIS2 pyramid extracts, producing missing coverage for affected districts.
-> - **`input_pop_file`**: When no raster is supplied and none exists locally, the computation step cannot run; place an extract in **`data/worldpop/raw/`** or upload a raster explicitly.
+> - **Radius**: The 5000m meters around health facilities describe **Euclidean** buffers around facility points; results are not network travel times.
+> - **`input_fosa_file`**: If an optional FOSA location file is supplied, it must be .csv and must have the mandatory **`LATITUDE`** and **`LONGITUDE`** columns; failing that, the pipeline defaults to using DHIS2 data from **`DHIS2_DATASET_FORMATTED`**
 > - **`CRS choice`**: Buffer operations use a fixed metric CRS inside the notebook; very large countries may need methodological review for edge districts.

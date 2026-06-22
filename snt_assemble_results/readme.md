@@ -18,15 +18,9 @@ The **SNT Assemble Results** pipeline builds a single **ADM2**-level results tab
   * **Name:** Reporting rate aggregation across years
   * **Description:** **`mean`** or **`median`** of **`REPORTING_RATE`** over all periods per **`ADM2_ID`** before scaling to a **0–100** percentage in the results table.
   * **Default:** `mean`.
-* **`map_selection`** (String, Multi, Required):
-  * **Name:** MAP indicators selection
-  * **Description:** Subset of MAP metrics to merge from **`[COUNTRY_CODE]_map_data.parquet`**. For each selected metric, the pipeline keeps **`STATISTIC == "MEAN"`**, takes the **latest `YEAR`**, maps to results columns (**`PF_PR_RATE`**, **`PF_MORTALITY_RATE`**, etc.), and applies indicator-specific unit scaling.
-* **`adm1_layers_file`** (File, Optional):
-  * **Name:** Additional ADM 1 layers (.csv)
-  * **Description:** Optional user CSV joined on **`ADM1_ID`** to append extra columns.
-* **`adm2_layers_file`** (File, Optional):
-  * **Name:** Additional ADM 2 layers (.csv)
-  * **Description:** Optional user CSV joined on **`ADM2_ID`** to append extra columns.
+* **`add_layers_file`** (File, Optional):
+  * **Name:** Additional layers (.csv)
+  * **Description:** Optional user CSV joined on **`ADM2_ID`** to append extra columns. Only columns already declared in **`SNT_metadata.json`** are updated; any unrecognised column is ignored and logged as a warning.
 
 ---
 
@@ -34,14 +28,14 @@ The **SNT Assemble Results** pipeline builds a single **ADM2**-level results tab
 
 1. **Base table:** **`build_results_table`** copies **`SNT_metadata.json`** into the pipeline **`data/`** folder, reads variable keys as empty columns, and fills **ADM1/ADM2** identifiers and names from **`[COUNTRY_CODE]_pyramid.parquet`** (**`get_file_from_dataset`** on **`DHIS2_DATASET_FORMATTED`**).
 2. **DHIS2 block (`add_dhis2_indicators_to`):**
-   * **`add_population_to`**: Prefers **`[COUNTRY_CODE]_population.parquet`** from **`DHIS2_POPULATION_TRANSFORMATION`**, else falls back to formatted population; picks a **reference year** from config or heuristics; merges **`POPULATION`** (and any extra matching columns).
+   * **`add_population_to`**: Prefers **`[COUNTRY_CODE]_population.parquet`** from **`DHIS2_POPULATION_TRANSFORMATION`** (reference year read from **`[COUNTRY_CODE]_parameters.json`** key **`TOT_POP_REFERENCE_YEAR`**), else falls back to formatted population (uses **`YEAR.max()`**); merges **`POPULATION`** and any additional allowed population columns (**`POP_UNDER_5`**, **`POP_PREGNANT_WOMEN`**, etc.) present in both metadata and source.
    * **`add_reporting_rate_to`**: Resolves the latest **`[COUNTRY_CODE]_reporting_rate_*.parquet`** from **`DHIS2_REPORTING_RATE`**, aggregates with **`reporting_rate_metric`**, stores **`REPORTING_RATE`** as percent with one decimal.
    * **`add_incidence_indicators_to`**: Loads **`[COUNTRY_CODE]_incidence.parquet`** from **`DHIS2_INCIDENCE`**, filters years with **`incidence_years_to_include`**, aggregates **`INCIDENCE_*`** columns with **`incidence_metric`**, rounds merged values.
-3. **MAP (`add_map_indicators_to`):** Loads **`[COUNTRY_CODE]_map_data.parquet`** from **`SNT_MAP_EXTRACTS`**, filters **`map_selection`**, latest year, mean statistic; applies scaling factors (e.g. parasite rate ×100, mortality ×100000).
+3. **MAP (`add_map_indicators_to`):** Loads all **`[COUNTRY_CODE]_map_data_*.parquet`** files from **`SNT_MAP_EXTRACTS`** and concatenates them; filters on a hardcoded set of MAP metrics, latest year, **`STATISTIC == "MEAN"`**; applies scaling factors (e.g. parasite rate ×100, mortality ×100 000).
 4. **Seasonality (`add_seasonality_indicators_to`):** Merges **`[COUNTRY_CODE]_rainfall_seasonality.parquet`** (**`SNT_SEASONALITY_RAINFALL`**) and **`[COUNTRY_CODE]_cases_seasonality.parquet`** (**`SNT_SEASONALITY_CASES`**) when metadata columns exist.
 5. **DHS (`add_dhs_indicators_to`):** Loads ADM1 parquet extracts from **`DHS_INDICATORS`** (care-seeking, dropout, vaccination proportions, mortality, prevalence, ITN metrics) via **`get_file_from_dataset`** / **`update_table_with`** where columns are declared in metadata.
 6. **Healthcare access (`add_access_to_health_to`):** Merges **`[COUNTRY_CODE]_population_covered_health.parquet`** from **`SNT_HEALTHCARE_ACCESS`** for **`PCT_HEALTH_ACCESS`** when present in metadata.
-7. **User layers (`add_user_uploaded_indicators_to`):** Left-joins optional **`adm1_layers_file`** and **`adm2_layers_file`**.
+7. **User layers (`add_user_uploaded_indicators_to`):** Left-joins optional **`add_layers_file`** on **`ADM2_ID`**; only columns already present in the metadata schema are updated, unrecognised columns are ignored and logged.
 8. **Metadata table:** **`build_metadata_table`** emits companion **`[COUNTRY_CODE]_metadata.csv`** / **`.parquet`** describing variables and periods updated during the run.
 9. **Publication:** **`add_files_to_dataset`** uploads results dataset (CSV/Parquet), metadata tables, and saved pipeline parameters to **`SNT_RESULTS`**.
 

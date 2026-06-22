@@ -74,13 +74,14 @@ def snt_healthcare_access(
     data_intermediate_path.mkdir(parents=True, exist_ok=True)
 
     # validate input parameter values
-    if input_fosa_file is not None:
-        current_run.log_info(f"FOSA coordinates file: {input_fosa_file.path}")
-    else:
-        current_run.log_info(f"Using default FOSA data (DHIS2).")
-
-    if not has_allowed_extension(input_fosa_file):
-        current_run.log_warning(f"FOSA location file should be a .csv file. Using default FOSA data instead.")
+    if input_fosa_file is None:  
+        current_run.log_info("Using default FOSA data (DHIS2).")  
+    elif not Path(input_fosa_file.path).exists():  
+        current_run.log_warning("Input FOSA file not found. Check the path and rerun pipeline.")  
+    elif not has_allowed_extension(input_fosa_file):  
+        current_run.log_warning("FOSA location file should be a .csv file. Using default FOSA data instead.")
+    else:  
+        current_run.log_info(f"Using FOSA coordinates file: {input_fosa_file.path}")
 
     if not (2015 <= wpop_year <= 2030):
         msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015–2030."

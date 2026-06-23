@@ -6,14 +6,18 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 
 ## Parameters
 
-* **`pop_raster_selection`** (File, Optional):
-  * **Name:** Population raster selection (.tif)
-  * **Description:** Population **`.tif`** used for population-weighted metrics and total-population denominators; must exist on disk when provided.
-  * **Default:** `None` (unweighted branch only).
-* **`target_year`** (String, Required):
-  * **Name:** Target Year
-  * **Description:** Target calendar year passed to MAP downloads (e.g. **`2022`**); the MAP client may fall back when a layer is unavailable.
-  * **Choices/Default:** Required string (no default in **`pipeline.py`**).
+- `**pop_raster_selection**` (File, Optional):
+  - **Name:** Population raster selection (.tif)
+  - **Description:** Population `**.tif**` used for population-weighted metrics and total-population denominators; must exist on disk when provided.
+  - **Default:** `None` (unweighted branch only).
+- `**year_start**` (Integer, Required):
+  - **Name:** Start Year
+  - **Description:** Start calendar year passed to MAP downloads (e.g. `**2020**`); the MAP client may fall back when a layer is unavailable.
+  - **Choices/Default:** Required integer (no default in `**pipeline.py**`).
+- `**year_end**` (Integer, Required):
+  - **Name:** End Year
+  - **Description:** End calendar year passed to MAP downloads (e.g. `**2022**`); the MAP client may fall back when a layer is unavailable.
+  - **Choices/Default:** Required integer (no default in `**pipeline.py**`).
 
 ---
 
@@ -31,7 +35,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 
 ## Inputs
 
-* **`SNT_config.json`**: **`COUNTRY_CODE`**, **`DHIS2_DATASET_FORMATTED`**, **`SNT_MAP_EXTRACTS`**.
+* **`SNT_config.json`**: **`COUNTRY_CODE`**, **`DHIS2_DATASET_FORMATTED`**
 * **Optional population raster** file path from **`pop_raster_selection`**.
 
 ---

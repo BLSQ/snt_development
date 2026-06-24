@@ -1,18 +1,17 @@
 import json
 from pathlib import Path
 from typing import Any
-import re
 
 import pandas as pd
-from openhexa.sdk import current_run, parameter, pipeline, workspace, File
+from openhexa.sdk import File, current_run, parameter, pipeline, workspace
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     copy_file,
     get_file_from_dataset,
-    load_configuration_snt,
-    validate_config,
     get_matching_filename_from_dataset_last_version,
+    load_configuration_snt,
     save_pipeline_parameters,
+    validate_config,
 )
 
 
@@ -85,7 +84,7 @@ def snt_assemble_results(
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     except Exception as e:
         current_run.log_error(f"Validation error: {e}")
-        raise Exception from e
+        raise
 
     try:
         # Get metadata file
@@ -96,7 +95,7 @@ def snt_assemble_results(
         )
     except Exception as e:
         current_run.log_error(f"{e}")
-        raise Exception from e
+        raise
 
     # defaults
     map_selection = [
@@ -128,7 +127,6 @@ def snt_assemble_results(
                 "incidence_metric": incidence_metric,
                 "incidence_years_to_include": incidence_years_to_include,
                 "reporting_rate_metric": reporting_rate_metric,
-                "map_selection": map_selection,
                 "add_layers_file": add_layers_file.path if add_layers_file else None,
             },
             output_path=results_path,
@@ -276,6 +274,28 @@ def add_population_to(table: pd.DataFrame, snt_config: dict) -> pd.DataFrame:
     return _handle_additional_pop_columns(table, pop_data, year_selection)
 
 
+def _resolve_year_from_parameters(parameters: dict[str, Any], data: pd.DataFrame) -> int:
+    """Resolve the reference year from the parameters or default to the latest available year.
+
+    Returns
+    -------
+    int
+        The resolved reference year.
+    """
+    year = parameters.get("TOT_POP_REFERENCE_YEAR")
+    if not isinstance(year, (int, float)):
+        current_run.log_warning(
+            f"TOT_POP_REFERENCE_YEAR missing or invalid ({year!r}), defaulting to latest available year."
+        )
+        year = int(data["YEAR"].max())
+
+    current_run.log_info(
+        "Population data loaded from transformed dataset "
+        f"(DHIS2_POPULATION_TRANSFORMATION). Ref year: {year}."
+    )
+    return int(year)
+
+
 def _load_population_data(
     country_code: str,
     dataset_transform_id: str,
@@ -290,10 +310,7 @@ def _load_population_data(
             dataset_id=dataset_transform_id,
             filename=f"{country_code}_parameters.json",
         )
-        year = parameters.get("TOT_POP_REFERENCE_YEAR")
-        current_run.log_info(
-            "Population data loaded from transformed dataset (DHIS2_POPULATION_TRANSFORMATION)."
-        )
+        year = _resolve_year_from_parameters(parameters, data)
         return data, year
     except Exception as e:
         current_run.log_warning(
@@ -493,7 +510,7 @@ def add_reporting_rate_to(table: pd.DataFrame, snt_config: dict, reporting_rate_
     try:
         dhis2_reporting = get_file_from_dataset(
             dataset_id=dataset_id,
-            filename=reporting_filename,
+            filename=reporting_filename[0],
         )
     except Exception as e:
         current_run.log_warning("Error while loading reporting rate data, data not added.")
@@ -564,8 +581,8 @@ def add_incidence_indicators_to(
         return table
 
     try:
-        dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name)
-        current_run.log_debug(f"Incidence file selection: {f_name}")
+        dhis2_incidence = get_file_from_dataset(dataset_id=dataset_id, filename=f_name[0])
+        current_run.log_debug(f"Incidence file selection: {f_name[0]}")
     except Exception as e:
         current_run.log_warning("Error while loading incidence data, data not added.")
         current_run.log_debug(f"Error while loading incidence data: {e}")
@@ -707,16 +724,28 @@ def add_map_indicators_to(table: pd.DataFrame, snt_config: dict, map_selection: 
             current_run.log_warning(f"No metric {metric} data found in MAP dataset, skipping.")
             continue
 
+        if "YEAR" not in indicator_data.columns:
+            current_run.log_warning(f"No YEAR column found in MAP dataset for metric {metric}, skipping.")
+            continue
+
+        if "VALUE" not in indicator_data.columns:
+            current_run.log_warning(f"No VALUE column found in MAP dataset for metric {metric}, skipping.")
+            continue
+
         # Select latest period available for metric
         latest_period = indicator_data["YEAR"].max()
         indicator_data = indicator_data[indicator_data["YEAR"] == latest_period].copy()
         current_run.log_info(f"{metric.upper()} latest period : {latest_period}")
 
-        indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
-        indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
-        merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
-        table.update(merged[[col_mappings[metric]]])
-        columns_mapped.append(col_mappings[metric])
+        try:
+            indicator_df = indicator_data[["ADM2_ID", "VALUE"]].copy()
+            indicator_df = indicator_df.rename(columns={"VALUE": col_mappings[metric]})
+            merged = table.merge(indicator_df, how="left", on="ADM2_ID", suffixes=("_old", ""))
+            table.update(merged[[col_mappings[metric]]])
+            columns_mapped.append(col_mappings[metric])
+        except Exception as e:
+            current_run.log_warning(f"Error while merging MAP data for metric {metric}: {e}")
+            continue
 
         try:
             update_metadata(variable=col_mappings[metric], attribute="PERIOD", value=str(latest_period))
@@ -1608,35 +1637,6 @@ def build_metadata_table(output_path: Path, country_code: str, filename: str = "
     # Save
     metadata_table.to_parquet(output_path / f"{country_code}_metadata.parquet", index=False)
     metadata_table.to_csv(output_path / f"{country_code}_metadata.csv", index=False)
-
-
-def get_reporting_method_from_incidence_filename(snt_config: dict) -> str:
-    """Get the reporting method from the incidence filename in the incidence dataset.
-
-    Parameters
-    ----------
-    snt_config : dict
-        The SNT configuration dictionary.
-
-    Returns
-    -------
-    str
-        The reporting method extracted from the incidence filename.
-    """
-    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
-    try:
-        filename = get_matching_filename_from_dataset_last_version(
-            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_INCIDENCE"),
-            filename_pattern=f"{country_code}_incidence_year_routine-*_rr-method-*.parquet",
-        )
-    except Exception:
-        return None
-
-    match = re.search(r"rr-method-([^.]+)\.parquet", filename)
-    if match:
-        current_run.log_debug(f"Reporting method found in incidence filename: {match.group(1)}")
-        return match.group(1)
-    return None
 
 
 if __name__ == "__main__":

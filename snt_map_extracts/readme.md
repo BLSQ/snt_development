@@ -1,8 +1,7 @@
 # SNT Map Extracts Pipeline
 
-The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters for a fixed set of malaria and intervention indicators, computes **ADM2** zonal statistics (mean and optional population-weighted summaries), and publishes long-format tables for downstream assembly.
+The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters for a fixed set of malaria and intervention indicators, computes **ADM2** zonal statistics (mean and optional population-weighted summaries of malaria-related health indicators and intervention metrics), and publishes long-format aggregated result tables for downstream assembly.
 
----
 
 ## Parameters
 
@@ -19,7 +18,6 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
   - **Description:** End calendar year passed to MAP downloads (e.g. `**2022**`); the MAP client may fall back when a layer is unavailable.
   - **Choices/Default:** Required integer (no default in `**pipeline.py**`).
 
----
 
 ## Functionality Overview
 
@@ -31,14 +29,12 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 6. **Logging:** Writes timestamped log files under `pipelines/snt_map_extracts/logs/`.
 7. **Reporting:** Runs `snt_map_extracts_report.ipynb`.
 
----
 
 ## Inputs
 
 * **`SNT_config.json`**: **`COUNTRY_CODE`**, **`DHIS2_DATASET_FORMATTED`**
 * **Optional population raster** file path from **`pop_raster_selection`**.
 
----
 
 ## Outputs
 
@@ -48,4 +44,14 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 * **Published files** on **`SNT_MAP_EXTRACTS`** (parquet, csv, parameters)
 * **Report outputs** under `pipelines/snt_map_extracts/reporting/outputs/`
 
----
+> **Notes for the Data Analyst:**
+> - Logic
+>    - Validates input periods and loads SNT configuration
+>    - Loads geographic boundary data (shapes) from the dataset, validates geometries
+>    - Defines indicators to extract: Malaria metrics (parasite rate, mortality, incidence) and Interventions (net access, IRS coverage, antimalarial treatment)
+>    - For each year in the range:
+>       - Downloads/retrieves WorldPop population rasters using ISO country codes
+>       - Builds map statistics by intersecting health indicators with geographic shapes
+>    - Aggregates data using population weighting
+>    - Uploads results to a DHIS2 dataset
+>    - Runs a reporting notebook to visualize results

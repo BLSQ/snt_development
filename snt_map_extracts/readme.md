@@ -27,7 +27,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 4. **Output layout:** Writes long-format **`[COUNTRY_CODE]_map_data.parquet`** / **`.csv`** under `data/map/formatted/{country}/` with uppercase columns including **`METRIC_CATEGORY`**, **`METRIC_NAME`**, **`STATISTIC`**, **`VALUE`**, **`YEAR`**, **`VERSION`**.
 5. **Dataset upload:** Publishes parquet, CSV, and parameters JSON to **`SNT_MAP_EXTRACTS`**.
 6. **Logging:** Writes timestamped log files under `pipelines/snt_map_extracts/logs/`.
-7. **Reporting:** Runs `snt_map_extracts_report.ipynb`.
+7. **Reporting:** Runs `snt_map_extracts_report.ipynb` to create visualizations of each indicator, for the most recent year available (`**year_end**`).
 
 
 ## Inputs

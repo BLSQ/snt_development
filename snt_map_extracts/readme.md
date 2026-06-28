@@ -5,18 +5,18 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 
 ## Parameters
 
-- `**pop_raster_selection**` (File, Optional):
+- **`pop_raster_selection`** (File, Optional):
   - **Name:** Population raster selection (.tif)
-  - **Description:** Population `**.tif**` used for population-weighted metrics and total-population denominators; must exist on disk when provided.
+  - **Description:** Population **`.tif`** file used for population-weighted metrics and total-population denominators; must exist on disk when provided.
   - **Default:** `None` (unweighted branch only).
-- `**year_start**` (Integer, Required):
+- **`year_start`** (Integer, Required):
   - **Name:** Start Year
-  - **Description:** Start calendar year passed to MAP downloads (e.g. `**2020**`); the MAP client may fall back when a layer is unavailable.
-  - **Choices/Default:** Required integer (no default in `**pipeline.py**`).
-- `**year_end**` (Integer, Required):
+  - **Description:** Start calendar year passed to MAP downloads (e.g. **`2020`**); the MAP client may fall back when a layer is unavailable.
+  - **Choices/Default:** Required integer (no default in **`pipeline.py`**).
+- **`year_end`** (Integer, Required):
   - **Name:** End Year
-  - **Description:** End calendar year passed to MAP downloads (e.g. `**2022**`); the MAP client may fall back when a layer is unavailable.
-  - **Choices/Default:** Required integer (no default in `**pipeline.py**`).
+  - **Description:** End calendar year passed to MAP downloads (e.g. **`2022`**); the MAP client may fall back when a layer is unavailable.
+  - **Choices/Default:** Required integer (no default in **`pipeline.py`**).
 
 
 ## Functionality Overview
@@ -27,7 +27,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 4. **Output layout:** Writes long-format **`[COUNTRY_CODE]_map_data.parquet`** / **`.csv`** under `data/map/formatted/{country}/` with uppercase columns including **`METRIC_CATEGORY`**, **`METRIC_NAME`**, **`STATISTIC`**, **`VALUE`**, **`YEAR`**, **`VERSION`**.
 5. **Dataset upload:** Publishes parquet, CSV, and parameters JSON to **`SNT_MAP_EXTRACTS`**.
 6. **Logging:** Writes timestamped log files under `pipelines/snt_map_extracts/logs/`.
-7. **Reporting:** Runs `snt_map_extracts_report.ipynb` to create visualizations of each indicator, for the most recent year available (`**year_end**`).
+7. **Reporting:** Runs `snt_map_extracts_report.ipynb` to create visualizations of each indicator, for the most recent year available (**`year_end`**).
 
 
 ## Inputs

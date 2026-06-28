@@ -103,21 +103,51 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 #'
 #' @param map_data_joined Spatial table containing `METRIC_NAME` and `VALUE`.
 #' @param metrics Character vector of metric names to plot.
+#' @param year reference year of the data/indicator
+#' @param na_color color for missing values
+#' @param plot_caption map caption (defaults to NULL)
+#' 
 #' @return List of `ggplot` objects, one per metric.
-build_metric_plots <- function(map_data_joined, metrics, year) {
+build_metric_plots <- function(
+    map_data_joined,
+    metrics,
+    year,
+    na_color = "#D3D3D3",
+    plot_caption = NULL
+) {
     purrr::map(metrics, function(metric) {
         ggplot2::ggplot(map_data_joined %>% dplyr::filter(METRIC_NAME == metric)) +
             ggplot2::geom_sf(ggplot2::aes(fill = VALUE), color = "white") +
-            ggplot2::scale_fill_viridis_c(option = "C", na.value = "lightgrey") +
+            ggplot2::scale_fill_viridis_c(option = "C", na.value = na_color) +
+            
+            # titles
             ggplot2::labs(
-                title = paste0(metric , " - ", year),
-                fill = "Valeur"
+            title = metric,
+            subtitle = year,
+            caption = plot_caption,
+            fill = "Valeur"
             ) +
-            ggplot2::theme_minimal(base_size = 16) +
+        
+            # map theme
+            ggplot2::theme_void() +
             ggplot2::theme(
-                plot.title = ggplot2::element_text(size = 20, face = "bold"),
-                legend.title = ggplot2::element_text(size = 16),
-                legend.text = ggplot2::element_text(size = 14)
+                plot.title = ggplot2::element_text(
+                    face = "bold", size = 10,
+                    margin = ggplot2::margin(b = 4)
+                ),
+                plot.subtitle = ggplot2::element_text(
+                    size = 8, colour = "grey40",
+                    margin = ggplot2::margin(b = 8)
+                ),
+                plot.caption = ggplot2::element_text(
+                    size = 8,
+                    colour = "grey55",
+                    hjust = 1,
+                    margin = ggplot2::margin(t = 8)
+                ),
+                legend.position = "right",
+                legend.text = ggplot2::element_text(size = 8),
+                plot.margin = ggplot2::margin(10, 10, 10, 10)
             )
     })
 }

@@ -684,13 +684,16 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
 #' @param point_estimation_colname column with the point estimates for the main bars
 #' @param ci_lower_colname column with the lower bound values for the confidence intervals
 #' @param ci_upper_colname column with the upper bound values for the confidence intervals
-#' @param title_name plot title (defaults to NULL)
+#' @param plot_title plot title (defaults to NULL)
+#' @param plot_subtitle plot subtitle (defaults to NULL)
+#' @param plot_caption plot caption (defaults to NULL)
 #' @param x_title x-axis label (defaults to NULL)
 #' @param y_title y-axis label (defaults to NULL)
+#' 
 #'
 #' @return ggplot2 bar chart with confidence interval error bars (also printed)
 #'
-make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, title_name = NULL, x_title = NULL, y_title = NULL){
+make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL){
   
   ci_plot <- ggplot(data = df_to_plot)
   ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
@@ -717,9 +720,38 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
   # ),
   # size= 2, vjust = 1
   # )
-  ci_plot <- ci_plot + labs(title = title_name)
-  ci_plot <- ci_plot + labs(x= x_title, y = y_title)
-  ci_plot <- ci_plot + theme_minimal()
+
+  # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption,
+      x = x_title,
+      y = y_title
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
   ci_plot <- ci_plot + coord_flip()
   
   return(ci_plot)

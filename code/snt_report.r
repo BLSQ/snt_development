@@ -674,3 +674,53 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
   print(output_plot)
   return(output_plot)
  }
+
+
+####################################
+#' Make confidence interval plots for DHS data (horizontal bar chart with error bars)
+#'
+#' @param df_to_plot data.frame with columns for the administrative unit, point estimate and confidence intervals
+#' @param admin_colname column for the administrative unit identifiers (used as x-axis)
+#' @param point_estimation_colname column with the point estimates for the main bars
+#' @param ci_lower_colname column with the lower bound values for the confidence intervals
+#' @param ci_upper_colname column with the upper bound values for the confidence intervals
+#' @param title_name plot title (defaults to NULL)
+#' @param x_title x-axis label (defaults to NULL)
+#' @param y_title y-axis label (defaults to NULL)
+#'
+#' @return ggplot2 bar chart with confidence interval error bars (also printed)
+#'
+make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, title_name = NULL, x_title = NULL, y_title = NULL){
+  
+  ci_plot <- ggplot(data = df_to_plot)
+  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
+  ci_plot <- ci_plot + geom_errorbar(aes(
+    x=get(admin_colname),
+    ymin=get(ci_lower_colname),
+    ymax=get(ci_upper_colname)),
+    width = 0.4, color ="#091bb8", linewidth = 1.5
+  )
+  # # Uncomment below to add value labels
+  # # text for the lower bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_lower_colname),
+  #   label = round(get(ci_lower_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  # # text for the upper bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_upper_colname),
+  #   label = round(get(ci_upper_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  ci_plot <- ci_plot + labs(title = title_name)
+  ci_plot <- ci_plot + labs(x= x_title, y = y_title)
+  ci_plot <- ci_plot + theme_minimal()
+  ci_plot <- ci_plot + coord_flip()
+  
+  return(ci_plot)
+}

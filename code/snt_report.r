@@ -684,6 +684,8 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
 #' @param point_estimation_colname column with the point estimates for the main bars
 #' @param ci_lower_colname column with the lower bound values for the confidence intervals
 #' @param ci_upper_colname column with the upper bound values for the confidence intervals
+#' @param bar_color color for the bars (defaults to muted teal-blue)
+#' @param errorbar_color color for the error bars (defaults to periwinkle blue)
 #' @param plot_title plot title (defaults to NULL)
 #' @param plot_subtitle plot subtitle (defaults to NULL)
 #' @param plot_caption plot caption (defaults to NULL)
@@ -693,19 +695,24 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
 #'
 #' @return ggplot2 bar chart with confidence interval error bars (also printed)
 #'
-make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL){
+make_ci_plot <- function(
+  df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname,
+  bar_color = "#5B8CBE", errorbar_color = "#2D5F8A", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL
+){
   
+  # main plot
   ci_plot <- ggplot(data = df_to_plot)
-  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = "#a8aabc", stat="identity")
-  ci_plot <- ci_plot + geom_errorbar(aes(
-    x=get(admin_colname),
-    ymin=get(ci_lower_colname),
-    ymax=get(ci_upper_colname)),
-    width = 0.4, color ="#091bb8", linewidth = 1.5
+  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = bar_color, alpha = 0.7, width = 0.6, stat="identity")
+
+  # add the error bars
+  ci_plot <- ci_plot + geom_errorbar(
+    aes(x=get(admin_colname), ymin = get(ci_lower_colname), ymax = get(ci_upper_colname)),
+    width = 0.25,
+    color = errorbar_color,
+    linewidth = 1
   )
-  # # Uncomment below to add value labels
-  # # text for the lower bound
-  # ci_plot <- ci_plot + geom_text(aes(
+  ## Uncomment below to add value label text for the lower bound
+  # + ci_plot <- ci_plot + geom_text(aes(
   #   x=get(admin_colname),
   #   y=get(ci_lower_colname),
   #   label = round(get(ci_lower_colname),1)
@@ -721,8 +728,13 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
   # size= 2, vjust = 1
   # )
 
+  # spacing
+  ci_plot <- ci_plot +
+    scale_x_discrete(expand = expansion(mult = c(0.05, 0.05))) +
+    scale_y_continuous(expand = expansion(mult = c(0.02, 0.05))) +
+  
   # titles
-  ci_plot <- ci_plot + labs(
+  labs(
       title = plot_title,
       subtitle = plot_subtitle,
       caption = plot_caption,

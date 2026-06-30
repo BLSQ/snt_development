@@ -722,7 +722,7 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
   # )
 
   # titles
-    ggplot2::labs(
+  ci_plot <- ci_plot + labs(
       title = plot_title,
       subtitle = plot_subtitle,
       caption = plot_caption,
@@ -731,25 +731,27 @@ make_ci_plot <- function(df_to_plot, admin_colname, point_estimation_colname, ci
     ) +
  
     # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
-            face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
-        ),
-        plot.subtitle = ggplot2::element_text(
-            size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
-        ),
-        plot.caption = ggplot2::element_text(
-            size = 8,
-            colour = "grey55",
-            hjust = 1,
-            margin = ggplot2::margin(t = 8)
-        ),
-        legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    theme_void() +
+    theme(
+      axis.title.x = element_text(size = 8, margin = margin(t = 10)),
+      axis.title.y = element_text(size = 8, angle = 90, margin = margin(r = 10)),
+      plot.title = ggplot2::element_text(
+          face = "bold", size = 10,
+          margin = ggplot2::margin(b = 4)
+      ),
+      plot.subtitle = ggplot2::element_text(
+          size = 8, colour = "grey40",
+          margin = ggplot2::margin(b = 8)
+      ),
+      plot.caption = ggplot2::element_text(
+          size = 8,
+          colour = "grey55",
+          hjust = 1,
+          margin = ggplot2::margin(t = 8)
+      ),
+      legend.position = "right",
+      legend.text = ggplot2::element_text(size = 8),
+      plot.margin = ggplot2::margin(10, 10, 10, 10)
     )
 
   ci_plot <- ci_plot + coord_flip()

@@ -313,8 +313,10 @@ export_careseeking_reporting_ci_plots <- function(
             point_estimation_colname = sample_avg_col,
             ci_lower_colname = lower_bound_col,
             ci_upper_colname = upper_bound_col,
-            title_name = glue::glue("{country_code} {data_source} {indicator_label} CI"),
-            x_title = admin_name_col,
+            plot_title = glue::glue("{indicator_label} (Intervalles de confiance)"),
+            plot_subtitle = country_code,
+            plot_caption = glue::glue("Données : {data_source}")
+            x_title = "ADM1",
             y_title = glue::glue("{indicator_label} (%)")
         )
         ggplot2::ggsave(

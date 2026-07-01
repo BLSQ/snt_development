@@ -123,6 +123,173 @@ cut_to_categories <- function(input_dt, input_colname, output_colname, input_bre
 }
 
 
+#' @description
+#' choropleth map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the numeric column to map
+#' @param low_color color for the low end of the gradient (defaults to "#f7fbff").
+#' @param high_color color for the high end of the gradient (defaults to "#08306b").
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_choropleth_map <- function(
+    input_data,
+    target_colname,
+    low_color = "#f7fbff",
+    high_color = "#08306b",
+    na_color = "#D3D3D3",
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL
+) {
+  # validate inputs
+  if (!inherits(input_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(input_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(input_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+ 
+  # plot
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    
+    scale_fill_gradient(
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
+  return(output_plot)
+}
+
+
+#' @description
+#' categorical map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the factor column to map
+#' @param color_vector vector of colors to use
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_categorical_map <- function(
+  input_data,
+  target_colname,
+  color_vector,
+  na_color = "#D3D3D3",
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  legend_title = NULL
+) {
+ 
+  # validation
+ 
+  if (!is.data.frame(input_data)) {
+    stop("Data to plot must be a sf data frame.")
+  }
+ 
+  if (!target_colname %in% names(input_data)) {
+    stop("Target column should be part of the data to plot.")
+  }
+  
+  if(!is.factor(input_data[[target_colname]])){
+	stop("Target column should be an ordered factor.")
+  }
+ 
+  if (!is.character(color_vector)) {
+    stop("The vector of colors is not valid.")
+  }
+ 
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(aes(fill = .data[[target_colname]]), color = "white", linewidth = 0.2) +
+    scale_fill_manual(
+      values  = color_vector,
+      na.value = na_color,
+      name    = legend_title,
+      drop    = FALSE # show all levels
+    ) +
+    
+    # titles
+    ggplot2::labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+  
+  return(output_plot)
+}
+
 
 #%% SEASONALITY PLOTS -------------------------------------------------------------------
 
@@ -644,10 +811,12 @@ make_season_proportion_plot <- function(
 #' @param spatial_df sf object containing geometries and the variable map
 #' @param target_colname name of the column to use for the fill aesthetic
 #' @param map_colors vector of colors to scale_fill_manual with names that match the levels of the target variable
-#' @param plot_title plot title
-#' @param legend_title legend title
+#' @param plot_title plot title (defaults to NULL)
+#' @param plot_subtitle plot subtitle (defaults to NULL)
+#' @param plot_caption plot caption (defaults to NULL)
+#' @param legend_caption legend caption (defaults to NULL)
 #' @return map
-make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title, legend_title){
+make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL){
   output_plot <- ggplot(spatial_df) +
     geom_sf(aes(fill = get(target_colname)))+
     coord_sf() +
@@ -655,23 +824,28 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title,
       legend_title,
       values=map_colors
     ) +
-    guides(fill=guide_legend(nrow = 2)) +
-    theme_void() +
-    theme(
-      plot.title = element_text(
-        family = "Helvetica",
-        # face = "bold",
-        hjust = 0.5
-      ),
-      legend.position = "bottom", legend.key.width = unit(2,"cm"),
-      legend.text=element_text(
-        family = "Helvetica",
-        size=10
-      )
-    ) +
-    labs(title=plot_title)
+    # map theme
+    ggplot2::theme_void() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(
+            face = "bold", size = 10,
+            margin = ggplot2::margin(b = 4)
+        ),
+        plot.subtitle = ggplot2::element_text(
+            size = 8, colour = "grey40",
+            margin = ggplot2::margin(b = 8)
+        ),
+        plot.caption = ggplot2::element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = ggplot2::margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = ggplot2::element_text(size = 8),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
 
-  print(output_plot)
   return(output_plot)
  }
 

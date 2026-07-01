@@ -804,26 +804,37 @@ make_season_proportion_plot <- function(
   return(season_proportion_plot)
 }
 
-
-#' @description
-#' make a choropleth map from an sf object
+#' make percentage map (choropleth)
 #'
-#' @param spatial_df sf object containing geometries and the variable map
-#' @param target_colname name of the column to use for the fill aesthetic
-#' @param map_colors vector of colors to scale_fill_manual with names that match the levels of the target variable
-#' @param plot_title plot title (defaults to NULL)
-#' @param plot_subtitle plot subtitle (defaults to NULL)
-#' @param plot_caption plot caption (defaults to NULL)
-#' @param legend_caption legend caption (defaults to NULL)
-#' @return map
-make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL){
-  output_plot <- ggplot(spatial_df) +
-    geom_sf(aes(fill = get(target_colname)))+
+#' @param plot_dt spatial df with attribute data
+#' @param plot_colname string with the name of the column that contains the coverage values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param low_color color for the low end of the gradient (defaults to "white")
+#' @param high_color color for the high end of the gradient (defaults to "navy")
+#' @param na_color color for missing values (defaults to "#D3D3D3")
+#' @return ggplot object of the map
+make_pct_choropleth_map <- function(plot_dt, plot_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = na_color = "#D3D3D3") {
+  
+  plot_obj <- ggplot(plot_dt) +
+    geom_sf(aes(fill = get(plot_colname))) +
     coord_sf() +
-    scale_fill_manual(
-      legend_title,
-      values=map_colors
+    scale_fill_gradient(
+      limits = c(0, 100),
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
     ) +
+    # titles
+    ggplot2::labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
     # map theme
     ggplot2::theme_void() +
     ggplot2::theme(
@@ -845,12 +856,11 @@ make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title 
         legend.text = ggplot2::element_text(size = 8),
         plot.margin = ggplot2::margin(10, 10, 10, 10)
     )
+  
+  return(plot_obj)
+}
 
-  return(output_plot)
- }
 
-
-####################################
 #' Make confidence interval plots for DHS data (horizontal bar chart with error bars)
 #'
 #' @param df_to_plot data.frame with columns for the administrative unit, point estimate and confidence intervals

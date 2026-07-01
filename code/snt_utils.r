@@ -1156,47 +1156,6 @@ make_dhs_adm1_u5mort_dt <- function(dhs_adm1_dt){
   return(u5mort_dt)
 }
 
-
-###################################
-make_dhs_map <- function(plot_dt, plot_colname, title_name, legend_title="Percentage", scale_limits = c(0, 100)) {
-  #' make, show and save coverage map (coropleth of coverage proportions
-  #' TODO in a subsequent version, it was requested these be percentages. code is changes, maybe also change the names
-  #' prints the plot, saves it to a file, and returns the plot object
-  #'
-  #' @param plot_dt spatial df with attribute data
-  #' @param plot_colname string with the name of the column that contains the coverage values
-  #' @param title_name name for the title
-  #' @param legend_title scale of the indicator
-  #' @param scale_limits vector for range of scale values
-  #' @return ggplot object of the map
-  
-  plot_obj <- ggplot(plot_dt) +
-    geom_sf(aes(fill = get(plot_colname))) +
-    coord_sf() +
-    scale_fill_gradient(
-      limits = scale_limits,
-      low = "white",
-      high = "navy",
-      na.value = "grey90"
-    ) +
-    theme_classic() +
-    theme(
-      plot.title = element_text(face = "bold", hjust = 0.5),
-      legend.position = "bottom",
-      legend.key.width = unit(2, "cm"),
-      legend.text = element_text(size = 10)
-    ) +
-    labs(
-      title = title_name,
-      fill = legend_title
-    )
-  
-  print(plot_obj)
-  
-  return(plot_obj)
-}
-                                           
-
                                            
 #%% MISC FUNCTIONS
                             

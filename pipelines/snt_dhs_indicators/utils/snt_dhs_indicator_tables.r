@@ -260,14 +260,15 @@ export_careseeking_reporting_plots <- function(
 ) {
     for (indicator_name in all_indicators) {
         plot_label <- gsub("PCT ", "", gsub("_", " ", indicator_name))
-        indicator_plot <- make_dhs_map(
-            plot_dt = plot_data,
-            plot_colname = indicator_name,
-            title_name = glue::glue("Percentage children: {plot_label}"),
-            legend_title = "%",
-            scale_limits = c(0, 100)
-        )
-        ggplot2::ggsave(
+        indicator_plot <- make_pct_choropleth_map(
+                map_data = plot_data,
+                target_colname = indicator_name,
+                plot_title = glue("Percentage children: {plot_label}"),
+                plot_subtitle = COUNTRY_CODE,
+                plot_caption = glue("Données: {data_source}"),
+                legend_title = "%"
+            )
+        ggsave(
             indicator_plot,
             file = file.path(output_plots_path, glue::glue("{country_code}_{data_source}_{admin_level}_{toupper(indicator_name)}_plot.png")),
             dpi = 500

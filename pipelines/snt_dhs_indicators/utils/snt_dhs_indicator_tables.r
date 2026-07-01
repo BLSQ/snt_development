@@ -263,7 +263,7 @@ export_careseeking_reporting_plots <- function(
         indicator_plot <- make_pct_choropleth_map(
                 map_data = plot_data,
                 target_colname = indicator_name,
-                plot_title = glue("Percentage children: {plot_label}"),
+                plot_title = glue("Soins pour enfants fébriles: {plot_label}"),
                 plot_subtitle = COUNTRY_CODE,
                 plot_caption = glue("Données: {data_source}"),
                 legend_title = "%"

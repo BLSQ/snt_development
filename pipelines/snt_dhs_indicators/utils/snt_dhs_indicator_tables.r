@@ -315,7 +315,7 @@ export_careseeking_reporting_ci_plots <- function(
             ci_upper_colname = upper_bound_col,
             plot_title = glue::glue("{indicator_label} (Intervalles de confiance)"),
             plot_subtitle = country_code,
-            plot_caption = glue::glue("Données : {data_source}")
+            plot_caption = glue::glue("Données : {data_source}"),
             x_title = "ADM1",
             y_title = glue::glue("{indicator_label} (%)")
         )

@@ -1,8 +1,7 @@
 {
   "SNT_CONFIG": {
     "COUNTRY_CODE": "CMR",
-    "COUNTRY_NAME": "REPUBLIC OF CAMEROON",
-    "NA_TREATMENT": "SET_0_TO_NA",
+    "COUNTRY_NAME": "REPUBLIC OF CAMEROON", 
     "DHIS2_ADMINISTRATION_1": "level_2_name",
     "DHIS2_ADMINISTRATION_2": "level_3_name",
     "ANALYTICS_ORG_UNITS_LEVEL": 5,
@@ -40,7 +39,6 @@
       "SUSP": [
         "Z42AOrmgznI",
         "lVRTjB2u2of",
-        "UAiMROlz29l",
         "lCgYt1zGst9",
         "JNm9eUbZITm"
       ],

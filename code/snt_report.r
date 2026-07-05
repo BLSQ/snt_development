@@ -882,7 +882,7 @@ make_season_proportion_plot <- function(
 }
 
 
-#' Make confidence interval plots for DHS data (horizontal bar chart with error bars)
+#' Make confidence interval plots (horizontal bar chart with error bars)
 #'
 #' @param df_to_plot data.frame with columns for the administrative unit, point estimate and confidence intervals
 #' @param admin_colname column for the administrative unit identifiers (used as x-axis)

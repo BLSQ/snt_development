@@ -314,7 +314,7 @@ export_careseeking_reporting_ci_plots <- function(
             point_estimation_colname = sample_avg_col,
             ci_lower_colname = lower_bound_col,
             ci_upper_colname = upper_bound_col,
-            plot_title = glue::glue("{indicator_label} (Intervalles de confiance)"),
+            plot_title = glue::glue("{indicator_label} (Intervalles de confiance 95%)"),
             plot_subtitle = country_code,
             plot_caption = glue::glue("Données : {data_source}"),
             x_title = "ADM1",
@@ -328,4 +328,78 @@ export_careseeking_reporting_ci_plots <- function(
             dpi = 300
         )
     }
+}
+
+
+#' make permil map using DHS data (choropleth)
+#'
+#' @param map_data spatial df with attribute data
+#' @param target_colname column to plot
+#' @param scale_range the minimum and maximum values of the scale (defaults to 0-200)
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param low_color color for the low end of the gradient (defaults to white)
+#' @param high_color color for the high end of the gradient (defaults to very dark green)
+#' @param na_color color for missing values (defaults to "#D3D3D3")
+#' @return ggplot object of the map
+make_permil_choropleth_map <- function(map_data, target_colname, scale_range = c(0, 200), plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = "#D3D3D3") {
+  
+   # validate inputs
+  if (!inherits(map_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(map_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(map_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+
+  plot <- ggplot(map_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    coord_sf() +
+    scale_fill_gradient(
+      limits = scale_range,
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
+    # map theme
+    theme_void() +
+    theme(
+        plot.title = element_text(
+            face = "bold", size = 10,
+            margin = margin(b = 4)
+        ),
+        plot.subtitle = element_text(
+            size = 8, colour = "grey40",
+            margin = margin(b = 8)
+        ),
+        plot.caption = element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
+    )
+  
+  return(plot)
 }

@@ -218,8 +218,9 @@ make_snt_choropleth_map <- function(
 #' @param low_color color for the low end of the gradient (defaults to white)
 #' @param high_color color for the high end of the gradient (defaults to very dark green)
 #' @param na_color color for missing values (defaults to "#D3D3D3")
+#' @param scale_range vector of minimum and maximum values for the percentage (defaults to 0-100)
 #' @return ggplot object of the map
-make_pct_choropleth_map <- function(map_data, target_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = "#D3D3D3") {
+make_pct_choropleth_map <- function(map_data, target_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = "#D3D3D3", scale_range = c(0, 100)) {
   
    # validate inputs
   if (!inherits(map_data, "sf")) {
@@ -244,7 +245,7 @@ make_pct_choropleth_map <- function(map_data, target_colname, plot_title = NULL,
     ) +
     coord_sf() +
     scale_fill_gradient(
-      limits = c(0, 100),
+      limits = scale_range,
       low = low_color,
       high = high_color,
       name = legend_title,

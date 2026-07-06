@@ -198,7 +198,7 @@ def snt_dhis2_extract(
                 country_code=country_code,
             )
 
-            files_ready = add_files_to_dataset(
+            files_ready = add_files_to_dataset_for_extracts(
                 dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
                 country_code=country_code,
                 org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
@@ -1377,7 +1377,7 @@ def get_unique_data_elements(data_dictionary: dict) -> list[str]:
 
 
 @snt_dhis2_extract.task
-def add_files_to_dataset(
+def add_files_to_dataset_for_extracts(
     dataset_id: str,
     country_code: str,
     org_unit_level: str,
@@ -1435,6 +1435,7 @@ def add_files_to_dataset(
         try:
             # Determine file extension
             ext = src.suffix.lower()
+            current_run.log_debug(f"Loading file: {src} extension: {ext}")
             if ext == ".parquet":
                 df = pd.read_parquet(src)
                 tmp_suffix = ".parquet"

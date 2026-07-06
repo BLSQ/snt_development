@@ -268,6 +268,9 @@ export_careseeking_reporting_plots <- function(
                 plot_caption = glue("Données: {data_source}"),
                 legend_title = "%"
             )
+
+        print(indicator_plot)
+
         ggsave(
             indicator_plot,
             file = file.path(output_plots_path, glue::glue("{country_code}_{data_source}_{admin_level}_{toupper(indicator_name)}_plot.png")),
@@ -320,6 +323,9 @@ export_careseeking_reporting_ci_plots <- function(
             x_title = "ADM1",
             y_title = glue::glue("{indicator_label} (%)")
         )
+
+        print(ci_plot)
+        
         ggplot2::ggsave(
             plot = ci_plot,
             filename = file.path(output_plots_path, glue::glue("{country_code}_{data_source}_{admin_level}_{toupper(indicator_name)}_CI_plot.png")),

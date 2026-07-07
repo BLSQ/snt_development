@@ -938,7 +938,7 @@ make_ci_plot <- function(
   ci_plot <- ci_plot +
     scale_x_discrete(expand = expansion(mult = c(0.05, 0.05))) +
     scale_y_continuous(expand = expansion(mult = c(0.02, 0.05))) +
-  
+
   # titles
   labs(
       title = plot_title,
@@ -947,30 +947,34 @@ make_ci_plot <- function(
       x = x_title,
       y = y_title
     ) +
- 
-    # map theme
-    theme_void() +
-    theme(
-      axis.title.x = element_text(size = 8, margin = margin(t = 10)),
-      axis.title.y = element_text(size = 8, angle = 90, margin = margin(r = 10)),
-      plot.title = element_text(
-          face = "bold", size = 10,
-          margin = margin(b = 4)
-      ),
-      plot.subtitle = element_text(
-          size = 8, colour = "grey40",
-          margin = margin(b = 8)
-      ),
-      plot.caption = element_text(
-          size = 8,
-          colour = "grey55",
-          hjust = 1,
-          margin = margin(t = 8)
-      ),
-      legend.position = "right",
-      legend.text = element_text(size = 8),
-      plot.margin = margin(10, 10, 10, 10)
-    )
+    
+  # map theme
+  theme_minimal() +
+  theme(
+    axis.ticks.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank()
+  ) +
+
+  theme(
+    plot.title = element_text(
+        face = "bold", size = 10,
+        margin = margin(b = 4)
+    ),
+    plot.subtitle = element_text(
+        size = 8, colour = "grey40",
+        margin = margin(b = 8)
+    ),
+    plot.caption = element_text(
+        size = 8,
+        colour = "grey55",
+        hjust = 1,
+        margin = margin(t = 8)
+    ),
+    plot.margin = margin(10, 10, 10, 10)
+  )
 
   ci_plot <- ci_plot + coord_flip()
   

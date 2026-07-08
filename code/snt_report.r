@@ -123,6 +123,324 @@ cut_to_categories <- function(input_dt, input_colname, output_colname, input_bre
 }
 
 
+#' @description
+#' choropleth map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the numeric column to map
+#' @param low_color color for the low end of the gradient (defaults to "#f7fbff").
+#' @param high_color color for the high end of the gradient (defaults to "#08306b").
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_choropleth_map <- function(
+    input_data,
+    target_colname,
+    low_color = "#f7fbff",
+    high_color = "#08306b",
+    na_color = "#D3D3D3",
+    plot_title = NULL,
+    plot_subtitle = NULL,
+    plot_caption = NULL,
+    legend_title = NULL
+) {
+  # validate inputs
+  if (!inherits(input_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(input_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(input_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+ 
+  # plot
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    
+    scale_fill_gradient(
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    theme_void() +
+    theme(
+        plot.title = element_text(
+            face = "bold", size = 10,
+            margin = margin(b = 4)
+        ),
+        plot.subtitle = element_text(
+            size = 8, colour = "grey40",
+            margin = margin(b = 8)
+        ),
+        plot.caption = element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
+    )
+
+  return(output_plot)
+}
+
+
+#' make percentage map (choropleth)
+#'
+#' @param map_data spatial df with attribute data
+#' @param target_colname column to plot
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param low_color color for the low end of the gradient (defaults to white)
+#' @param high_color color for the high end of the gradient (defaults to very dark green)
+#' @param na_color color for missing values (defaults to "#D3D3D3")
+#' @param scale_range vector of minimum and maximum values for the percentage (defaults to 0-100)
+#' @return ggplot object of the map
+make_pct_choropleth_map <- function(map_data, target_colname, plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = "#D3D3D3", scale_range = c(0, 100)) {
+  
+   # validate inputs
+  if (!inherits(map_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(map_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(map_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+
+  if(min(map_data[[target_colname]]) < 0 | max(map_data[[target_colname]]) > 100){
+    stop("The column to plot is not a correct percentage.")
+  }
+  
+  plot <- ggplot(map_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    coord_sf() +
+    scale_fill_gradient(
+      limits = scale_range,
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
+    # map theme
+    theme_void() +
+    theme(
+        plot.title = element_text(
+            face = "bold", size = 10,
+            margin = margin(b = 4)
+        ),
+        plot.subtitle = element_text(
+            size = 8, colour = "grey40",
+            margin = margin(b = 8)
+        ),
+        plot.caption = element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
+    )
+  
+  return(plot)
+}
+
+#' make permil map (choropleth)
+#'
+#' @param map_data spatial df with attribute data
+#' @param target_colname column to plot
+#' @param scale_range the minimum and maximum values of the scale (defaults to 0-200)
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#' @param low_color color for the low end of the gradient (defaults to white)
+#' @param high_color color for the high end of the gradient (defaults to very dark green)
+#' @param na_color color for missing values (defaults to "#D3D3D3")
+#' @return ggplot object of the map
+make_permil_choropleth_map <- function(map_data, target_colname, scale_range = c(0, 200), plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, low_color = "white", high_color = "#1B3150", na_color = "#D3D3D3") {
+  
+   # validate inputs
+  if (!inherits(map_data, "sf")) {
+    stop("The data to plot must be an sf object.")
+  }
+  if (!target_colname %in% names(map_data)) {
+    stop("The column to plot is not part of the data.")
+  }
+  if (!is.numeric(map_data[[target_colname]])) {
+    stop("The column to plot must be numeric.")
+  }
+
+  plot <- ggplot(map_data) +
+    geom_sf(
+      aes(fill = .data[[target_colname]]),
+      color = "white",
+      linewidth = 0.2
+    ) +
+    coord_sf() +
+    scale_fill_gradient(
+      limits = scale_range,
+      low = low_color,
+      high = high_color,
+      name = legend_title,
+      na.value = na_color
+    ) +
+    
+    # titles
+    labs(
+      title    = plot_title,
+      subtitle = plot_subtitle,
+      caption  = plot_caption
+    ) +
+ 
+    # map theme
+    theme_void() +
+    theme(
+        plot.title = element_text(
+            face = "bold", size = 10,
+            margin = margin(b = 4)
+        ),
+        plot.subtitle = element_text(
+            size = 8, colour = "grey40",
+            margin = margin(b = 8)
+        ),
+        plot.caption = element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
+    )
+  
+  return(plot)
+}
+
+
+#' @description
+#' categorical map with unified SNT style
+#'
+#' @param input_data sf object with the geometries and data to plot
+#' @param target_colname name of the factor column to map
+#' @param color_vector vector of colors to use
+#' @param na_color color for missing values
+#' @param plot_title map title (defaults to NULL)
+#' @param plot_subtitle map subtitle (defaults to NULL)
+#' @param plot_caption map caption (defaults to NULL)
+#' @param legend_title title of the legend (defaults to NULL)
+#'
+#' @return ggplot object
+make_snt_categorical_map <- function(
+  input_data,
+  target_colname,
+  color_vector,
+  na_color = "#D3D3D3",
+  plot_title = NULL,
+  plot_subtitle = NULL,
+  plot_caption = NULL,
+  legend_title = NULL
+) {
+ 
+  # validation
+ 
+  if (!is.data.frame(input_data)) {
+    stop("Data to plot must be a sf data frame.")
+  }
+ 
+  if (!target_colname %in% names(input_data)) {
+    stop("Target column should be part of the data to plot.")
+  }
+  
+  if(!is.factor(input_data[[target_colname]])){
+	stop("Target column should be an ordered factor.")
+  }
+ 
+  if (!is.character(color_vector)) {
+    stop("The vector of colors is not valid.")
+  }
+ 
+  output_plot <- ggplot(data = input_data) +
+    geom_sf(aes(fill = .data[[target_colname]]), color = "white", linewidth = 0.2) +
+    scale_fill_manual(
+      values  = color_vector,
+      na.value = na_color,
+      name    = legend_title,
+      drop    = FALSE # show all levels
+    ) +
+    
+    # titles
+    labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption
+    ) +
+ 
+    # map theme
+    theme_void() +
+    theme(
+        plot.title = element_text(
+            face = "bold", size = 10,
+            margin = margin(b = 4)
+        ),
+        plot.subtitle = element_text(
+            size = 8, colour = "grey40",
+            margin = margin(b = 8)
+        ),
+        plot.caption = element_text(
+            size = 8,
+            colour = "grey55",
+            hjust = 1,
+            margin = margin(t = 8)
+        ),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
+    )
+  
+  return(output_plot)
+}
+
 
 #%% SEASONALITY PLOTS -------------------------------------------------------------------
 
@@ -201,21 +519,21 @@ make_ridgeline_plot <- function(
   ) +
 
   theme(
-    plot.title = ggplot2::element_text(
+    plot.title = element_text(
         face = "bold", size = 10,
-        margin = ggplot2::margin(b = 4)
+        margin = margin(b = 4)
     ),
-    plot.subtitle = ggplot2::element_text(
+    plot.subtitle = element_text(
         size = 8, colour = "grey40",
-        margin = ggplot2::margin(b = 8)
+        margin = margin(b = 8)
     ),
-    plot.caption = ggplot2::element_text(
+    plot.caption = element_text(
         size = 8,
         colour = "grey55",
         hjust = 1,
-        margin = ggplot2::margin(t = 8)
+        margin = margin(t = 8)
     ),
-    plot.margin = ggplot2::margin(10, 10, 10, 10)
+    plot.margin = margin(10, 10, 10, 10)
   )
 
   return(ridge_plot)
@@ -265,7 +583,7 @@ make_seasonality_plot <- function(
     coord_sf() + # map projection
 
     # titles
-    ggplot2::labs(
+    labs(
       title = plot_title,
       subtitle = plot_subtitle,
       caption = plot_caption
@@ -274,25 +592,25 @@ make_seasonality_plot <- function(
     guides(fill=guide_legend(nrow = 2)) +
     
     # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
+    theme_void() +
+    theme(
+        plot.title = element_text(
             face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
+            margin = margin(b = 4)
         ),
-        plot.subtitle = ggplot2::element_text(
+        plot.subtitle = element_text(
             size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
+            margin = margin(b = 8)
         ),
-        plot.caption = ggplot2::element_text(
+        plot.caption = element_text(
             size = 8,
             colour = "grey55",
             hjust = 1,
-            margin = ggplot2::margin(t = 8)
+            margin = margin(t = 8)
         ),
         legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
     )
   
   return(seasonality_plot)
@@ -360,63 +678,63 @@ make_season_start_month_plot <- function(
   scale_labels <- color_labels[present_months]
  
   # make the plot
-  season_first_month <- ggplot2::ggplot(data = plot_data) +
+  season_first_month <- ggplot(data = plot_data) +
  
     # geo layer
-    ggplot2::geom_sf(
-      ggplot2::aes(fill = .month_factor),
+    geom_sf(
+      aes(fill = .month_factor),
       colour = "white",
       linewidth = 0.15
     ) +
  
     # discrete color scale with NA handling
-    ggplot2::scale_fill_manual(
+    scale_fill_manual(
       values = scale_values,
       breaks = scale_breaks,
       labels = scale_labels,
       na.value = "#D3D3D3",
       name = legend_title,
-      guide = ggplot2::guide_legend(
+      guide = guide_legend(
         title = legend_title,
         override.aes = list(colour = "white", linewidth = 0.3),
         label.position = "right",
-        keywidth = ggplot2::unit(0.9, "lines"),
-        keyheight = ggplot2::unit(0.9, "lines")
+        keywidth = unit(0.9, "lines"),
+        keyheight = unit(0.9, "lines")
       )
     ) +
  
     # titles
-    ggplot2::labs(
+    labs(
       title = plot_title,
       subtitle = plot_subtitle,
       caption = plot_caption
     ) +
  
     # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
+    theme_void() +
+    theme(
+        plot.title = element_text(
             face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
+            margin = margin(b = 4)
         ),
-        plot.subtitle = ggplot2::element_text(
+        plot.subtitle = element_text(
             size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
+            margin = margin(b = 8)
         ),
-        plot.caption = ggplot2::element_text(
+        plot.caption = element_text(
             size = 8,
             colour = "grey55",
             hjust = 1,
-            margin = ggplot2::margin(t = 8)
+            margin = margin(t = 8)
         ),
         legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
     )
  
   # append NA note to caption if any missing values exist in the data, so they also appear in the legend
   if (anyNA(month_vals)) {
-    season_first_month <- season_first_month + ggplot2::labs(
+    season_first_month <- season_first_month + labs(
       caption = paste0(plot_caption,
         if (nchar(plot_caption) > 0) "\n" else "",
         "\u25A0 : ", missing_label)
@@ -475,7 +793,7 @@ make_season_duration_plot <- function(
     ) +
     
     # titles
-    ggplot2::labs(
+    labs(
       title = plot_title,
       subtitle = plot_subtitle,
       caption = plot_caption
@@ -484,25 +802,25 @@ make_season_duration_plot <- function(
     guides(fill = guide_legend(nrow = 2)) +
 
     # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
+    theme_void() +
+    theme(
+        plot.title = element_text(
             face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
+            margin = margin(b = 4)
         ),
-        plot.subtitle = ggplot2::element_text(
+        plot.subtitle = element_text(
             size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
+            margin = margin(b = 8)
         ),
-        plot.caption = ggplot2::element_text(
+        plot.caption = element_text(
             size = 8,
             colour = "grey55",
             hjust = 1,
-            margin = ggplot2::margin(t = 8)
+            margin = margin(t = 8)
         ),
         legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
     )
 
   return(duration_plot)
@@ -571,63 +889,63 @@ make_season_proportion_plot <- function(
     )
  
   # make plot
-  season_proportion_plot <- ggplot2::ggplot(data = plot_data) +
+  season_proportion_plot <- ggplot(data = plot_data) +
  
     # geo layer
-    ggplot2::geom_sf(
-      ggplot2::aes(fill = .rain_category),
+    geom_sf(
+      aes(fill = .rain_category),
       colour    = "white",
       linewidth = 0.15
     ) +
  
     # discrete colors and handle missings
-    ggplot2::scale_fill_manual(
+    scale_fill_manual(
       values   = color_vector,
       breaks   = bin_labels,
       na.value = "#D3D3D3",
       name     = legend_title,
       drop     = TRUE,
-      guide    = ggplot2::guide_legend(
+      guide    = guide_legend(
         title          = NULL,
         override.aes   = list(colour = "white", linewidth = 0.3),
         label.position = "right",
-        keywidth       = ggplot2::unit(0.9, "lines"),
-        keyheight      = ggplot2::unit(0.9, "lines")
+        keywidth       = unit(0.9, "lines"),
+        keyheight      = unit(0.9, "lines")
       )
     ) +
  
     # titles
-    ggplot2::labs(
+    labs(
       title    = plot_title,
       subtitle = plot_subtitle,
       caption  = plot_caption
     ) +
  
     # map theme
-    ggplot2::theme_void() +
-    ggplot2::theme(
-        plot.title = ggplot2::element_text(
+    theme_void() +
+    theme(
+        plot.title = element_text(
             face = "bold", size = 10,
-            margin = ggplot2::margin(b = 4)
+            margin = margin(b = 4)
         ),
-        plot.subtitle = ggplot2::element_text(
+        plot.subtitle = element_text(
             size = 8, colour = "grey40",
-            margin = ggplot2::margin(b = 8)
+            margin = margin(b = 8)
         ),
-        plot.caption = ggplot2::element_text(
+        plot.caption = element_text(
             size = 8,
             colour = "grey55",
             hjust = 1,
-            margin = ggplot2::margin(t = 8)
+            margin = margin(t = 8)
         ),
         legend.position = "right",
-        legend.text = ggplot2::element_text(size = 8),
-        plot.margin = ggplot2::margin(10, 10, 10, 10)
+        legend.text = element_text(size = 8),
+        plot.margin = margin(10, 10, 10, 10)
     )
  
   # add NA note to caption if any missing values in data
   if (anyNA(prop_vals)) {
-    season_proportion_plot <- season_proportion_plot + ggplot2::labs(
+    season_proportion_plot <- season_proportion_plot + labs(
       caption = paste0(data_source,
         if (nchar(data_source) > 0) "\n" else "",
         "\u25A0 Non saisonnier")
@@ -638,39 +956,100 @@ make_season_proportion_plot <- function(
 }
 
 
-#' @description
-#' make a choropleth map from an sf object
+#' Make confidence interval plots (horizontal bar chart with error bars)
 #'
-#' @param spatial_df sf object containing geometries and the variable map
-#' @param target_colname name of the column to use for the fill aesthetic
-#' @param map_colors vector of colors to scale_fill_manual with names that match the levels of the target variable
-#' @param plot_title plot title
-#' @param legend_title legend title
-#' @return map
-make_output_plot <- function(spatial_df, target_colname, map_colors, plot_title, legend_title){
-  output_plot <- ggplot(spatial_df) +
-    geom_sf(aes(fill = get(target_colname)))+
-    coord_sf() +
-    scale_fill_manual(
-      legend_title,
-      values=map_colors
-    ) +
-    guides(fill=guide_legend(nrow = 2)) +
-    theme_void() +
-    theme(
-      plot.title = element_text(
-        family = "Helvetica",
-        # face = "bold",
-        hjust = 0.5
-      ),
-      legend.position = "bottom", legend.key.width = unit(2,"cm"),
-      legend.text=element_text(
-        family = "Helvetica",
-        size=10
-      )
-    ) +
-    labs(title=plot_title)
+#' @param df_to_plot data.frame with columns for the administrative unit, point estimate and confidence intervals
+#' @param admin_colname column for the administrative unit identifiers (used as x-axis)
+#' @param point_estimation_colname column with the point estimates for the main bars
+#' @param ci_lower_colname column with the lower bound values for the confidence intervals
+#' @param ci_upper_colname column with the upper bound values for the confidence intervals
+#' @param bar_color color for the bars (defaults to muted teal-blue)
+#' @param errorbar_color color for the error bars (defaults to periwinkle blue)
+#' @param plot_title plot title (defaults to NULL)
+#' @param plot_subtitle plot subtitle (defaults to NULL)
+#' @param plot_caption plot caption (defaults to NULL)
+#' @param x_title x-axis label (defaults to NULL)
+#' @param y_title y-axis label (defaults to NULL)
+#' 
+#'
+#' @return ggplot2 bar chart with confidence interval error bars (also printed)
+#'
+make_ci_plot <- function(
+  df_to_plot, admin_colname, point_estimation_colname, ci_lower_colname, ci_upper_colname,
+  bar_color = "#5B8CBE", errorbar_color = "#2D5F8A", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL
+){
+  
+  # main plot
+  ci_plot <- ggplot(data = df_to_plot)
+  ci_plot <- ci_plot + geom_bar(aes(x=get(admin_colname), y=get(point_estimation_colname)), fill = bar_color, alpha = 0.7, width = 0.6, stat="identity")
 
-  print(output_plot)
-  return(output_plot)
- }
+  # add the error bars
+  ci_plot <- ci_plot + geom_errorbar(
+    aes(x=get(admin_colname), ymin = get(ci_lower_colname), ymax = get(ci_upper_colname)),
+    width = 0.25,
+    color = errorbar_color,
+    linewidth = 1
+  )
+  ## Uncomment below to add value label text for the lower bound
+  # + ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_lower_colname),
+  #   label = round(get(ci_lower_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+  # # text for the upper bound
+  # ci_plot <- ci_plot + geom_text(aes(
+  #   x=get(admin_colname),
+  #   y=get(ci_upper_colname),
+  #   label = round(get(ci_upper_colname),1)
+  # ),
+  # size= 2, vjust = 1
+  # )
+
+  # spacing
+  ci_plot <- ci_plot +
+    scale_x_discrete(expand = expansion(mult = c(0.05, 0.05))) +
+    scale_y_continuous(expand = expansion(mult = c(0.02, 0.05))) +
+
+  # titles
+  labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption,
+      x = x_title,
+      y = y_title
+    ) +
+    
+  # map theme
+  theme_minimal() +
+  theme(
+    axis.ticks.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank()
+  ) +
+
+  theme(
+    plot.title = element_text(
+        face = "bold", size = 10,
+        margin = margin(b = 4)
+    ),
+    plot.subtitle = element_text(
+        size = 8, colour = "grey40",
+        margin = margin(b = 8)
+    ),
+    plot.caption = element_text(
+        size = 8,
+        colour = "grey55",
+        hjust = 1,
+        margin = margin(t = 8)
+    ),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+  ci_plot <- ci_plot + coord_flip()
+  
+  return(ci_plot)
+}

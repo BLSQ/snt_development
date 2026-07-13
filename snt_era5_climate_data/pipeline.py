@@ -113,25 +113,34 @@ def sync_variable(
     # Force a clean rebuild for deterministic outputs and avoid stale/corrupted zarr reuse.
     if zarr_store.exists():
         current_run.log_warning(
-            f"[{variable}] Removing existing zarr store "
-            f"to force full resync: {zarr_store}"
+            f"[{variable}] Removing existing zarr store to force full resync: {zarr_store}"
         )
         shutil.rmtree(zarr_store)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
-        requests = prepare_requests(
-            client=client,
-            dataset_id=DATASET_ID,
-            start_date=start_d,
-            end_date=end_d,
-            variable=variable,
-            area=area,
-            zarr_store=zarr_store,
-        )
-        if not requests:
-            current_run.log_info(f"[{variable}] No missing dates to download.")
-            return
+        try:
+            requests = prepare_requests(
+                client=client,
+                dataset_id=DATASET_ID,
+                start_date=start_d,
+                end_date=end_d,
+                variable=variable,
+                area=area,
+                zarr_store=zarr_store,
+            )
+            if not requests:
+                current_run.log_info(f"[{variable}] No missing dates to download.")
+                return
+        except Exception as e:
+            if "Too many data requests" in str(e):
+                current_run.log_error(
+                    f"[{variable}] Too many data requests for dataset '{DATASET_ID}' (max: 100). "
+                    "Consider splitting the date range into smaller chunks."
+                )
+            else:
+                current_run.log_error(f"[{variable}] Failed to prepare requests: {e}")
+            raise
 
         current_run.log_info(f"[{variable}] Prepared {len(requests)} request(s).")
         retrieve_requests(
@@ -204,9 +213,7 @@ def build_daily_snt(
         valid_boundaries = valid_boundaries.loc[non_empty_mask].copy()
         masks = masks.isel(boundary=np.where(non_empty_mask)[0])
         skipped = int((~non_empty_mask).sum())
-        current_run.log_warning(
-            f"Skipping {skipped} boundaries with no ERA5 pixel overlap."
-        )
+        current_run.log_warning(f"Skipping {skipped} boundaries with no ERA5 pixel overlap.")
     if len(valid_boundaries) == 0:
         raise ValueError("No boundaries overlap ERA5 pixels.")
 
@@ -286,8 +293,7 @@ def build_daily_snt(
     null_mean_rows = daily.filter(pl.col("mean").is_null()).height
     if null_mean_rows > 0:
         current_run.log_warning(
-            f"[{variable}] Daily output still contains {null_mean_rows} "
-            "null `mean` rows; dropping them."
+            f"[{variable}] Daily output still contains {null_mean_rows} null `mean` rows; dropping them."
         )
         daily = daily.filter(pl.col("mean").is_not_null())
 
@@ -404,7 +410,9 @@ def snt_era5_climate_data(
     raw_dir = root_path / "data" / "era5" / "raw"
     cache_dir = root_path / "data" / "era5" / "cache"
     output_dir = root_path / "data" / "era5" / "aggregate"
-    report_nb = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "snt_era5_climate_data_report.ipynb"
+    report_nb = (
+        root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "snt_era5_climate_data_report.ipynb"
+    )
     report_out = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "outputs"
     raw_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -491,7 +499,9 @@ def snt_era5_climate_data(
             sum_aggregation = variable == "total_precipitation"
             weekly = aggregate_daily_snt(daily=daily, key_col="week", sum_aggregation=sum_aggregation)
             epi_weekly = aggregate_daily_snt(daily=daily, key_col="epi_week", sum_aggregation=sum_aggregation)
-            monthly = aggregate_daily_snt(daily=daily, key_col="period_month", sum_aggregation=sum_aggregation)
+            monthly = aggregate_daily_snt(
+                daily=daily, key_col="period_month", sum_aggregation=sum_aggregation
+            )
             if monthly.filter(pl.col("mean").is_null()).height > 0:
                 raise ValueError(f"[{variable}] Monthly output contains null `mean` values.")
 
@@ -531,7 +541,9 @@ def snt_era5_climate_data(
             file_paths=file_paths_to_upload,
         )
     else:
-        current_run.log_info("run_report_only=True: skipping ERA5 climate-data processing and dataset publication.")
+        current_run.log_info(
+            "run_report_only=True: skipping ERA5 climate-data processing and dataset publication."
+        )
 
     run_report_notebook(
         nb_file=report_nb,

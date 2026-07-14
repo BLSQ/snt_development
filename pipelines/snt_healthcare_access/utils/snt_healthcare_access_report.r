@@ -38,7 +38,7 @@ make_overlaid_sf_plot <- function(
 
   plot <- ggplot() +
     geom_sf(data = admin_unit_vect, fill = "gray95", color = "black") +
-    geom_sf(data = buffer_vect, fill = "dodgerblue", alpha = 0.3) +
+    geom_sf(data = buffer_vect, fill = "dodgerblue", alpha = 0.2) +
     geom_sf(data = points_sf_vect, color = "dodgerblue4", size = 0.7) +
     
     # titles

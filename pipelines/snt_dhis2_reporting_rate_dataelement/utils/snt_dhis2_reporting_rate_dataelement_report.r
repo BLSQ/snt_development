@@ -22,7 +22,7 @@ get_fosa_denominator <- function(input_string){
 }
 
 
-#' @description create a reporting rate scatter plot with ggplot2 faceted by year
+#' @description make reporting rate scatter plot with ggplot2 faceted by year
 #' @param df_to_plot data frame containing the plotting data
 #' @param admin_colname column with administrative unit identifier
 #' @param year_colname column with year values used in faceting
@@ -37,7 +37,7 @@ get_fosa_denominator <- function(input_string){
 #' @param plot_caption optional plot caption
 #' @param x_title optional x axis label
 #' @param y_title optional y axis label
-#' @returns a ggplot object displaying scattered points by month and value colored by category and faceted by year
+#' @returns a ggplot object with scattered points by month and value colored by category and faceted by year
 make_reporting_rate_scatterplot <- function(
   df_to_plot, admin_colname, year_colname, month_colname, value_colname, category_colname, break_vector, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL
 ){
@@ -48,8 +48,9 @@ make_reporting_rate_scatterplot <- function(
         x = get(month_colname),
         y = get(value_colname),
         group = get(admin_colname),
-        color = get(category_colname))
-      ) + 
+        color = get(category_colname)
+      )
+    ) + 
     facet_grid(~get(year_colname)) + 
     scale_color_manual(
       values = plot_palette,
@@ -97,9 +98,86 @@ make_reporting_rate_scatterplot <- function(
       panel.grid.minor = element_blank(),
       panel.grid.major.x = element_blank(),
       strip.placement = "outside",
-      strip.text = element_text(face = "bold", size = 8, colour = "grey40",),
+      strip.text = element_text(face = "bold", size = 8, colour = "grey40"),
       plot.margin = margin(10, 10, 10, 10)
     )
 
   return(output_plot)
+}
+
+
+#' @description make reporting rate heatmap with ggplot2 tiles faceted by year
+#' @param df_to_plot data frame containing the plotting data
+#' @param admin_colname column with administrative unit identifier on y axis
+#' @param year_colname column with year values used in column faceting
+#' @param month_colname column with month values on x axis
+#' @param category_colname column with categorical variable mapped to fill color
+#' @param plot_palette named list or vector of colors for categories
+#' @param none_color hex color string for missing values
+#' @param plot_title optional plot title
+#' @param plot_subtitle optional plot subtitle
+#' @param plot_caption optional plot caption
+#' @param legend_title optional legend title
+#' @param x_title optional x axis label
+#' @param y_title optional y axis label
+#' @returns a ggplot object with heat tiles by month and admin unit colored by category and faceted by year
+make_reporting_rate_heatmap <- function(
+    df_to_plot, admin_colname, year_colname, month_colname, category_colname, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, x_title = NULL, y_title = NULL
+){
+ggplot(data = df_to_plot) +
+  geom_tile(
+      aes(x = get(month_colname),
+                y = fct_rev(get(admin_colname)),
+                fill = get(category_colname)
+               ), 
+                color = "white",
+                 show.legend = TRUE
+                 ) +
+  scale_fill_manual(
+      values = plot_palette,
+      na.value = none_color,
+      name = legend_title
+    ) +
+  scale_x_continuous(breaks = seq(1, 12, 1)) +
+  labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      caption = plot_caption,
+      x = x_title
+      ) +
+  facet_grid(cols = vars(get(year_colname)), 
+    scales = "free_y", space = "free_y",
+    switch = "y") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+        face = "bold", size = 10,
+        margin = margin(b = 4)
+      ),
+      plot.subtitle = element_text(
+        size = 8, colour = "grey40",
+        margin = margin(b = 8)
+      ),
+      plot.caption = element_text(
+        size = 8,
+        colour = "grey55",
+        hjust = 1,
+        margin = margin(t = 8)
+      ),
+      axis.title.x = element_text(
+        colour = "grey55",
+        size = 8
+      ),
+    legend.position = "bottom",
+    legend.key.height = unit(0.25, "cm"),
+    axis.text.x = element_text(size = 7),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    strip.placement = "outside",    
+    strip.text = element_text(face = "bold", size = 8, colour = "grey40"),
+    plot.margin = margin(10, 10, 10, 10)
+  ) +
+  guides(fill = guide_legend(nrow = 1))
 }

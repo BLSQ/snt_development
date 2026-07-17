@@ -109,6 +109,7 @@ make_reporting_rate_scatterplot <- function(
 #' @description make reporting rate heatmap with ggplot2 tiles faceted by year
 #' @param df_to_plot data frame containing the plotting data
 #' @param admin_colname column with administrative unit identifier on y axis
+#' @param admin_labels column with the administrative unit names for y axis labels
 #' @param year_colname column with year values used in column faceting
 #' @param month_colname column with month values on x axis
 #' @param category_colname column with categorical variable mapped to fill color
@@ -122,8 +123,14 @@ make_reporting_rate_scatterplot <- function(
 #' @param y_title optional y axis label
 #' @returns a ggplot object with heat tiles by month and admin unit colored by category and faceted by year
 make_reporting_rate_heatmap <- function(
-    df_to_plot, admin_colname, year_colname, month_colname, category_colname, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, x_title = NULL, y_title = NULL
+    df_to_plot, admin_colname, admin_labels, year_colname, month_colname, category_colname, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, x_title = NULL, y_title = NULL
 ){
+
+  # build a lookup: admin_colname value -> admin_labels value
+  label_lookup <- df_to_plot %>%
+    dplyr::distinct(.data[[admin_colname]], .data[[admin_labels]]) %>%
+    tibble::deframe()
+
 ggplot(data = df_to_plot) +
   geom_tile(
       aes(x = get(month_colname),
@@ -139,6 +146,7 @@ ggplot(data = df_to_plot) +
       name = legend_title
     ) +
   scale_x_continuous(breaks = seq(1, 12, 1)) +
+  scale_y_discrete(labels = label_lookup) +
   labs(
       title = plot_title,
       subtitle = plot_subtitle,
@@ -172,7 +180,7 @@ ggplot(data = df_to_plot) +
     legend.key.height = unit(0.25, "cm"),
     axis.text.x = element_text(size = 7),
     axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
+    axis.text.y = element_text(size = 7),
     panel.grid.minor = element_blank(),
     panel.grid.major = element_blank(),
     strip.placement = "outside",    

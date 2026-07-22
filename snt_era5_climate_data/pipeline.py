@@ -341,13 +341,7 @@ def sync_variable(
                     current_run.log_info(f"[{variable}] No missing dates to download.")
                     return
             except Exception as e:
-                if "Too many data requests" in str(e):
-                    current_run.log_error(
-                        f"[{variable}] Too many data requests for dataset '{DATASET_ID}' (max: 100). "
-                        "Consider splitting the date range into smaller chunks."
-                    )
-                else:
-                    current_run.log_error(f"[{variable}] Failed to prepare requests: {e}")
+                current_run.log_error(f"[{variable}] Failed to prepare requests: {e}")
                 raise
 
             current_run.log_info(f"[{variable}] Prepared {len(requests)} request(s).")

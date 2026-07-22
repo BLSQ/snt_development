@@ -4,6 +4,7 @@ SNT Process/
 venv/
 uv.lock
 __pycache__/
+*.yaml
 
 # Jupyter stuff -------------------------
 

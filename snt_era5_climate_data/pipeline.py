@@ -33,6 +33,209 @@ ERA5_VARIABLES = ["total_precipitation"]
 # ERA5_VARIABLES = ["2m_dewpoint_temperature", "2m_temperature", "total_precipitation"]
 
 
+@pipeline("snt_era5_climate_data")
+@parameter(
+    "start_date",
+    type=str,
+    name="Start date",
+    help="Start date of extraction period.",
+    default="2018-01-01",
+    required=True,
+)
+@parameter(
+    "end_date",
+    type=str,
+    name="End date",
+    help="End date of extraction period. Latest available by default.",
+    required=False,
+)
+@parameter(
+    "cds_connection",
+    name="Climate data store",
+    type=CustomConnection,
+    help="Credentials for connection to the Copernicus Climate Data Store",
+    required=True,
+)
+@parameter(
+    "force_resync",
+    name="Force resync",
+    help="Force re-download ERA5 data even if zarr store already exists.",
+    type=bool,
+    default=True,
+    required=False,
+)
+@parameter(
+    "pull_scripts",
+    name="Pull Scripts",
+    help="Pull the latest scripts from the repository",
+    type=bool,
+    default=False,
+    required=False,
+)
+@parameter(
+    "run_report_only",
+    name="Run reporting only",
+    help="This will only execute the reporting notebook",
+    type=bool,
+    default=False,
+    required=False,
+)
+def snt_era5_climate_data(
+    start_date: str,
+    end_date: str | None,
+    force_resync: bool,
+    cds_connection: CustomConnection,
+    pull_scripts: bool,
+    run_report_only: bool,
+) -> None:
+    """Unified ERA5 pipeline for SNT: synchronize raw ERA5 then aggregate to SNT outputs."""
+    root_path = Path(workspace.files_path)
+    raw_dir = root_path / "data" / "era5" / "raw"
+    cache_dir = root_path / "data" / "era5" / "cache"
+    output_dir = root_path / "data" / "era5" / "aggregate"
+    report_nb = (
+        root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "snt_era5_climate_data_report.ipynb"
+    )
+    report_out = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "outputs"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if pull_scripts:
+        current_run.log_info("Pulling ERA5 scripts from repository.")
+        try:
+            pull_scripts_from_repository(
+                pipeline_name="snt_era5_climate_data",
+                report_scripts=["snt_era5_climate_data_report.ipynb"],
+                code_scripts=[],
+            )
+        except Exception as e:
+            current_run.log_warning(f"Could not pull snt_era5_climate_data scripts: {e}")
+
+    snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+    validate_config(snt_config)
+    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    if not run_report_only:
+        if not is_valid_ymd(start_date):
+            raise ValueError(f"Invalid start date format: {start_date}. Expected YYYY-MM-DD.")
+        if not is_valid_ymd(end_date):
+            raise ValueError(f"Invalid end date format: {end_date}. Expected YYYY-MM-DD.")
+
+        variables_to_run = ERA5_VARIABLES
+        current_run.log_info(f"Variables to process: {variables_to_run}")
+
+        dhis2_formatted_dataset = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+        era5_dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["ERA5_DATASET_CLIMATE"]
+        boundaries = get_file_from_dataset(
+            dataset_id=dhis2_formatted_dataset,
+            filename=f"{country_code}_shapes.geojson",
+        )
+        if not isinstance(boundaries, gpd.GeoDataFrame):
+            raise TypeError(
+                f"Expected GeoDataFrame for boundaries, got {type(boundaries).__name__} "
+                f"from dataset {dhis2_formatted_dataset}."
+            )
+        area = [int(v) for v in get_bounds(boundaries)]
+
+        if start_date:
+            start_date = start_date[0:8] + "01"
+        if not end_date:
+            end_date = (
+                datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
+            ).strftime("%Y-%m-%d")
+        else:
+            end_date = to_last_day_previous_month(end_date)
+
+        start_d = date.fromisoformat(start_date)
+        end_d = date.fromisoformat(end_date)
+        current_run.log_info(f"Sync period: {start_d} to {end_d}")
+
+        cds_key = get_cds_api_key(cds_connection=cds_connection)
+        client = Client(url=CDS_API_URL, key=cds_key, retry_after=30)
+        cache = Cache(database_uri=workspace.database_url, cache_dir=cache_dir)
+        current_run.log_info(f"ERA5 cache directory: {cache_dir}")
+        get_variables()  # fail fast if toolbox era5 API is not available as expected
+
+        # 1) synchronize raw ERA5
+        for variable in variables_to_run:
+            sync_variable(
+                client=client,
+                cache=cache,
+                variable=variable,
+                start_d=start_d,
+                end_d=end_d,
+                area=area,
+                raw_dir=raw_dir,
+                force_resync=force_resync,
+            )
+            validate_synced_zarr(zarr_store=raw_dir / f"{variable}.zarr", variable=variable)
+
+        # 2) aggregate and export with same outputs as snt_era5_aggregate
+        file_paths_to_upload: list[Path] = []
+        for variable in variables_to_run:
+            current_run.log_info(f"Running SNT aggregation for {variable}")
+            daily = build_daily_snt(
+                zarr_store=raw_dir / f"{variable}.zarr",
+                boundaries=boundaries,
+                variable=variable,
+                column_uid="ADM2_ID",
+            )
+            sum_aggregation = variable == "total_precipitation"
+            weekly = aggregate_daily_snt(daily=daily, key_col="week", sum_aggregation=sum_aggregation)
+            epi_weekly = aggregate_daily_snt(daily=daily, key_col="epi_week", sum_aggregation=sum_aggregation)
+            monthly = aggregate_daily_snt(
+                daily=daily, key_col="period_month", sum_aggregation=sum_aggregation
+            )
+            if monthly.filter(pl.col("mean").is_null()).height > 0:
+                raise ValueError(f"[{variable}] Monthly output contains null `mean` values.")
+
+            dst_dir = output_dir / variable
+            dst_dir.mkdir(parents=True, exist_ok=True)
+
+            daily_fname = dst_dir / f"{country_code}_{variable}_daily.parquet"
+            weekly_fname = dst_dir / f"{country_code}_{variable}_weekly.parquet"
+            epi_weekly_fname = dst_dir / f"{country_code}_{variable}_epi_weekly.parquet"
+            monthly_fname = dst_dir / f"{country_code}_{variable}_monthly.parquet"
+
+            apply_snt_formatting(daily, "daily").write_parquet(daily_fname)
+            apply_snt_formatting(weekly, "weekly").write_parquet(weekly_fname)
+            apply_snt_formatting(epi_weekly, "epi_weekly").write_parquet(epi_weekly_fname)
+            apply_snt_formatting(monthly, "monthly").write_parquet(monthly_fname)
+
+            # Keep upload behavior identical to existing aggregate pipeline (monthly only)
+            file_paths_to_upload.append(monthly_fname)
+
+        params_file = save_pipeline_parameters(
+            pipeline_name="snt_era5_aggregate",
+            parameters={
+                "run_report_only": run_report_only,
+                "start_date": start_date,
+                "end_date": end_date,
+                "variables": variables_to_run,
+                "pull_scripts": pull_scripts,
+            },
+            output_path=output_dir,
+            country_code=country_code,
+        )
+        file_paths_to_upload.append(params_file)
+
+        add_files_to_dataset(
+            dataset_id=era5_dataset_id,
+            country_code=country_code,
+            file_paths=file_paths_to_upload,
+        )
+    else:
+        current_run.log_info(
+            "run_report_only=True: skipping ERA5 climate-data processing and dataset publication."
+        )
+
+    run_report_notebook(
+        nb_file=report_nb,
+        nb_output_path=report_out,
+        country_code=country_code,
+    )
+
+
 def get_bounds(boundaries: gpd.GeoDataFrame) -> tuple[int, int, int, int]:
     """Compute CDS request bounds (N, W, S, E) from boundaries extent.
 
@@ -107,56 +310,86 @@ def sync_variable(
     end_d: date,
     area: list[int],
     raw_dir: Path,
+    force_resync: bool = True,
 ) -> None:
     """Download and store one ERA5 variable into a zarr store."""
     zarr_store = raw_dir / f"{variable}.zarr"
     # Force a clean rebuild for deterministic outputs and avoid stale/corrupted zarr reuse.
-    if zarr_store.exists():
+    if zarr_store.exists() and force_resync:
         current_run.log_warning(
             f"[{variable}] Removing existing zarr store to force full resync: {zarr_store}"
         )
         shutil.rmtree(zarr_store)
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir)
-        try:
-            requests = prepare_requests(
+    batch_size = 50  # months per request batch
+    periods = _batch_periods_from(start_d=start_d, end_d=end_d, batch_size=batch_size)
+
+    for period in periods:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            try:
+                requests = prepare_requests(
+                    client=client,
+                    dataset_id=DATASET_ID,
+                    start_date=period[0],
+                    end_date=period[-1],
+                    variable=variable,
+                    area=area,
+                    zarr_store=zarr_store,
+                )
+                if not requests:
+                    current_run.log_info(f"[{variable}] No missing dates to download.")
+                    return
+            except Exception as e:
+                if "Too many data requests" in str(e):
+                    current_run.log_error(
+                        f"[{variable}] Too many data requests for dataset '{DATASET_ID}' (max: 100). "
+                        "Consider splitting the date range into smaller chunks."
+                    )
+                else:
+                    current_run.log_error(f"[{variable}] Failed to prepare requests: {e}")
+                raise
+
+            current_run.log_info(f"[{variable}] Prepared {len(requests)} request(s).")
+            retrieve_requests(
                 client=client,
                 dataset_id=DATASET_ID,
-                start_date=start_d,
-                end_date=end_d,
-                variable=variable,
-                area=area,
-                zarr_store=zarr_store,
+                requests=requests,
+                dst_dir=tmp_path,
+                cache=None,
+                wait=30,
             )
-            if not requests:
-                current_run.log_info(f"[{variable}] No missing dates to download.")
-                return
-        except Exception as e:
-            if "Too many data requests" in str(e):
-                current_run.log_error(
-                    f"[{variable}] Too many data requests for dataset '{DATASET_ID}' (max: 100). "
-                    "Consider splitting the date range into smaller chunks."
-                )
-            else:
-                current_run.log_error(f"[{variable}] Failed to prepare requests: {e}")
-            raise
+            grib_to_zarr(
+                src_dir=tmp_path,
+                zarr_store=zarr_store,
+                data_var=get_variables()[variable]["short_name"],
+            )
 
-        current_run.log_info(f"[{variable}] Prepared {len(requests)} request(s).")
-        retrieve_requests(
-            client=client,
-            dataset_id=DATASET_ID,
-            requests=requests,
-            dst_dir=tmp_path,
-            cache=None,
-            wait=30,
-        )
-        grib_to_zarr(
-            src_dir=tmp_path,
-            zarr_store=zarr_store,
-            data_var=get_variables()[variable]["short_name"],
-        )
-        current_run.log_info(f"[{variable}] Sync completed.")
+    current_run.log_info(f"[{variable}] Sync completed.")
+
+
+def _batch_periods_from(start_d: date, end_d: date, batch_size: int) -> list[list[date]]:
+    """Split a date range into batches of months.
+
+    Returns
+    -------
+    list[list[date]]
+        List of date batches, each containing a list of month start dates.
+    """
+    periods = []
+    current_start = start_d.replace(day=1)
+    while current_start <= end_d:
+        current_end = (current_start + relativedelta(months=batch_size)) - timedelta(days=1)
+        if current_end > end_d:
+            current_end = end_d
+        batch = []
+        month_iter = current_start
+        while month_iter <= current_end:
+            batch.append(month_iter)
+            month_iter += relativedelta(months=1)
+        periods.append(batch)
+        current_start = current_end + timedelta(days=1)
+    return periods
 
 
 def validate_synced_zarr(zarr_store: Path, variable: str) -> None:
@@ -357,199 +590,6 @@ def apply_snt_formatting(df: pl.DataFrame, aggregation: str) -> pl.DataFrame:
             ]
         )
     return df
-
-
-@pipeline("snt_era5_climate_data")
-@parameter(
-    "start_date",
-    type=str,
-    name="Start date",
-    help="Start date of extraction period.",
-    default="2018-01-01",
-    required=True,
-)
-@parameter(
-    "end_date",
-    type=str,
-    name="End date",
-    help="End date of extraction period. Latest available by default.",
-    required=False,
-)
-@parameter(
-    "cds_connection",
-    name="Climate data store",
-    type=CustomConnection,
-    help="Credentials for connection to the Copernicus Climate Data Store",
-    required=True,
-)
-@parameter(
-    "pull_scripts",
-    name="Pull Scripts",
-    help="Pull the latest scripts from the repository",
-    type=bool,
-    default=False,
-    required=False,
-)
-@parameter(
-    "run_report_only",
-    name="Run reporting only",
-    help="This will only execute the reporting notebook",
-    type=bool,
-    default=False,
-    required=False,
-)
-def snt_era5_climate_data(
-    start_date: str,
-    end_date: str | None,
-    cds_connection: CustomConnection,
-    pull_scripts: bool,
-    run_report_only: bool,
-) -> None:
-    """Unified ERA5 pipeline for SNT: synchronize raw ERA5 then aggregate to SNT outputs."""
-    root_path = Path(workspace.files_path)
-    raw_dir = root_path / "data" / "era5" / "raw"
-    cache_dir = root_path / "data" / "era5" / "cache"
-    output_dir = root_path / "data" / "era5" / "aggregate"
-    report_nb = (
-        root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "snt_era5_climate_data_report.ipynb"
-    )
-    report_out = root_path / "pipelines" / "snt_era5_climate_data" / "reporting" / "outputs"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    if pull_scripts:
-        current_run.log_info("Pulling ERA5 scripts from repository.")
-        try:
-            pull_scripts_from_repository(
-                pipeline_name="snt_era5_climate_data",
-                report_scripts=["snt_era5_climate_data_report.ipynb"],
-                code_scripts=[],
-            )
-        except Exception as e:
-            current_run.log_warning(f"Could not pull snt_era5_climate_data scripts: {e}")
-
-    snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
-    validate_config(snt_config)
-    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-    if not run_report_only:
-        if not is_valid_ymd(start_date):
-            raise ValueError(f"Invalid start date format: {start_date}. Expected YYYY-MM-DD.")
-        if not is_valid_ymd(end_date):
-            raise ValueError(f"Invalid end date format: {end_date}. Expected YYYY-MM-DD.")
-
-        variables_to_run = ERA5_VARIABLES
-        current_run.log_info(f"Variables to process: {variables_to_run}")
-
-        dhis2_formatted_dataset = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-        era5_dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["ERA5_DATASET_CLIMATE"]
-        boundaries = get_file_from_dataset(
-            dataset_id=dhis2_formatted_dataset,
-            filename=f"{country_code}_shapes.geojson",
-        )
-        if not isinstance(boundaries, gpd.GeoDataFrame):
-            raise TypeError(
-                f"Expected GeoDataFrame for boundaries, got {type(boundaries).__name__} "
-                f"from dataset {dhis2_formatted_dataset}."
-            )
-        area = [int(v) for v in get_bounds(boundaries)]
-
-        if start_date:
-            start_date = start_date[0:8] + "01"
-        if not end_date:
-            end_date = (
-                datetime.now().astimezone(timezone.utc).replace(day=1) - relativedelta(days=1)  # noqa: UP017
-            ).strftime("%Y-%m-%d")
-        else:
-            end_date = to_last_day_previous_month(end_date)
-
-        start_d = date.fromisoformat(start_date)
-        end_d = date.fromisoformat(end_date)
-        current_run.log_info(f"Sync period: {start_d} to {end_d}")
-
-        cds_key = get_cds_api_key(cds_connection=cds_connection)
-        client = Client(url=CDS_API_URL, key=cds_key, retry_after=30)
-        cache = Cache(database_uri=workspace.database_url, cache_dir=cache_dir)
-        current_run.log_info(f"ERA5 cache directory: {cache_dir}")
-        get_variables()  # fail fast if toolbox era5 API is not available as expected
-
-        # 1) synchronize raw ERA5
-        for variable in variables_to_run:
-            sync_variable(
-                client=client,
-                cache=cache,
-                variable=variable,
-                start_d=start_d,
-                end_d=end_d,
-                area=area,
-                raw_dir=raw_dir,
-            )
-            validate_synced_zarr(zarr_store=raw_dir / f"{variable}.zarr", variable=variable)
-
-        # 2) aggregate and export with same outputs as snt_era5_aggregate
-        file_paths_to_upload: list[Path] = []
-        for variable in variables_to_run:
-            current_run.log_info(f"Running SNT aggregation for {variable}")
-            daily = build_daily_snt(
-                zarr_store=raw_dir / f"{variable}.zarr",
-                boundaries=boundaries,
-                variable=variable,
-                column_uid="ADM2_ID",
-            )
-            sum_aggregation = variable == "total_precipitation"
-            weekly = aggregate_daily_snt(daily=daily, key_col="week", sum_aggregation=sum_aggregation)
-            epi_weekly = aggregate_daily_snt(daily=daily, key_col="epi_week", sum_aggregation=sum_aggregation)
-            monthly = aggregate_daily_snt(
-                daily=daily, key_col="period_month", sum_aggregation=sum_aggregation
-            )
-            if monthly.filter(pl.col("mean").is_null()).height > 0:
-                raise ValueError(f"[{variable}] Monthly output contains null `mean` values.")
-
-            dst_dir = output_dir / variable
-            dst_dir.mkdir(parents=True, exist_ok=True)
-
-            daily_fname = dst_dir / f"{country_code}_{variable}_daily.parquet"
-            weekly_fname = dst_dir / f"{country_code}_{variable}_weekly.parquet"
-            epi_weekly_fname = dst_dir / f"{country_code}_{variable}_epi_weekly.parquet"
-            monthly_fname = dst_dir / f"{country_code}_{variable}_monthly.parquet"
-
-            apply_snt_formatting(daily, "daily").write_parquet(daily_fname)
-            apply_snt_formatting(weekly, "weekly").write_parquet(weekly_fname)
-            apply_snt_formatting(epi_weekly, "epi_weekly").write_parquet(epi_weekly_fname)
-            apply_snt_formatting(monthly, "monthly").write_parquet(monthly_fname)
-
-            # Keep upload behavior identical to existing aggregate pipeline (monthly only)
-            file_paths_to_upload.append(monthly_fname)
-
-        params_file = save_pipeline_parameters(
-            pipeline_name="snt_era5_aggregate",
-            parameters={
-                "run_report_only": run_report_only,
-                "start_date": start_date,
-                "end_date": end_date,
-                "variables": variables_to_run,
-                "pull_scripts": pull_scripts,
-            },
-            output_path=output_dir,
-            country_code=country_code,
-        )
-        file_paths_to_upload.append(params_file)
-
-        add_files_to_dataset(
-            dataset_id=era5_dataset_id,
-            country_code=country_code,
-            file_paths=file_paths_to_upload,
-        )
-    else:
-        current_run.log_info(
-            "run_report_only=True: skipping ERA5 climate-data processing and dataset publication."
-        )
-
-    run_report_notebook(
-        nb_file=report_nb,
-        nb_output_path=report_out,
-        country_code=country_code,
-    )
 
 
 if __name__ == "__main__":

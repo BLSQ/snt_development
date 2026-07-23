@@ -93,12 +93,13 @@ make_reporting_rate_scatterplot <- function(
         colour = "grey55",
         size = 8
       ),
+      axis.text = element_text(size = 8),
       legend.position = "none",
       legend.title = element_blank(),
       panel.grid.minor = element_blank(),
       panel.grid.major.x = element_blank(),
       strip.placement = "outside",
-      strip.text = element_text(face = "bold", size = 8, colour = "grey40"),
+      strip.text = element_text(size = 8, colour = "grey40"),
       plot.margin = margin(10, 10, 10, 10)
     )
 
@@ -180,7 +181,7 @@ ggplot(data = df_to_plot) +
     legend.key.height = unit(0.25, "cm"),
     axis.text.x = element_text(size = 7),
     axis.title.y = element_blank(),
-    axis.text.y = element_text(size = 7),
+    axis.text.y = element_text(size = 5),
     panel.grid.minor = element_blank(),
     panel.grid.major = element_blank(),
     strip.placement = "outside",    

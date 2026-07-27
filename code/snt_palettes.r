@@ -125,7 +125,6 @@ bdi_cat_healthcare_access_ahadi_palette <- c(
   "#1A6B2A" # 99-100%
 )
 
-
 # Functions (related to palettes) ------------------------------------------------------
 # I would keep palette definitions and functions in the same file (no need to move to snt_utils.r)
 
@@ -160,4 +159,20 @@ get_range_from_count <- function(count) {
 
 
 cat_healthcare_covered_palette <- c("#f4b5d0", "#f5efa5", "#a5e9c8")
+
+# cat_reporting_rate_palette <- c(
+#   "#8d0801ff", # Blood Red
+#   "#bf0603ff", # Brick Ember
+#   "#f4d58dff", # Jasmine
+#   "#708d81ff", # Deep Teal
+#   "#001427ff"  # Prussian Blue
+# )
+
+cat_reporting_rate_palette <- c(
+  "#bc4b51ff", # Blushed Brick
+  "#f4a259ff", # Sandy Brown
+  "#f4e285ff", # Light Gold
+  "#8cb369ff", # Muted Olive
+  "#5b8e7dff"  # Jungle Teal
+)
 

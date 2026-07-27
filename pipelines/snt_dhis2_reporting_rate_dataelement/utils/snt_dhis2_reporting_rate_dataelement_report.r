@@ -321,30 +321,3 @@ make_yearly_reporting_map <- function(
       guides(fill = guide_legend(nrow = 1))
   return(output_plot)
 }
-
-
-summarise_reporting_rate_by_year <- function(
-  input_df,
-  output_df = NULL,
-  admin2_id_colname = "ADM2_ID",
-  admin2_name_colname = "ADM2_NAME",
-  admin1_id_colname = "ADM1_ID",
-  admin1_name_colname = "ADM1_NAME",
-  year_colname = "YEAR",
-  reporting_rate_colname = "REPORTING_RATE") {
-
-  result <- input_df %>%
-    group_by(
-      geometry,
-      .data[[admin2_id_colname]],
-      .data[[admin2_name_colname]],
-      .data[[admin1_name_colname]],
-      .data[[year_colname]]
-    ) %>%
-    summarise(
-      "{reporting_rate_colname}" := mean(.data[[reporting_rate_colname]], na.rm = TRUE),
-      .groups = "drop"
-    )
-
-  return(result)
-}

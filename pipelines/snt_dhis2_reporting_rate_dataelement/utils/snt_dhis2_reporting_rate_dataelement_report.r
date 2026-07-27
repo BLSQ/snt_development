@@ -1,4 +1,4 @@
-# Helpers for the access to healthcare pipeline report
+# Helpers for the reporting rate (data element) report
 
 #' extract the routine data type from the saved pipeline parameters (raw = routine / imputed / removed)
 get_routine_type <- function(input_filename){

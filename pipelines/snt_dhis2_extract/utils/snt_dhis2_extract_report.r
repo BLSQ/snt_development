@@ -1,53 +1,54 @@
 # Shared helpers for snt_dhis2_extract notebooks.
+# GP (2026-08-06): silenced commented out functions that are not used in snt_dhis2_extract_report.ipynb
 
 printdim <- function(df, name = deparse(substitute(df))) {
     cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
 }
 
-make_point_geojson <- function(lat, lon) {
-    sprintf('{"type": "Point", "coordinates": [%f, %f]}', lon, lat)
-}
+# make_point_geojson <- function(lat, lon) {
+#     sprintf('{"type": "Point", "coordinates": [%f, %f]}', lon, lat)
+# }
 
-apply_ner_manual_geometry_fixes <- function(group_prioritaires_table) {
-    manual_points <- data.frame(
-        id = c(
-            "xMqXanPgczy",
-            "sgO4yBg59SJ",
-            "oHRvIBeR5xH",
-            "TVaP0vBLvat",
-            "evMtQ7bLFYI",
-            "u3xCSh4hG9Q",
-            "P1oyCQT39rj"
-        ),
-        lat = c(
-            14.212177799561589,
-            13.485271755127068,
-            13.551421362165923,
-            13.509657990942971,
-            13.586255600670649,
-            13.509793678687808,
-            13.535431049590938
-        ),
-        lon = c(
-            1.4625739941131144,
-            7.143422105623865,
-            2.116344191939423,
-            2.1473435456528174,
-            2.0918749136394097,
-            2.147386518669057,
-            2.09186651126039
-        ),
-        stringsAsFactors = FALSE
-    )
+# apply_ner_manual_geometry_fixes <- function(group_prioritaires_table) {
+#     manual_points <- data.frame(
+#         id = c(
+#             "xMqXanPgczy",
+#             "sgO4yBg59SJ",
+#             "oHRvIBeR5xH",
+#             "TVaP0vBLvat",
+#             "evMtQ7bLFYI",
+#             "u3xCSh4hG9Q",
+#             "P1oyCQT39rj"
+#         ),
+#         lat = c(
+#             14.212177799561589,
+#             13.485271755127068,
+#             13.551421362165923,
+#             13.509657990942971,
+#             13.586255600670649,
+#             13.509793678687808,
+#             13.535431049590938
+#         ),
+#         lon = c(
+#             1.4625739941131144,
+#             7.143422105623865,
+#             2.116344191939423,
+#             2.1473435456528174,
+#             2.0918749136394097,
+#             2.147386518669057,
+#             2.09186651126039
+#         ),
+#         stringsAsFactors = FALSE
+#     )
 
-    for (i in seq_len(nrow(manual_points))) {
-        this_id <- manual_points$id[[i]]
-        group_prioritaires_table[group_prioritaires_table$id == this_id, ]$geometry <-
-            make_point_geojson(manual_points$lat[[i]], manual_points$lon[[i]])
-    }
+#     for (i in seq_len(nrow(manual_points))) {
+#         this_id <- manual_points$id[[i]]
+#         group_prioritaires_table[group_prioritaires_table$id == this_id, ]$geometry <-
+#             make_point_geojson(manual_points$lat[[i]], manual_points$lon[[i]])
+#     }
 
-    group_prioritaires_table
-}
+#     group_prioritaires_table
+# }
 
 open_in_year <- function(df, y) {
     y <- as.integer(y)
@@ -76,46 +77,46 @@ norm_fosa_type <- function(x) {
     )
 }
 
-map_points_to_ds_polygons <- function(points_sf, polygons_sf) {
-    inside_matrix <- sf::st_within(points_sf, polygons_sf, sparse = FALSE)
-    point_polygon_dict <- list()
+# map_points_to_ds_polygons <- function(points_sf, polygons_sf) {
+#     inside_matrix <- sf::st_within(points_sf, polygons_sf, sparse = FALSE)
+#     point_polygon_dict <- list()
 
-    for (i in seq_len(nrow(points_sf))) {
-        point_id <- points_sf$id[[i]]
-        point_name <- points_sf$name[[i]]
-        polygons_containing <- which(inside_matrix[i, ])
+#     for (i in seq_len(nrow(points_sf))) {
+#         point_id <- points_sf$id[[i]]
+#         point_name <- points_sf$name[[i]]
+#         polygons_containing <- which(inside_matrix[i, ])
 
-        if (length(polygons_containing) > 0) {
-            found_polygons <- polygons_sf[polygons_containing, ]
-            found_polygons_ds <- found_polygons[grepl("^DS", found_polygons$name), ]
+#         if (length(polygons_containing) > 0) {
+#             found_polygons <- polygons_sf[polygons_containing, ]
+#             found_polygons_ds <- found_polygons[grepl("^DS", found_polygons$name), ]
 
-            if (nrow(found_polygons_ds) >= 1) {
-                polygon_id <- found_polygons_ds$id[1]
-                polygon_name <- found_polygons_ds$name[1]
+#             if (nrow(found_polygons_ds) >= 1) {
+#                 polygon_id <- found_polygons_ds$id[1]
+#                 polygon_name <- found_polygons_ds$name[1]
 
-                point_polygon_dict[[point_id]] <- list(
-                    point_name = point_name,
-                    polygon_id = polygon_id,
-                    polygon_name = polygon_name
-                )
-                print(glue::glue("Point: {point_name} ({point_id}) is inside polygon: {polygon_name} ({polygon_id})"))
-            } else {
-                point_polygon_dict[[point_id]] <- list(
-                    point_name = point_name,
-                    polygon_id = NA,
-                    polygon_name = NA
-                )
-                cat("Point:", point_id, "is not inside any district (DS) polygon\n")
-            }
-        } else {
-            point_polygon_dict[[point_id]] <- list(
-                point_name = point_name,
-                polygon_id = NA,
-                polygon_name = NA
-            )
-            cat("Point:", point_id, "is not inside any district (DS) polygon\n")
-        }
-    }
+#                 point_polygon_dict[[point_id]] <- list(
+#                     point_name = point_name,
+#                     polygon_id = polygon_id,
+#                     polygon_name = polygon_name
+#                 )
+#                 print(glue::glue("Point: {point_name} ({point_id}) is inside polygon: {polygon_name} ({polygon_id})"))
+#             } else {
+#                 point_polygon_dict[[point_id]] <- list(
+#                     point_name = point_name,
+#                     polygon_id = NA,
+#                     polygon_name = NA
+#                 )
+#                 cat("Point:", point_id, "is not inside any district (DS) polygon\n")
+#             }
+#         } else {
+#             point_polygon_dict[[point_id]] <- list(
+#                 point_name = point_name,
+#                 polygon_id = NA,
+#                 polygon_name = NA
+#             )
+#             cat("Point:", point_id, "is not inside any district (DS) polygon\n")
+#         }
+#     }
 
-    point_polygon_dict
-}
+#     point_polygon_dict
+# }

@@ -5,6 +5,7 @@ description = "SNT pipelines maintained by Bluesquare Data Services team"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "nbstripout>=0.9.1",
     "openhexa.sdk",
 ]
 

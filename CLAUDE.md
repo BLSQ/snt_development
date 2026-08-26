@@ -251,9 +251,3 @@ Before calling a change done:
 - [ ] Handover states: which country/workspace it was tested in (or that it was not), and that
       operators must run with **`Pull scripts` = ON** to pick up notebook changes.
 
----
-
-## Note on this file
-
-`.gitignore` currently lists `CLAUDE.md` and `.claude/`, so this file is **untracked**. To share
-it with the team, add a negation (`!CLAUDE.md`) — left to your decision rather than changed here.

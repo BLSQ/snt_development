@@ -2,6 +2,7 @@
     "POPULATION": {
         "SOURCE_DATA": {
         "DATASET": "DHIS2_DATASET_FORMATTED",
+        // Shall we include a DATASET.VERSION node here? Default to "lates" unless specified?
         "FILENAME": "{COUNTRY_CODE}_population.csv",
         "COLUMN": "POPULATION"
     },
@@ -14,7 +15,7 @@
             "FR": "Nombre total de personnes vivant dans une zone spécifique."
         },
         "SOURCE": {
-            "EN":"DHIS2",
+            "EN": "DHIS2",
             "FR": "DHIS2"
         },
         "UNITS": {
@@ -23,13 +24,13 @@
         },
         "CATEGORY": {
             "EN": "Variable of population and health",
-            "FR":  "Variables de population et de santé"
+            "FR": "Variables de population et de santé"
         },
         "TYPE": "Threshold",
-        "SCALE": "[50000,100000,200000,300000,400000,500000]",
+        "SCALE": [50000,100000,200000,300000,400000,500000], // TBD: should include limits (e.g., 0 to max)? This is inconsistent at the moment
         "UNIT_SYMBOL": null,
         "PERIOD": null,
-        "ORDER": 1
+        "ORDER": 1 // is order used?
     },
     "INCIDENCE_CRUDE": {
         "SOURCE_DATA": {
@@ -58,7 +59,7 @@
             "FR":  "Indicateurs épidémiologiques"
         },
         "TYPE": "Threshold",
-        "SCALE": "[50, 150, 250, 350, 450, 1000]",
+        "SCALE": [50, 150, 250, 350, 450, 1000],
         "UNIT_SYMBOL": null,
         "PERIOD": null,
         "ORDER": 2
@@ -90,7 +91,7 @@
             "FR":  "Indicateurs épidémiologiques"
         },
         "TYPE": "Threshold",
-        "SCALE": "[50, 150, 250, 350, 450, 1000]",
+        "SCALE": [50, 150, 250, 350, 450, 1000],
         "UNIT_SYMBOL": null,
         "PERIOD": null,
         "ORDER": 2
@@ -122,7 +123,7 @@
             "FR":  "Indicateurs épidémiologiques"
         },
         "TYPE": "Threshold",
-        "SCALE": "[50, 150, 250, 350, 450, 1000]",
+        "SCALE": [50, 150, 250, 350, 450, 1000],
         "UNIT_SYMBOL": null,
         "PERIOD": null,
         "ORDER": 2
@@ -154,12 +155,12 @@
             "FR":  "Indicateurs épidémiologiques"
         },
         "TYPE": "Threshold",
-        "SCALE": "[50, 150, 250, 350, 450, 1000]",
+        "SCALE": [50, 150, 250, 350, 450, 1000],
         "UNIT_SYMBOL": null,
         "PERIOD": null,
         "ORDER": 2
     },
-    "REPORTING_RATE_DATAELEMENT": { // TBD: should this match the "COLUMN" literally or not?
+    "REPORTING_RATE_DATAELEMENT": { // # NOTE: Kept separate top-level keys to avoid key collisions when identical COLUMN names
         "SOURCE_DATA": {
         "DATASET": "SNT_DHIS2_REPORTING_RATE",
         "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
@@ -174,7 +175,7 @@
             "FR": "Nombre de rapports reçus, sur le nombre total de rapports attendus."
         },
         "SOURCE": {
-            "EN":"",
+            "EN":"", // ok to leave a language blank (default to the other)?
             "FR": "DHIS2"
         },
         "UNITS": {
@@ -186,12 +187,12 @@
             "FR":  "Qualité des données"
         },
         "TYPE": "Threshold",
-        "SCALE": "[0, 0.25, 0.5, 0.75, 1]",
+        "SCALE": [0, 0.25, 0.5, 0.75, 1], // see here for example the limits are included
         "UNIT_SYMBOL": "%",
         "PERIOD": null,
         "ORDER": 3
     },
-    "REPORTING_RATE_DATASET": { // TBD: should this match the "COLUMN" literally or not?
+    "REPORTING_RATE_DATASET": { // # NOTE: Kept separate top-level keys - here example of exact same COL name for different layer
         "SOURCE_DATA": {
         "DATASET": "SNT_DHIS2_REPORTING_RATE",
         "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset.csv",
@@ -218,7 +219,7 @@
             "FR":  "Qualité des données"
         },
         "TYPE": "Threshold",
-        "SCALE": "[0, 0.25, 0.5, 0.75, 1]",
+        "SCALE": [0, 0.25, 0.5, 0.75, 1],
         "UNIT_SYMBOL": "%",
         "PERIOD": null,
         "ORDER": 3

@@ -15,9 +15,12 @@ Guardrails for anyone (human or agent) changing code in this repository.
 plus external sources (ERA5, WorldPop, Malaria Atlas Project, DHS) into a one-row-per-ADM2
 malaria **subnational tailoring** results table.
 
-It is **not** a dbt / Airflow / Dagster project. There is no DAG engine, no test suite, and no
-local runtime for most of the code. Orchestration is OpenHEXA's `@pipeline` / `@task` SDK;
-the analytics themselves live in **R notebooks executed by papermill**.
+Orchestration is OpenHEXA's `@pipeline` / `@task` SDK. The analytics themselves live in **R
+notebooks executed by papermill**. Each pipeline is launched by hand from the OpenHEXA UI, and
+pipelines pass data to each other through **OpenHEXA datasets** — never by calling each other.
+
+An inventory of all 20 pipelines is in
+[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-20-pipelines-at-a-glance).
 
 ```
 <pipeline_name>/pipeline.py            ← deployed by CI. Orchestration only.
@@ -29,6 +32,33 @@ pipelines/<pipeline_name>/reporting/   ← R reporting notebooks.
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
 configuration/SNT_config_<CC>.json     ← reference copies only (see below).
 ```
+
+### Note — if you're coming from dbt / Airflow / Dagster
+
+Those are the three tools most data teams reach for. None of them is here, so don't go looking for
+a `dbt_project.yml`, a `dags/` folder or a `tests/` directory. What the words mean, and what
+stands in for each:
+
+| Term | What it normally gives you | Here |
+|---|---|---|
+| **Airflow / Dagster** | An *orchestrator*: you declare which jobs depend on which, and it runs them in the right order, on a schedule, retrying failures and keeping a history of what ran when. | OpenHEXA runs one pipeline at a time, when a person clicks Run. |
+| **DAG engine** | The part of an orchestrator that knows "formatting must finish before incidence starts" — a **D**irected **A**cyclic **G**raph of dependencies — and refuses to get it wrong. | That knowledge lives in people's heads and in these docs. Nothing enforces it. |
+| **dbt** | A framework for SQL transformations that also generates lineage diagrams, data tests and docs from your models. | Not applicable — the analytics are R, not SQL. |
+| **test suite** | Automated checks (`pytest`) that tell you a change broke something before a user does. | None exist. `ruff` is the only automated check, and nothing runs it for you. |
+| **local runtime** | Running the code on your laptop before shipping it. | Partial — see [Getting set up locally](#getting-set-up-locally). |
+
+Two of those absences are deliberate and two are debt:
+
+- **No dbt — permanent.** The analytics are R. Nothing to fix.
+- **No DAG engine — deliberate.** Pipelines are re-run independently with different parameters,
+  alternative methods deliberately override each other, and an operator may supply their own input
+  instead of running the upstream pipeline. A DAG engine would fight all three. *But* the
+  operator-facing run order should still be written down, and currently isn't:
+  [`DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md) — `[TODO: Giulia]`.
+- **No test suite — debt.** [Logged](#suggestions-logged-for-later-evaluation-giulia): several pure
+  functions are unit-testable today with no new infrastructure.
+- **No full local runtime — debt.** The known pain point. [Logged](#suggestions-logged-for-later-evaluation-giulia),
+  with options weighed.
 
 ---
 
@@ -71,18 +101,62 @@ Local development is a **known pain point**, honestly stated:
 
 | Kind | Local story |
 |---|---|
-| **Python-only pipelines** (`snt_assemble_results`, `snt_dhis2_extract`, `snt_map_extracts`, `snt_worldpop_extract`, `snt_era5_climate_data`) | The only well-supported path. Editable and lintable locally; still needs a workspace to actually run. |
-| **Notebook-driven pipelines** (13 of them) | No supported local loop. Real testing happens in an OpenHEXA workspace (JupyterLab), then changes are copied back into git. Better tooling is being explored — log suggestions, don't invent commands. |
+| **Python-only pipelines** (`snt_assemble_results`, `snt_dhis2_extract`, `snt_map_extracts`, `snt_worldpop_extract`, `snt_era5_climate_data`) | The best-supported path. Editable and lintable locally; still needs a workspace to actually run. |
+| **Notebook-driven pipelines** (15 of them) | Editable locally and **executable against the remote workspace kernel** — see [Editing R notebooks](#editing-r-notebooks-the-vs-code-remote-kernel-loop). There is no fully offline loop. |
 
-Nothing in this checkout is installed (`uv`, `ruff`, `openhexa`, `R`, `jupyter` are all absent
-on this machine). The commands below assume you install them first.
+### Getting set up locally
 
-### Commands that actually exist
+Install by tier — you do not need all of it. Everything below is cross-platform and none of it is
+required to *read* the repo.
+
+| Tier | Install | Why | Effort |
+|---|---|---|---|
+| **1 — do this** | [`uv`](https://docs.astral.sh/uv/) and `ruff` | `ruff` is the repo's only automated quality gate and the only check you can run before opening a PR. `pyproject.toml` already configures it. | ~2 min |
+| **2 — if you touch notebooks** | `nbstripout` | Stops you committing executed notebooks, which leak country data (**R1**). Better still, install it as a git filter so it happens without you remembering. | ~1 min |
+| **3 — if you edit R notebooks** | VS Code + the Jupyter extension | Lets you edit locally and execute on the workspace kernel — see below. | ~5 min |
+| **4 — rarely** | `openhexa` CLI | CI deploys for you. Only needed for a manual push, and see [Always publish from `snt-development`](#always-publish-from-snt-development) before you do. | ~1 min |
 
 ```bash
-# Environment (project declares requires-python >= 3.11)
-uv sync                                   # or: pip install -e . ; pip install ruff nbstripout
+# Tier 1
+curl -LsSf https://astral.sh/uv/install.sh | sh    # or: pipx install uv
+uv sync                                            # project declares requires-python >= 3.11
 
+# Tier 2
+uv tool install nbstripout
+
+# Tier 4
+uv tool install openhexa.sdk
+```
+
+**You do not need a local R installation.** R code runs on the workspace kernel (below), so
+installing R locally buys you syntax checking at best and a subtly different environment at worst —
+the workspace runs a specific image, documented in
+[`DATA_ARCHITECTURE.md` §7.4](docs/DATA_ARCHITECTURE.md#74-the-workspace-runtime-image).
+
+### Editing R notebooks: the VS Code remote-kernel loop
+
+This is the working loop today, and it is better than "no local story":
+
+1. Work in a local clone of this repo, with the `.ipynb` open in VS Code.
+2. Connect the Jupyter extension to the OpenHEXA workspace kernel. Code executes **on the OH
+   server**, so you get the workspace's files, datasets, connections and globals — exactly as if
+   you were in JupyterLab — while keeping VS Code's syntax highlighting, completions, git
+   integration and AI tooling.
+3. Commit from the local clone as normal.
+
+**The gap — `utils/*.r` helpers.** The notebook `source()`s its helpers from the *workspace*
+filesystem, not from your local clone. So changing a helper function means editing it in the OH
+workspace, then copying the change back into the local clone to version it — by hand, in that
+order, every time. It is the main friction in the R loop and the reason a helper change is easy to
+lose. Until it is solved: **make the helper edit in the workspace, test it, then immediately copy
+the file back and commit** — do not batch several helper edits before copying back.
+
+> Remember **Rule 2**: committing a notebook or `.r` change does *not* update any workspace.
+> Operators must run the pipeline with **`Pull scripts` = ON** to pick it up.
+
+### Commands
+
+```bash
 # Lint / format — the ONLY automated quality gate in this repo
 uv run ruff check .                       # ruff config lives in pyproject.toml (line-length 110)
 uv run ruff check --fix .
@@ -100,8 +174,9 @@ openhexa workspaces add <workspace>
 openhexa pipelines push <pipeline_name> --yes
 ```
 
-There is **no** `pytest`, no `make`, no pre-commit config, and no CI lint job. Do not reference
-commands that do not exist; if a check is needed, propose adding it.
+**This repo has no `pytest`, no `make`, no pre-commit config and no CI lint job** — that is a fact
+about the repository, not about any one machine. Do not invent commands, and never report a test
+run you could not have performed. If a check is needed, propose adding it.
 
 ### Verifying a change without a workspace
 
@@ -176,6 +251,24 @@ Not implemented — recorded here so they can be assessed:
   sources `code/snt_utils.r` + `pipelines/<name>/utils/<name>.r` against a tiny fixture would
   make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
   when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
+- **Reproducible local environments — three options, weighed.** The question that keeps coming up
+  is whether to ship a shareable environment definition. Recommendation: **skip conda, pull the
+  workspace image instead.**
+
+  | Option | Verdict |
+  |---|---|
+  | **conda / mamba env file** | **Not worth it.** The Python side needs two linters and a CLI; `uv` + `pyproject.toml` already cover it, and a conda file would be a second dependency list to keep in sync. For the R side, conda's `r-base` would drift from whatever the workspace actually runs — so "works locally" still wouldn't mean "works in the workspace". Solves the easy half, badly, and not the hard half. |
+  | **`renv.lock`** | **Useful, narrow.** R's native lockfile; the workspace image already ships `r-renv`. Pairs with the R-local-loop suggestion above. Gives reproducible R *packages*, but not the system libraries (GDAL/PROJ for `sf`, TeX for reports) that are the usual cause of "works there, not here". |
+  | **Pull `blsq/openhexa-blsq-r-environment:latest`** | **Best value.** It is the *actual* runtime — public on Docker Hub, ~2.5 GB, R 4.5, all R packages, Quarto and the geo stack included. A `.devcontainer/` pointing at it gives VS Code a local environment identical to production, with no second dependency list to maintain. Contents documented in [`DATA_ARCHITECTURE.md` §7.4](docs/DATA_ARCHITECTURE.md#74-the-workspace-runtime-image). |
+
+  Caveat before adopting: a local container has no OpenHEXA workspace mounted, so `workspace.files_path`,
+  dataset access and connections are absent. It gives you a faithful *language* environment for
+  helpers and pure functions — not a way to run a whole pipeline offline. The remote-kernel loop
+  stays the way to run real analytics.
+
+  Two questions for the OH devs: pin `latest` to a digest for reproducibility, and add
+  `data.table` and `rmapshaper` to the image explicitly (see §7.4 — the code uses both, and both
+  currently arrive only as transitive dependencies).
 - **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
 - **Stamp readmes with the version they describe**, to make drift detectable. Blocked on deciding
   *which* version number counts (source / template / workspace — see
@@ -195,6 +288,21 @@ Not implemented — recorded here so they can be assessed:
   a missed use site fails only at runtime, in a workspace, with an "object not found" error.
   Cheapest sequencing: do it in the same PR as the R15 vocabulary migration for
   `snt_dhis2_quality_of_care`, since that notebook is being touched anyway.
+- **Write a domain glossary** (`docs/GLOSSARY.md`) — **the largest documentation gap left, and the
+  one nobody but the SNT team can fill.** The code is full of domain terms that cannot be inferred
+  from it: `N1_METHOD` with choices `PRES` / `SUSP-TEST`, `CSB` (care-seeking behaviour), `FOSA`,
+  `PfPR`, `ITN`, `IRS`, epi-weeks, `ADM1`/`ADM2`, "incidence adjusted for reporting", the five
+  outlier methods (what is "Magic Glasses"? what does the "PATH" method do?), and the difference
+  between `ANALYTICS_ORG_UNITS_LEVEL` and `DHIS2_ADMINISTRATION_2` in *epidemiological* rather than
+  structural terms. Without these, a newcomer — human or AI — guesses, and the guess ends up in a
+  `readme.md`.
+
+  Doing it properly needs a full sweep of the codebase (`pipeline.py` help strings, `choices`
+  values, notebook markdown cells, output column names in `SNT_metadata.json`, config keys) to
+  collect every term, then a pass by someone with the domain knowledge to define them. Suggested
+  split: an agent produces the *list* with each term's call sites and a proposed definition where
+  the code makes it unambiguous; Giulia (or a malaria epidemiologist) fills in and corrects the
+  rest. Mark anything unconfirmed rather than shipping a plausible guess.
 - **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
   append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
   are fine as they are — overwriting is the intended override mechanism and their companion

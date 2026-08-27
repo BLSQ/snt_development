@@ -5,8 +5,51 @@ Reference for the data lineage, storage layout and orchestration patterns of the
 
 Companion document: [`CLAUDE.md`](../CLAUDE.md) — conventions, guardrails and working rules.
 
-> **Status of this document.** Written from a code audit of `main` (2026-08-26). Sections
+> **Status of this document.** Written from a code audit of `main` (2026-08-26/27). Sections
 > marked **`[TODO: Giulia]`** need input that cannot be derived from the code.
+
+---
+
+## 0. Audit scope — what is verified here, and what is not
+
+Read this before trusting any claim below. This document was produced by reading code, not by
+running it, and the coverage is uneven on purpose.
+
+**Verified by reading the code** (2026-08-27, branch `SNT25-640_codebase-documentation`):
+
+- All 20 `pipeline.py` files, in full — parameters, guards, and every `add_files_to_dataset(...)`
+  call. Published-output claims in §3 come from those calls, not from the pipelines' `readme.md`.
+- The `utils/*.r` helpers behind filename resolution and column selection, and the notebook cells
+  that resolve dataset ids (`config_json$SNT_DATASET_IDENTIFIERS$…`).
+- All 20 `.github/workflows/push_snt_*.yaml`, `pyproject.toml`, `.gitignore`, `CODEOWNERS`, and
+  the five `configuration/SNT_config_<CC>.json` reference copies.
+- The OpenHEXA workspace image `blsq/openhexa-blsq-r-environment:latest`, read from its registry
+  manifest (see [§7.4](#74-the-workspace-runtime-image)).
+
+**Read selectively, not exhaustively:** the analytics notebooks. They were opened where a specific
+question needed answering (parameter fallbacks, grouping keys, dataset ids, the population-column
+defect). Nobody has line-by-line reviewed the statistics in them, and this document does not claim
+the methods are correct — only what they consume and produce.
+
+**Deliberately out of scope:**
+
+| Excluded | Why |
+|---|---|
+| `configuration/SNT_metadata.json` | mid-change; excluded on Giulia's instruction (see §3.2 Stage E) |
+| Deep audit of `snt_assemble_results` | being deprecated; read for lineage only, not reviewed |
+| `snt_dhis2_outliers_detection/` | discontinued; local-only leftover, not on the remote |
+| `deprecated/` | history, never a template |
+| `snt_lib` (`BLSQ/snt_utils`) internals | external repo, not in this checkout |
+
+**Not verified at all:** nothing here was executed. No pipeline was run, no workspace was
+inspected, no output file was opened. Runtime behaviour — actual data volumes, real DHIS2
+responses, whether a given country's config is valid — is unverified. Where the code makes a
+behaviour conditional on data that only exists in a workspace, this document says so rather than
+guessing.
+
+**A future agent picking this up should:** trust §3's published-output lists (checked against the
+code), treat the statistical descriptions as summaries rather than specifications, and re-verify
+anything in a pipeline whose `pipeline.py` has changed since the commit above.
 
 ---
 
@@ -25,6 +68,47 @@ OpenHEXA datasets*, identified by logical names in `SNT_config.json`. A downstre
 does not know which upstream pipeline produced its input — it only knows a dataset id and a
 filename. This is what makes the "user can supply their own input" and "alternative pipelines
 override each other" behaviours possible.
+
+### 1.1 The 20 pipelines at a glance
+
+Orientation table — one row per pipeline, for answering "which one do I even open?". Dataset ids
+are the logical names in `SNT_CONFIG.SNT_DATASET_IDENTIFIERS`; the detail is in
+[§3.2](#32-stages). **Engine** is `py` (Python only, lintable locally) or `nb` (drives R
+notebooks — see [Rule 2 in `CLAUDE.md`](../CLAUDE.md)).
+
+| Pipeline | Stage | Does | Reads | Publishes to | Engine |
+|---|---|---|---|---|---|
+| `snt_dhis2_extract` | A | Downloads raw analytics, population, pyramid, shapes and reporting rates from the DHIS2 API | DHIS2 API | `DHIS2_DATASET_EXTRACTS` | `py` (+1 NER-only notebook) |
+| `snt_dhis2_formatting` | B | Reshapes all five raw extracts into the SNT schema; **the hinge of the whole system** | `DHIS2_DATASET_EXTRACTS` | `DHIS2_DATASET_FORMATTED` | `nb` ×5 |
+| `snt_dhis2_outliers_imputation_iqr` | C | Outlier detection + imputation, IQR method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
+| `snt_dhis2_outliers_imputation_mean` | C | Same, mean method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
+| `snt_dhis2_outliers_imputation_median` | C | Same, median method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
+| `snt_dhis2_outliers_imputation_path` | C | Same, PATH method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
+| `snt_dhis2_outliers_imputation_magic_glasses` | C | Same, Magic Glasses method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
+| `snt_dhis2_population_transformation` | C | Rescales/projects population; optional disaggregation upload | `DHIS2_DATASET_FORMATTED` | `DHIS2_POPULATION_TRANSFORMATION` | `nb` |
+| `snt_dhis2_reporting_rate_dataelement` | D | Reporting rates computed from data elements | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
+| `snt_dhis2_reporting_rate_dataset` | D | Reporting rates taken from DHIS2 dataset metrics | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
+| `snt_dhis2_incidence` | D | Malaria incidence, optionally adjusted for reporting and care-seeking | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION`, `DHIS2_POPULATION_TRANSFORMATION`, `DHS_INDICATORS` | `DHIS2_INCIDENCE` | `nb` |
+| `snt_dhis2_quality_of_care` | D | Care-quality indicators | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_QUALITY_OF_CARE` | `nb` |
+| `snt_seasonality_cases` | D | Seasonality of malaria cases | `DHIS2_DATASET_FORMATTED` | `SNT_SEASONALITY_CASES` | `nb` |
+| `snt_seasonality_rainfall` | D | Seasonality of rainfall | `DHIS2_DATASET_FORMATTED`, `ERA5_DATASET_CLIMATE` | `SNT_SEASONALITY_RAINFALL` | `nb` |
+| `snt_era5_climate_data` | A′ | Copernicus ERA5 precipitation, zonal-aggregated to ADM2 | `DHIS2_DATASET_FORMATTED` (shapes), Copernicus CDS | `ERA5_DATASET_CLIMATE` | `py` |
+| `snt_worldpop_extract` | A′ | WorldPop rasters → ADM2 population | `DHIS2_DATASET_FORMATTED` (shapes), WorldPop | `WORLDPOP_DATASET_EXTRACT` | `py` |
+| `snt_map_extracts` | A′ | Malaria Atlas Project layers (PfPR, ITN, IRS, …) | `DHIS2_DATASET_FORMATTED` (shapes), MAP WCS | `SNT_MAP_EXTRACTS` | `py` |
+| `snt_healthcare_access` | A′ | Travel-time / access to health facilities | `DHIS2_DATASET_FORMATTED` (shapes), WorldPop raster cache, operator FOSA upload | `SNT_HEALTHCARE_ACCESS` | `nb` |
+| `snt_dhs_indicators` | A′ | DHS survey indicators at **ADM1** | `DHIS2_DATASET_FORMATTED`, DHS recode files | `DHS_INDICATORS` | `nb` |
+| `snt_assemble_results` | E | Flattens everything into the one-row-per-ADM2 results table — **⚠️ being deprecated** | most of the above | `SNT_RESULTS` | `py` |
+
+Notes that the table cannot carry:
+
+- **Stage A′** pipelines look like independent roots but are not — each fetches
+  `{CC}_shapes.geojson` from `DHIS2_DATASET_FORMATTED` first, so Stage B must have run.
+- **The five Stage C outlier pipelines are alternatives, not a sequence.** They write identical
+  filenames and the last run wins, by design — see [§3.2](#32-stages).
+- **The two Stage D reporting-rate pipelines are likewise alternatives**, both writing to
+  `DHIS2_REPORTING_RATE`.
+- **Run order within a stage is not enforced** and the authoritative operator-facing order is
+  still [`[TODO: Giulia]` (§4.2)](#42-todo-giulia--authoritative-order--dependency-map).
 
 ---
 
@@ -138,6 +222,12 @@ analytics (never pulled) — with nothing anywhere reporting the mismatch.
 This is a known, acknowledged pain point; solutions are being discussed with the OpenHEXA
 developers. Until it changes, treat the two halves of every pipeline as **independently
 versioned**, and see [`CLAUDE.md` rule 2](../CLAUDE.md#the-five-rules-that-matter-most).
+
+A second, smaller consequence sits on the *authoring* side: because the R code lives in the
+workspace at run time, the `utils/*.r` helpers a notebook `source()`s are read from the workspace
+filesystem, not from a developer's clone. Editing a helper therefore means changing it in the
+workspace and copying it back to git by hand. The working loop, and that gap, are described in
+[`CLAUDE.md` → Editing R notebooks](../CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop).
 
 ### 2.3 Language split
 
@@ -683,6 +773,43 @@ file. Therefore:
 - The workflows that do fire run **after** merge and only perform `openhexa pipelines push`.
 - `ruff` is configured in `pyproject.toml` but is never executed by CI, before or after merge.
 
+### 7.4 The workspace runtime image
+
+Every SNT workspace runs the Docker image **`blsq/openhexa-blsq-r-environment:latest`**, built
+from [`github.com/blsq/openhexa-docker-images`](https://github.com/blsq/openhexa-docker-images).
+This is the actual runtime — what a notebook can `library()` and what version of R it gets are
+decided here, not in this repo. Read from the registry manifest on 2026-08-27
+(digest `sha256:b673a7b6…`, pushed 2026-08-21, ~2.5 GB):
+
+| | |
+|---|---|
+| Base | Ubuntu 24.04 → `jupyter/docker-stacks` → OpenHEXA base → R layer |
+| R | **4.5.\*** (conda-forge), with `IRkernel` |
+| Python | 3.13, conda/mamba at `/opt/conda` |
+| OpenHEXA | `openhexa.sdk=2.22.6`, `openhexa.toolbox=2.11.3`, `papermill>=2.6,<2.7` |
+| R packages | `tidyverse`, `arrow`, `sf`, `raster`, `terra`(transitive), `plotly`, `ggmap`, `ggthemes`, `viridis`, `RPostgres`, `survey`, `fpp3`, `reticulate`, `renv`, `styler`, `httr`, `XML`, `e1071`, `pagedown`, `qpdf` + CRAN `GISTools`, `OpenStreetMap`, `DHS.rates` |
+| Also | Quarto, pandoc, TeX Live (XeTeX), duckdb, epiweeks, node 22, gcsfuse/blobfuse/s3fs |
+| User | `jovyan` (uid 1000), `HOME=/home/jovyan`, symlinked as `/home/hexa` |
+| Marker | `HEXA_ENVIRONMENT=CLOUD_JUPYTER` — code can branch on this to detect the workspace |
+
+Two consequences worth knowing:
+
+- **⚠️ The image pins `openhexa.toolbox=2.11.3`; every `requirements.txt` in this repo overrides it
+  with `@main`.** So a *notebook* run interactively in JupyterLab sees the image's pinned 2.11.3,
+  while a *pipeline* run sees whatever the tip of `main` was at deploy time. The two halves of the
+  same pipeline can therefore run against different toolbox versions. This sharpens the pinning
+  argument in [§7.1](#71-dependency-resolution-is-not-reproducible): the image already does the
+  right thing, and the repo undoes it.
+- **Two R packages the code uses are not named in the image build**: `data.table` (67 call sites)
+  and `rmapshaper` (4). They evidently resolve transitively today, since the notebooks run — but a
+  transitive dependency is not a guarantee, and an upstream image rebuild could drop either
+  without warning. Worth asking the OH devs to name them explicitly. (`glue`, `jsonlite`, `terra`,
+  `scales`, `rlang` are likewise transitive but are hard dependencies of packages the image *does*
+  name, so they are safe.)
+
+Because the image is public on Docker Hub, it is also the most faithful basis for a local
+environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
+
 ---
 
 ## 8. Excluded / historical
@@ -712,3 +839,11 @@ file. Therefore:
 8. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)
 9. Should a `pull_request`-triggered `ruff check` job be added? (§7.3)
 10. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)
+11. **[TODO: Giulia]** A domain glossary. `PRES` / `SUSP-TEST`, `CSB`, `FOSA`, `PfPR`, the five
+    outlier methods and similar cannot be derived from the code, and are the largest remaining
+    documentation gap. Needs a full term sweep plus domain input — see
+    [`CLAUDE.md` → Suggestions](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
+12. **For the OpenHEXA developers** — pin the workspace image to a digest, and name `data.table`
+    and `rmapshaper` explicitly in it rather than relying on transitive resolution (§7.4).
+13. Is the toolbox-version split worth closing — image pins `openhexa.toolbox=2.11.3`, every
+    `requirements.txt` overrides it with `@main` (§7.4)?

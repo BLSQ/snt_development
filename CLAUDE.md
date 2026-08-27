@@ -34,10 +34,19 @@ configuration/SNT_config_<CC>.json     ← reference copies only (see below).
 values. `.gitignore` blocks most of these — do not add exceptions, do not `git add -f`. This is
 health data for real districts.
 
-**2. Merging to `main` does not update any workspace notebook.** CI deploys only
-`pipeline.py` + `requirements.txt`. Notebooks and `.r` files reach a workspace only when an
-operator runs that pipeline in the OpenHEXA UI with **`Pull scripts` = ON**. Say so explicitly
-whenever you hand over a notebook change.
+**2. The Python and R halves of a pipeline are versioned independently.** OpenHEXA supports
+Python pipelines but not R, so the two travel by different routes:
+
+- **`pipeline.py` + `requirements.txt`** — CI pushes them to the `snt-development` workspace,
+  which publishes a new version of the SNT **template pipeline**; country workspaces subscribed
+  to that template update automatically. Merging to `main` is enough.
+- **Notebooks and `.r` files** — reach a workspace *only* when an operator runs that pipeline in
+  the OpenHEXA UI with **`Pull scripts` = ON**. Merging to `main` does nothing on its own.
+
+So a country workspace can run the newest `pipeline.py` against months-old R analytics, with
+nothing reporting the mismatch. Always say explicitly, when handing over a notebook change, that
+operators must run with `Pull scripts` = ON. (Known pain point; under discussion with the
+OpenHEXA developers. Details: [`docs/DATA_ARCHITECTURE.md` §2.2](docs/DATA_ARCHITECTURE.md).)
 
 **3. `pipeline.py` orchestrates; it must not compute.** Load config, resolve paths, call tasks
 and notebooks, publish to datasets. Business logic belongs in the R notebook (or, for the
@@ -106,13 +115,54 @@ In descending order of what is actually achievable:
 
 Not implemented — recorded here so they can be assessed:
 
-- **Pin dependencies.** Every `requirements.txt` uses `openhexa.toolbox @ …@main` and
-  `snt_lib @ …snt_utils.git` with no ref. An upstream commit silently changes every pipeline on
-  its next deploy. Tags or commit SHAs would make deploys reproducible.
+- **Pin the two Git dependencies.** Every `requirements.txt` in this repo is these two lines:
+
+  ```
+  openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@main
+  snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+  ```
+
+  Both install straight from a GitHub branch rather than a released version. `@main` means
+  "whatever the tip of `main` is **at install time**"; the `snt_lib` line names no ref at all, so
+  it takes that repo's default branch. Nothing records which commit was actually installed.
+
+  Consequences: (a) deploying a pipeline today and redeploying the identical `pipeline.py`
+  next month can produce two different runtimes, because `snt_utils` moved in between;
+  (b) a change to `snt_utils` — say a new required argument on `run_notebook()` — reaches every
+  SNT pipeline on its next deploy, with no PR in this repo and no CI signal here; (c) when a run
+  breaks, "which version of `snt_lib` was this?" is unanswerable after the fact.
+
+  The fix is to name a fixed point instead of a moving branch — a tag
+  (`…/snt_utils.git@v1.4.0`) or a commit SHA (`…/snt_utils.git@a1b2c3d`). Upgrades then become a
+  deliberate one-line PR you can review, roll back, and correlate with a broken run. The cost is
+  that someone has to bump those refs when `snt_utils` ships something you want. Tags are the
+  usual compromise: readable, and cheap to move forward.
 - **`nbstripout --install` as a repo git filter** plus a committed `.gitattributes`, so output
   stripping stops depending on each developer remembering.
-- **CI lint job** running `ruff check` on PRs — currently a notebook-only PR triggers no CI at
-  all, and a `pipeline.py` PR triggers deployment without ever being linted.
+- **Add a `ruff check` CI job on pull requests.** Today the only GitHub Actions workflows are the
+  20 `push_snt_*.yaml` deployment files, and each is narrowly triggered:
+
+  ```yaml
+  on:
+    push:
+      branches: [main]           # ← only after merge, never on the PR
+      paths:
+        - "snt_dhis2_extract/pipeline.py"
+        - "snt_dhis2_extract/requirements.txt"
+        - ".github/workflows/push_snt_dhis2_extract.yaml"
+  ```
+
+  Two gaps follow. First, `paths:` does not list `pipelines/**` — so a PR that only touches R
+  notebooks or `.r` helpers (the majority of analytics changes) matches no workflow, and GitHub
+  shows no checks at all. That is expected behaviour here, not a broken pipeline; it also means
+  those PRs are reviewed entirely by eye. Second, because the trigger is `push` to `main` rather
+  than `pull_request`, the workflow that *does* fire on a `pipeline.py` change fires **after**
+  merge, and its only job is `openhexa pipelines push` — deployment. No linting runs anywhere,
+  before or after. `ruff` is configured in `pyproject.toml` and is the repo's only automated
+  quality gate, but nothing enforces it; it passes only if a developer remembers to run it.
+
+  A single small `pull_request`-triggered workflow running `uv run ruff check .` would close the
+  second gap for every PR at once, without touching the 20 deployment files.
 - **A `tests/` seed**: pure functions such as `validate_yyyymm`, `validate_period_range`,
   `get_unique_data_elements`, `validate_reporting_rates`, `merge_parquet_files`,
   `raw_reporting_ds_format` are dependency-free and unit-testable today.
@@ -121,8 +171,10 @@ Not implemented — recorded here so they can be assessed:
   make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
   when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
 - **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
-- **Stamp outlier provenance** into `{CC}_routine_outliers_*.parquet` (method + run id), since
-  all five imputation variants overwrite the same filenames.
+- **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
+  append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
+  are fine as they are — overwriting is the intended override mechanism and their companion
+  `{CC}_parameters.json` records the method. The table has no such companion.
 
 ---
 
@@ -135,12 +187,30 @@ Not implemented — recorded here so they can be assessed:
 3. `<name>/readme.md` — Parameters / Functionality Overview / Inputs / Outputs. Existing readmes
    are detailed and accurate; match that standard, they are the user-facing contract.
 4. `.github/workflows/push_<name>.yaml` — copy an existing one; update **every** occurrence of
-   the pipeline name, including the `paths:` filter and the `--code "<kebab-case-name>"` slug.
+   the pipeline name, including the `paths:` filter and the `--code "<kebab-case-name>"` slug
+   (directory name with underscores → hyphens). **Leave `workspace: "snt-development"` alone** —
+   see below.
 5. `pipelines/<name>/{code,reporting,utils}/` — analytics, and register the filenames in
    `pull_scripts_from_repository(report_scripts=[...], code_scripts=[...])`. A file not listed
    there will never reach a workspace.
 6. Add the dataset id to `SNT_DATASET_IDENTIFIERS` in the config, and to the lineage tables in
    `docs/DATA_ARCHITECTURE.md`.
+
+### Always publish from `snt-development`
+
+`snt-development` is the team's single publication point for SNT pipelines, by convention.
+OpenHEXA ties template publication to the workspace a pipeline is pushed from:
+
+- Push from **`snt-development`** → publishes a **new version of the existing SNT template**,
+  which propagates to every country workspace subscribed to auto-update.
+- Push from **any other workspace** → creates a **separate new template pipeline**: a duplicate
+  nobody is subscribed to, competing with the real one in the template list.
+
+So: never edit `workspace:` in a `push_snt_*.yaml`, and never run `openhexa pipelines push` for
+an SNT pipeline from a country or personal workspace. `--description` and `--link` in those
+workflows stamp each published version with the commit message and a link to the commit, which is
+what makes the OpenHEXA version list a usable deployment history — write commit messages that
+will read well there.
 
 ### Standard pipeline parameters
 
@@ -216,11 +286,17 @@ Keep these names and behaviours identical across pipelines — operators rely on
 
 ## Traps
 
-- **Five outlier-imputation pipelines write identical filenames to the same dataset**
-  (`{CC}_routine_outliers_{detected,removed,imputed}.parquet` → `DHIS2_OUTLIERS_IMPUTATION`), and
-  each also overwrites the workspace DB table `outliers_detected`. **Last run wins**, with no
-  provenance in the data. Never assume which method produced the file you are reading. Same for
-  the two `reporting_rate_*` variants → `DHIS2_REPORTING_RATE`.
+- **Last run wins — by design.** The five outlier-imputation pipelines all write
+  `{CC}_routine_outliers_{detected,removed,imputed}.parquet` to `DHIS2_OUTLIERS_IMPUTATION`, and
+  the two `reporting_rate_*` variants both write to `DHIS2_REPORTING_RATE`. This is **intended**:
+  the analyst tries alternative methods, settles on one, and downstream consumes whatever was
+  produced last. Do not "fix" it by renaming outputs per method — that would break the override
+  mechanism. Do remember that the file alone does not tell you which method produced it: check the
+  `{CC}_parameters.json` published beside it, or the OpenHEXA dataset version.
+  - ⚠️ **Needs attention (not a rule yet):** the same runs also overwrite the workspace DB table
+    `outliers_detected`. No pipeline reads that table — its consumer is a Shiny app, currently
+    paused and possibly to be replaced. Whoever resumes that work should decide whether the table
+    needs a method/run discriminator column before it is depended on again.
 - **Missing inputs skip, they do not fail.** `snt_dhis2_formatting` gates each of its five stages
   on `dataset_file_exists()`; `download_dhis2_analytics` catches per-period errors and continues.
   A partial run looks successful. If you add a stage, decide deliberately between skip and raise,

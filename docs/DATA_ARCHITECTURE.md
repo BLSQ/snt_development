@@ -52,23 +52,92 @@ override each other" behaviours possible.
 
 | Channel | Carries | Trigger | Mechanism |
 |---|---|---|---|
-| **CI push** | `pipeline.py`, `requirements.txt` | push to `main` touching those paths | `.github/workflows/push_<pipeline>.yaml` → `blsq/openhexa-cli-action@v1` → `openhexa pipelines push <dir>` into workspace `snt-development` |
-| **Runtime pull** | `pipelines/<name>/code/*.ipynb`, `reporting/*.ipynb`, `utils/*.r` | operator runs the pipeline with **`Pull scripts` = ON** in the OpenHEXA UI | `pull_scripts_from_repository()` from `snt_lib`, reading this repo |
+| **CI push → template** | `pipeline.py`, `requirements.txt` (Python only) | push to `main` touching those paths | `.github/workflows/push_<pipeline>.yaml` → `blsq/openhexa-cli-action@v1` → `openhexa pipelines push <dir>` into `snt-development`, which publishes a **new version of the SNT template pipeline**; subscribed country workspaces update automatically (§2.2) |
+| **Runtime pull** | `pipelines/<name>/code/*.ipynb`, `reporting/*.ipynb`, `utils/*.r` (all R) | operator runs the pipeline with **`Pull scripts` = ON** in the OpenHEXA UI | `pull_scripts_from_repository()` from `snt_lib`, reading this repo — no template involvement, no automation (§2.2.1) |
 
-**This asymmetry is the single most important operational fact in the system.** Merging a
-notebook change to `main` changes *nothing* in any workspace until somebody runs that pipeline
-with `Pull scripts` toggled on. Country workspaces can silently run months-old analytics code
-while `main` looks current.
+**This asymmetry is the single most important operational fact in the system**, and it exists
+because OpenHEXA supports Python pipelines but not R (§2.2.1). Merging a notebook change to
+`main` changes *nothing* in any workspace until somebody runs that pipeline with `Pull scripts`
+toggled on. The Python half, by contrast, can reach every country workspace automatically through
+the template mechanism — so the two halves of one pipeline drift apart by default.
 
 Corollary: the CI path filters only watch `pipeline.py` / `requirements.txt` / `readme.txt`, so
 a notebook-only PR produces **no CI run at all** — absence of a green check is expected, not a
 failure.
 
-### 2.2 Deployment target
+### 2.2 How a pipeline version reaches a country workspace — the template mechanism
 
-All 20 workflows push to the **same** workspace: `snt-development`. Country workspaces are
-provisioned separately; **[TODO: Giulia]** document how a pipeline version reaches a production
-country workspace (promotion from `snt-development`? independent push? manual?).
+All 20 workflows push to the **same** workspace, `snt-development`, and that is not incidental:
+it is the mechanism by which updates reach every country.
+
+OpenHEXA supports **template pipelines**: a pipeline that normally lives in one workspace can be
+published as a template, which makes it installable in *any* OpenHEXA workspace. Each country
+workspace installs the SNT pipelines from that template list, and can opt in to being updated
+automatically whenever the source template publishes a new version. That opt-in is how validated
+changes propagate across all countries without touching each workspace by hand.
+
+```
+  this repo ──push (CI)──▶  snt-development ws  ──▶  SNT template pipelines
+                             (the reference ws)              │
+                                                             │ install / auto-update
+                            ┌────────────────┬───────────────┼────────────────┐
+                            ▼                ▼               ▼                ▼
+                        COD ws           BFA ws          NER ws           … ws
+```
+
+**Why the workspace must be `snt-development`.** Publishing a template version is tied to the
+workspace the pipeline is pushed from. Pushing from `snt-development` publishes a **new version
+of the existing SNT template**, which flows to every country workspace subscribed to it. Pushing
+the same pipeline from *any other* workspace instead creates a **separate, new template
+pipeline** — a duplicate that no country workspace is subscribed to, and that silently competes
+with the real one in the template list.
+
+> **Rule:** never change `workspace:` in a `push_snt_*.yaml`, and never `openhexa pipelines push`
+> an SNT pipeline from a country workspace or a personal one. `snt-development` is the single
+> publication point by team convention.
+
+What each workflow does, concretely (all 20 are identical apart from names):
+
+```yaml
+on:
+  push:
+    branches: [main]
+    paths:                                   # ← Python side only
+      - "<pipeline>/pipeline.py"
+      - "<pipeline>/requirements.txt"
+      - ".github/workflows/push_<pipeline>.yaml"
+jobs:
+  deploy:
+    - actions/checkout@v4
+    - actions/setup-python@v5                # 3.11, pip cache on requirements.txt
+    - blsq/openhexa-cli-action@v1            # workspace: "snt-development", token: secrets.OH_TOKEN
+    - run: openhexa pipelines push <pipeline_dir>
+             --code "<kebab-case-slug>"      # dir name, underscores → hyphens
+             --description "<commit message>"
+             --link "https://github.com/BLSQ/snt_development/commit/<sha>"
+             --yes
+```
+
+`--description` and `--link` stamp each published version with the commit message and a link back
+to the commit — so the OpenHEXA version list is a readable deployment history. Keep commit
+messages meaningful for that reason. Verified 2026-08-26: all 20 workflows target
+`snt-development`, use the same four flags, and every `--code` slug matches its directory name.
+
+### 2.2.1 R is outside this mechanism — the core pain point
+
+**OpenHEXA pipelines and templates cover the Python side only.** OpenHEXA was not built for R, so
+none of the analytics — which is where essentially all the business logic lives — can travel
+through the template system.
+
+That asymmetry is the reason `pull_scripts` exists. The R notebooks and `.r` helpers are fetched
+from this repository *at run time*, by a parameter an operator has to remember to toggle, rather
+than being versioned and propagated with the pipeline they belong to. So a country workspace can
+be running the newest `pipeline.py` (auto-updated via the template) against months-old R
+analytics (never pulled) — with nothing anywhere reporting the mismatch.
+
+This is a known, acknowledged pain point; solutions are being discussed with the OpenHEXA
+developers. Until it changes, treat the two halves of every pipeline as **independently
+versioned**, and see [`CLAUDE.md` rule 2](../CLAUDE.md#the-five-rules-that-matter-most).
 
 ### 2.3 Language split
 
@@ -145,14 +214,25 @@ Five pipelines — `iqr`, `median`, `mean`, `path`, `magic_glasses` — all read
 {CC}_routine_outliers_imputed.parquet
 ```
 
-> **Last run wins.** Because the variants share output names and a single dataset, the most
-> recent run determines what every downstream pipeline sees. Nothing in the data records which
-> method produced it except the pipeline-parameters JSON and the dataset version name.
-> This is the system's principal reproducibility hazard.
+> **Last run wins — this is the intended design, not a collision.** The analyst runs several
+> methods on the same routine data, compares the reports, settles on one, and moves to the next
+> stage; downstream pipelines consume whatever was produced last. Shared output names are the
+> mechanism that makes the methods interchangeable — renaming outputs per method would break the
+> override and force every downstream consumer to know which method it wants.
+>
+> The trade-off is that the file itself carries no method label. To recover which method produced
+> a given file, read the `{CC}_parameters.json` published alongside it in the same dataset
+> version, or the dataset version name. Never infer the method from the filename.
 
 Each variant also pushes `{CC}_routine_outliers_detected.parquet` into the **workspace database
-table `outliers_detected`** (`push_data_to_db_table`, parameter `push_db`, default `True`) —
-the only relational sink in the system, and again shared across all five variants.
+table `outliers_detected`** (`push_data_to_db_table`, parameter `push_db`, default `True`) — the
+only relational sink in the system, and likewise overwritten by whichever variant ran last.
+
+> ⚠️ **Needs attention.** No pipeline reads `outliers_detected`; its consumer is a Shiny app that
+> is currently paused and may be replaced by a different tool. Unlike the dataset files, the table
+> has no parameters JSON beside it, so once overwritten there is no record of which method or run
+> produced its rows. Before anything depends on this table again, decide whether it needs a
+> method/run-id discriminator (or append-with-run-id semantics instead of overwrite).
 
 **Stage D — Derived indicators**
 
@@ -175,13 +255,13 @@ the only relational sink in the system, and again shared across all five variant
 
 | `routine_data_choice` | dataset | filename |
 |---|---|---|
-| `raw` | `DHIS2_DATASET_FORMATTED` | `{CC}_routine_outliers_imputed.parquet`¹ |
+| `raw` | `DHIS2_DATASET_FORMATTED` | resolved by `resolve_routine_filename()` |
 | `raw_without_outliers` | `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_routine_outliers_removed.parquet` |
 | `imputed` (default) | `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_routine_outliers_imputed.parquet` |
 
-¹ `resolve_routine_filename()` returns an `_outliers_{removed|imputed}` name regardless of
-branch, so the `raw` branch asks `DHIS2_DATASET_FORMATTED` for a file that stage B never
-writes. **[TODO: Giulia]** confirm whether `raw` is expected to work — it looks unreachable.
+The dataset is chosen by the `raw` / not-`raw` branch; the filename comes from
+`resolve_routine_filename()`, which keys off `ROUTINE_DATA_CHOICE` via the `is_removed` global.
+Reading either half alone is misleading — trace both together before changing this.
 
 **Stage E — Assemble (egress)**
 
@@ -370,7 +450,8 @@ Validation is **in-line and advisory**, not a framework. What exists today:
   smaller merged file, not a failure.
 - `download_dhis2_analytics` catches per-period exceptions and `continue`s — a systematically
   failing DHIS2 endpoint produces a partial extract that looks successful.
-- Outlier-variant collision (§3.2 Stage C) has no provenance stamp in the data itself.
+- The `outliers_detected` DB table carries no method/run provenance (§3.2 Stage C). The dataset
+  files have theirs in the companion `{CC}_parameters.json`; the table has no equivalent.
 - No automated test suite anywhere in the repo.
 
 ---
@@ -385,9 +466,43 @@ Validation is **in-line and advisory**, not a framework. What exists today:
 | `worldpopclient.py` | **duplicated** in `snt_worldpop_extract/`, `snt_map_extracts/`, `snt_healthcare_access/` | WorldPop raster download |
 | `malariaAtlasProject/map.py` | `snt_map_extracts/` | MAP WCS client |
 
-`snt_lib` and `openhexa.toolbox` are both pinned to `@main` / no ref in every
-`requirements.txt` — **builds are not reproducible across time**; an upstream change to
-`snt_utils` reaches every pipeline on its next deploy.
+### 7.1 Dependency resolution is not reproducible
+
+Every `requirements.txt` in the repo is the same two lines:
+
+```
+openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@main
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+```
+
+Both are **Git dependencies pointing at a moving branch**, not at released versions. `@main`
+resolves to whatever the tip of `main` happens to be *at the moment the pipeline is deployed*;
+the `snt_lib` line specifies no ref at all and so follows that repo's default branch. The
+installed commit is never recorded.
+
+What this means in practice:
+
+| | Effect |
+|---|---|
+| **Same code, different runtime** | Redeploying an unchanged `pipeline.py` weeks apart can install different `snt_lib` code, so behaviour changes with no diff in this repo. |
+| **Invisible blast radius** | A change in `BLSQ/snt_utils` — a renamed helper, a new required argument on `run_notebook()` — propagates to all ~20 pipelines on their next deploy, with no PR and no CI signal here. |
+| **Un-diagnosable failures** | After a broken run, "which version of `snt_lib` did this use?" cannot be answered. |
+
+Mitigation would be to pin a fixed point — a tag (`…/snt_utils.git@v1.4.0`) or a commit SHA
+(`…/snt_utils.git@a1b2c3d`) — turning upgrades into reviewable, revertible one-line PRs. Cost:
+someone must bump the refs to adopt upstream changes. **Not currently implemented**; logged in
+[`CLAUDE.md`](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) for evaluation.
+
+### 7.2 CI coverage
+
+The only workflows are the 20 `push_snt_*.yaml` deployment files. Each triggers on `push` to
+`main`, filtered to `<pipeline>/pipeline.py`, `<pipeline>/requirements.txt` and its own workflow
+file. Therefore:
+
+- A PR touching only `pipelines/**` (notebooks, `.r` helpers) matches **no** workflow — no checks
+  appear on the PR. Expected, not a fault.
+- The workflows that do fire run **after** merge and only perform `openhexa pipelines push`.
+- `ruff` is configured in `pyproject.toml` but is never executed by CI, before or after merge.
 
 ---
 
@@ -403,7 +518,10 @@ Validation is **in-line and advisory**, not a framework. What exists today:
 ## 9. Open questions
 
 1. **[TODO: Giulia]** Pipeline order & dependency mapping (§4.2).
-2. **[TODO: Giulia]** Promotion path from `snt-development` to country workspaces (§2.2).
-3. **[TODO: Giulia]** Is `routine_data_choice = "raw"` reachable in `snt_dhis2_incidence`? (§3.2)
-4. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7)
-5. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)
+2. **Under discussion with the OpenHEXA developers** — how to version and propagate the R half of
+   each pipeline, so notebooks stop depending on an operator remembering `Pull scripts` (§2.2.1).
+3. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
+   (paused Shiny app, or its replacement) is resumed (§3.2 Stage C).
+4. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)
+5. Should a `pull_request`-triggered `ruff check` job be added? (§7.2)
+6. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)

@@ -1,7 +1,11 @@
 # CLAUDE.md — working rules for `snt_development`
 
 Guardrails for anyone (human or agent) changing code in this repository.
-Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
+
+- **[Conventions → Register](#register)** — every hard rule (R1–R18) in one table, with its
+  enforcement status and known exceptions. Start there if you want the rules without the prose.
+- Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
+- Writing a pipeline `readme.md`: [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md).
 
 ---
 
@@ -105,7 +109,9 @@ In descending order of what is actually achievable:
 
 1. `uv run ruff check <pipeline_dir>/` — catches the majority of Python regressions.
 2. Read the R notebook's fallback cell (`if (!exists("PARAM")) PARAM <- …`) and confirm every
-   parameter injected from `pipeline.py` has a matching fallback, spelled identically.
+   parameter injected from `pipeline.py` has a matching fallback, spelled identically — **case
+   included** (**R11/R12**). This is a silent failure: a case mismatch means the notebook quietly
+   runs on its hardcoded default instead of the operator's choice.
 3. Trace dataset ids and filenames by hand against
    [`docs/DATA_ARCHITECTURE.md` §3](docs/DATA_ARCHITECTURE.md#3-data-lineage) — a filename typo
    is the most common breakage and fails only at runtime.
@@ -171,6 +177,24 @@ Not implemented — recorded here so they can be assessed:
   make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
   when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
 - **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
+- **Stamp readmes with the version they describe**, to make drift detectable. Blocked on deciding
+  *which* version number counts (source / template / workspace — see
+  [`docs/DATA_ARCHITECTURE.md` §7.1.1](docs/DATA_ARCHITECTURE.md)). A commit SHA of the
+  `pipeline.py` last verified against is well-defined today and needs no OpenHEXA change.
+- **Unify the routine-data-choice vocabulary** across `snt_dhis2_incidence`, both
+  `reporting_rate_*` pipelines and `snt_dhis2_quality_of_care` — operator-visible, so it needs a
+  migration rather than a rename. (Rule **R15**.)
+- **Migrate the three lowercase-parameter pipelines to UPPERCASE** (rule **R11**):
+  `snt_dhis2_quality_of_care` (`data_action`), `snt_seasonality_cases` and
+  `snt_seasonality_rainfall` (`minimum_month_block_size`, `maximum_month_block_size`,
+  `threshold_for_seasonality`, `threshold_proportion_seasonal_years`,
+  `use_calendar_year_denominator`). Purely internal — these are notebook globals, not `@parameter`
+  codes, so **no operator-visible name changes and no OpenHEXA UI churn**, unlike R15. Each is a
+  contained three-part edit: the injected dict in `pipeline.py`, the `if (!exists("X"))` fallback
+  cell, and every use inside the notebook and its `utils/*.r`. It must be atomic per pipeline —
+  a missed use site fails only at runtime, in a workspace, with an "object not found" error.
+  Cheapest sequencing: do it in the same PR as the R15 vocabulary migration for
+  `snt_dhis2_quality_of_care`, since that notebook is being touched anyway.
 - **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
   append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
   are fine as they are — overwriting is the intended override mechanism and their companion
@@ -180,12 +204,47 @@ Not implemented — recorded here so they can be assessed:
 
 ## Conventions
 
+### Register
+
+Every hard rule in this repo, in one scannable place. The prose sections below carry the *why*;
+this table is the *what*. **Status** is honest about the gap between the rule and the code:
+
+- `enforced` — something mechanical fails if you break it.
+- `convention` — manual, but no known violations. Treat as binding.
+- `⚠ exceptions` — the rule is the target, and named code violates it today. Write new code to the
+  rule; do not partially convert an existing violator (see the linked TODO).
+
+| ID | Rule | Status |
+|---|---|---|
+| **R1** | No country data in git — no `.csv`/`.xlsx`/`.parquet`/`.rds`/`.geojson` with real values | `enforced` (`.gitignore`); never `git add -f` |
+| **R2** | Notebook outputs stripped before commit | `convention` → [nbstripout git filter](#suggestions-logged-for-later-evaluation-giulia) |
+| **R3** | `pipeline.py` orchestrates, never computes | `convention` |
+| **R4** | An output only exists if it is passed to `add_files_to_dataset(...)` | `convention` |
+| **R5** | Publish only from the `snt-development` workspace | `convention` — [why](#always-publish-from-snt-development) |
+| **R6** | Every new notebook / `.r` file registered in `pull_scripts_from_repository(...)` | `convention` |
+| **R7** | Every data file prefixed `{CC}_`, uppercase country code | `⚠ exceptions` — `data/worldpop/rasters/{cc_lower}_pop_*.tif` (see [Traps](#traps)) |
+| **R8** | Parquet is the machine contract; write the `.csv` twin beside it | `convention` |
+| **R9** | `{CC}_parameters.json` published beside the data, via `save_pipeline_parameters(...)` | `⚠ exceptions` — ERA5 stamps `pipeline_name="snt_era5_aggregate"`; healthcare_access stores the `File` object, not `.path` |
+| **R10** | All **column** names UPPERCASE in every published artefact | `convention` |
+| **R11** | All **notebook parameter** globals UPPERCASE, injected side and `exists()` side alike | `⚠ exceptions` — [TODO: migrate 3 pipelines](#suggestions-logged-for-later-evaluation-giulia) |
+| **R12** | Every injected parameter has a matching `if (!exists("X")) X <- …` fallback, spelled identically | `convention` |
+| **R13** | Admin levels read from config, never hardcoded | `convention` — [Schema](#schema) |
+| **R14** | Standard flags named `run_report_only` / `pull_scripts` / `overwrite` | `⚠ exceptions` — `run_reports_only` in `snt_dhs_indicators` |
+| **R15** | One vocabulary per concept in operator-facing `choices=[...]` | `⚠ exceptions` — 3 routine-data vocabularies ([TODO](#suggestions-logged-for-later-evaluation-giulia)) |
+| **R16** | `readme.md` updated in the same PR as the `pipeline.py` change it describes | `convention` — [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
+| **R17** | R failure messages prefixed `[ERROR]` or `[WARNING]`, chosen deliberately | `convention` — [Logging](#logging--error-labels) |
+| **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](#suggestions-logged-for-later-evaluation-giulia) |
+
+Adding a rule: add a row here *and* the rationale to the matching section below. A rule that is
+only in the prose will be missed; a rule that is only in the table will be misapplied.
+
 ### Adding or changing a pipeline
 
 1. `<name>/pipeline.py` — `@pipeline("<name>")`, `@parameter(...)`, orchestration only.
 2. `<name>/requirements.txt` — match the existing two-line pattern unless more is genuinely needed.
-3. `<name>/readme.md` — Parameters / Functionality Overview / Inputs / Outputs. Existing readmes
-   are detailed and accurate; match that standard, they are the user-facing contract.
+3. `<name>/readme.md` — the user-facing contract. Follow
+   [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md), which defines the
+   required sections and how to verify each one against the code.
 4. `.github/workflows/push_<name>.yaml` — copy an existing one; update **every** occurrence of
    the pipeline name, including the `paths:` filter and the `--code "<kebab-case-name>"` slug
    (directory name with underscores → hyphens). **Leave `workspace: "snt-development"` alone** —
@@ -275,6 +334,12 @@ Keep these names and behaviours identical across pipelines — operators rely on
   tracked by mistake under `pipelines/snt_dhis2_formatting/reporting/`.
 - Every parameter injected from `pipeline.py` needs an `if (!exists("X")) X <- <default>` fallback
   cell, so the notebook stays interactively runnable. Change both sides together.
+- **Notebook parameter globals are UPPERCASE** (**R11**) — `ROUTINE_DATA_CHOICE`, `SNT_ROOT_PATH`,
+  `DEVIATION_IQR`. This distinguishes an injected pipeline parameter from an ordinary R local at a
+  glance, and matches the UPPERCASE column convention. Three pipelines predate the rule and use
+  lowercase — see [Traps](#traps). New parameters are UPPERCASE even when added to one of those
+  three, *unless* that would leave a single notebook mixing both: converting a violator is an
+  all-at-once change, not a drive-by.
 - Notebooks under `.github/CODEOWNERS` require **@sPuntinG** approval:
   `pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb`,
   `pipelines/snt_dhis2_reporting_rate_dataelement/code/snt_dhis2_reporting_rate_dataelement.ipynb`.
@@ -310,20 +375,56 @@ Keep these names and behaviours identical across pipelines — operators rely on
   Exclude it. `deprecated/` is history, never a template.
 - `snt_lib` (`github.com/BLSQ/snt_utils`) is an **external, unpinned** dependency — its source is
   not in this repo. Do not guess its signatures; read the upstream repo or an existing call site.
+- **The external-source pipelines depend on `snt_dhis2_formatting`.** `snt_era5_climate_data`,
+  `snt_map_extracts`, `snt_worldpop_extract` and `snt_healthcare_access` all fetch
+  `{CC}_shapes.geojson` from `DHIS2_DATASET_FORMATTED` first. They look like independent roots;
+  they are not.
+- **`data/worldpop/rasters/` is a shared cache across three pipelines**, keyed on the filename
+  pattern `{cc_lower}_pop_{year}_*.tif` — note the *lowercase* country code, unlike every other
+  data file in the system. This is the one place pipelines couple through the filesystem instead
+  of a dataset. Don't rename those files.
+- **The same concept has three different parameter vocabularies.** "Routine data with outliers
+  removed" is `raw_without_outliers` in `snt_dhis2_incidence`, `outliers_removed` in the two
+  `reporting_rate_*` pipelines, and `removed` under a differently-named parameter (`data_action`)
+  in `snt_dhis2_quality_of_care`. Check the target pipeline's `choices=[...]` before assuming.
+- **Three pipelines break the UPPERCASE parameter rule (R11).** `snt_dhis2_quality_of_care`
+  (`data_action`), `snt_seasonality_cases` and `snt_seasonality_rainfall` inject lowercase globals.
+  Each is internally self-consistent, so it works — but it means you cannot assume the case of a
+  parameter without checking. Read the pipeline's injected dict before writing the notebook's
+  `exists()` cell. **Not a permitted variant**: logged for migration below. Do not half-convert
+  one — a notebook mixing `data_action` and `DATA_ACTION` is worse than either.
+  - Beware the near-miss in `snt_healthcare_access`: it injects UPPERCASE
+    (`INPUT_FOSA_FILE`, `WORLDPOP_YEAR`) into the notebook but records lowercase keys in its
+    parameters JSON. Both are intentional; only the notebook side is governed by R11.
+- **Selecting "Pregnant Women" in `snt_dhis2_incidence` fails** — confirmed defect. The mapped
+  value `PREGNANT_WOMAN` (singular) correctly drives the indicator suffix but composes
+  `POP_PREGNANT_WOMAN`, while every producer writes `POP_PREGNANT_WOMEN` (plural). It stops loudly,
+  so no bad data — but the pipeline's own help text makes the bug read as expected behaviour. Fix
+  belongs in `select_population_column()`, not in the mapping. See
+  [`docs/DATA_ARCHITECTURE.md` §6.1](docs/DATA_ARCHITECTURE.md).
+- **`snt_dhis2_reporting_rate_*` is the reference implementation for routine-file selection** —
+  its `resolve_routine_filename()` is explicit and total, and it verifies the file exists with
+  `dataset_file_exists()` before running anything. Copy that shape rather than inventing another.
+- **`snt_assemble_results` is being deprecated** — the SNT Explorer will read the OpenHEXA datasets
+  directly instead. Don't extend it, and treat `configuration/SNT_metadata.json` as mid-change.
 
 ---
 
 ## Handover checklist
 
-Before calling a change done:
+Before calling a change done — each item maps to a rule in the [Register](#register):
 
-- [ ] `uv run ruff check <changed dirs>` clean.
-- [ ] Notebook outputs stripped; no `.csv`/`.parquet`/Zone.Identifier files staged.
-- [ ] `pipeline.py` parameters ↔ notebook `exists()` fallbacks agree, name for name.
+- [ ] `uv run ruff check <changed dirs>` clean. *(R18)*
+- [ ] Notebook outputs stripped; no `.csv`/`.parquet`/Zone.Identifier files staged. *(R1, R2)*
+- [ ] `pipeline.py` parameters ↔ notebook `exists()` fallbacks agree, name for name and **case for
+      case**; new globals are UPPERCASE. *(R11, R12)*
 - [ ] New outputs are in `add_files_to_dataset(...)`, in the pipeline `readme.md`, and in
-      `docs/DATA_ARCHITECTURE.md`.
-- [ ] New notebook/`.r` filenames registered in `pull_scripts_from_repository(...)`.
-- [ ] New pipeline: workflow file added with the name updated in *all* places.
+      `docs/DATA_ARCHITECTURE.md`. *(R4, R16)*
+- [ ] New notebook/`.r` filenames registered in `pull_scripts_from_repository(...)`. *(R6)*
+- [ ] New pipeline: workflow file added with the name updated in *all* places, `workspace:` left
+      as `snt-development`. *(R5)*
+- [ ] `readme.md` re-verified against the code, not patched by memory —
+      [`docs/PIPELINE_README_STANDARD.md` §3](docs/PIPELINE_README_STANDARD.md). *(R16)*
 - [ ] Handover states: which country/workspace it was tested in (or that it was not), and that
       operators must run with **`Pull scripts` = ON** to pick up notebook changes.
 

@@ -164,7 +164,22 @@ Python pipelines are the only ones with a workable local development story today
 | **WorldPop** | `https://data.worldpop.org/GIS/Population` (`Global_2015_2030/R2025A`) | `snt_worldpop_extract`, `snt_map_extracts`, `snt_healthcare_access` | population rasters (`worldpopclient.py`, duplicated in 3 pipelines) |
 | **Malaria Atlas Project** | `https://data.malariaatlas.org/geoserver` (WCS) | `snt_map_extracts` | `malariaAtlasProject/map.py` |
 | **DHS** | recode files staged in the workspace | `snt_dhs_indicators` | `extract_latest_dhs_recode_filename()` in `code/snt_utils.r` |
-| **Operator uploads** | OpenHEXA `File` parameter | `snt_dhis2_incidence` (care-seeking CSV), `snt_assemble_results` (`add_layers_file`) | user-supplied override paths |
+| **Operator uploads** | OpenHEXA `File` parameter | `snt_dhis2_incidence` (care-seeking CSV), `snt_dhis2_population_transformation` (disaggregation CSV), `snt_healthcare_access` (FOSA locations CSV), `snt_assemble_results` (`add_layers_file`) | user-supplied override paths |
+
+> **The external-source pipelines are not lineage roots.** `snt_era5_climate_data`,
+> `snt_map_extracts`, `snt_worldpop_extract` and `snt_healthcare_access` each fetch
+> `{CC}_shapes.geojson` from `DHIS2_DATASET_FORMATTED` before they can do anything — the ADM2
+> geometries define the zones they aggregate into (and, for ERA5, the CDS request bounding box).
+> **`snt_dhis2_formatting` must have run first**, even for the pipelines that touch no DHIS2 data.
+
+**A shared raster cache sits outside the dataset contract.** `data/worldpop/rasters/` is written
+by `snt_worldpop_extract` and read *and* written by `snt_map_extracts` and `snt_healthcare_access`,
+all keyed on the filename pattern `{cc_lower}_pop_{year}_*.tif`. `snt_healthcare_access` even
+carries a source comment explaining it copies MAP's lowercase-country convention to find the file.
+This is the one place where pipelines couple through the **filesystem** rather than through a
+dataset, and it is invisible to the lineage tables below: a raster downloaded by one pipeline is
+silently reused by another. It is a cache, so the failure mode is a redundant download rather than
+wrong data — but a stale or partial `.tif` would be picked up by all three.
 
 ### 3.2 Stages
 
@@ -245,11 +260,29 @@ only relational sink in the system, and likewise overwritten by whichever varian
 | `snt_dhis2_quality_of_care` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_quality_of_care_district_year_{action}.*` → `DHIS2_QUALITY_OF_CARE` |
 | `snt_seasonality_cases` | `DHIS2_DATASET_FORMATTED` | `{CC}_cases_seasonality.*` → `SNT_SEASONALITY_CASES` |
 | `snt_seasonality_rainfall` | `DHIS2_DATASET_FORMATTED`, `ERA5_DATASET_CLIMATE` | `{CC}_rainfall_seasonality.*` → `SNT_SEASONALITY_RAINFALL` |
-| `snt_healthcare_access` | `DHIS2_DATASET_FORMATTED` + WorldPop rasters | `{CC}_population_covered_health.*` → `SNT_HEALTHCARE_ACCESS` |
-| `snt_dhs_indicators` | DHS recodes + `DHIS2_DATASET_FORMATTED` | one file per indicator, `{CC}_{source}_{admin_level}_{INDICATOR}.*` → `DHS_INDICATORS` |
-| `snt_map_extracts` | MAP WCS + WorldPop | `{CC}_map_data_{year}.*` → `SNT_MAP_EXTRACTS` |
-| `snt_worldpop_extract` | WorldPop + `{CC}_shapes.geojson` | `{CC}_worldpop_population*.parquet` → `WORLDPOP_DATASET_EXTRACT` |
-| `snt_era5_climate_data` | Copernicus CDS | `{CC}_{variable}_{daily,weekly,epi_weekly,monthly}.parquet` → `ERA5_DATASET_CLIMATE` |
+| `snt_healthcare_access` | formatted shapes + WorldPop raster (`wpop_year`); optional FOSA CSV, else DHIS2 pyramid | `{CC}_population_covered_health.parquet/.csv` → `SNT_HEALTHCARE_ACCESS`. % of population within **5 km** of a health facility |
+| `snt_dhs_indicators` | DHS recodes + `DHIS2_DATASET_FORMATTED` | 11 indicators × parquet+csv, `{CC}_DHS_ADM1_{INDICATOR}.*` → `DHS_INDICATORS`. **ADM1 grain** (`data_source`/`admin_level` hardcoded) |
+| `snt_map_extracts` | MAP WCS + WorldPop raster + formatted shapes | `{CC}_map_data_{year}.parquet/.csv` → `SNT_MAP_EXTRACTS` |
+| `snt_worldpop_extract` | WorldPop + formatted shapes | **only** the concatenated `{CC}_worldpop_population.parquet/.csv` → `WORLDPOP_DATASET_EXTRACT` |
+| `snt_era5_climate_data` | Copernicus CDS + formatted shapes | **only** `{CC}_{variable}_monthly.parquet` → `ERA5_DATASET_CLIMATE` |
+
+Three details in that table are easy to get wrong from filenames alone, and all three were verified
+against the code:
+
+- **ERA5 publishes monthly only.** `build_daily_snt` writes `daily`, `weekly`, `epi_weekly` and
+  `monthly` parquets to `data/era5/aggregate/{variable}/`, but only the monthly path is appended to
+  `file_paths_to_upload` (the source comments this as deliberate: "Keep upload behavior identical to
+  existing aggregate pipeline (monthly only)"). The other three exist on the workspace filesystem
+  and are invisible downstream.
+- **ERA5 currently processes one variable.** `ERA5_VARIABLES = ["total_precipitation"]`;
+  `2m_temperature` and `2m_dewpoint_temperature` are commented out at module level. Temperature
+  outputs do not exist today, whatever a downstream notebook may hope for.
+- **WorldPop publishes only the concatenation.** Per-year `{CC}_worldpop_agg_{year}.parquet` and
+  `{CC}_worldpop_population_{year}.parquet` stay on disk; only the all-years concatenation is
+  published. Note `snt_map_extracts` writes a file of the *same name*
+  (`{CC}_worldpop_population_{year}.parquet`) into a *different* directory
+  (`data/map/aggregated_populations/`) with a different schema — same name, different meaning,
+  no collision only because the directories differ.
 
 `snt_dhis2_incidence` input selection (in `pipelines/snt_dhis2_incidence/utils/snt_dhis2_incidence.r`):
 
@@ -259,11 +292,44 @@ only relational sink in the system, and likewise overwritten by whichever varian
 | `raw_without_outliers` | `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_routine_outliers_removed.parquet` |
 | `imputed` (default) | `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_routine_outliers_imputed.parquet` |
 
-The dataset is chosen by the `raw` / not-`raw` branch; the filename comes from
-`resolve_routine_filename()`, which keys off `ROUTINE_DATA_CHOICE` via the `is_removed` global.
-Reading either half alone is misleading — trace both together before changing this.
+Verified in `pipelines/snt_dhis2_incidence/utils/snt_dhis2_incidence.r`: `resolve_routine_filename()`
+early-returns `"_routine.parquet"` for `raw` (line 83) before the `is_removed` logic runs, and
+`select_routine_dataset_and_filename()` picks the dataset on the same condition. All three choices
+resolve correctly.
 
-**Stage E — Assemble (egress)**
+**But the same concept is spelled three different ways across pipelines**, which defeats the
+operator muscle-memory the shared parameter names are supposed to buy:
+
+| Pipeline | Parameter | Choices |
+|---|---|---|
+| `snt_dhis2_incidence` | `routine_data_choice` | `raw`, **`raw_without_outliers`**, `imputed` |
+| `snt_dhis2_reporting_rate_dataelement` / `_dataset` | `routine_data_choice` | `raw`, `imputed`, **`outliers_removed`** |
+| `snt_dhis2_quality_of_care` | **`data_action`** | `imputed`, **`removed`** (no `raw` option) |
+
+Three names for "routine data with outliers removed", and a fourth parameter name for the same
+choice. Worth unifying; changing published parameter names is operator-visible, so it needs a
+deliberate migration rather than a quiet rename.
+
+**Stage E — Assemble (egress) — ⚠️ BEING DEPRECATED**
+
+> **This stage is on its way out. Do not build on it, and do not invest in extending it.**
+>
+> `snt_assemble_results` exists for exactly one consumer: it flattens everything into a single
+> ADM2 table for the **SNT Explorer** (an IASO-based application). The approach is changing —
+> the SNT Explorer will instead **import data layers directly from the OpenHEXA datasets**,
+> driven by a modified version of `SNT_metadata.json`. Once that lands, the single assembled
+> results table stops being the system's egress point, and this pipeline is expected to be
+> deprecated and removed.
+>
+> Two practical consequences right now:
+> - **`configuration/SNT_metadata.json` is mid-change** and is deliberately *not* audited in this
+>   document. Treat its current structure as unstable; do not encode assumptions about it.
+> - The description below documents the pipeline **as it stands today**, for operators still
+>   running it — not as a design to extend or replicate.
+>
+> The architectural direction is worth stating plainly: the per-stage datasets already *are* the
+> contract (§1), so having the Explorer read them directly removes a lossy flattening step —
+> along with the metadata gate that silently drops undeclared columns (point 1 below).
 
 `snt_assemble_results` (pure Python, 1 643 lines) builds the deliverable:
 
@@ -302,11 +368,23 @@ DHIS2 ──▶ A. extract ──▶ DHIS2_DATASET_EXTRACTS
   DHIS2_REPORTING_RATE      DHIS2_INCIDENCE                           │              │
         └───────────────┬───────────┴────────────────────────────────┴──────────────┘
                         ▼
-ERA5 ─▶ era5_climate ───┤       WorldPop ─▶ worldpop_extract ─┐
-MAP  ─▶ map_extracts ───┤       DHS ──────▶ dhs_indicators ───┤
-                        ▼                                     ▼
-                   E. snt_assemble_results  ──▶  SNT_RESULTS  (1 row per ADM2)
+                        │
+   ┌────────────────────┴─── {CC}_shapes.geojson (from DHIS2_DATASET_FORMATTED) ───┐
+   │                                                                               │
+ERA5 ─▶ era5_climate    MAP ─▶ map_extracts    WorldPop ─▶ worldpop_extract    DHS ─▶ dhs_indicators
+   │                          │       │                          │                   │
+   │                          │       └── data/worldpop/rasters/ ┘ (shared FS cache)  │
+   ▼                          ▼                                  ▼                   ▼
+ERA5_DATASET_CLIMATE   SNT_MAP_EXTRACTS              WORLDPOP_DATASET_EXTRACT   DHS_INDICATORS
+   │                          │                                                      │
+   └──────────────────────────┴──────────────────┬───────────────────────────────────┘
+                                                 ▼
+                          E. snt_assemble_results  ──▶  SNT_RESULTS  (1 row per ADM2)
+                             ⚠️ being deprecated — SNT Explorer will read datasets directly
 ```
+
+Note the shapes fan-out: the three external-source pipelines are **downstream of
+`snt_dhis2_formatting`**, not independent roots, because they aggregate into its ADM2 geometries.
 
 ---
 
@@ -343,8 +421,21 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
 
 `run_notebook()` / `run_report_notebook()` (from `snt_lib`) wrap papermill:
 
-- Parameters are injected as **uppercase globals** into the R notebook; every notebook has a
-  fallback cell `if (!exists("PARAM")) PARAM <- <default>` so it stays runnable interactively.
+- Parameters are injected as globals into the R notebook, and every notebook has a fallback cell
+  `if (!exists("PARAM")) PARAM <- <default>` so it stays runnable interactively. Injected globals
+  are **UPPERCASE** (`ROOT_PATH`, `N1_METHOD`, `DEVIATION_IQR`, `SNT_ROOT_PATH`…) — rule **R11** in
+  [`CLAUDE.md`](../CLAUDE.md). Three pipelines predate the rule and use lowercase on both sides:
+  `snt_dhis2_quality_of_care` (`data_action`), `snt_seasonality_cases` and
+  `snt_seasonality_rainfall` (`minimum_month_block_size`, …). Each is internally consistent, so
+  nothing is broken today, and they are logged for migration. Until then, do not assume the case
+  of a parameter — read `pipeline.py`'s injected dict, and keep it and the fallback cell in exact
+  agreement, case included.
+
+  Note the distinction between the two dicts a pipeline builds: the one passed to `run_notebook()`
+  (governed by R11) and the one passed to `save_pipeline_parameters()` (a provenance record, free
+  to use the operator-facing lowercase `@parameter` codes). `snt_healthcare_access` deliberately
+  does both — `INPUT_FOSA_FILE`/`WORLDPOP_YEAR` to the notebook, `input_fosa_file`/`wpop_year` to
+  the JSON.
 - The notebook resolves its own inputs — dataset ids come from `SNT_config.json` inside the R
   code (`config_json$SNT_DATASET_IDENTIFIERS$…`), not from `pipeline.py`. **Lineage for
   notebook-driven pipelines is therefore only visible in the `.ipynb`/`.r` files.**
@@ -445,7 +536,43 @@ Validation is **in-line and advisory**, not a framework. What exists today:
 | DHS recode consistency | `check_dhs_same_version()` | logs |
 | Metadata-schema gate | `snt_assemble_results` | column absent from `SNT_metadata.json` is dropped + warned |
 
-**Known blind spots** (candidates for hardening, not defects to fix silently):
+### 6.1 Confirmed defect — `POP_PREGNANT_WOMAN` vs `POP_PREGNANT_WOMEN`
+
+Selecting **"Pregnant Women"** in `snt_dhis2_incidence` fails, every time, in every country.
+
+The chain, all verified:
+
+1. `snt_dhis2_incidence/pipeline.py:117` maps the UI label to the singular
+   `"Pregnant Women" → "PREGNANT_WOMAN"`.
+2. That single value is then used for **two different naming domains**:
+   - *indicator suffix* — `target_colnames <- glue("{prefix_all}_{DISAGGREGATION_SELECTION}")` →
+     `SUSP_PREGNANT_WOMAN`, `TEST_PREGNANT_WOMAN`, … which **matches** the singular keys in
+     `SNT_config_NER.json`. ✅
+   - *population column* — `POPULATION_SELECTION <- paste0("POP_", DISAGGREGATION_SELECTION)` →
+     `POP_PREGNANT_WOMAN`. ❌
+3. Every producer of that column uses the **plural**: `snt_dhis2_formatting_population.ipynb`
+   (`disaggregation_cols <- c("POP_UNDER_5", "POP_PREGNANT_WOMEN", …)`),
+   `snt_dhis2_population_transformation.ipynb`, `snt_assemble_results/pipeline.py:351`, and the
+   `POPULATION_INDICATOR_DEFINITIONS` key in all five country configs.
+4. `select_population_column()` therefore takes its else-branch and calls `stop()`.
+
+The failure is **loud, not silent** — it raises with
+`Population Disaggregation: Column 'POP_PREGNANT_WOMAN' not found in Population dataset!` — so no
+bad data is produced, and `pipeline.py`'s help text already warns the run will fail if the group is
+unavailable. That warning makes a genuine bug look like expected behaviour.
+
+The `"Children Under 5 Years Old" → "UNDER_5" → "POP_UNDER_5"` path is unaffected: singular and
+plural coincide.
+
+**The fix is not a rename of the mapped value** — that value legitimately drives the singular
+indicator suffix. It needs an explicit disaggregation → population-column mapping in
+`select_population_column()`. Note also that `configuration/readme.txt` records the historical
+population blocks with the singular `POP_PREGNANT_WOMAN`, which is where the ambiguity likely
+originates.
+
+### 6.2 Known blind spots
+
+(Candidates for hardening, not defects to fix silently.)
 - No row-count or schema assertion between stages; an empty period yields a warning and a
   smaller merged file, not a failure.
 - `download_dhis2_analytics` catches per-period exceptions and `continue`s — a systematically
@@ -453,6 +580,18 @@ Validation is **in-line and advisory**, not a framework. What exists today:
 - The `outliers_detected` DB table carries no method/run provenance (§3.2 Stage C). The dataset
   files have theirs in the companion `{CC}_parameters.json`; the table has no equivalent.
 - No automated test suite anywhere in the repo.
+- **`snt_dhs_indicators` publishes even in report-only mode.** Unlike every other pipeline, its
+  `add_files_to_dataset(...)` call sits outside the `if not run_reports_only:` guard, with 22
+  hardcoded file paths. Running it with "Run reportings only" = ON therefore cuts a **new dataset
+  version from whatever files happen to be on disk** — re-publishing stale data as if it were fresh.
+  Its parameters JSON is the only file excluded from that path.
+- **`snt_era5_climate_data` stamps the wrong pipeline name into its provenance file**:
+  `save_pipeline_parameters(pipeline_name="snt_era5_aggregate", …)` — a leftover from the
+  deprecated `snt_era5_aggregate` pipeline it replaced. Since the parameters JSON is the only
+  provenance record the system keeps, this misattributes every ERA5 run.
+- **`snt_healthcare_access` passes the `File` object, not its path**, into
+  `save_pipeline_parameters` (`"input_fosa_file": input_fosa_file`), where every other pipeline
+  passes `.path`. Whatever that serialises to is what the provenance record will contain.
 
 ---
 
@@ -493,7 +632,47 @@ Mitigation would be to pin a fixed point — a tag (`…/snt_utils.git@v1.4.0`) 
 someone must bump the refs to adopt upstream changes. **Not currently implemented**; logged in
 [`CLAUDE.md`](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) for evaluation.
 
-### 7.2 CI coverage
+### 7.1.1 Pipeline versions: three different numbers — ⚠️ pain point
+
+There is no single "version of a pipeline". At least three numbers exist, and they routinely
+disagree:
+
+| Version | What it counts |
+|---|---|
+| **Source pipeline version** | Increments on every `openhexa pipelines push` into `snt-development` |
+| **Template version** | Increments only from the point the pipeline was *made* a template — often lower than the source version, because templating usually happens after several iterations |
+| **Workspace version** | Always starts at **v1** on install. Installing a template that is at v5 gives the country workspace a pipeline at **v1** |
+
+So "which version is COD running?" cannot be answered by comparing numbers across workspaces — v1
+in a country workspace may be template v5 may be source v11. Combined with the R half not being
+versioned at all (§2.2.1), a country workspace's effective state is currently not expressible as a
+single version string.
+
+**Recorded as a pain point to raise with the OpenHEXA developers**, alongside the R propagation
+problem. Any drift-detection scheme (§7.3) has to pick *which* of these three numbers it compares,
+and the answer is not obvious.
+
+### 7.2 `readme.md` drift — ⚠️ pain point
+
+Each pipeline's `readme.md` is its user-facing contract, but nothing keeps it in step with the
+code: it is updated at the discretion of whoever edits `pipeline.py`, and practice varies between
+contributors. Nothing detects a readme that describes behaviour the code no longer has.
+
+This audit found the readmes to be accurate in substance — but it also found details that a
+filename-level reading would have got wrong (ERA5 publishing monthly only; WorldPop publishing only
+the concatenation), which is exactly the class of drift a readme accumulates silently.
+
+The required structure and a per-section verification checklist are now written down in
+[`PIPELINE_README_STANDARD.md`](PIPELINE_README_STANDARD.md), so "what a good readme contains" is
+no longer tacit knowledge held in one person's prompt.
+
+**Proposed mitigation (not implemented):** stamp the pipeline version the readme describes at the
+top of each `readme.md`, so a check can compare it against the deployed pipeline version and flag a
+mismatch. Blocked on §7.1.1 — the check has to decide *which* version number is authoritative.
+A weaker but immediately available variant: record the **commit SHA** of the `pipeline.py` the
+readme was last verified against, which is well-defined today and needs no OpenHEXA involvement.
+
+### 7.3 CI coverage
 
 The only workflows are the 20 `push_snt_*.yaml` deployment files. Each triggers on `push` to
 `main`, filtered to `<pipeline>/pipeline.py`, `<pipeline>/requirements.txt` and its own workflow
@@ -520,8 +699,16 @@ file. Therefore:
 1. **[TODO: Giulia]** Pipeline order & dependency mapping (§4.2).
 2. **Under discussion with the OpenHEXA developers** — how to version and propagate the R half of
    each pipeline, so notebooks stop depending on an operator remembering `Pull scripts` (§2.2.1).
-3. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
+3. **Under discussion with the OpenHEXA developers** — the three-way pipeline version split, which
+   blocks any readme-drift check (§7.1.1, §7.2).
+4. **Confirmed defect, needs a decision** — `POP_PREGNANT_WOMAN` vs `POP_PREGNANT_WOMEN` makes the
+   pregnant-women disaggregation unusable in `snt_dhis2_incidence` (§6.1).
+5. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
    (paused Shiny app, or its replacement) is resumed (§3.2 Stage C).
-4. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)
-5. Should a `pull_request`-triggered `ruff check` job be added? (§7.2)
-6. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)
+6. **In progress** — SNT Explorer reading OpenHEXA datasets directly; `snt_assemble_results` and
+   `SNT_metadata.json` change as a result (§3.2 Stage E).
+7. Should the routine-data-choice vocabulary be unified across the four pipelines that use it?
+   (§3.2 Stage D)
+8. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)
+9. Should a `pull_request`-triggered `ruff check` job be added? (§7.3)
+10. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)

@@ -479,7 +479,6 @@ Keep these names and behaviours identical across pipelines — operators rely on
 - **Country escape hatches are hardcoded** in `snt_dhis2_extract/pipeline.py`: BFA filters
   `level_4_name` starting `"DS"`; NER fetches org-unit groups and rewrites the pyramid through an
   R notebook. Adding a country may mean adding a branch there — check the pyramid levels first.
-- `snt_dhis2_outliers_detection/` is **discontinued** (local-only leftover, not on the remote).
   Exclude it. `deprecated/` is history, never a template.
 - `snt_lib` (`github.com/BLSQ/snt_utils`) is an **external, unpinned** dependency — its source is
   not in this repo. Do not guess its signatures; read the upstream repo or an existing call site.

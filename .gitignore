@@ -37,6 +37,11 @@ __pycache__/
 *.py:Zone.Identifier
 *:Zone.Identifier
 
+# Local dev environment ---------------------------
+# Negated after BOTH *.yaml (above) and *.yml — in .gitignore the last matching
+# pattern wins, so this must come last or the file never reaches a clone.
+!dev/environment.yml
+
 # # Claude Code -----------------
 # CLAUDE.md
 # .claude/

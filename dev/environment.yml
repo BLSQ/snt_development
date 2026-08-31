@@ -1,0 +1,36 @@
+# Local Python development environment for snt_development.
+#
+# These are DESK TOOLS ONLY — none of them runs on OpenHEXA. What runs in a
+# workspace is declared per pipeline, in <pipeline_name>/requirements.txt.
+# Nothing here affects a pipeline run, so versions may drift harmlessly.
+#
+#   conda env create -f dev/environment.yml
+#   conda activate snt_development
+#
+# Update after an edit:  conda env update -f dev/environment.yml --prune
+name: snt_development
+
+channels:
+  - conda-forge
+
+dependencies:
+  # Lower bound = what CI packages a pipeline on (actions/setup-python 3.11);
+  # upper bound keeps you off versions the workspace has never seen — its image
+  # runs 3.13 (DATA_ARCHITECTURE.md §7.4). Unbounded, conda resolves to 3.14.
+  - python>=3.11,<3.14
+  # Floors, not pins. Each is the version in use when this file was written; they stop a
+  # fresh clone silently resolving to something older than what the repo was checked against.
+  #
+  # ruff matters most: ../pyproject.toml sets `preview = true`, which enables lint rules that
+  # are still being added, so two colleagues on different ruff versions can get different
+  # results from identical code. Raise this floor when the team agrees to a newer ruff.
+  - ruff>=0.16          # the repo's only automated code check; rules live in ../pyproject.toml
+  - nbstripout>=0.9.1   # strips notebook outputs before commit (R1, R2)
+  - nbdime>=4.0.4       # readable notebook diffs
+  - pip
+  - pip:
+      # Not on conda-forge. Optional: only for editor autocomplete on the
+      # @pipeline / @parameter decorators, and for `openhexa pipelines push`
+      # (which CI normally does for you — see CLAUDE.md "Always publish from
+      # snt-development" before running it by hand).
+      - openhexa.sdk

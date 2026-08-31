@@ -81,6 +81,9 @@ pipelines/<pipeline_name>/utils/*.r    ← R helpers sourced by the notebooks.
 pipelines/<pipeline_name>/reporting/   ← R reporting notebooks.
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
 configuration/SNT_config_<CC>.json     ← reference copies only (see below).
+dev/environment.yml                    ← local Python dev tools. Never runs on OpenHEXA.
+pyproject.toml                         ← ruff's rulebook. Declares no package, installs nothing.
+.claude/                               ← agent guardrails (R19). Active on clone.
 ```
 
 ### Note — if you're coming from dbt / Airflow / Dagster
@@ -159,29 +162,38 @@ Local development is a **known pain point**, honestly stated:
 Install by tier — you do not need all of it. Everything below is cross-platform and none of it is
 required to *read* the repo.
 
+Everything for the Python side lives in [`dev/`](dev/) — one conda environment, matching team
+convention. See [`dev/README.md`](dev/README.md).
+
 | Tier | Install | Why | Effort |
 |---|---|---|---|
-| **1 — do this** | [`uv`](https://docs.astral.sh/uv/) and `ruff` | `ruff` is the repo's only automated quality gate and the only check you can run before opening a PR. `pyproject.toml` already configures it. | ~2 min |
-| **2 — if you touch notebooks** | `nbstripout` | Stops you committing executed notebooks, which leak country data (**R1**). Better still, install it as a git filter so it happens without you remembering. | ~1 min |
-| **3 — if you edit R notebooks** | VS Code + the Jupyter extension | Lets you edit locally and execute on the workspace kernel — see below. | ~5 min |
-| **4 — rarely** | `openhexa` CLI | CI deploys for you. Only needed for a manual push, and see [Always publish from `snt-development`](#always-publish-from-snt-development) before you do. | ~1 min |
+| **1 — do this** | `conda env create -f dev/environment.yml` | Gets you `ruff` (the repo's only automated quality gate, and the only check you can run before opening a PR), plus `nbstripout` and `nbdime`. | ~3 min |
+| **2 — if you edit R notebooks** | VS Code + the Jupyter extension | Lets you edit locally and execute on the workspace kernel — see below. | ~5 min |
+| **3 — rarely** | `openhexa` CLI | Already in `dev/environment.yml`. CI deploys for you; only needed for a manual push, and see [Always publish from `snt-development`](#always-publish-from-snt-development) before you do. | — |
 
 ```bash
-# Tier 1
-curl -LsSf https://astral.sh/uv/install.sh | sh    # or: pipx install uv
-uv sync                                            # project declares requires-python >= 3.11
+conda env create -f dev/environment.yml
+conda activate snt_development
 
-# Tier 2
-uv tool install nbstripout
-
-# Tier 4
-uv tool install openhexa.sdk
+# after someone edits dev/environment.yml
+conda env update -f dev/environment.yml --prune
 ```
 
-**Nothing extra is needed for the agent guardrail** (**R19**). It ships in `.claude/`, activates on
-clone, and uses only `python3` — which Tier 1 already gives you. On native Windows, Claude Code runs
-hooks through Git Bash, so make sure `python3` resolves there; if it does not, the `permissions.deny`
-half still applies and the hook half quietly does not.
+**These are desk tools only.** Nothing in `dev/` runs on OpenHEXA — what a workspace installs is
+declared per pipeline in `<pipeline_name>/requirements.txt`, a separate list that never meets this
+one. So a version drift here cannot affect a pipeline run.
+
+**Two files, deliberately not one.** `dev/environment.yml` says *which tools to install*;
+[`pyproject.toml`](pyproject.toml) at the repo root holds *`ruff`'s rulebook* — line length, and
+which mistakes to flag. The rulebook cannot move into `dev/`: `ruff` finds it by walking up from the
+file it is checking, so a copy in `dev/` would govern `dev/` alone and leave every pipeline silently
+on ruff's defaults. `pyproject.toml` declares no package and installs nothing.
+
+**Nothing extra is needed for the agent guardrail** (**R19**), but note *which* Python it uses. The
+hook runs in a plain shell with no conda environment activated, so it needs a **system** `python3`
+on `PATH` — not the one inside `snt_development`. macOS, Linux and WSL have one. On native Windows,
+Claude Code runs hooks through Git Bash: check `python3` resolves there, because if it does not the
+`permissions.deny` half still applies and the hook half quietly does not.
 
 **You do not need a local R installation.** R code runs on the workspace kernel (below), so
 installing R locally buys you syntax checking at best and a subtly different environment at worst —
@@ -212,17 +224,19 @@ the file back and commit** — do not batch several helper edits before copying 
 ### Commands
 
 ```bash
+conda activate snt_development            # everything below needs this first
+
 # Lint / format — the ONLY automated quality gate in this repo
-uv run ruff check .                       # ruff config lives in pyproject.toml (line-length 110)
-uv run ruff check --fix .
-uv run ruff format .
+ruff check .                              # ruff config lives in pyproject.toml (line-length 110)
+ruff check --fix .
+ruff format .
 
 # Lint a single pipeline before opening a PR
-uv run ruff check snt_dhis2_incidence/
+ruff check snt_dhis2_incidence/
 
 # Notebook hygiene
-uv run nbstripout pipelines/<name>/code/<notebook>.ipynb
-uv run nbdime diff <a>.ipynb <b>.ipynb    # readable notebook diffs (dev dependency)
+nbstripout pipelines/<name>/code/<notebook>.ipynb
+nbdime diff <a>.ipynb <b>.ipynb           # readable notebook diffs
 
 # Deployment (what CI runs; needs an OpenHEXA token + workspace access)
 openhexa workspaces add <workspace>
@@ -239,7 +253,7 @@ report a test run you could not have performed. If a check is needed, propose ad
 
 In descending order of what is actually achievable:
 
-1. `uv run ruff check <pipeline_dir>/` — catches the majority of Python regressions.
+1. `ruff check <pipeline_dir>/` — catches the majority of Python regressions.
 2. Read the R notebook's fallback cell (`if (!exists("PARAM")) PARAM <- …`) and confirm every
    parameter injected from `pipeline.py` has a matching fallback, spelled identically — **case
    included** (**R11/R12**). This is a silent failure: a case mismatch means the notebook quietly
@@ -299,8 +313,8 @@ Not implemented — recorded here so they can be assessed:
   before or after. `ruff` is configured in `pyproject.toml` and is the repo's only automated
   quality gate, but nothing enforces it; it passes only if a developer remembers to run it.
 
-  A single small `pull_request`-triggered workflow running `uv run ruff check .` would close the
-  second gap for every PR at once, without touching the 20 deployment files.
+  A single small `pull_request`-triggered workflow running `ruff check .` would close the second
+  gap for every PR at once, without touching the 20 deployment files.
 - **A `tests/` seed**: pure functions such as `validate_yyyymm`, `validate_period_range`,
   `get_unique_data_elements`, `validate_reporting_rates`, `merge_parquet_files`,
   `raw_reporting_ds_format` are dependency-free and unit-testable today.
@@ -308,13 +322,14 @@ Not implemented — recorded here so they can be assessed:
   sources `code/snt_utils.r` + `pipelines/<name>/utils/<name>.r` against a tiny fixture would
   make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
   when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
-- **Reproducible local environments — three options, weighed.** The question that keeps coming up
-  is whether to ship a shareable environment definition. Recommendation: **skip conda, pull the
-  workspace image instead.**
+- **Reproducible local environments — the *R* half is still open.** The Python half is settled:
+  `dev/environment.yml` (conda, team convention) + `pyproject.toml` for the `ruff` rules. Good
+  enough, because those are desk tools that never run in a workspace, so drift is harmless. What is
+  still unsolved is reproducing the **R** side. Recommendation: **pull the workspace image.**
 
   | Option | Verdict |
   |---|---|
-  | **conda / mamba env file** | **Not worth it.** The Python side needs two linters and a CLI; `uv` + `pyproject.toml` already cover it, and a conda file would be a second dependency list to keep in sync. For the R side, conda's `r-base` would drift from whatever the workspace actually runs — so "works locally" still wouldn't mean "works in the workspace". Solves the easy half, badly, and not the hard half. |
+  | **conda / mamba, extended to R** | **Adopted for Python, not for R.** For desk tools it is the right call and it is done. Do not extend it to R: conda's `r-base` would drift from whatever the workspace actually runs, so "works locally" still would not mean "works in the workspace" — and it would not carry the system libraries either. |
   | **`renv.lock`** | **Useful, narrow.** R's native lockfile; the workspace image already ships `r-renv`. Pairs with the R-local-loop suggestion above. Gives reproducible R *packages*, but not the system libraries (GDAL/PROJ for `sf`, TeX for reports) that are the usual cause of "works there, not here". |
   | **Pull `blsq/openhexa-blsq-r-environment:latest`** | **Best value.** It is the *actual* runtime — public on Docker Hub, ~2.5 GB, R 4.5, all R packages, Quarto and the geo stack included. A `.devcontainer/` pointing at it gives VS Code a local environment identical to production, with no second dependency list to maintain. Contents documented in [`DATA_ARCHITECTURE.md` §7.4](docs/DATA_ARCHITECTURE.md#74-the-workspace-runtime-image). |
 
@@ -581,7 +596,7 @@ Keep these names and behaviours identical across pipelines — operators rely on
 
 Before calling a change done — each item maps to a rule in the [Register](#register):
 
-- [ ] `uv run ruff check <changed dirs>` clean. *(R18)*
+- [ ] `ruff check <changed dirs>` clean, in the `snt_development` conda env. *(R18)*
 - [ ] Notebook outputs stripped; no `.csv`/`.parquet`/Zone.Identifier files staged. *(R1, R2)*
 - [ ] `pipeline.py` parameters ↔ notebook `exists()` fallbacks agree, name for name and **case for
       case**; new globals are UPPERCASE. *(R11, R12)*

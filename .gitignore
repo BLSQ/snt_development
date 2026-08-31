@@ -45,6 +45,9 @@ __pycache__/
 # ignore .json files unless if SNT_config.json
 *.json
 !configuration/SNT_config_*.json
+# ...or the shared Claude Code settings, which must reach every clone for the
+# destructive-git guardrail to be active (see CLAUDE.md "Agent guardrails").
+!.claude/settings.json
 
 # R ----------------------------------------
 *.rds

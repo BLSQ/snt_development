@@ -98,7 +98,7 @@ exist, and do not report running a check that lives in none of them.
 |---|---|---|
 | Scheduler / DAG engine | **deliberate** | Nothing enforces run order. Pipelines are launched by hand, one at a time, and may run against stale upstreams. Operator-facing order is unwritten: [`DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md) `[TODO: Giulia]`. |
 | dbt | **permanent** | Analytics are R, not SQL. |
-| Test suite | **debt** | `ruff` is the only automated check and [no CI runs it](#suggestions-logged-for-later-evaluation-giulia). Verify by reading; say what you could not verify. |
+| Test suite | **debt** | `ruff` is the only automated check. CI runs it on a PR over the *changed* Python files only ([`pr-checks.yaml`](.github/workflows/pr-checks.yaml)); nothing checks the R analytics at all. Verify by reading; say what you could not verify. |
 | Full local runtime | **debt** | Partial only — see [Getting set up locally](#getting-set-up-locally). |
 
 **Why no DAG engine, in one line:** pipelines are re-run independently with different parameters,
@@ -163,7 +163,7 @@ convention. See [`dev/README.md`](dev/README.md).
 
 | Tier | Install | Why | Effort |
 |---|---|---|---|
-| **1 — do this** | `conda env create -f dev/environment.yml` | Gets you `ruff` (the repo's only automated quality gate, and the only check you can run before opening a PR), plus `nbstripout` and `nbdime`. | ~3 min |
+| **1 — do this** | `conda env create -f dev/environment.yml` | Gets you `ruff` (the repo's only automated quality gate — CI runs it on your PR, so running it first saves a round trip), plus `nbstripout` and `nbdime`. | ~3 min |
 | **2 — if you edit R notebooks** | VS Code + the Jupyter extension | Lets you edit locally and execute on the workspace kernel — see below. | ~5 min |
 | **3 — rarely** | `openhexa` CLI | Already in `dev/environment.yml`. CI deploys for you; only needed for a manual push, and see [Always publish from `snt-development`](#always-publish-from-snt-development) before you do. | — |
 
@@ -239,11 +239,18 @@ openhexa workspaces add <workspace>
 openhexa pipelines push <pipeline_name> --yes
 ```
 
-**This repo has no `pytest`, no `make`, no pre-commit config and no CI lint job** — that is a fact
-about the repository, not about any one machine. The only thing that runs by itself is the
-[agent guardrail hook](#how-this-is-enforced-r19) in `.claude/`, and that gates *agent behaviour*,
-not code quality — it will never tell you your change is wrong. Do not invent commands, and never
-report a test run you could not have performed. If a check is needed, propose adding it.
+**This repo has no `pytest`, no `make` and no pre-commit config** — that is a fact about the
+repository, not about any one machine. Two things run without you asking, and neither tells you
+your analytics are correct:
+
+- [`.github/workflows/pr-checks.yaml`](.github/workflows/pr-checks.yaml) on every PR to `main` —
+  `ruff` over the **changed** `.py` files, a scope report, and a guard against committed data files
+  and unstripped notebook outputs (**R1**, **R2**). It never touches the R code.
+- The [agent guardrail hook](#how-this-is-enforced-r19) in `.claude/`, which gates *agent
+  behaviour*, not code quality.
+
+Do not invent commands, and never report a test run you could not have performed. If a check is
+needed, propose adding it.
 
 ### Verifying a change without a workspace
 
@@ -285,32 +292,18 @@ Not implemented — recorded here so they can be assessed:
   deliberate one-line PR you can review, roll back, and correlate with a broken run. The cost is
   that someone has to bump those refs when `snt_utils` ships something you want. Tags are the
   usual compromise: readable, and cheap to move forward.
-- **`nbstripout --install` as a repo git filter** plus a committed `.gitattributes`, so output
-  stripping stops depending on each developer remembering.
-- **Add a `ruff check` CI job on pull requests.** Today the only GitHub Actions workflows are the
-  20 `push_snt_*.yaml` deployment files, and each is narrowly triggered:
-
-  ```yaml
-  on:
-    push:
-      branches: [main]           # ← only after merge, never on the PR
-      paths:
-        - "snt_dhis2_extract/pipeline.py"
-        - "snt_dhis2_extract/requirements.txt"
-        - ".github/workflows/push_snt_dhis2_extract.yaml"
-  ```
-
-  Two gaps follow. First, `paths:` does not list `pipelines/**` — so a PR that only touches R
-  notebooks or `.r` helpers (the majority of analytics changes) matches no workflow, and GitHub
-  shows no checks at all. That is expected behaviour here, not a broken pipeline; it also means
-  those PRs are reviewed entirely by eye. Second, because the trigger is `push` to `main` rather
-  than `pull_request`, the workflow that *does* fire on a `pipeline.py` change fires **after**
-  merge, and its only job is `openhexa pipelines push` — deployment. No linting runs anywhere,
-  before or after. `ruff` is configured in `pyproject.toml` and is the repo's only automated
-  quality gate, but nothing enforces it; it passes only if a developer remembers to run it.
-
-  A single small `pull_request`-triggered workflow running `ruff check .` would close the second
-  gap for every PR at once, without touching the 20 deployment files.
+- **Clear the repo-wide `ruff` debt, then tighten the CI lint.** The
+  [`pr-checks.yaml`](.github/workflows/pr-checks.yaml) workflow lints only the Python files a PR
+  *changes*, deliberately: `ruff check .` over the whole repo reports ~119 pre-existing errors, so a
+  repo-wide job would fail every PR from day one and teach everyone to ignore a red X. Today's
+  arrangement is a ratchet — the debt blocks nobody, no new violation gets in. Clearing the backlog
+  is worth its own PR (`ruff check --fix .` handles ~59 of them); after that, change the lint step
+  to `ruff check .` and delete the explanatory comment at the top of the workflow.
+- **`nbstripout --install` still depends on each developer running it once.** `.gitattributes` is
+  committed and names the filter, but the filter itself is configured per clone
+  ([`dev/README.md`](dev/README.md) → one-time git setup). A clone that skipped it silently falls
+  back to plain-text behaviour. `pr-checks.yaml` catches the consequence at PR time; nothing
+  catches it at commit time. A `pre-commit` config, or an onboarding check, would.
 - **A `tests/` seed**: pure functions such as `validate_yyyymm`, `validate_period_range`,
   `get_unique_data_elements`, `validate_reporting_rates`, `merge_parquet_files`,
   `raw_reporting_ds_format` are dependency-free and unit-testable today.
@@ -413,7 +406,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R15** | One vocabulary per concept in operator-facing `choices=[...]` | `⚠ exceptions` — 3 routine-data vocabularies ([TODO](#suggestions-logged-for-later-evaluation-giulia)) |
 | **R16** | `readme.md` updated in the same PR as the `pipeline.py` change it describes | `convention` — [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
 | **R17** | R failure messages prefixed `[ERROR]` or `[WARNING]`, chosen deliberately | `convention` — [Logging](#logging--error-labels) |
-| **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](#suggestions-logged-for-later-evaluation-giulia) |
+| **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `enforced` on a PR, for **changed** `.py` files only — [`pr-checks.yaml`](.github/workflows/pr-checks.yaml); ~119 pre-existing violations remain ([TODO](#suggestions-logged-for-later-evaluation-giulia)) |
 | **R19** | Agents never run destructive / history-rewriting `git` or `gh` commands | `enforced` — hook + `permissions.deny` in `.claude/` ([how](#how-this-is-enforced-r19)) |
 
 Adding a rule: add a row here *and* the rationale to the matching section below. A rule that is

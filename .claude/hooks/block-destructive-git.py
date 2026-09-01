@@ -93,10 +93,7 @@ def find_violation(command: str) -> str | None:
 def main() -> None:
     """Read the hook payload from stdin and deny the command if it matches a rule.
 
-    Returns
-    -------
-    None
-        Always exits 0; a deny decision, when there is one, is written to stdout as JSON.
+    Always exits 0; a deny decision, when there is one, is written to stdout as JSON.
     """
     try:
         command = str(json.load(sys.stdin).get("tool_input", {}).get("command", ""))

@@ -145,9 +145,10 @@ because OpenHEXA supports Python pipelines but not R (§2.2.1). Merging a notebo
 toggled on. The Python half, by contrast, can reach every country workspace automatically through
 the template mechanism — so the two halves of one pipeline drift apart by default.
 
-Corollary: the CI path filters only watch `pipeline.py` / `requirements.txt` / `readme.txt`, so
-a notebook-only PR produces **no CI run at all** — absence of a green check is expected, not a
-failure.
+Corollary: the *deploy* path filters only watch `pipeline.py` / `requirements.txt` / `readme.txt`,
+so a notebook-only merge deploys nothing — that is expected, not a failure. Such a PR does still
+get a check run (`.github/workflows/pr-checks.yaml` runs on every PR), but that check reports scope
+and lints Python; **nothing anywhere validates the R analytics.**
 
 ### 2.2 How a pipeline version reaches a country workspace — the template mechanism
 

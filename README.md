@@ -118,9 +118,11 @@ deliberate; none is a bug to fix.
    analyst tries several methods and the last run wins. Renaming outputs per method would break
    this. → [Traps](CLAUDE.md#traps)
 
-6. **There is no test suite and no CI lint.** `ruff` is the only automated check and nothing runs
-   it for you. Analytics changes are reviewed by eye. Do not report a test run you could not have
-   performed.
+6. **There is no test suite.** `ruff` is the only automated check. CI runs it on pull requests, but
+   **only over the Python files that PR changes** — the repo carries pre-existing violations, so a
+   repo-wide job would fail every PR from day one
+   ([why](.github/workflows/pr-checks.yaml)). Analytics changes — the R notebooks — are reviewed
+   entirely by eye. Do not report a test run you could not have performed.
 
 ---
 
@@ -193,7 +195,7 @@ Stated plainly, so nobody spends a day rediscovering them:
 
 | | |
 |---|---|
-| **No automated tests** | `ruff` is the only check, and no CI job runs it. |
+| **No automated tests** | `ruff` is the only check. CI lints changed Python files on a PR; nothing checks the R analytics. |
 | **Dependencies are unpinned** | Both entries in every `requirements.txt` install from a Git branch, so two deploys of identical code can produce different runtimes. → [detail](CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) |
 | **No full offline development** | R notebooks are edited locally but execute on the workspace kernel. → [the loop](CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop) |
 | **`snt_assemble_results` is being deprecated** | The SNT Explorer will read the OpenHEXA datasets directly. Don't extend it. |

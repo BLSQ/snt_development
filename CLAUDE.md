@@ -4,8 +4,11 @@ Guardrails for anyone (human or agent) changing code in this repository.
 
 - **[Conventions → Register](#register)** — every hard rule (R1–R19) in one table, with its
   enforcement status and known exceptions. Start there if you want the rules without the prose.
+- New here? Orientation and the documentation map: [`README.md`](README.md).
 - Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
+- Domain vocabulary: [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 - Writing a pipeline `readme.md`: [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md).
+- Who to ask / how review works: [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
 
 ---
 
@@ -86,32 +89,21 @@ pyproject.toml                         ← ruff's rulebook. Declares no package,
 .claude/                               ← agent guardrails (R19). Active on clone.
 ```
 
-### Note — if you're coming from dbt / Airflow / Dagster
+### Note — no dbt, no Airflow, no DAG engine, no tests
 
-Those are the three tools most data teams reach for. None of them is here, so don't go looking for
-a `dbt_project.yml`, a `dags/` folder or a `tests/` directory. What the words mean, and what
-stands in for each:
+There is no `dbt_project.yml`, no `dags/` and no `tests/`. Do not look for them, do not infer they
+exist, and do not report running a check that lives in none of them.
 
-| Term | What it normally gives you | Here |
+| Absent | Status | What follows for you |
 |---|---|---|
-| **Airflow / Dagster** | An *orchestrator*: you declare which jobs depend on which, and it runs them in the right order, on a schedule, retrying failures and keeping a history of what ran when. | OpenHEXA runs one pipeline at a time, when a person clicks Run. |
-| **DAG engine** | The part of an orchestrator that knows "formatting must finish before incidence starts" — a **D**irected **A**cyclic **G**raph of dependencies — and refuses to get it wrong. | That knowledge lives in people's heads and in these docs. Nothing enforces it. |
-| **dbt** | A framework for SQL transformations that also generates lineage diagrams, data tests and docs from your models. | Not applicable — the analytics are R, not SQL. |
-| **test suite** | Automated checks (`pytest`) that tell you a change broke something before a user does. | None exist. `ruff` is the only automated check, and nothing runs it for you. |
-| **local runtime** | Running the code on your laptop before shipping it. | Partial — see [Getting set up locally](#getting-set-up-locally). |
+| Scheduler / DAG engine | **deliberate** | Nothing enforces run order. Pipelines are launched by hand, one at a time, and may run against stale upstreams. Operator-facing order is unwritten: [`DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md) `[TODO: Giulia]`. |
+| dbt | **permanent** | Analytics are R, not SQL. |
+| Test suite | **debt** | `ruff` is the only automated check and [no CI runs it](#suggestions-logged-for-later-evaluation-giulia). Verify by reading; say what you could not verify. |
+| Full local runtime | **debt** | Partial only — see [Getting set up locally](#getting-set-up-locally). |
 
-Two of those absences are deliberate and two are debt:
-
-- **No dbt — permanent.** The analytics are R. Nothing to fix.
-- **No DAG engine — deliberate.** Pipelines are re-run independently with different parameters,
-  alternative methods deliberately override each other, and an operator may supply their own input
-  instead of running the upstream pipeline. A DAG engine would fight all three. *But* the
-  operator-facing run order should still be written down, and currently isn't:
-  [`DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md) — `[TODO: Giulia]`.
-- **No test suite — debt.** [Logged](#suggestions-logged-for-later-evaluation-giulia): several pure
-  functions are unit-testable today with no new infrastructure.
-- **No full local runtime — debt.** The known pain point. [Logged](#suggestions-logged-for-later-evaluation-giulia),
-  with options weighed.
+**Why no DAG engine, in one line:** pipelines are re-run independently with different parameters,
+alternative methods deliberately overwrite each other, and an operator may supply their own input
+instead of running the upstream — a DAG engine would fight all three.
 
 ---
 
@@ -129,6 +121,10 @@ Python pipelines but not R, so the two travel by different routes:
   to that template update automatically. Merging to `main` is enough.
 - **Notebooks and `.r` files** — reach a workspace *only* when an operator runs that pipeline in
   the OpenHEXA UI with **`Pull scripts` = ON**. Merging to `main` does nothing on its own.
+- **Country-specific notebook variants (`<generic_name>_<CC>.ipynb`)** — reach a workspace by **no
+  automated route at all.** They are deliberately outside `Pull scripts`, which means it can never
+  overwrite one *and* never deliver one. See
+  [Country-specific notebook variants](#country-specific-notebook-variants).
 
 So a country workspace can run the newest `pipeline.py` against months-old R analytics, with
 nothing reporting the mismatch. Always say explicitly, when handing over a notebook change, that
@@ -375,6 +371,10 @@ Not implemented — recorded here so they can be assessed:
   split: an agent produces the *list* with each term's call sites and a proposed definition where
   the code makes it unambiguous; Giulia (or a malaria epidemiologist) fills in and corrects the
   rest. Mark anything unconfirmed rather than shipping a plausible guess.
+- **Documentation open items are tracked separately** in
+  [`docs/OWNERSHIP.md` §4](docs/OWNERSHIP.md#4-open-items): filling in the per-pipeline responsible
+  persons, confirming the (provisional MIT) licence, linking an external published reference for the
+  SNT method, and removing the unadopted `.github/CODEOWNERS`.
 - **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
   append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
   are fine as they are — overwriting is the intended override mechanism and their companion
@@ -523,12 +523,66 @@ Keep these names and behaviours identical across pipelines — operators rely on
   lowercase — see [Traps](#traps). New parameters are UPPERCASE even when added to one of those
   three, *unless* that would leave a single notebook mixing both: converting a violator is an
   all-at-once change, not a drive-by.
-- Notebooks under `.github/CODEOWNERS` require **@sPuntinG** approval:
-  `pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb`,
-  `pipelines/snt_dhis2_reporting_rate_dataelement/code/snt_dhis2_reporting_rate_dataelement.ipynb`.
-- Country-specific variants live in `country_specific/` (e.g. `..._pyramid_BDI.ipynb`,
-  `snt_seasonality_rainfall_NER.ipynb`). Prefer a config-driven branch over a new variant; when a
-  variant is unavoidable, note the reason and the ticket in the notebook.
+- **A notebook change needs a domain reviewer**, not just any reviewer. Every change to `main` goes
+  via PR, and a change to `pipelines/*/code/`, `pipelines/*/utils/` or `code/` should be reviewed by
+  the person responsible for that pipeline — listed in
+  [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md#2-pipeline-responsibilities). This is a convention only:
+  nothing blocks an unreviewed merge. `.github/CODEOWNERS` exists but was **not adopted** by the
+  team — do not treat it as the rule, and see
+  [`docs/OWNERSHIP.md` §4](docs/OWNERSHIP.md#4-open-items) for its pending removal.
+### Country-specific notebook variants
+
+**The mechanism.** A notebook whose filename is the generic name plus an underscore and a country
+code — `snt_seasonality_rainfall_NER.ipynb` beside `snt_seasonality_rainfall.ipynb` — is executed
+**instead of** the generic notebook, but only in the workspace whose
+`SNT_CONFIG.COUNTRY_CODE` matches that suffix. Everywhere else the generic notebook runs and the
+variant is inert.
+
+`pipeline.py` never names the variant. It passes `country_code=` to `run_notebook()` /
+`run_report_notebook()` alongside the *generic* `nb_path`, and the substitution happens inside
+`snt_lib` (external repo — do not guess its resolution rules beyond this):
+
+```python
+run_notebook(
+    nb_path=pipeline_path / "code" / "snt_seasonality_rainfall.ipynb",  # generic name only
+    country_code=country_code,                                          # ← enables the swap
+    ...
+)
+```
+
+**Why it exists.** It lets a country keep a bespoke analysis without that file being clobbered on
+the next `Pull scripts` run. Variants are deliberately **not** listed in
+`pull_scripts_from_repository(code_scripts=[...])` — check any pipeline and you will see only
+generic names there. That single omission is what makes them safe, and it cuts both ways:
+
+| | `Pull scripts` = ON |
+|---|---|
+| Generic notebook | overwritten from `main` |
+| `_<CC>` variant | **untouched — neither overwritten nor delivered** |
+
+**The consequence — there is no version-propagation story.** A variant has to be created and edited
+**in the workspace**. Committing it to `main` is *archival only*: nothing brings it into any
+workspace, ever. So a committed variant is a copy of what the workspace had at some past moment,
+with no mechanism keeping the two in step and nothing that reports the drift. Treat the committed
+file as a backup, not as the running code.
+
+**Working rules:**
+
+- **Prefer a config-driven branch inside the generic notebook** over creating a variant. A variant
+  is a permanent fork that no tooling maintains.
+- When a variant is unavoidable, record the reason and the ticket in a markdown cell inside it.
+- After editing a variant in the workspace, **copy it back and commit it immediately** — same
+  discipline as `utils/*.r` helpers, and for the same reason.
+- **Before changing a generic notebook, check for `_<CC>` siblings.** A fix applied to
+  `snt_seasonality_rainfall.ipynb` does **not** reach Niger if `..._NER.ipynb` exists there. State
+  in the handover which countries need the change applied to their variant by hand.
+- **Location matters.** A variant only takes effect when it sits in the same folder the generic
+  notebook is loaded from (`code/`, or `reporting/`). Files parked in a `country_specific/`
+  folder — `pipelines/snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`,
+  `pipelines/snt_dhis2_formatting/country_specific/snt_dhis2_formatting_pyramid_BDI.ipynb` — are
+  **not** on any execution path; they are archived copies. Only
+  `pipelines/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb` is committed in an
+  active location.
 
 ---
 
@@ -545,6 +599,11 @@ Keep these names and behaviours identical across pipelines — operators rely on
     `outliers_detected`. No pipeline reads that table — its consumer is a Shiny app, currently
     paused and possibly to be replaced. Whoever resumes that work should decide whether the table
     needs a method/run discriminator column before it is depended on again.
+- **A country may not be running the notebook you are editing.** If a `<generic>_<CC>.ipynb`
+  variant exists in that workspace, it runs *instead* of the generic notebook, and `Pull scripts`
+  neither overwrites nor delivers it. Your fix silently misses that country, and `main` is not a
+  reliable record of which variants exist. → [Country-specific notebook
+  variants](#country-specific-notebook-variants)
 - **Missing inputs skip, they do not fail.** `snt_dhis2_formatting` gates each of its five stages
   on `dataset_file_exists()`; `download_dhis2_analytics` catches per-period errors and continues.
   A partial run looks successful. If you add a stage, decide deliberately between skip and raise,

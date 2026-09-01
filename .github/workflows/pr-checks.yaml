@@ -1,0 +1,174 @@
+# PR checks — the first workflow in this repo that runs BEFORE a merge.
+#
+# The other 20 workflows (push_snt_*.yaml) all trigger on `push` to main, i.e. AFTER
+# merge, and all they do is deploy. Nothing has ever checked a pull request. This does
+# two things, neither of which deploys anything:
+#
+#   1. Lints the Python files the PR actually changed.
+#   2. Prints which pipelines the PR touches, so a reviewer can see scope at a glance.
+#
+# WHY ONLY THE CHANGED FILES ARE LINTED. `ruff check .` across the whole repo currently
+# reports 119 pre-existing errors (ruff 0.16.5, 2026-09-01). A repo-wide job would fail
+# on every PR from day one regardless of the change, which teaches everyone to ignore a
+# red X — worse than no check at all. Linting only changed files is a "ratchet": the
+# existing debt blocks nobody, but no NEW violation gets in. Clearing the 119 is worth
+# doing as its own PR (`ruff check --fix .` handles 59 of them); after that, switch the
+# lint step to `ruff check .` and delete this paragraph.
+
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+# Read-only. This workflow must never need write access — it does not deploy, comment
+# or push. If a future step needs to comment on the PR, add `pull-requests: write`
+# deliberately and say why.
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the previous run, so you are not paying for
+# checks on a commit nobody will look at any more.
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint changed files & report scope
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history: we need the merge base to work out what changed.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'   # matches the deploy workflows
+
+      # ruff's rules live in pyproject.toml (line-length 110, preview = true).
+      # The floor mirrors dev/environment.yml — keep the two in step, because
+      # `preview = true` means different ruff versions can disagree on identical code.
+      - name: Install ruff
+        run: pip install "ruff>=0.16"
+
+      - name: Work out what this PR changes
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # --diff-filter=d excludes deleted files: linting a file that no longer
+          # exists would just error.
+          git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" > /tmp/changed.txt
+          echo "Changed files:"
+          cat /tmp/changed.txt
+          grep -E '\.py$' /tmp/changed.txt > /tmp/changed_py.txt || true
+          echo "py_count=$(wc -l < /tmp/changed_py.txt)" >> "$GITHUB_OUTPUT"
+
+      # Scope report. Goes to the run summary (visible in the Checks tab) rather than
+      # a PR comment, so it needs no write permission and posts no comment spam.
+      # To make it a PR comment instead: add `pull-requests: write` above and a step
+      # using `gh pr comment`, with GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}.
+      - name: Report scope
+        run: |
+          {
+            echo "## PR scope"
+            echo
+            echo "**Pipelines touched** (a PR should normally touch one):"
+            echo
+            # Both halves of a pipeline: <name>/ for pipeline.py, pipelines/<name>/ for R.
+            sed -nE 's#^(pipelines/)?(snt_[a-z0-9_]+)/.*#\2#p' /tmp/changed.txt \
+              | sort -u | sed 's/^/- `/; s/$/`/'
+            echo
+            echo "**Shared code** (affects many pipelines — review with extra care):"
+            echo
+            grep -E '^(code/|configuration/)' /tmp/changed.txt \
+              | sed 's/^/- `/; s/$/`/' || echo "_none_"
+            echo
+            echo "**Notebooks changed** — operators must run with \`Pull scripts\` = ON:"
+            echo
+            grep -E '\.ipynb$' /tmp/changed.txt | sed 's/^/- `/; s/$/`/' || echo "_none_"
+            echo
+            echo "**Country-specific variants changed** — these reach NO workspace"
+            echo "automatically; they must be edited in the workspace itself:"
+            echo
+            grep -E '_[A-Z]{3}\.ipynb$' /tmp/changed.txt | sed 's/^/- `/; s/$/`/' || echo "_none_"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Lint changed Python files
+        if: steps.changed.outputs.py_count != '0'
+        run: |
+          echo "Linting $(wc -l < /tmp/changed_py.txt) changed Python file(s)."
+          # xargs -r: do nothing if the list is empty.
+          xargs -r ruff check --output-format=github < /tmp/changed_py.txt
+
+      - name: No Python changed
+        if: steps.changed.outputs.py_count == '0'
+        run: echo "No .py files in this PR — nothing for ruff to check."
+
+      # Guardrail for rules R1 and R2: catch committed data files and unstripped
+      # notebook outputs before merge, not after.
+      #
+      # Belt and braces. .gitignore and the nbstripout filter should already prevent
+      # both, but the filter is installed per-clone (see .gitattributes), so a
+      # colleague who skipped that setup step is unprotected. This check is not.
+      - name: Check for forbidden files
+        run: |
+          cat > /tmp/forbidden_check.py <<'PY'
+          """Fail the build on committed data files or unstripped notebook outputs."""
+          import json
+          import pathlib
+          import re
+          import sys
+
+          DATA_SUFFIXES = {".csv", ".xlsx", ".xls", ".parquet", ".rds", ".geojson"}
+          changed = [
+              line.strip()
+              for line in pathlib.Path("/tmp/changed.txt").read_text().splitlines()
+              if line.strip()
+          ]
+          failed = False
+
+          for name in changed:
+              path = pathlib.Path(name)
+
+              # R1 — no country data in git, whatever the case of the extension.
+              if path.suffix.lower() in DATA_SUFFIXES:
+                  print(
+                      f"::error file={name}::Data file committed. Country health data must "
+                      f"never reach git (R1). Remove it and check .gitignore."
+                  )
+                  failed = True
+
+              if re.search(r"Zone\.Identifier$", name):
+                  print(f"::error file={name}::Windows Zone.Identifier sidecar. Delete it.")
+                  failed = True
+
+              # R2 — notebook outputs stripped before commit.
+              if path.suffix == ".ipynb" and path.is_file():
+                  try:
+                      cells = json.loads(path.read_text()).get("cells", [])
+                  except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                      print(f"::error file={name}::Notebook is not readable JSON: {exc}")
+                      failed = True
+                      continue
+                  dirty = [
+                      i
+                      for i, cell in enumerate(cells, start=1)
+                      if cell.get("outputs") or cell.get("execution_count") is not None
+                  ]
+                  if dirty:
+                      print(
+                          f"::error file={name}::{len(dirty)} cell(s) still carry outputs or "
+                          f"execution counts (first: cell {dirty[0]}). Run: nbstripout {name}  (R2)"
+                      )
+                      failed = True
+
+          print(f"Checked {len(changed)} changed file(s).")
+          sys.exit(1 if failed else 0)
+          PY
+          python /tmp/forbidden_check.py

@@ -42,6 +42,16 @@ __pycache__/
 # pattern wins, so this must come last or the file never reaches a clone.
 !dev/environment.yml
 
+# GitHub Actions ----------------------------------
+# Also negated after *.yaml above, for the same reason.
+#
+# Why this is needed: the 20 push_snt_*.yaml workflows are tracked only because
+# they were added BEFORE the `*.yaml` rule — git ignores patterns for files
+# already in the index. Any NEW workflow file was therefore invisible to git:
+# `git add` did nothing, no warning was printed, and CI silently never ran it.
+# Confirm with:  git check-ignore -v .github/workflows/<new>.yaml
+!.github/workflows/*.yaml
+
 # # Claude Code -----------------
 # CLAUDE.md
 # .claude/

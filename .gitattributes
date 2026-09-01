@@ -1,0 +1,53 @@
+# Git behaviour for this repository.
+#
+# WHAT THIS FILE DOES, in one line: it tells git to treat .ipynb notebooks as
+# notebooks rather than as lines of JSON text.
+#
+# WHY IT MATTERS. A notebook is a JSON file with the code, the execution counts and
+# the cell outputs all mixed together. Git does not know that, so by default it
+# merges notebooks line by line. That is close to meaningless for JSON: a merge can
+# "succeed" with no conflict reported and still leave you a notebook holding cells
+# from two different versions, or quietly reinstate old code. This is the main way
+# a dirty merge enters this repo.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORTANT: this file alone does nothing.
+#
+# It only says *which* tool handles notebooks. Each developer must also install
+# those tools into their own clone, once:
+#
+#     conda activate snt_development
+#     nbstripout --install       # teaches git to strip outputs on commit
+#     nbdime config-git --enable # teaches git to diff/merge notebooks by cell
+#
+# Full instructions: dev/README.md → "One-time git setup for notebooks".
+#
+# If a developer skips that step, git silently falls back to its normal text
+# behaviour. Nothing breaks and nothing errors — they just lose the protection.
+# So do not assume a colleague's clone is set up; ask.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 1. Strip outputs on the way into git (rules R1, R2).
+#    Outputs are executed results — they contain real country health data and they
+#    make diffs unreviewable. This filter removes them as the file is staged, so
+#    the copy in git is clean even if the copy on your disk is not. Your local
+#    notebook keeps its outputs; only what git stores is stripped.
+*.ipynb filter=nbstripout
+
+# 2. Diff notebooks cell by cell instead of line by line (nbdime).
+#    Turns an unreadable JSON diff into "cell 4 changed, this line of R differs".
+*.ipynb diff=jupyternotebook
+
+# 3. Merge notebooks cell by cell instead of line by line (nbdime).
+#    This is the line that prevents the dirty-merge class of bug. It cannot prevent
+#    all of them: when two people edit the same cell, nbdime still reports a genuine
+#    conflict. What it stops is git inventing a silently-wrong resolution.
+#
+#    HOUSE RULE when a notebook conflict does happen: never hand-edit the JSON to
+#    resolve it. Take one side whole, then redo the change in the notebook editor.
+#    See dev/README.md and CLAUDE.md → "Notebook hygiene".
+*.ipynb merge=jupyternotebook
+
+# Windows security sidecars, in case one is ever staged by accident. Marking them
+# binary keeps them out of diffs; .gitignore should stop them arriving at all.
+*:Zone.Identifier binary

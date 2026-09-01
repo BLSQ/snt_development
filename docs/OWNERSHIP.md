@@ -33,8 +33,8 @@ holds only because people follow it. Two consequences worth stating:
 
 **Why this matters more here than in most repositories.** These pipelines compute epidemiological
 indicators that inform where malaria interventions are deployed. A change that shifts a number
-does not fail, does not warn, and is not caught by any test — there are none
-([`../README.md`](../README.md#status-and-known-limitations)). It simply produces different
+does not fail, does not warn, and is not caught by any test — there are none, as
+[`../README.md`](../README.md) records under *Status and known limitations*. It simply produces different
 districts. Treat a one-line change to a formula as a bigger deal than a hundred-line change to
 orchestration.
 

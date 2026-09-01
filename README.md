@@ -1,4 +1,4 @@
-# SNT — Subnational Tailoring pipelines
+# 🦟 SNT — Subnational Tailoring pipelines
 
 Data pipelines that turn a country's routine health data into the evidence base for **subnational
 tailoring (SNT) of malaria interventions** — deciding which interventions to deploy where, at a
@@ -23,7 +23,7 @@ platform. This repository is the **source** for ~20 pipelines; OpenHEXA publishe
 
 ---
 
-## How it works, in one picture
+## 🗺️ How it works, in one picture
 
 ```mermaid
 flowchart TD
@@ -52,7 +52,7 @@ the stage letters above are used throughout (stage `A2` here is written `A′` t
 
 ---
 
-## What's in this repo
+## 📂 What's in this repo
 
 | Path | What it is |
 |---|---|
@@ -69,7 +69,7 @@ the stage letters above are used throughout (stage `A2` here is written `A′` t
 
 ---
 
-## Start here
+## 🧭 Start here
 
 Pick the row that matches what you came for.
 
@@ -87,7 +87,7 @@ Pick the row that matches what you came for.
 
 ---
 
-## Non-obvious things
+## ⚠️ Non-obvious things
 
 Facts that are not visible from the code and that newcomers reliably get wrong. Each is
 deliberate; none is a bug to fix.
@@ -124,9 +124,9 @@ deliberate; none is a bug to fix.
 
 ---
 
-## Working on this repo
+## 🛠️ Working on this repo
 
-### Before you start
+### 🔑 Before you start
 
 - Access to the relevant **OpenHEXA workspace with the `Admin` role** — ask your team lead.
   Everything real runs there: the data, the datasets, the R kernel.
@@ -134,7 +134,7 @@ deliberate; none is a bug to fix.
 - Optional but recommended: the local Python tooling (`ruff`, `nbstripout`) — see
   [`dev/README.md`](dev/README.md).
 
-### Your first day
+### 🗓️ Your first day
 
 1. Read [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md) §1–2, then skim
    [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
@@ -145,7 +145,7 @@ deliberate; none is a bug to fix.
 5. Take a small ticket. Ask your pipeline's contact in [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md)
    before changing anything in `pipelines/*/code/`.
 
-### Working with an AI coding assistant
+### 🤖 Working with an AI coding assistant
 
 Assumed, not merely tolerated — most of the documentation in this repo is written to be read by a
 person *or* an agent.
@@ -164,7 +164,7 @@ person *or* an agent.
   epidemiological number moved in the wrong direction, and neither can anything else in this repo.
   Nothing here changes who has to approve a change to the analytics.
 
-### How changes get in
+### 🔀 How changes get in
 
 **Every change to `main` goes through a pull request, and every PR should be reviewed by a team
 member** — for analytics changes, by the person listed for that pipeline in
@@ -187,7 +187,7 @@ Before opening a PR, walk the
 
 ---
 
-## Status and known limitations
+## 🚧 Status and known limitations
 
 Stated plainly, so nobody spends a day rediscovering them:
 
@@ -201,7 +201,7 @@ Stated plainly, so nobody spends a day rediscovering them:
 
 ---
 
-## Licence
+## ⚖️ Licence
 
 [MIT](LICENSE) — **provisional**, pending confirmation by the team. See
 [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) for open documentation items.

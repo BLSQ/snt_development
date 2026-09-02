@@ -1,0 +1,5 @@
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+cfgrib
+xarray
+epiweeks
+openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@v2.9.0

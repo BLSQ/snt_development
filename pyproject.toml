@@ -1,19 +1,16 @@
-# Rulebook for `ruff`, the repo's only automated code check. Nothing else reads this file:
-# it declares no package and installs nothing. To INSTALL the tools, see dev/environment.yml.
-#
-# It must stay at the repo root. `ruff` looks for its rules by walking up from the file it is
-# checking, so a copy inside dev/ would govern dev/ only and leave every pipeline on ruff's
-# defaults — silently. See dev/README.md.
-#
-#   ruff check .        (after: conda activate snt_development)
+[project]
+name = "openhexa-templates-ds"
+version = "0.1.0"
+description = "SNT pipelines maintained by Bluesquare Data Services team"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "nbstripout>=0.9.1",
+    "openhexa.sdk",
+]
 
 [tool.ruff]
 line-length = 110
-# Lowest Python the code must run on — CI packages pipelines with setup-python 3.11.
-# Set explicitly because ruff used to infer it from a `requires-python` key that lived
-# here; that key moved to dev/environment.yml. Without it, the `UP` (pyupgrade) and `FA`
-# rules would suggest syntax that breaks on 3.11.
-target-version = "py311"
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -48,7 +45,7 @@ select = [
 ]
 
 ignore = [
-    "I001", # Alphabetic order of imports 
+    "I001", # Alphabetic order of imports
     "D100", # Missing docstring in public module
     "D104", # Missing docstring in public package
     "D105", # Missing docstring in magic method
@@ -61,8 +58,8 @@ ignore = [
     "SIM108", # Use ternary operators
     "SIM102", # Use a single if statement instead of nested if statements
     "SIM114", # Combine `if` branches
-    "DOC501", # Raised exception {id} missing from docstring	
-    "DOC502", # Raised exception is not explicitly raised: {id}	
+    "DOC501", # Raised exception {id} missing from docstring
+    "DOC502", # Raised exception is not explicitly raised: {id}
     "RUF022", # `__all__` is not sorted
     "RUF005", # Consider expression instead of concatenation
     "PD901", # Avoid using the generic variable name df for dataframes
@@ -82,3 +79,8 @@ allow-star-arg-any = true
 mypy-init-return = true
 suppress-dummy-args = true
 suppress-none-returning = true
+
+[dependency-groups]
+dev = [
+    "nbdime>=4.0.4",
+]

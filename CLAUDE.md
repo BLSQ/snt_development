@@ -85,7 +85,7 @@ pipelines/<pipeline_name>/reporting/   ← R reporting notebooks.
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
 configuration/SNT_config_<CC>.json     ← reference copies only (see below).
 dev/environment.yml                    ← local Python dev tools. Never runs on OpenHEXA.
-pyproject.toml                         ← ruff's rulebook. Declares no package, installs nothing.
+pyproject.toml                         ← ruff's rulebook + PEP 621 metadata. Never runs on OpenHEXA.
 .claude/                               ← agent guardrails (R19). Active on clone.
 ```
 
@@ -179,11 +179,27 @@ conda env update -f dev/environment.yml --prune
 declared per pipeline in `<pipeline_name>/requirements.txt`, a separate list that never meets this
 one. So a version drift here cannot affect a pipeline run.
 
-**Two files, deliberately not one.** `dev/environment.yml` says *which tools to install*;
-[`pyproject.toml`](pyproject.toml) at the repo root holds *`ruff`'s rulebook* — line length, and
-which mistakes to flag. The rulebook cannot move into `dev/`: `ruff` finds it by walking up from the
-file it is checking, so a copy in `dev/` would govern `dev/` alone and leave every pipeline silently
-on ruff's defaults. `pyproject.toml` declares no package and installs nothing.
+**Two files, deliberately not one.** `dev/environment.yml` is the **supported** way to install the
+desk tools — conda, matching team convention. [`pyproject.toml`](pyproject.toml) at the repo root
+holds *`ruff`'s rulebook* — line length, and which mistakes to flag — **and** a `[project]` block
+with PEP 621 metadata, `requires-python = ">=3.11"` and a short `dependencies` /
+`[dependency-groups]` list, so the repo can also be set up by a PEP 621 tool (`pip install -e .`,
+`uv sync`).
+
+Those dependency lists **deliberately duplicate** part of `dev/environment.yml`. That is a known,
+accepted duplication, not an oversight: conda is the path this repo documents, and unifying the two
+waits on a decision about the local-workflow strategy. Practical consequences — keep them roughly in
+step when you add a tool, and if they disagree, `dev/environment.yml` is the one that describes what
+the team actually runs. Neither file affects a pipeline run: what a workspace installs is declared
+per pipeline in `<pipeline_name>/requirements.txt`.
+
+One thing the `[project]` block quietly does: `requires-python` is where `ruff` gets its target
+Python version, which drives the `UP` (pyupgrade) and `FA` rules. If that block is ever removed, add
+`target-version = "py311"` under `[tool.ruff]` in its place, or ruff will start suggesting syntax
+that breaks on 3.11.
+
+The rulebook cannot move into `dev/`: `ruff` finds it by walking up from the file it is checking, so
+a copy in `dev/` would govern `dev/` alone and leave every pipeline silently on ruff's defaults.
 
 **Nothing extra is needed for the agent guardrail** (**R19**), but note *which* Python it uses. The
 hook runs in a plain shell with no conda environment activated, so it needs a **system** `python3`
@@ -318,10 +334,12 @@ Not implemented — recorded here so they can be assessed:
   sources `code/snt_utils.r` + `pipelines/<name>/utils/<name>.r` against a tiny fixture would
   make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
   when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
-- **Reproducible local environments — the *R* half is still open.** The Python half is settled:
-  `dev/environment.yml` (conda, team convention) + `pyproject.toml` for the `ruff` rules. Good
-  enough, because those are desk tools that never run in a workspace, so drift is harmless. What is
-  still unsolved is reproducing the **R** side. Recommendation: **pull the workspace image.**
+- **Reproducible local environments — the *R* half is still open.** The Python half is good enough:
+  `dev/environment.yml` (conda, team convention) + `pyproject.toml` for the `ruff` rules and PEP 621
+  metadata. The one loose end is that the two carry overlapping dependency lists — accepted for now,
+  to be revisited when the local-workflow strategy is settled; harmless meanwhile, because these are
+  desk tools that never run in a workspace. What is still genuinely unsolved is reproducing the **R**
+  side. Recommendation: **pull the workspace image.**
 
   | Option | Verdict |
   |---|---|

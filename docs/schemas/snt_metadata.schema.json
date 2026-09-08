@@ -63,12 +63,12 @@
                 },
                 "TYPE": {
                     "type": "string",
-                    "enum": ["Threshold"],
-                    "description": "How the Explorer turns values into map colours. \"Threshold\" = classify into bins whose cut points are SCALE. Only this value has been used so far; the enum is deliberately narrow so an unreviewed new value fails validation rather than reaching IASO unnoticed. Adding a rendering mode means adding it here AND agreeing it with the IASO developers (README, Open questions #4)."
+                    "enum": ["Threshold", "Ordinal"],
+                    "description": "How the Explorer turns values into map colours, and therefore how SCALE is read. \"Threshold\" = a continuous measure classified into bins whose CUT POINTS are SCALE. \"Ordinal\" = a discrete measure with a small set of ordered values, which SCALE ENUMERATES in full (a 0/1 seasonality flag, a block duration in whole months). The distinction matters because the two read SCALE differently — see the SCALE description. The enum is deliberately narrow so an unreviewed new value fails validation rather than reaching IASO unnoticed. Adding a rendering mode means adding it here AND agreeing it with the IASO developers (README, Open questions #4)."
                 },
                 "SCALE": {
                     "type": "array",
-                    "description": "Cut points between colour bins, ascending, in the units of the column. DO NOT include the outer limits (no leading 0, no trailing max) — the SNT Explorer adds those itself. So n values produce n+1 bins. Ascending order is a REQUIREMENT that JSON Schema cannot express; check it by eye or with the validator in README §Validating.",
+                    "description": "Ascending numbers whose meaning depends on TYPE. TYPE \"Threshold\": the CUT POINTS between colour bins, in the units of the column — DO NOT include the outer limits (no leading 0, no trailing max), the SNT Explorer adds those itself, so n values produce n+1 bins. TYPE \"Ordinal\": the COMPLETE ordered list of values the column can take, outer values INCLUDED — [0, 1] for a binary flag, [3, 4, 5] for a duration in months — so n values produce n classes and there is nothing for the Explorer to add. Getting this backwards yields either two degenerate empty bins (Threshold with limits) or a missing class (Ordinal without them). Ascending order is a REQUIREMENT that JSON Schema cannot express; check it by eye or with the validator in README §Validating.",
                     "items": {
                         "type": "number"
                     },

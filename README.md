@@ -82,6 +82,7 @@ Pick the row that matches what you came for.
 | read the epidemiological method | the R notebooks in `pipelines/<name>/code/*.ipynb`, with [`docs/GLOSSARY.md`](docs/GLOSSARY.md) §4 open beside them |
 | **change any code** | [`CLAUDE.md`](CLAUDE.md) — start at the [rule Register](CLAUDE.md#register) |
 | write or update a pipeline `readme.md` | [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
+| add or edit an SNT Explorer data layer in `SNT_metadata.json` | [`docs/schemas/README.md`](docs/schemas/README.md) |
 | know who to ask about a pipeline | [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) |
 | set up locally | [`dev/README.md`](dev/README.md) |
 

@@ -8,6 +8,7 @@ Guardrails for anyone (human or agent) changing code in this repository.
 - Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
 - Domain vocabulary: [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 - Writing a pipeline `readme.md`: [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md).
+- `SNT_metadata.json` layer format (schema + reasoning, WIP): [`docs/schemas/`](docs/schemas/README.md).
 - Who to ask / how review works: [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
 
 ---
@@ -355,6 +356,28 @@ Not implemented — recorded here so they can be assessed:
   Two questions for the OH devs: pin `latest` to a digest for reproducibility, and add
   `data.table` and `rmapshaper` to the image explicitly (see §7.4 — the code uses both, and both
   currently arrive only as transitive dependencies).
+- **Give `SNT_DATASET_IDENTIFIERS` a single key-naming convention.** Its keys follow no consistent
+  rule today: some carry an `SNT_` prefix (`SNT_HEALTHCARE_ACCESS`, `SNT_MAP_EXTRACTS`,
+  `SNT_RESULTS`, `SNT_SEASONALITY_*`) and some do not (`DHIS2_INCIDENCE`, `DHIS2_REPORTING_RATE`,
+  `ERA5_DATASET_CLIMATE`); `DHIS2_DATASET_EXTRACTS` is plural while `WORLDPOP_DATASET_EXTRACT` is
+  singular; and the key often does not resemble the dataset it points at (`DHIS2_INCIDENCE` → the
+  dataset shown in the OpenHEXA UI as `SNT_DHIS2_INCIDENCE`).
+
+  This is not cosmetic. The SNT Explorer resolves a data layer by looking its
+  `SOURCE_DATA.DATASET.NAME` up in this map, so an author who reasonably writes the *dataset's*
+  name instead of the *key* produces a layer that silently fails to load. That already happened:
+  six of the seven entries in the 2026-09-08 `SNT_metadata.json` draft pointed at
+  `SNT_DHIS2_INCIDENCE` / `SNT_DHIS2_REPORTING_RATE`, neither of which is a key
+  ([`docs/schemas/README.md` §2.5](docs/schemas/README.md)).
+
+  Two parts, separable: (a) agree one convention and apply it to the keys; (b) decide whether the
+  key should simply *equal* the OpenHEXA dataset name, which would remove the trap entirely. Note
+  the migration cost — these keys are read by every `pipeline.py`, appear in all five
+  `configuration/SNT_config_<CC>.json` files, and would need the country workspaces' live configs
+  updated in step, so it is a coordinated change rather than a rename. Also note the key set is
+  **not** identical across countries today (NER's config has `DHIS2_OUTLIERS_DETECTION`,
+  `DHIS2_OUTLIERS_REMOVAL_IMPUTATION` and `SNT_SEASONALITY`; the other four do not), which is
+  worth resolving at the same time.
 - **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
 - **Stamp readmes with the version they describe**, to make drift detectable. Blocked on deciding
   *which* version number counts (source / template / workspace — see
@@ -433,6 +456,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R17** | R failure messages prefixed `[ERROR]` or `[WARNING]`, chosen deliberately | `convention` — [Logging](#logging--error-labels) |
 | **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](#suggestions-logged-for-later-evaluation-giulia) |
 | **R19** | Agents never run destructive / history-rewriting `git` or `gh` commands | `enforced` — hook + `permissions.deny` in `.claude/` ([how](#how-this-is-enforced-r19)) |
+| **R20** | Every published output **table** carries a `YEAR` column | `convention` — new, existing outputs not audited ([why](#schema)) |
 
 Adding a rule: add a row here *and* the rationale to the matching section below. A rule that is
 only in the prose will be missed; a rule that is only in the table will be misapplied.
@@ -504,6 +528,20 @@ Keep these names and behaviours identical across pipelines — operators rely on
   `pyramid["level"].max()` as the existing tasks do.
 - A results column must be declared in `configuration/SNT_metadata.json` or
   `snt_assemble_results` **silently drops it**. Adding an indicator means editing that file too.
+- **Every published output table carries a `YEAR` column** (**R20**). Data points are always
+  attached to a year, so this costs nothing — and the SNT Explorer imports `YEAR` alongside the
+  layer's value column to let the user choose which year to display. A table without it cannot be
+  displayed over time, and the omission surfaces only when the layer fails to load. Applies to
+  tabular outputs (`.parquet` / `.csv`); not to shapes (`{CC}_shapes.geojson`), the org-unit
+  pyramid, or other genuinely time-independent artefacts. **This rule is newly stated — existing
+  outputs have not been audited against it.** Bring a table into line when you touch it; do not
+  assume every current output already complies.
+- **`SNT_metadata.json` is mid-format-change.** The file in `configuration/` is the old shape and
+  is what runs today. The **target** shape — one entry per SNT Explorer data layer, with a
+  `SOURCE_DATA` pointer and bilingual labels — is specified in
+  [`docs/schemas/`](docs/schemas/README.md), with a JSON Schema as its source of truth. Write new
+  metadata entries to that schema, and read its **Open questions** before assuming a field's
+  meaning: the format is still being validated with the IASO developers.
 
 ### Configuration
 

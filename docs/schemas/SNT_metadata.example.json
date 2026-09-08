@@ -1,0 +1,276 @@
+{
+    "POPULATION": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Total population (DHIS2)",
+            "FR": "Population totale (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "Total number of people living in a given area.",
+            "FR": "Nombre total de personnes vivant dans une zone spécifique."
+        },
+        "SOURCE": {
+            "EN": "DHIS2",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
+        },
+        "CATEGORY": {
+            "EN": "Variable of population and health",
+            "FR": "Variables de population et de santé"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_CRUDE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_CRUDE"
+        },
+        "LABEL": {
+            "EN": "Crude incidence (DHIS2)",
+            "FR": "Incidence brute (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population.",
+            "FR": "Nombre de nouveaux cas de paludisme, rapportés à la population."
+        },
+        "SOURCE": {
+            "EN": "DHIS2",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_TESTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_TESTING"
+        },
+        "LABEL": {
+            "EN": "Incidence adjusted for testing (DHIS2)",
+            "FR": "Incidence ajustée pour le dépistage (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate.",
+            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de positivité des tests, et rapportés à la population."
+        },
+        "SOURCE": {
+            "EN": "DHIS2",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_REPORTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_REPORTING"
+        },
+        "LABEL": {
+            "EN": "Incidence adjusted for reporting rate (DHIS2)",
+            "FR": "Incidence ajustée pour le taux de rapportage (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate and reporting rate.",
+            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de rapportage et le taux de positivité des tests, et rapportés à la population."
+        },
+        "SOURCE": {
+            "EN": "DHIS2",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_CARESEEKING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_CARESEEKING"
+        },
+        "LABEL": {
+            "EN": "Incidence adjusted for careseeking behaviour (DHIS2)",
+            "FR": "Incidence ajustée pour le taux de recherce de soins (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate, reporting rate, and careseeking behaviour.",
+            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour la recherche de soins, le taux de rapportage et le taux de positivité des tests, et rapportés à la population"
+        },
+        "SOURCE": {
+            "EN": "DHIS2",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "REPORTING_RATE_DATAELEMENT": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_REPORTING_RATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
+            "COLUMN": "REPORTING_RATE"
+        },
+        "LABEL": {
+            "EN": "",
+            "FR": "Taux de rapportage (DHIS2)"
+        },
+        "DESCRIPTION": {
+            "EN": "",
+            "FR": "Nombre de rapports reçus, sur le nombre total de rapports attendus."
+        },
+        "SOURCE": {
+            "EN": "",
+            "FR": "DHIS2"
+        },
+        "UNITS": {
+            "EN": "Proportion",
+            "FR": ""
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": "Qualité des données"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.25,
+            0.5,
+            0.75
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "REPORTING_RATE_DATASET": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_REPORTING_RATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset.csv",
+            "COLUMN": "REPORTING_RATE"
+        },
+        "LABEL": {
+            "EN": "",
+            "FR": ""
+        },
+        "DESCRIPTION": {
+            "EN": "",
+            "FR": ""
+        },
+        "SOURCE": {
+            "EN": "",
+            "FR": ""
+        },
+        "UNITS": {
+            "EN": "Proportion",
+            "FR": ""
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": "Qualité des données"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.25,
+            0.5,
+            0.75
+        ],
+        "UNIT_SYMBOL": "%"
+    }
+}

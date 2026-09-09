@@ -1,0 +1,134 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/BLSQ/snt_development/docs/schemas/snt_metadata.schema.json",
+    "title": "SNT_metadata.json (shape of 2026-09-08)",
+    "description": "Declares the data layers the SNT Explorer offers to a user, for one country. Each top-level property is one layer: SOURCE_DATA says where its values come from, the remaining fields say how it is presented. Work in progress — being validated with the IASO developers. Rationale, conventions and open questions: docs/schemas/README.md.",
+    "type": "object",
+    "minProperties": 1,
+    "propertyNames": {
+        "$ref": "#/$defs/upperSnakeName",
+        "description": "The layer id. UPPER_SNAKE_CASE, unique within the file, and stable once published — the Explorer and any saved user selection refer to a layer by this id. It is NOT required to equal SOURCE_DATA.COLUMN: two layers may read the same column from different files (see REPORTING_RATE_DATAELEMENT and REPORTING_RATE_DATASET in the example)."
+    },
+    "additionalProperties": {
+        "$ref": "#/$defs/layer"
+    },
+    "$defs": {
+        "upperSnakeName": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$",
+            "description": "UPPER_SNAKE_CASE identifier: starts with a letter, no leading/trailing/double underscores."
+        },
+        "localizedText": {
+            "type": "object",
+            "description": "The same text in each supported language. Both keys are required so a missing translation is visible as an empty string rather than an absent key. An empty string means 'not translated yet' — how the Explorer renders that is an OPEN QUESTION (see README, Open questions #1).",
+            "properties": {
+                "EN": {
+                    "type": "string",
+                    "description": "English. May be \"\" if not yet translated."
+                },
+                "FR": {
+                    "type": "string",
+                    "description": "French. May be \"\" if not yet translated."
+                }
+            },
+            "required": ["EN", "FR"],
+            "additionalProperties": false
+        },
+        "layer": {
+            "type": "object",
+            "description": "One data layer: where to read it, and how to present it.",
+            "properties": {
+                "SOURCE_DATA": {
+                    "$ref": "#/$defs/sourceData"
+                },
+                "LABEL": {
+                    "$ref": "#/$defs/localizedText",
+                    "description": "Short name shown in the Explorer's layer list and map legend. Keep it short enough to fit a legend; put the detail in DESCRIPTION. House style is to end with the source in parentheses, e.g. \"Crude incidence (DHIS2)\"."
+                },
+                "DESCRIPTION": {
+                    "$ref": "#/$defs/localizedText",
+                    "description": "One or two sentences defining the indicator for a non-technical reader: what is counted, over what population, with what adjustment. Shown on hover / in the layer's info panel."
+                },
+                "SOURCE": {
+                    "$ref": "#/$defs/localizedText",
+                    "description": "Origin of the data as shown to the user — e.g. \"DHIS2\", \"DHS\", \"WorldPop\", \"ERA5\". This is a display credit, not a machine reference: the machine-readable origin is SOURCE_DATA.DATASET."
+                },
+                "UNITS": {
+                    "$ref": "#/$defs/localizedText",
+                    "description": "Unit of the values, spelled out for a human — e.g. \"Per 1000 people\", \"Number of people\", \"Proportion\". The short form for an axis or legend is UNIT_SYMBOL."
+                },
+                "CATEGORY": {
+                    "$ref": "#/$defs/localizedText",
+                    "description": "The group the layer is filed under in the Explorer's layer list — e.g. \"Epidemiological indicators\", \"Qualité des données\". Layers sharing a category MUST spell it identically in every language, or they split into two groups in the UI. There is no controlled list yet (OPEN QUESTION: README, Open questions #3)."
+                },
+                "TYPE": {
+                    "type": "string",
+                    "enum": ["Threshold", "Ordinal"],
+                    "description": "How the Explorer turns values into map colours, and therefore how SCALE is read. \"Threshold\" = a continuous measure classified into bins whose CUT POINTS are SCALE. \"Ordinal\" = a discrete measure with a small set of ordered values, which SCALE ENUMERATES in full (a 0/1 seasonality flag, a block duration in whole months). The distinction matters because the two read SCALE differently — see the SCALE description. The enum is deliberately narrow so an unreviewed new value fails validation rather than reaching IASO unnoticed. Adding a rendering mode means adding it here AND agreeing it with the IASO developers (README, Open questions #4)."
+                },
+                "SCALE": {
+                    "type": "array",
+                    "description": "Ascending numbers whose meaning depends on TYPE. TYPE \"Threshold\": the CUT POINTS between colour bins, in the units of the column — DO NOT include the outer limits (no leading 0, no trailing max), the SNT Explorer adds those itself, so n values produce n+1 bins. TYPE \"Ordinal\": the COMPLETE ordered list of values the column can take, outer values INCLUDED — [0, 1] for a binary flag, [3, 4, 5] for a duration in months — so n values produce n classes and there is nothing for the Explorer to add. Getting this backwards yields either two degenerate empty bins (Threshold with limits) or a missing class (Ordinal without them). Ascending order is a REQUIREMENT that JSON Schema cannot express; check it by eye or with the validator in README §Validating.",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                },
+                "UNIT_SYMBOL": {
+                    "type": ["string", "null"],
+                    "description": "Short symbol appended to values in legends and tooltips, e.g. \"%\". null when the values carry no symbol (a count, or a rate already spelled out in UNITS). Must agree with how SCALE is expressed: \"%\" implies SCALE holds percentages (0-100), null with UNITS \"Proportion\" implies SCALE holds fractions (0-1). The example currently violates this and it is unresolved (README, Open questions #2).",
+                    "examples": ["%", null]
+                }
+            },
+            "required": [
+                "SOURCE_DATA",
+                "LABEL",
+                "DESCRIPTION",
+                "SOURCE",
+                "UNITS",
+                "CATEGORY",
+                "TYPE",
+                "SCALE",
+                "UNIT_SYMBOL"
+            ],
+            "additionalProperties": false
+        },
+        "sourceData": {
+            "type": "object",
+            "description": "Where the layer's values are read from: one column, of one file, in one version of one OpenHEXA dataset. This block is what makes the file a machine-resolvable pointer rather than presentation metadata only.",
+            "properties": {
+                "DATASET": {
+                    "type": "object",
+                    "description": "The OpenHEXA dataset holding the file.",
+                    "properties": {
+                        "NAME": {
+                            "$ref": "#/$defs/upperSnakeName",
+                            "description": "MUST be a key of SNT_DATASET_IDENTIFIERS in the country's SNT_config.json — that is how the SNT Explorer resolves the layer to a real dataset, by looking the key up to get the workspace dataset identifier (e.g. DHIS2_INCIDENCE -> \"snt-dhis2-incidence\"). Write the CONFIG KEY here, not the dataset's display name in the OpenHEXA UI and not its slug. A key absent from the config resolves to nothing and the layer fails to load. Not enumerated in this schema because the valid set lives in the per-country config; cross-check it with the validator in README section 5."
+                        },
+                        "VERSION": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Which dataset version to read. \"latest\" follows the newest version — the only value used so far, and the one that makes a re-run pick up fresh data automatically. A pinned version id would make a published Explorer view reproducible; whether IASO supports that is an OPEN QUESTION (README, Open questions #6).",
+                            "examples": ["latest"]
+                        }
+                    },
+                    "required": ["NAME", "VERSION"],
+                    "additionalProperties": false
+                },
+                "FILENAME": {
+                    "type": "string",
+                    "pattern": "^\\{COUNTRY_CODE\\}_[A-Za-z0-9][A-Za-z0-9_.-]*\\.(csv|parquet)$",
+                    "description": "File within that dataset. MUST begin with the literal placeholder {COUNTRY_CODE}, which the consumer substitutes with the uppercase country code from SNT_CONFIG.COUNTRY_CODE — this is what lets one metadata file serve every country (repo rule R7: every data file is prefixed {CC}_). Keeping the placeholder literal, rather than writing \"COD_incidence.csv\", is deliberate: a hardcoded code silently reads the wrong country's file if the config is copied.",
+                    "examples": ["{COUNTRY_CODE}_incidence.csv"]
+                },
+                "COLUMN": {
+                    "$ref": "#/$defs/upperSnakeName",
+                    "description": "Column within that file holding the layer's values. UPPERCASE, per repo rule R10 (all published column names are uppercase). Need not be unique across the file — the layer id is what disambiguates."
+                }
+            },
+            "required": ["DATASET", "FILENAME", "COLUMN"],
+            "additionalProperties": false
+        }
+    }
+}

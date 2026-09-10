@@ -59,10 +59,16 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
             ],
         )
 
-    # Load configuration (needed for report and for main run)
-    snt_config_dict = load_configuration_snt(config_path=snt_root_path / "configuration" / "SNT_config.json")
-    validate_config(snt_config_dict)
-    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    try:
+        # Load configuration (needed for report and for main run)
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    except Exception as e:
+        current_run.log_error(f"Error in loading configuration: {e}")
+        raise
 
     if not run_report_only:
         # Shapes must be generated first because pyramid coordinate validation

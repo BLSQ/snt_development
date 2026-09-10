@@ -1,79 +1,22 @@
-# Shared bootstrap for the IQR outliers pipeline notebooks.
-#
-# Function docs use lightweight R comments to keep notebooks readable
-# while documenting expected inputs/outputs for analysts and maintainers.
+# Load base utils
+source(file.path("~/workspace/code", "snt_utils.r"))   
 
-#' Initialize runtime context for the IQR outliers pipeline.
-#'
-#' Creates standard project paths, loads shared dependencies and utilities,
-#' initializes OpenHEXA SDK access, loads SNT configuration, and returns a
-#' single context object used by notebooks.
-#'
-#' @param root_path Project root folder (workspace).
-#' @param required_packages Character vector of R packages to install/load.
-#' @param load_openhexa Logical; import OpenHEXA SDK when TRUE.
-#' @return Named list with paths, OpenHEXA handle, and parsed config.
-bootstrap_iqr_context <- function(
-    root_path = "~/workspace",
-    required_packages = c(
-        "data.table", "arrow", "tidyverse", "jsonlite", "DBI", "RPostgres",
-        "reticulate", "glue", "zoo"
-    ),
-    load_openhexa = TRUE
-) {
-    code_path <- file.path(root_path, "code")
-    config_path <- file.path(root_path, "configuration")
-    data_path <- file.path(root_path, "data")
-    output_dir <- file.path(data_path, "dhis2", "outliers_imputation")
-    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
-    source(file.path(code_path, "snt_utils.r"))
-    install_and_load(required_packages)
-
-    Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
-    Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-
-    openhexa <- NULL
-    if (load_openhexa) {
-        openhexa <- reticulate::import("openhexa.sdk")
-    }
-    # snt_utils::log_msg() expects a global `openhexa` object.
-    assign("openhexa", openhexa, envir = .GlobalEnv)
-
-    config_json <- tryCatch(
-        {
-            jsonlite::fromJSON(file.path(config_path, "SNT_config.json"))
-        },
-        error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading configuration {conditionMessage(e)}")
-            log_msg(msg)
-            stop(msg)
-        }
-    )
-
-    return(list(
-        ROOT_PATH = root_path,
-        CODE_PATH = code_path,
-        CONFIG_PATH = config_path,
-        DATA_PATH = data_path,
-        OUTPUT_DIR = output_dir,
-        openhexa = openhexa,
-        config_json = config_json
-    ))
-}
-
-#' Load DHIS2 routine input data with validation and logging.
+#' Load DHIS2 Routine Input Data with Validation and Logging
 #'
 #' Reads the latest routine parquet file from OpenHEXA, logs dataset details,
 #' optionally casts YEAR and MONTH to integers, and validates indicator columns.
 #' Stops execution with a clear error when required fields are missing.
 #'
-#' @param dataset_name OpenHEXA dataset identifier/name.
-#' @param country_code Country code used in routine filename prefix.
-#' @param required_indicators Optional character vector of required indicators.
-#' @param cast_year_month Logical; cast YEAR/MONTH columns to integer.
-#' @return Data frame containing validated routine data.
+#' @param dataset_name Character. OpenHEXA dataset identifier/name.
+#' @param country_code Character. Country code used in the routine filename prefix.
+#' @param required_indicators Character vector. Indicator columns that must be present;
+#'   stops execution if any are missing. Default: NULL (no validation).
+#' @param cast_year_month Logical. If TRUE, casts the YEAR/MONTH columns to integer
+#'   when both are present. Default: TRUE.
+#' @return Data frame containing the validated routine data.
+#'
+#' @export
 load_routine_data <- function(dataset_name, country_code, required_indicators = NULL, cast_year_month = TRUE) {
     dhis2_routine <- tryCatch(
         {
@@ -105,15 +48,19 @@ load_routine_data <- function(dataset_name, country_code, required_indicators = 
     dhis2_routine
 }
 
-#' Impute flagged outliers using a centered moving average.
+  
+#' Impute Flagged Outliers Using a Centered Moving Average
 #'
 #' For each ADM/OU/indicator time series, values marked as outliers are
 #' replaced by a 3-point centered moving average (ceiling), preserving
 #' non-outlier observations.
 #'
-#' @param dt Routine data in long format.
-#' @param outlier_col Name of the logical outlier flag column.
-#' @return Data frame with VALUE_IMPUTED column and helper columns removed.
+#' @param dt Data frame or data.table. Routine data in long format.
+#' @param outlier_col Character. Name of the logical outlier flag column.
+#' @return Data frame with VALUE_IMPUTED and MOVING_AVG columns added, and the
+#'   TO_IMPUTE helper column removed.
+#'
+#' @export
 impute_outliers_dt <- function(dt, outlier_col) {
     dt <- data.table::as.data.table(dt)
     data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)
@@ -132,23 +79,26 @@ impute_outliers_dt <- function(dt, outlier_col) {
     return(as.data.frame(data.table::copy(dt)))
 }
 
-#' Build final routine output tables (imputed or removed).
+
+#' Build Final Routine Output Tables (Imputed or Removed)
 #'
 #' Reshapes long-format routine values back to wide indicator columns, joins
 #' location names, and standardizes output columns expected by downstream
 #' datasets and reporting.
 #'
-#' @param df Long-format routine data including VALUE_IMPUTED.
-#' @param outlier_column Outlier flag column used to filter removed records.
-#' @param DHIS2_INDICATORS Indicator columns to keep in the final table.
-#' @param fixed_cols Fixed identifier/date columns in long format.
-#' @param pyramid_names Mapping table with ADM/OU names.
-#' @param remove Logical; when TRUE returns outlier-removed data.
+#' @param df Data frame. Long-format routine data including VALUE_IMPUTED.
+#' @param outlier_column Character. Outlier flag column used to filter removed records.
+#' @param dhis2_indicators Character vector. Indicator columns to keep in the final table.
+#' @param fixed_cols Character vector. Fixed identifier/date columns in long format.
+#' @param pyramid_names Data frame. Mapping table with ADM/OU names.
+#' @param remove Logical. When TRUE, returns outlier-removed data instead of imputed data. Default FALSE.
 #' @return Wide routine data frame ready for export.
+#'
+#' @export
 format_routine_data_selection <- function(
     df,
     outlier_column,
-    DHIS2_INDICATORS,
+    dhis2_indicators,
     fixed_cols,
     pyramid_names,
     remove = FALSE
@@ -159,7 +109,7 @@ format_routine_data_selection <- function(
 
     target_cols <- c(
         "PERIOD", "YEAR", "MONTH", "ADM1_NAME", "ADM1_ID",
-        "ADM2_NAME", "ADM2_ID", "OU_ID", "OU_NAME", DHIS2_INDICATORS
+        "ADM2_NAME", "ADM2_ID", "OU_ID", "OU_NAME", dhis2_indicators
     )
 
     output <- df %>%

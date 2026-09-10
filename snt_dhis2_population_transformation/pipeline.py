@@ -192,10 +192,16 @@ def snt_dhis2_population_transformation(
             ],
         )
 
-    # Load configuration (needed for report and for main run)
-    snt_config_dict = load_configuration_snt(config_path=snt_root_path / "configuration" / "SNT_config.json")
-    validate_config(snt_config_dict)
-    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    try:
+        # Load configuration (needed for report and for main run)
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+    except Exception as e:
+        current_run.log_error(f"Failed to load configuration: {e}")
+        raise
 
     if not run_report_only:
         if disaggregation_file and not Path(disaggregation_file.path).exists():
@@ -241,13 +247,17 @@ def snt_dhis2_population_transformation(
         )
         current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
-        # Apply transformation to population data
-        dhis2_population_transformation(
-            snt_root_path=snt_root_path,
-            pipeline_root_path=snt_pipeline_path,
-            snt_config=snt_config_dict,
-            nb_parameter=parameters,
-        )
+        try:
+            # Apply transformation to population data
+            dhis2_population_transformation(
+                snt_root_path=snt_root_path,
+                pipeline_root_path=snt_pipeline_path,
+                snt_config=snt_config_dict,
+                nb_parameter=parameters,
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to apply population transformation: {e}")
+            raise
 
         add_files_to_dataset(
             dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
@@ -261,12 +271,16 @@ def snt_dhis2_population_transformation(
             ],
         )
 
-    run_report_notebook(
-        nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
-        nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-        error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
+            nb_output_path=snt_pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Failed to run reporting notebook: {e}")
+        raise
 
 
 def dhis2_population_transformation(

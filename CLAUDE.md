@@ -433,6 +433,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R17** | R failure messages prefixed `[ERROR]` or `[WARNING]`, chosen deliberately | `convention` — [Logging](#logging--error-labels) |
 | **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](#suggestions-logged-for-later-evaluation-giulia) |
 | **R19** | Agents never run destructive / history-rewriting `git` or `gh` commands | `enforced` — hook + `permissions.deny` in `.claude/` ([how](#how-this-is-enforced-r19)) |
+| **R20** | R: roxygen2 docstrings above every function (`#' Title`, blank, description, `@param`, `@return`, `@export`) | `convention` — see `code/snt_utils.r` |
 
 Adding a rule: add a row here *and* the rationale to the matching section below. A rule that is
 only in the prose will be missed; a rule that is only in the table will be misapplied.
@@ -488,7 +489,9 @@ Keep these names and behaviours identical across pipelines — operators rely on
 - Run parameters: `{CC}_parameters.json` via `save_pipeline_parameters(...)` — always publish it
   to the dataset alongside the data. It is the only provenance record.
 - Python: snake_case, ruff line-length 110, numpydoc docstrings with a `Returns` section
-  (pydocstyle + pydoclint are enabled). R: snake_case functions, `<-` assignment.
+  (pydocstyle + pydoclint are enabled). R: snake_case functions, `<-` assignment, roxygen2
+  docstrings above the function signature (`#' Title`, blank `#'`, description, `@param` per
+  argument, `@return`, `@export`) — see `code/snt_utils.r` for examples.
 
 ### Schema
 

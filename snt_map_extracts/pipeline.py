@@ -3,13 +3,15 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import polars as pl
+from exactextract import exact_extract
+from exactextract.raster import NumPyRasterSource
+from rasterio.transform import array_bounds
 from malariaAtlasProject.map import MAPExtractorError, MAPRasterExtractor
 from malariaAtlasProject.map_utils import (
     load_tiff_bands,
     parse_raster_filename_vars,
 )
 from openhexa.sdk import current_run, parameter, pipeline, workspace
-from rasterstats import zonal_stats
 from snt_lib.snt_pipeline_utils import (
     add_files_to_dataset,
     get_file_from_dataset,
@@ -32,6 +34,7 @@ from worldpopclient import WorldPopClient
 # https://bluesquare.atlassian.net/browse/SNT25-259 (old pipeline)
 # https://bluesquare.atlassian.net/browse/SNT25-284
 # https://bluesquare.atlassian.net/browse/SNT25-518 (include periods)
+# https://bluesquare.atlassian.net/browse/SNT25-606 (AHADI)
 
 
 @pipeline("snt_map_extracts")
@@ -134,7 +137,7 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
         periods = get_extract_periods(start=str(year_start), end=str(year_end))
         files_to_dataset = []
         for year in periods:
-            pop_table, pop_raster_path = get_or_download_population_table(
+            _, pop_raster_path = get_or_download_population_table(
                 year=year,
                 country_code=country_code,
                 shapes=shapes,
@@ -144,7 +147,6 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
 
             files_to_dataset += build_map_statistics_table(
                 coverage_categories=snt_indicators,
-                population_totals=pop_table,
                 pop_raster_path=pop_raster_path,
                 shapes=shapes,
                 target_year=year,
@@ -296,7 +298,7 @@ def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
 
     current_run.log_info(f"Shapes loaded from dataset: {dataset_shapes_id}.")
 
-    # Drop None geometries — zonal_stats fails on None.
+    # Drop None geometries, since aggregation over a shape with no geometry fails.
     invalid_shapes = shapes[shapes.geometry.isna()]
     if len(invalid_shapes) > 0:
         current_run.log_warning(f"Dropping {len(invalid_shapes)} organisation units without geometry.")
@@ -316,7 +318,6 @@ def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
 
 def build_map_statistics_table(
     coverage_categories: dict,
-    population_totals: pl.DataFrame | None,
     pop_raster_path: Path | None,
     shapes: gpd.GeoDataFrame,
     target_year: str,
@@ -329,8 +330,6 @@ def build_map_statistics_table(
     ----------
     coverage_categories : dict
         Dictionary mapping categories to indicator layer names.
-    population_totals : pl.DataFrame | None
-        DataFrame containing total population values for each shape, or None if not available.
     pop_raster_path : Path
         Path to the selected raster directory.
     shapes : gpd.GeoDataFrame
@@ -367,8 +366,8 @@ def build_map_statistics_table(
         map_indicators = compute_zonal_statistics(
             raster_files=raster_files,
             shapes=shapes,
-            population_totals=population_totals,
             pop_raster_path=pop_raster_path,
+            statistic="median",  # AHADI computation
         )
     except Exception as e:
         current_run.log_error(f"Error during aggregation: {e}")
@@ -426,14 +425,23 @@ def retrieve_rasters(
 def compute_zonal_statistics(
     raster_files: list[Path],
     shapes: gpd.GeoDataFrame,
-    population_totals: pl.DataFrame | None,
     pop_raster_path: Path | None,
+    statistic: str = "median",
 ) -> pl.DataFrame:
     """Run zonal statistics aggregations on the downloaded rasters.
+
+    Args:
+        raster_files: Paths to the downloaded raster files to process.
+        shapes: GeoDataFrame containing the shapes for zonal statistics.
+        pop_raster_path: Path to the population raster, or None to skip population weighting.
+        statistic: Either "mean" or "median".
 
     Returns:
         A Polars DataFrame containing the aggregated statistics for each indicator and shape.
     """
+    if statistic not in ("mean", "median"):
+        raise ValueError(f"Unsupported statistic: {statistic!r}. Must be 'mean' or 'median'.")
+
     # 1. Load population raster (if available)
     pop_data = pop_transform = pop_crs = pop_nodata = None
     if pop_raster_path is None:
@@ -469,17 +477,27 @@ def compute_zonal_statistics(
         for band in bands:
             if band in bands_for_statistics:
                 current_run.log_info(f"Processing {file_vars['indicator']} band: {band}.")
-                zstats = zonal_stats(
-                    vectors=shapes,
-                    raster=raster_data[band],
-                    affine=raster_transform,
-                    stats=["mean"],
-                    geojson_out=True,
-                    nodata=raster_nodata,
+                xmin, ymin, xmax, ymax = array_bounds(
+                    raster_data[band].shape[0], raster_data[band].shape[1], raster_transform
                 )
-                result_gdf = gpd.GeoDataFrame.from_features(zstats).drop(columns=["geometry"])
-                metric_var = "MEAN" if band in ["Data", "GRAY_INDEX"] else band
-                result_gdf = result_gdf.rename(columns={"mean": metric_var})
+                band_source = NumPyRasterSource(
+                    raster_data[band],
+                    xmin,
+                    ymin,
+                    xmax,
+                    ymax,
+                    nodata=raster_nodata,
+                    srs_wkt=raster_crs.to_wkt(),
+                )
+                result_gdf = exact_extract(
+                    band_source,
+                    shapes,
+                    [statistic],
+                    include_cols=ref_columns,
+                    output="pandas",
+                )
+                metric_var = statistic.upper() if band in ["Data", "GRAY_INDEX"] else band
+                result_gdf = result_gdf.rename(columns={statistic: metric_var})
                 melt_df = result_gdf.melt(
                     id_vars=ref_columns,
                     value_vars=[metric_var],
@@ -497,9 +515,9 @@ def compute_zonal_statistics(
                         pop_data=pop_data,
                         pop_transform=pop_transform,
                         pop_crs=pop_crs,
-                        population_totals=population_totals,
                         shapes=shapes,
                         indicator=file_vars["indicator"],
+                        statistic=statistic,
                     )
                     if weighted_metric is not None:
                         melt_df = (

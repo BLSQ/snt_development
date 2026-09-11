@@ -12,6 +12,9 @@ from snt_lib.snt_pipeline_utils import (
     save_pipeline_parameters,
 )
 
+# ticket:
+# https://bluesquare.atlassian.net/browse/SNT25-659
+
 
 @pipeline("snt_dhis2_formatting")
 @parameter(
@@ -63,66 +66,72 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
         )
         validate_config(snt_config_dict)
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-        if country_code is None:
-            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+    except Exception as e:
+        current_run.log_error(f"Error in loading configuration: {e}")
+        raise
 
-        if not run_report_only:
-            # Shapes must be generated first because pyramid coordinate validation
-            # uses the country geojson boundaries.
-            dhis2_shapes_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
+    if not run_report_only:
+        # Shapes must be generated first because pyramid coordinate validation
+        # uses the country geojson boundaries.
+        dhis2_shapes_formatting(
+            snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+        )
 
-            dhis2_pyramid_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
+        dhis2_pyramid_formatting(
+            snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+        )
 
-            dhis2_analytics_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
-            dhis2_population_formatting(
-                snt_root_path=snt_root_path,
-                pipeline_root_path=snt_pipeline_path,
-                snt_config=snt_config_dict,
-            )
+        dhis2_analytics_formatting(
+            snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+        )
 
-            dhis2_reporting_rates_formatting(
-                snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
-            )
+        dhis2_population_formatting(
+            snt_root_path=snt_root_path,
+            pipeline_root_path=snt_pipeline_path,
+            snt_config=snt_config_dict,
+        )
 
+        dhis2_reporting_rates_formatting(
+            snt_root_path=snt_root_path, pipeline_root_path=snt_pipeline_path, snt_config=snt_config_dict
+        )
+
+        try:
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_formatting",
                 parameters={"run_report_only": run_report_only, "pull_scripts": pull_scripts},
                 output_path=snt_dhis2_formatted_path,
                 country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Error in saving pipeline parameters: {e}")
+            raise
 
-            add_files_to_dataset(
-                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
-                country_code=country_code,
-                file_paths=[
-                    snt_dhis2_formatted_path / f"{country_code}_routine.parquet",
-                    snt_dhis2_formatted_path / f"{country_code}_routine.csv",
-                    snt_dhis2_formatted_path / f"{country_code}_population.parquet",
-                    snt_dhis2_formatted_path / f"{country_code}_population.csv",
-                    snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
-                    snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
-                    snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
-                    snt_dhis2_formatted_path / f"{country_code}_reporting.parquet",
-                    snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
-                    parameters_file,
-                ],
-            )
+        add_files_to_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
+            country_code=country_code,
+            file_paths=[
+                snt_dhis2_formatted_path / f"{country_code}_routine.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_routine.csv",
+                snt_dhis2_formatted_path / f"{country_code}_population.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_population.csv",
+                snt_dhis2_formatted_path / f"{country_code}_shapes.geojson",
+                snt_dhis2_formatted_path / f"{country_code}_pyramid.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_pyramid.csv",
+                snt_dhis2_formatted_path / f"{country_code}_reporting.parquet",
+                snt_dhis2_formatted_path / f"{country_code}_reporting.csv",
+                parameters_file,
+            ],
+        )
 
+    try:
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_formatting_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
-
     except Exception as e:
-        current_run.log_error(f"Error in SNT DHIS2 formatting: {e}")
+        current_run.log_error(f"Error in running report notebook: {e}")
         raise
 
 
@@ -155,7 +164,8 @@ def dhis2_analytics_formatting(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting analytics data: {e}") from e
+        current_run.log_error(f"Error in formatting analytics data: {e}")
+        raise
 
 
 def dhis2_population_formatting(
@@ -187,7 +197,8 @@ def dhis2_population_formatting(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting population data: {e}") from e
+        current_run.log_error(f"Error in formatting population data: {e}")
+        raise
 
 
 def dhis2_shapes_formatting(
@@ -219,11 +230,8 @@ def dhis2_shapes_formatting(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting shapes data: {e}") from e
-
-    # current_run.log_info(
-    #     f"SNT population formatted data saved under: {snt_root_path / 'data' / 'dhis2_formatted'}"
-    # )
+        current_run.log_error(f"Error in formatting shapes data: {e}")
+        raise
 
 
 def dhis2_pyramid_formatting(
@@ -255,7 +263,8 @@ def dhis2_pyramid_formatting(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting pyramid data: {e}") from e
+        current_run.log_error(f"Error in formatting pyramid data: {e}")
+        raise
 
 
 def dhis2_reporting_rates_formatting(
@@ -287,7 +296,8 @@ def dhis2_reporting_rates_formatting(
             country_code=country_code,
         )
     except Exception as e:
-        raise Exception(f"Error in formatting reporting rates data: {e}") from e
+        current_run.log_error(f"Error in formatting reporting rates data: {e}")
+        raise
 
 
 if __name__ == "__main__":

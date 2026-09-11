@@ -1,112 +1,5 @@
-# Shared helpers for snt_dhis2_formatting code notebooks.
-
 # Load base utils
 source(file.path("~/workspace/code", "snt_utils.r"))   
-
-
-#' Get Setup Variables for SNT Workspace
-#' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
-#'
-#' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
-#' @param packages Character vector. R packages to install and load.
-#' @return List with SNT paths.
-#'
-#' @export
-get_setup_variables <- function(
-    SNT_ROOT_PATH='~/workspace', 
-    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
-) {
-        
-    # List required pcks
-    required_packages <- unique(c(packages, "reticulate"))
-    install_and_load(required_packages)
-
-    # Set environment to load openhexa.sdk from the right environment
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    
-    # Attempt to import the SDK
-    tryCatch({
-        sdk <- reticulate::import("openhexa.sdk")
-        assign("openhexa", sdk, envir = .GlobalEnv)
-    }, error = function(e) {
-        log_msg("Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python", "warning")
-    })    
-
-    # Set paths (add paths here)
-    paths_to_check = list(
-        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),        
-        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
-        DATA_PATH = file.path(SNT_ROOT_PATH, "data")
-    )
-
-    # create if they do not exist
-    lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE)
-    
-    return(paths_to_check)
-}
-
-
-#' Load SNT Configuration File
-#' Reads and parses a JSON configuration file.
-#' @param snt_config_path Character. Path to the configuration JSON file.
-#' @return List containing parsed configuration.
-#'
-#' @export
-load_snt_config <- function(snt_config_path) {
-
-    # config file path 
-    config_json <- tryCatch({ fromJSON(snt_config_path) },
-                error = function(e) {
-                    stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
-                })
-    
-    log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
-    return(config_json)    
-}
-
-
-#' Load Dataset File from OpenHEXA
-#' Retrieves the latest version of a file from an OpenHEXA dataset.
-#'
-#' @param dataset_id Character. OpenHEXA dataset identifier.
-#' @param filename Character. Name of file to load.
-#' @param verbose Bool. Log messages
-#' @return Dataframe containing the loaded data.
-#'
-#' @export
-load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
-    data <- tryCatch({ 
-            get_latest_dataset_file_in_memory(dataset_id, filename) 
-        }, error = function(e) {
-            stop(glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
-    })
-
-    if (verbose) {        
-        log_msg(glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
-    }    
-    return(data)
-}
-
-
-#' Load a CSV File with Error Handling
-#'
-#' @description 
-#' Attempts to read a CSV file from the specified path. If the file cannot be loaded, 
-#' it logs a high-level error message and stops execution.
-#'
-#' @param csv_file_path String representing the file path to the CSV.
-#' @return A dataframe containing the contents of the CSV file.
-#' 
-#' @export
-load_csv_file <- function(csv_file_path) {
-    csv_data <- tryCatch({ read.csv(csv_file_path) },
-        error = function(e) {
-            stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}"))
-        }
-    )
-    log_msg(glue::glue("File loaded: {csv_file_path}"))
-    return(csv_data)
-}
 
 
 # -----------------------------------------------------------------------------------------
@@ -116,16 +9,15 @@ load_csv_file <- function(csv_file_path) {
 
 #' Validate and Resolve Reference Year
 #'
-#' @description 
-#' Checks if a provided reference year exists within a population dataset. 
-#' If the year is NULL or missing from the data, it defaults to the maximum 
+#' Checks if a provided reference year exists among the available years.
+#' If the year is NULL or missing from the data, it defaults to the maximum
 #' available year and logs a warning.
 #'
-#' @param dhis2_population A dataframe containing at least a \code{YEAR} column.
+#' @param available_years Numeric or character vector of years present in the population data.
 #' @param reference_year The year to validate (numeric or string). Can be NULL.
 #'
 #' @return A numeric or string representing the resolved reference year.
-#' 
+#'
 #' @export
 resolve_reference_year <- function(available_years, reference_year = NULL) {
         
@@ -149,10 +41,20 @@ resolve_reference_year <- function(available_years, reference_year = NULL) {
 
 
 #' Project Specific Population Columns Backward
+#'
+#' Projects target population columns backward in time from a base year, by
+#' repeatedly dividing by (1 + growth_factor) for each year moving away from
+#' the base year.
+#'
 #' @param ref_data Dataframe of the base year.
 #' @param years Vector of years to project.
 #' @param growth_factor Numeric growth rate.
 #' @param target_columns Character vector of column names to project.
+#'
+#' @return Data frame with one row per input year (stacked via rbind), with target_columns
+#'   scaled down for each year, or NULL if years is empty.
+#'
+#' @export
 project_backward <- function(ref_data, years, growth_factor, target_columns) {
     if (length(years) == 0) return(NULL)
     
@@ -179,10 +81,20 @@ project_backward <- function(ref_data, years, growth_factor, target_columns) {
 
 
 #' Project Specific Population Columns Forward
+#'
+#' Projects target population columns forward in time from a base year, by
+#' repeatedly multiplying by (1 + growth_factor) for each year moving away from
+#' the base year.
+#'
 #' @param ref_data Dataframe of the base year.
 #' @param years Vector of years to project.
 #' @param growth_factor Numeric growth rate.
 #' @param target_columns Character vector of column names to project (e.g., c("TOTAL_POP", "FEMALE_POP")).
+#'
+#' @return Data frame with one row per input year (stacked via rbind), with target_columns
+#'   scaled up for each year, or NULL if years is empty.
+#'
+#' @export
 project_forward <- function(ref_data, years, growth_factor, target_columns) {
     if (length(years) == 0) return(NULL)
     
@@ -216,7 +128,12 @@ project_forward <- function(ref_data, years, growth_factor, target_columns) {
 #'
 #' @param population_table A data frame containing at least 'ADM2_ID' and 'POPULATION'.
 #' @param disaggregation_table A data frame containing 'ADM2_ID' and demographic proportion columns.
-#' @return A combined data frame with new columns for each valid disaggregated population group.
+#' @return population_table with one column added per disaggregation_table column that has at
+#'   least one non-NA proportion, computed as POPULATION times that proportion (any pre-existing
+#'   column of the same name is overwritten). Returned unchanged if no column in
+#'   disaggregation_table has any non-NA values.
+#'
+#' @export
 add_population_disaggregations <- function(
     population_table, 
     disaggregation_table

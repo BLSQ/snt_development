@@ -199,53 +199,55 @@ def snt_dhis2_population_transformation(
         )
         validate_config(snt_config_dict)
         country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-        if country_code is None:
-            current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
+    except Exception as e:
+        current_run.log_error(f"Failed to load configuration: {e}")
+        raise
 
-        if not run_report_only:
-            if disaggregation_file and not Path(disaggregation_file.path).exists():
-                current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
-                raise FileNotFoundError
+    if not run_report_only:
+        if disaggregation_file and not Path(disaggregation_file.path).exists():
+            current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
+            raise FileNotFoundError
 
-            years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
-            if not years_available:
-                current_run.log_error("No DHIS2 population data available.")
-                raise ValueError
+        years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
+        if not years_available:
+            current_run.log_error("No DHIS2 population data available.")
+            raise ValueError
 
-            tot_pop_reference_year_res = None
-            if tot_pop_reference:
-                tot_pop_reference_year_res = resolve_reference_year(
-                    years_available, tot_pop_reference_year, var_name="Total population"
-                )
-
-            growth_reference_year_res = None
-            if growth_factor:
-                growth_reference_year_res = resolve_reference_year(
-                    years_available, growth_reference_year, var_name="Growth projection"
-                )
-
-            parameters = {
-                "TOT_POP_REFERENCE": tot_pop_reference,
-                "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
-                "GROWTH_FACTOR": growth_factor,
-                "GROWTH_REFERENCE_YEAR": growth_reference_year_res,
-                "POP_UNDER_5": pop_under_5,
-                "POP_PREGNANT_WOMEN": pop_pregnant_women,
-                "POP_0_1_Y": pop_0_1_y,
-                "POP_1_2_Y": pop_1_2_y,
-                "POP_5_10_Y": pop_5_10_y,
-                "POP_5_36_M": pop_5_36_m,
-                "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
-            }
-
-            params_file = save_pipeline_parameters(
-                pipeline_name="snt_dhis2_population_transformation",
-                parameters=parameters,
-                output_path=snt_dhis2_pop_transform_path,
-                country_code=country_code,
+        tot_pop_reference_year_res = None
+        if tot_pop_reference:
+            tot_pop_reference_year_res = resolve_reference_year(
+                years_available, tot_pop_reference_year, var_name="Total population"
             )
-            current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
+        growth_reference_year_res = None
+        if growth_factor:
+            growth_reference_year_res = resolve_reference_year(
+                years_available, growth_reference_year, var_name="Growth projection"
+            )
+
+        parameters = {
+            "TOT_POP_REFERENCE": tot_pop_reference,
+            "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
+            "GROWTH_FACTOR": growth_factor,
+            "GROWTH_REFERENCE_YEAR": growth_reference_year_res,
+            "POP_UNDER_5": pop_under_5,
+            "POP_PREGNANT_WOMEN": pop_pregnant_women,
+            "POP_0_1_Y": pop_0_1_y,
+            "POP_1_2_Y": pop_1_2_y,
+            "POP_5_10_Y": pop_5_10_y,
+            "POP_5_36_M": pop_5_36_m,
+            "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
+        }
+
+        params_file = save_pipeline_parameters(
+            pipeline_name="snt_dhis2_population_transformation",
+            parameters=parameters,
+            output_path=snt_dhis2_pop_transform_path,
+            country_code=country_code,
+        )
+        current_run.log_info(f"Saved pipeline parameters to {params_file}")
+
+        try:
             # Apply transformation to population data
             dhis2_population_transformation(
                 snt_root_path=snt_root_path,
@@ -253,28 +255,31 @@ def snt_dhis2_population_transformation(
                 snt_config=snt_config_dict,
                 nb_parameter=parameters,
             )
+        except Exception as e:
+            current_run.log_error(f"Failed to apply population transformation: {e}")
+            raise
 
-            add_files_to_dataset(
-                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
-                    "DHIS2_POPULATION_TRANSFORMATION", None
-                ),
-                country_code=country_code,
-                file_paths=[
-                    snt_dhis2_pop_transform_path / f"{country_code}_population.parquet",
-                    snt_dhis2_pop_transform_path / f"{country_code}_population.csv",
-                    params_file,
-                ],
-            )
+        add_files_to_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
+                "DHIS2_POPULATION_TRANSFORMATION", None
+            ),
+            country_code=country_code,
+            file_paths=[
+                snt_dhis2_pop_transform_path / f"{country_code}_population.parquet",
+                snt_dhis2_pop_transform_path / f"{country_code}_population.csv",
+                params_file,
+            ],
+        )
 
+    try:
         run_report_notebook(
             nb_file=snt_pipeline_path / "reporting" / "snt_dhis2_population_transformation_report.ipynb",
             nb_output_path=snt_pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
-
     except Exception as e:
-        current_run.log_error(f"Error in population transformation: {e}")
+        current_run.log_error(f"Failed to run reporting notebook: {e}")
         raise
 
 

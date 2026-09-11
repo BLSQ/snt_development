@@ -3,7 +3,7 @@
 # Description: This script contains utility functions used for SNT computation workflow.
 # Author: Esteban Montandon
 # Created: [2024-10-01]
-# Last updated: [2026-09-09]
+# Last updated: [2026-09-11]
 # Dependencies: stringi, httr, arrow, tools, jsonlite, data.table, dplyr, tidyr, sf, terra, glue,
 #   tsibble, fable, DHS.rates, readr, rlang, utils, reticulate
 # Notes:
@@ -23,7 +23,7 @@
 #' @export
 format_names <- function(x) {
     # add any other matching logic here
-    x <- stri_trans_general(str = x, id = "Latin-ASCII") # remove weird characters
+    x <- stringi::stri_trans_general(str = x, id = "Latin-ASCII") # remove weird characters
     x <- gsub("[^a-zA-Z0-9]", " ", toupper(x))           # replace non-alphanum with space
     # x <- gsub("(?i)PROVINCE|ZONE DE SANTE|AIRE DE SANTE|CENTRE DE SANTE", "", x) # TEMPORARY SKIP
     x <- gsub("  +", " ", x)       # collapse multiple spaces
@@ -130,8 +130,9 @@ init_snt_workspace <- function(
     paths_to_check = list(
         CONFIG_PATH = file.path(snt_root_path, "configuration"),  
         UPLOADS_PATH = file.path(snt_root_path, "uploads"),
-        DATA_PATH = file.path(snt_root_path, "data"),
-        INTERMEDIATE_RESULTS = file.path(snt_root_path, "pipelines", snt_pipeline_name, "intermediate_results")        
+        DATA_PATH = file.path(snt_root_path, "data"),        
+        INTERMEDIATE_RESULTS_PATH = file.path(snt_root_path, "pipelines", snt_pipeline_name, "intermediate_results"),
+        OUTPUT_PLOTS_PATH <- file.path(snt_root_path, "pipelines", snt_pipeline_name, "reporting", "outputs", "figures")  # reporting   
     )
     lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE) # create if they do not exist
     return(paths_to_check)
@@ -150,7 +151,7 @@ init_snt_workspace <- function(
 #' @export
 load_snt_config <- function(snt_config_path) {
     # config file path 
-    config_json <- tryCatch({ fromJSON(snt_config_path) },
+    config_json <- tryCatch({ jsonlite::fromJSON(snt_config_path) },
       error = function(e) {
           stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
       })    

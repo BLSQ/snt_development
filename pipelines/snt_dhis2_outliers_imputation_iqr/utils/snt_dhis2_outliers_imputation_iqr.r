@@ -52,30 +52,31 @@ load_routine_data <- function(dataset_name, country_code, required_indicators = 
 #' Impute Flagged Outliers Using a Centered Moving Average
 #'
 #' For each ADM/OU/indicator time series, values marked as outliers are
-#' replaced by a 3-point centered moving average (ceiling), preserving
-#' non-outlier observations.
+#' replaced by a centered moving average (ceiling), preserving non-outlier
+#' observations.
 #'
 #' @param dt Data frame or data.table. Routine data in long format.
 #' @param outlier_col Character. Name of the logical outlier flag column.
+#' @param n Integer. Size of the centered rolling window, in periods. Default: 3.
 #' @return Data frame with VALUE_IMPUTED and MOVING_AVG columns added, and the
 #'   TO_IMPUTE helper column removed.
 #'
 #' @export
-impute_outliers_dt <- function(dt, outlier_col) {
+impute_outliers_dt <- function(dt, outlier_col, n = 3) {
     dt <- data.table::as.data.table(dt)
     data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)
     dt[, TO_IMPUTE := data.table::fifelse(get(outlier_col) == TRUE, NA_real_, VALUE)]
-
     dt[, MOVING_AVG := data.table::frollapply(
         TO_IMPUTE,
-        n = 3,
-        FUN = function(x) ceiling(mean(x, na.rm = TRUE)),
+        N = n,
+        FUN = function(x) {
+            m <- mean(x, na.rm = TRUE)
+            if (is.nan(m)) NA_real_ else ceiling(m)
+        },
         align = "center"
     ), by = .(ADM1_ID, ADM2_ID, OU_ID, INDICATOR)]
-
     dt[, VALUE_IMPUTED := data.table::fifelse(is.na(TO_IMPUTE), MOVING_AVG, TO_IMPUTE)]
     dt[, c("TO_IMPUTE") := NULL]
-
     return(as.data.frame(data.table::copy(dt)))
 }
 

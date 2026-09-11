@@ -72,13 +72,12 @@ def snt_dhis2_outliers_imputation_iqr(
     current_run.log_info(f"Pipeline path: {pipeline_path}")
     current_run.log_info(f"Data path: {data_path}")
 
-    config_path = root_path / "configuration" / "SNT_config.json"
-    snt_config = load_configuration_snt(config_path=config_path)
     try:
+        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
     except Exception as e:
-        current_run.log_error(f"Error validating configuration: {e}")
+        current_run.log_error(f"Error loading/validating configuration: {e}")
         raise
 
     if not run_report_only:
@@ -99,12 +98,16 @@ def snt_dhis2_outliers_imputation_iqr(
             current_run.log_error(f"Error running notebook: {e}")
             raise
 
-        parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_dhis2_outliers_imputation_iqr",
-            parameters=input_params,
-            output_path=data_path,
-            country_code=country_code,
-        )
+        try:
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_outliers_imputation_iqr",
+                parameters=input_params,
+                output_path=data_path,
+                country_code=country_code,
+            )
+        except Exception as e:
+            current_run.log_error(f"Error saving pipeline parameters: {e}")
+            raise
 
         add_files_to_dataset(
             dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
@@ -130,12 +133,16 @@ def snt_dhis2_outliers_imputation_iqr(
     else:
         current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")
 
-    run_report_notebook(
-        nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_iqr_report.ipynb",
-        nb_output_path=pipeline_path / "reporting" / "outputs",
-        error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_dhis2_outliers_imputation_iqr_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Error running reporting notebook: {e}")
+        raise
 
     current_run.log_info("Pipeline finished successfully.")
 

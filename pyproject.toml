@@ -63,7 +63,7 @@ ignore = [
     "DOC502", # Raised exception is not explicitly raised: {id}
     "RUF022", # `__all__` is not sorted
     "RUF005", # Consider expression instead of concatenation
-    "PD901", # Avoid using the generic variable name df for dataframes
+    "D213", # Multi-line docstring summary should start at the second line (conflicts with D212)
     "PLR0904", # Too many public methods ({methods} > {max_methods})
     "PLR0911", # Too many return statements ({returns} > {max_returns})
     "PLR0912", # Too many branches ({branches} > {max_branches})

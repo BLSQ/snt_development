@@ -186,7 +186,7 @@ get_coherence_definitions <- function() {
   list(checks = checks, check_labels = check_labels)
 }
 
-compute_national_coherency_metrics <- function(df, checks, check_labels) {
+compute_national_coherence_metrics <- function(df, checks, check_labels) {
   df_checks <- df %>%
     dplyr::mutate(
       !!!lapply(names(checks), function(check_name) {
@@ -228,8 +228,8 @@ compute_national_coherency_metrics <- function(df, checks, check_labels) {
     )
 }
 
-plot_national_coherence_heatmap <- function(coherency_metrics) {
-  ggplot2::ggplot(coherency_metrics, ggplot2::aes(
+plot_national_coherence_heatmap <- function(coherence_metrics) {
+  ggplot2::ggplot(coherence_metrics, ggplot2::aes(
     x = factor(.data$YEAR),
     y = .data$check_label,
     fill = .data$pct_coherent

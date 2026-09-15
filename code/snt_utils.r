@@ -132,7 +132,7 @@ init_snt_workspace <- function(
         UPLOADS_PATH = file.path(snt_root_path, "uploads"),
         DATA_PATH = file.path(snt_root_path, "data"),        
         INTERMEDIATE_RESULTS_PATH = file.path(snt_root_path, "pipelines", snt_pipeline_name, "intermediate_results"),
-        OUTPUT_PLOTS_PATH <- file.path(snt_root_path, "pipelines", snt_pipeline_name, "reporting", "outputs", "figures")  # reporting   
+        OUTPUT_PLOTS_PATH = file.path(snt_root_path, "pipelines", snt_pipeline_name, "reporting", "outputs", "figures")  # reporting   
     )
     lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE) # create if they do not exist
     return(paths_to_check)

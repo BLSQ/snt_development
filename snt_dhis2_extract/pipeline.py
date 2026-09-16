@@ -1,6 +1,4 @@
 import re
-import json
-import tempfile
 from datetime import datetime
 from itertools import product
 from pathlib import Path
@@ -8,7 +6,6 @@ from pathlib import Path
 import pandas as pd
 import papermill as pm
 import polars as pl
-from nbclient.exceptions import CellTimeoutError
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from openhexa.sdk.workspaces.connection import DHIS2Connection
 from openhexa.toolbox.dhis2 import DHIS2
@@ -22,8 +19,8 @@ from openhexa.toolbox.dhis2.periods import period_from_string
 from snt_lib.snt_pipeline_utils import (
     handle_rkernel_error_with_labels,
     pull_scripts_from_repository,
-    generate_html_report,
-    get_new_dataset_version,
+    run_report_notebook,
+    add_files_to_dataset,
     load_configuration_snt,
     validate_config,
     delete_raw_files,
@@ -32,6 +29,8 @@ from snt_lib.snt_pipeline_utils import (
 
 # Tickets:
 # -https://bluesquare.atlassian.net/browse/SNT25-406
+# -https://bluesquare.atlassian.net/browse/SNT25-659
+
 # Github repository: https://github.com/BLSQ/snt_development
 
 
@@ -92,10 +91,10 @@ def snt_dhis2_extract(
     run_report_only: bool,
     pull_scripts: bool,
 ) -> None:
-    """Write your pipeline code here.
+    """SNT extract pipeline for DHIS2 data.
 
-    Pipeline functions should only call tasks and should never perform IO operations or
-    expensive computations.
+    This pipeline extracts raw data from DHIS2 based on the specified period range,
+    handles population data download, and manages the addition of files to the dataset.
     """
     try:
         validate_period_range(start, end)
@@ -120,26 +119,26 @@ def snt_dhis2_extract(
         )
 
     try:
-        if not run_report_only:
-            # Load configuration
-            snt_config_dict = load_configuration_snt(
-                config_path=snt_root_path / "configuration" / "SNT_config.json"
-            )
+        # Load configuration
+        snt_config_dict = load_configuration_snt(
+            config_path=snt_root_path / "configuration" / "SNT_config.json"
+        )
+        validate_config(snt_config_dict)
+        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE")
+    except Exception as e:
+        current_run.log_error(f"Configuration loading failed: {e}")
+        raise
 
-            # Validate configuration
-            validate_config(snt_config_dict)
+    if not run_report_only:
+        # DHIS2 connection
+        dhis2_client = get_dhis2_client(dhis2_connection=dhis2_connection, cache_folder=None)
 
-            # get country identifier for file naming
-            country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        # get dhis2 pyramid
+        dhis2_pyramid = get_dhis2_pyramid(
+            dhis2_client=dhis2_client, snt_config=snt_config_dict, pipeline_path=pipeline_path
+        )
 
-            # DHIS2 connection
-            dhis2_client = get_dhis2_client(dhis2_connection=dhis2_connection, cache_folder=None)
-
-            # get dhis2 pyramid
-            dhis2_pyramid = get_dhis2_pyramid(
-                dhis2_client=dhis2_client, snt_config=snt_config_dict, pipeline_path=pipeline_path
-            )
-
+        try:
             pop_ready = download_dhis2_population(
                 start=start,
                 end=end,
@@ -149,20 +148,32 @@ def snt_dhis2_extract(
                 output_dir=dhis2_raw_data_path / "population_data",
                 overwrite=overwrite,
             )
+        except Exception as e:
+            current_run.log_warning(f"Error downloading DHIS2 population: {e}")
+            pop_ready = False
 
+        try:
             shapes_ready = download_dhis2_shapes(
                 source_pyramid=dhis2_pyramid,
                 dhis2_client=dhis2_client,
                 output_dir=dhis2_raw_data_path / "shapes_data",
                 snt_config=snt_config_dict,
             )
+        except Exception as e:
+            current_run.log_warning(f"Error downloading DHIS2 shapes: {e}")
+            shapes_ready = False
 
+        try:
             pyramid_ready = download_dhis2_pyramid(
                 source_pyramid=dhis2_pyramid,
                 output_dir=dhis2_raw_data_path / "pyramid_data",
                 snt_config=snt_config_dict,
             )
+        except Exception as e:
+            current_run.log_warning(f"Error downloading DHIS2 pyramid: {e}")
+            pyramid_ready = False
 
+        try:
             analytics_ready = download_dhis2_analytics(
                 start=start,
                 end=end,
@@ -173,18 +184,22 @@ def snt_dhis2_extract(
                 overwrite=overwrite,
                 ready=pop_ready,
             )
+        except Exception as e:
+            current_run.log_warning(f"Error downloading DHIS2 analytics: {e}")
+            analytics_ready = False
 
-            reporting_ready = download_dhis2_reporting_rates(
-                start=start,
-                end=end,
-                source_pyramid=dhis2_pyramid,
-                dhis2_client=dhis2_client,
-                snt_config=snt_config_dict,
-                output_dir=dhis2_raw_data_path / "reporting_data",
-                overwrite=overwrite,
-                ready=analytics_ready,
-            )
+        reporting_ready = download_dhis2_reporting_rates(
+            start=start,
+            end=end,
+            source_pyramid=dhis2_pyramid,
+            dhis2_client=dhis2_client,
+            snt_config=snt_config_dict,
+            output_dir=dhis2_raw_data_path / "reporting_data",
+            overwrite=overwrite,
+            ready=analytics_ready,
+        )
 
+        try:
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_extract",
                 parameters={
@@ -197,39 +212,39 @@ def snt_dhis2_extract(
                 output_path=dhis2_raw_data_path,
                 country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Error saving pipeline parameters: {e}")
+            raise
 
-            files_ready = add_files_to_dataset_for_extracts(
-                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
-                country_code=country_code,
-                org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
-                file_paths=[
-                    dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
-                    dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
-                    dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
-                    dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
-                    dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
-                    parameters_file,
-                ],
-                analytics_ready=analytics_ready,
-                pop_ready=pop_ready,
-                shapes_ready=shapes_ready,
-                pyramid_ready=pyramid_ready,
-                reporting_ready=reporting_ready,
-            )
-
-        else:
-            files_ready = True
-            current_run.log_info("Skipping data extraction and running report only.")
-
-        run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
-            nb_output_path=pipeline_path / "reporting" / "outputs",
-            ready=files_ready,
+        files_ready = add_files_to_dataset_for_extracts_task(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_EXTRACTS", None),
+            country_code=country_code,
+            org_unit_level=snt_config_dict["SNT_CONFIG"].get("ANALYTICS_ORG_UNITS_LEVEL", None),
+            file_paths=[
+                dhis2_raw_data_path / "routine_data" / f"{country_code}_dhis2_raw_analytics.parquet",
+                dhis2_raw_data_path / "population_data" / f"{country_code}_dhis2_raw_population.parquet",
+                dhis2_raw_data_path / "shapes_data" / f"{country_code}_dhis2_raw_shapes.parquet",
+                dhis2_raw_data_path / "pyramid_data" / f"{country_code}_dhis2_raw_pyramid.parquet",
+                dhis2_raw_data_path / "reporting_data" / f"{country_code}_dhis2_raw_reporting.parquet",
+                parameters_file,
+            ],
+            analytics_ready=analytics_ready,
+            pop_ready=pop_ready,
+            shapes_ready=shapes_ready,
+            pyramid_ready=pyramid_ready,
+            reporting_ready=reporting_ready,
         )
 
-    except Exception as e:
-        current_run.log_error(f"Error in pipeline execution: {e}")
-        raise
+    else:
+        files_ready = True
+        current_run.log_info("Skipping data extraction and running report only.")
+
+    run_report_notebook_task(
+        nb_file=pipeline_path / "reporting" / "snt_dhis2_extract_report.ipynb",
+        nb_output_path=pipeline_path / "reporting" / "outputs",
+        country_code=country_code,
+        ready=files_ready,
+    )
 
 
 def get_dhis2_client(dhis2_connection: DHIS2Connection, cache_folder: Path) -> DHIS2:
@@ -287,26 +302,30 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
     Exception
         If an error occurs while retrieving the pyramid data.
     """
+    current_run.log_info("Downloading DHIS2 organisation units data.")
+
     try:
-        current_run.log_info("Downloading DHIS2 organisation units data.")
         # retrieve the pyramid data
         dhis2_pyramid = get_organisation_units(dhis2_client)
+    except Exception as e:
+        raise Exception(f"An error occurred while retrieving the DHIS2 pyramid data: {e}") from e
 
-        country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", "")
-        country_code = country_code.upper().strip()  # not None
-        current_run.log_debug(f"Country code found: {country_code}")
+    country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", "")
+    country_code = country_code.upper().strip()  # not None
+    current_run.log_debug(f"Country code found: {country_code}")
 
-        # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
-        if country_code == "BFA":
-            current_run.log_info("Filtering district names at level 4 for Burkina Faso pyramid.")
-            dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_4_name").str.starts_with("DS"))
+    # NOTE: Filtering for Burkina Faso due to mixed levels in the pyramid (district: "DS")
+    if country_code == "BFA":
+        current_run.log_info("Filtering district names at level 4 for Burkina Faso pyramid.")
+        dhis2_pyramid = dhis2_pyramid.filter(pl.col("level_4_name").str.starts_with("DS"))
 
-        # NOTE: Filtering for Niger due to mixed levels in the pyramid (district: "DS")
-        if country_code == "NER":
-            # retrieve orgunits groups ref: https://bluesquare.atlassian.net/browse/SNT25-241
-            retrieve_org_units_groups_for_ner(dhis2_client)
+    # NOTE: Filtering for Niger due to mixed levels in the pyramid (district: "DS")
+    if country_code == "NER":
+        # retrieve orgunits groups ref: https://bluesquare.atlassian.net/browse/SNT25-241
+        retrieve_org_units_groups_for_ner(dhis2_client)
 
-            current_run.log_info("Re-arranging pyramid organisation units for Niger pyramid.")
+        current_run.log_info("Re-arranging pyramid organisation units for Niger pyramid.")
+        try:
             # run R script for ad-hoc transformations
             # ticket ref: https://bluesquare.atlassian.net/browse/SNT25-253
             dhis2_pyramid = run_transformation_notebook(
@@ -314,9 +333,12 @@ def get_dhis2_pyramid(dhis2_client: DHIS2, snt_config: dict, pipeline_path: Path
                 nb_path=pipeline_path / "NER_transformations" / "NER_pyramid_format.ipynb",
                 nb_output_dir=pipeline_path / "NER_transformations",
             )
-        current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
-    except Exception as e:
-        raise Exception(f"An error occurred while retrieving the DHIS2 pyramid data: {e}") from e
+        except Exception as e:
+            raise Exception(
+                f"An error occurred while transforming Niger (NER) DHIS2 pyramid data: {e}"
+            ) from e
+
+    current_run.log_info(f"{country_code} DHIS2 pyramid data retrieved: {len(dhis2_pyramid)} records")
 
     return dhis2_pyramid
 
@@ -354,25 +376,33 @@ def download_dhis2_reporting_rates(
 
     # Or we download reporting datasets or indicators but not both.
     if has_reporting_dataset(rep_datasets):
-        handle_reporting_datasets(
-            reporting_datasets=rep_datasets,
-            snt_config=snt_config,
-            source_pyramid=source_pyramid,
-            dhis2_client=dhis2_client,
-            periods=periods,
-            output=output_dir,
-            overwrite=overwrite,
-        )
+        try:
+            handle_reporting_datasets(
+                reporting_datasets=rep_datasets,
+                snt_config=snt_config,
+                source_pyramid=source_pyramid,
+                dhis2_client=dhis2_client,
+                periods=periods,
+                output=output_dir,
+                overwrite=overwrite,
+            )
+        except Exception as e:
+            current_run.log_warning(f"Error handling reporting datasets: {e}")
+            return False
     elif has_reporting_indicator(rep_indicators):
-        handle_reporting_indicators(
-            reporting_indicators=rep_indicators,
-            snt_config=snt_config,
-            source_pyramid=source_pyramid,
-            dhis2_client=dhis2_client,
-            periods=periods,
-            output=output_dir,
-            overwrite=overwrite,
-        )
+        try:
+            handle_reporting_indicators(
+                reporting_indicators=rep_indicators,
+                snt_config=snt_config,
+                source_pyramid=source_pyramid,
+                dhis2_client=dhis2_client,
+                periods=periods,
+                output=output_dir,
+                overwrite=overwrite,
+            )
+        except Exception as e:
+            current_run.log_warning(f"Error handling reporting indicators: {e}")
+            return False
     else:
         current_run.log_info("No reporting rates to download.")
 
@@ -436,6 +466,7 @@ def handle_reporting_datasets(
     # Download datasets metadata
     current_run.log_info("Downloading datasets metadata from DHIS2.")
     datasets_metadata = get_datasets(dhis2_client)
+    dataset_names = dict(zip(datasets_metadata["id"], datasets_metadata["name"], strict=False))
 
     # validate reporting_rates
     valid_reporting_rates = validate_reporting_rates(reporting_datasets, datasets_metadata)
@@ -455,68 +486,53 @@ def handle_reporting_datasets(
     except Exception as e:
         raise Exception(f"Error while cleaning old raw reporting rate files: {e}") from e
 
-    try:
-        current_run.log_info(
-            f"Downloading reporting datasets data for period : {periods[0]} to {periods[-1]}"
-        )
-        for p in periods:
-            fp = output_path / f"{country_code}_raw_reporting_ds_{p}.parquet"
+    current_run.log_info(f"Downloading reporting datasets data for period : {periods[0]} to {periods[-1]}")
+    for p in periods:
+        fp = output_path / f"{country_code}_raw_reporting_ds_{p}.parquet"
 
-            if fp.exists():
-                current_run.log_info(f"File {fp} already exists. Skipping download.")
+        if fp.exists():
+            current_run.log_info(f"File {fp} already exists. Skipping download.")
+            continue
+
+        reporting_rate_period = []
+        for rate in valid_reporting_rates:
+            dataset_uid = rate.get("DATASET")
+            metrics = rate.get("METRICS", [])
+            reporting_des = [f"{ds}.{metric}" for ds, metric in product([dataset_uid], metrics)]
+
+            # select dataset org units from DS (optional)
+            # ds_org_units = list(
+            #     datasets_metadata.filter(pl.col("id") == dataset_uid)
+            #     .select("organisation_units")
+            #     .to_series()[0]
+            # )
+
+            # Select org units from pyramid
+            ds_org_units = pyramid_metadata["id"].unique().to_list()
+
+            # Get dataset name
+            dataset_name = dataset_names.get(dataset_uid) or "[Name not found]"
+
+            current_run.log_info(
+                f"Downloading reporting rates {list(metrics.keys())} for {len(ds_org_units)} org units "
+                f"from : {dataset_name} ({dataset_uid}) period : {p}"
+            )
+            try:
+                data_elements = dhis2_client.analytics.get(
+                    data_elements=reporting_des,
+                    periods=[p],
+                    org_units=ds_org_units,
+                    include_cocs=False,
+                )
+            except Exception as e:
+                current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
                 continue
 
-            reporting_rate_period = []
-            for rate in valid_reporting_rates:
-                dataset_uid = rate.get("DATASET")
-                metrics = rate.get("METRICS", [])
-                reporting_des = [f"{ds}.{metric}" for ds, metric in product([dataset_uid], metrics)]
+            if len(data_elements) == 0:
+                current_run.log_warning(f"No data found for period {p}")
+                continue
 
-                # select dataset org units from DS (optional)
-                # ds_org_units = list(
-                #     datasets_metadata.filter(pl.col("id") == dataset_uid)
-                #     .select("organisation_units")
-                #     .to_series()[0]
-                # )
-
-                # Select org units from pyramid
-                ds_org_units = pyramid_metadata["id"].unique().to_list()
-
-                # Get dataset name
-                try:
-                    # Filter and select the name
-                    filtered_name_series = (
-                        datasets_metadata.filter(pl.col("id") == dataset_uid).select("name").to_series()
-                    )
-                    if filtered_name_series.is_empty():
-                        dataset_name = "[Name not found]"
-                    else:
-                        dataset_name = filtered_name_series.item(0)
-                        if dataset_name is None or not dataset_name:
-                            dataset_name = "[Name not found]"
-                except Exception as e:
-                    dataset_name = "[Name not found]"
-                    current_run.log_debug(f"An unexpected error occurred during dataset name retrieval: {e}")
-
-                current_run.log_info(
-                    f"Downloading reporting rates {list(metrics.keys())} for {len(ds_org_units)} org units "
-                    f"from : {dataset_name} ({dataset_uid}) period : {p}"
-                )
-                try:
-                    data_elements = dhis2_client.analytics.get(
-                        data_elements=reporting_des,
-                        periods=[p],
-                        org_units=ds_org_units,
-                        include_cocs=False,
-                    )
-                except Exception as e:
-                    current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
-                    continue
-
-                if len(data_elements) == 0:
-                    current_run.log_warning(f"No data found for period {p}")
-                    continue
-
+            try:
                 # Format the extracted data
                 data_elements_df = pl.DataFrame(data_elements)
                 df_formatted = raw_reporting_ds_format(
@@ -526,13 +542,17 @@ def handle_reporting_datasets(
                     pyramid_metadata=pyramid_metadata,
                 )
                 reporting_rate_period.append(df_formatted)
+            except Exception as e:
+                current_run.log_warning(f"An error occurred while formatting data for period {p} : {e}")
+                continue
 
-            # concat
-            reporting_rates_concat = pl.concat(reporting_rate_period, how="vertical")
-            reporting_rates_concat.write_parquet(fp, use_pyarrow=True)
+        if not reporting_rate_period:
+            current_run.log_warning(f"No reporting data collected for period {p}. Skipping file.")
+            continue
 
-    except Exception as e:
-        raise Exception(f"Error while downloading reporting rates: {e}") from e
+        # concat
+        reporting_rates_concat = pl.concat(reporting_rate_period, how="vertical")
+        reporting_rates_concat.write_parquet(fp, use_pyarrow=True)
 
     try:
         # merge all parquet files into one
@@ -611,35 +631,36 @@ def handle_reporting_indicators(
     except Exception as e:
         raise Exception(f"Error while cleaning raw indicator rate files: {e}") from e
 
-    try:
-        for p in periods:
-            fp = output_path / f"{country_code}_raw_reporting_ind_{p}.parquet"
+    for p in periods:
+        fp = output_path / f"{country_code}_raw_reporting_ind_{p}.parquet"
 
-            if fp.exists():
-                current_run.log_info(f"File {fp} already exists. Skipping download.")
-                continue
+        if fp.exists():
+            current_run.log_info(f"File {fp} already exists. Skipping download.")
+            continue
 
-            current_run.log_info(f"Downloading reporting indicators metrics for period : {p}")
-            try:
-                data_elements = dhis2_client.analytics.get(
-                    indicators=list(valid_indicators.values()),
-                    periods=[p],
-                    org_units=org_units_list,
-                    include_cocs=False,
-                )
-            except Exception as e:
-                current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
-                continue
+        current_run.log_info(f"Downloading reporting indicators metrics for period : {p}")
+        try:
+            data_elements = dhis2_client.analytics.get(
+                indicators=list(valid_indicators.values()),
+                periods=[p],
+                org_units=org_units_list,
+                include_cocs=False,
+            )
+        except Exception as e:
+            current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
+            continue
 
-            if len(data_elements) == 0:
-                current_run.log_warning(f"No data found for period {p}")
-                continue
+        if len(data_elements) == 0:
+            current_run.log_warning(f"No data found for period {p}")
+            continue
 
-            # Format the extracted data
-            data_elements_df = pd.DataFrame(data_elements)
-            data_elements_df = dhis2_client.meta.add_dx_name_column(dataframe=data_elements_df)
-            if not isinstance(data_elements_df, pd.DataFrame):
-                raise TypeError("Expected a pandas DataFrame output after adding dx_names")  # pyright
+        # Format the extracted data
+        data_elements_df = pd.DataFrame(data_elements)
+        data_elements_df = dhis2_client.meta.add_dx_name_column(dataframe=data_elements_df)
+        if not isinstance(data_elements_df, pd.DataFrame):
+            raise TypeError("Expected a pandas DataFrame output after adding dx_names")
+
+        try:
             df_formatted = raw_reporting_ind_format(
                 df=data_elements_df,
                 metrics=valid_indicators,
@@ -647,9 +668,9 @@ def handle_reporting_indicators(
                 pyramid_metadata=df_pyramid,
             )
             df_formatted.to_parquet(fp, index=False)
-
-    except Exception as e:
-        raise Exception(f"Error while downloading reporting rates: {e}") from e
+        except Exception as e:
+            current_run.log_warning(f"Error while formatting reporting rates: {e}")
+            continue
 
     try:
         # merge all parquet files into one
@@ -869,55 +890,47 @@ def download_dhis2_analytics(
     except Exception as e:
         raise Exception(f"Error while deleting raw analytics files: {e}") from e
 
-    try:
-        current_run.log_info(f"Downloading routine data for period : {periods[0]} to {periods[-1]}")
-        for p in periods:
-            fp = output_dir / f"{country_code}_raw_analytics_{p}.parquet"
+    current_run.log_info(f"Downloading routine data for period : {periods[0]} to {periods[-1]}")
+    for p in periods:
+        fp = output_dir / f"{country_code}_raw_analytics_{p}.parquet"
 
-            if fp.exists():
-                current_run.log_info(f"File {fp} already exists. Skipping download.")
-                continue
+        if fp.exists():
+            current_run.log_info(f"File {fp} already exists. Skipping download.")
+            continue
 
-            try:
-                data_values = dhis2_client.analytics.get(
-                    data_elements=data_elements,
-                    periods=[p],
-                    org_units=org_units_list,
-                )
+        try:
+            data_values = dhis2_client.analytics.get(
+                data_elements=data_elements,
+                periods=[p],
+                org_units=org_units_list,
+            )
+        except Exception as e:
+            current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
+            continue
 
-                if len(data_values) == 0:
-                    current_run.log_warning(f"No analytics data found for period {p}.")
-                    continue
+        if len(data_values) == 0:
+            current_run.log_warning(f"No analytics data found for period {p}.")
+            continue
 
-                current_run.log_info(
-                    f"Rountine data downloaded for period {p}: {len(data_values)} data values"
-                )
-                df = pd.DataFrame(data_values)
+        current_run.log_info(f"Rountine data downloaded for period {p}: {len(data_values)} data values")
+        df = pd.DataFrame(data_values)
 
-                # Add dx and co names
-                df = dhis2_client.meta.add_dx_name_column(dataframe=df)
-                df = dhis2_client.meta.add_coc_name_column(dataframe=df)
+        # Add dx and co names
+        df = dhis2_client.meta.add_dx_name_column(dataframe=df)
+        df = dhis2_client.meta.add_coc_name_column(dataframe=df)
 
-                # Add parent level names (left join with pyramid)
-                merging_col = f"level_{org_unit_level}_id"
-                parent_cols = [
-                    f"level_{ou}{suffix}"
-                    for ou in range(1, org_unit_level + 1)
-                    for suffix in ["_id", "_name"]
-                ]
-                df_orgunits = df.merge(  # type: ignore[reportAttributeAccessIssue]
-                    df_pyramid[parent_cols], how="left", left_on="ou", right_on=merging_col
-                )
+        # Add parent level names (left join with pyramid)
+        merging_col = f"level_{org_unit_level}_id"
+        parent_cols = [
+            f"level_{ou}{suffix}" for ou in range(1, org_unit_level + 1) for suffix in ["_id", "_name"]
+        ]
+        df_orgunits = df.merge(  # type: ignore[reportAttributeAccessIssue]
+            df_pyramid[parent_cols], how="left", left_on="ou", right_on=merging_col
+        )
 
-                # save raw data file
-                df_orgunits["value"] = pd.to_numeric(df_orgunits["value"], errors="coerce")
-                df_orgunits.to_parquet(fp, engine="pyarrow", index=False)
-            except Exception as e:
-                current_run.log_warning(f"An error occurred while downloading data for period {p} : {e}")
-                continue
-
-    except Exception as e:
-        raise Exception(f"Error while downloading: {e}") from e
+        # save raw data file
+        df_orgunits["value"] = pd.to_numeric(df_orgunits["value"], errors="coerce")
+        df_orgunits.to_parquet(fp, engine="pyarrow", index=False)
 
     # merge all parquet files into one
     try:
@@ -1313,7 +1326,7 @@ def add_org_level_names_to(org_unit_levels: pl.DataFrame, df_shapes: pl.DataFram
 
 
 @snt_dhis2_extract.task
-def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_config: dict) -> None:
+def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_config: dict) -> bool:
     """Download and save DHIS2 pyramid data.
 
     Parameters
@@ -1324,6 +1337,11 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
         Directory to save the downloaded pyramid data.
     snt_config : dict
         Configuration dictionary for SNT settings.
+
+    Returns
+    -------
+    bool
+        True if the DHIS2 pyramid data was successfully downloaded and saved.
     """
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE", None)
 
@@ -1349,6 +1367,8 @@ def download_dhis2_pyramid(source_pyramid: pl.DataFrame, output_dir: Path, snt_c
         current_run.log_info(f"{country_code} DHIS2 pyramid data saved at : {fp}")
     except Exception as e:
         raise Exception(f"Error while saving DHIS2 pyramid data: {e}") from e
+
+    return True
 
 
 def get_unique_data_elements(data_dictionary: dict) -> list[str]:
@@ -1377,7 +1397,7 @@ def get_unique_data_elements(data_dictionary: dict) -> list[str]:
 
 
 @snt_dhis2_extract.task
-def add_files_to_dataset_for_extracts(
+def add_files_to_dataset_for_extracts_task(
     dataset_id: str,
     country_code: str,
     org_unit_level: str,
@@ -1398,7 +1418,7 @@ def add_files_to_dataset_for_extracts(
         The country code for the dataset.
     org_unit_level : str
         The level of the organisation unit for which the DHIS2 Analytics have been downloaded.
-    file_paths : str
+    file_paths : list[str]
         Paths to the files to be added to the dataset.
     analytics_ready : bool, optional
         Whether the task is ready to run after analytics.
@@ -1411,71 +1431,21 @@ def add_files_to_dataset_for_extracts(
     reporting_ready : bool, optional
         Whether the task is ready to run after reporting data.
 
-    Raises
-    ------
-    Exception
-        If an error occurs while creating a new dataset version or adding files.
-
     Returns
     -------
     Bool
-        True if files were successfully added to the dataset version, False otherwise.
+        True if any files were successfully added to the dataset version, False otherwise.
     """
-    if country_code is None:
-        current_run.log_warning("COUNTRY_CODE is not specified in the configuration.")
-
-    added_any = False
-
-    for file in file_paths:
-        src = Path(file)
-        if not src.exists():
-            current_run.log_warning(f"File not found: {src}")
-            continue
-
-        try:
-            # Determine file extension
-            ext = src.suffix.lower()
-            current_run.log_debug(f"Loading file: {src} extension: {ext}")
-            if ext == ".parquet":
-                df = pd.read_parquet(src)
-                tmp_suffix = ".parquet"
-            elif ext == ".csv":
-                df = pd.read_csv(src)
-                tmp_suffix = ".csv"
-            elif ext == ".json":
-                with open(src, encoding="utf-8") as f:  # noqa: PTH123
-                    json_data = json.load(f)
-                tmp_suffix = ".json"
-            else:
-                current_run.log_warning(f"Unsupported file format: {src.name}")
-                continue
-
-            with tempfile.NamedTemporaryFile(suffix=tmp_suffix) as tmp:
-                if ext == ".parquet":
-                    df.to_parquet(tmp.name)
-                elif ext == ".csv":
-                    df.to_csv(tmp.name, index=False)
-                elif ext == ".json":
-                    with open(tmp.name, "w", encoding="utf-8") as f:  # noqa: PTH123
-                        json.dump(json_data, f, indent=2)
-
-                if not added_any:
-                    new_version = get_new_dataset_version(
-                        ds_id=dataset_id, prefix=f"{country_code}_dhis2_level{org_unit_level}"
-                    )
-                    current_run.log_info(f"New dataset version created : {new_version.name}")
-                    added_any = True
-                new_version.add_file(tmp.name, filename=src.name)
-                current_run.log_info(f"File {src.name} added to dataset version : {new_version.name}")
-        except Exception as e:
-            current_run.log_warning(f"File {src.name} cannot be added : {e}")
-            continue
-
-    if not added_any:
-        current_run.log_info("No valid files found. Dataset version was not created.")
+    try:
+        return add_files_to_dataset(
+            dataset_id=dataset_id,
+            country_code=country_code,
+            file_paths=file_paths,
+            ds_version_prefix=f"dhis2_level{org_unit_level}",
+        )
+    except Exception as e:
+        current_run.log_error(f"Failed to add files to dataset: {e}")
         return False
-
-    return True
 
 
 def snt_folders_setup(root_path: Path) -> None:
@@ -1503,10 +1473,10 @@ def snt_folders_setup(root_path: Path) -> None:
 
 
 @snt_dhis2_extract.task
-def run_report_notebook(
+def run_report_notebook_task(
     nb_file: Path,
     nb_output_path: Path,
-    nb_parameters: dict | None = None,
+    country_code: str,
     ready: bool = True,
 ) -> None:
     """Execute a Jupyter notebook using Papermill.
@@ -1517,34 +1487,25 @@ def run_report_notebook(
         The full file path to the notebook.
     nb_output_path : Path
         The path to the directory where the output notebook will be saved.
+    country_code : str
+        The country code to be used in the notebook execution.
     ready : bool, optional
         Whether the notebook should be executed (default is True).
-    nb_parameters : dict | None, optional
-        A dictionary of parameters to pass to the notebook (default is None).
     """
     if not ready:
         current_run.log_info("Reporting execution skipped.")
         return
 
-    current_run.log_info(f"Executing report notebook: {nb_file}")
-    execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    nb_output_full_path = nb_output_path / f"{nb_file.stem}_OUTPUT_{execution_timestamp}.ipynb"
-    nb_output_path.mkdir(parents=True, exist_ok=True)
-    warning_raised = False
     try:
-        pm.execute_notebook(input_path=nb_file, output_path=nb_output_full_path, parameters=nb_parameters)
-    except PapermillExecutionError as e:
-        handle_rkernel_error_with_labels(
-            e,
-            error_labels={"[WARNING]": "warning"},
-        )  # for labeled R kernel errors
-        warning_raised = True
-    except CellTimeoutError as e:
-        raise CellTimeoutError(f"Notebook execution timed out: {e}") from e
+        run_report_notebook(
+            nb_file=nb_file,
+            nb_output_path=nb_output_path,
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
+        )
     except Exception as e:
-        raise RuntimeError(f"Error executing the notebook ({type(e).__name__}): {e}") from e
-    if not warning_raised:
-        generate_html_report(nb_output_full_path)
+        current_run.log_error(f"Error in running report notebook: {e}")
+        raise
 
 
 def validate_yyyymm(value: int) -> None:

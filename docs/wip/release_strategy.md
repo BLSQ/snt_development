@@ -23,9 +23,11 @@ the real repo.
    alongside the release.
 3. **Pull mechanism for R/notebook files.** An OpenHEXA pipeline ("Workspace Manager") that fetches
    the R/notebook half of a given release into the workspace filesystem.
-4. **Pull mechanism for `pipeline.py` files.** The same Workspace Manager also fetches `pipeline.py`
-   for every pipeline from the release — see [why this replaces the Template
-   mechanism](#opting-out-of-openhexas-template-auto-update).
+4. **Deployment mechanism for `pipeline.py` files.** The same Workspace Manager also delivers
+   `pipeline.py` for every pipeline from the release — see [why this replaces the Template
+   mechanism](#opting-out-of-openhexas-template-auto-update). **Note the wording change from
+   "pull" to "deploy":** copying `pipeline.py` into the workspace filesystem is *not* enough to
+   make it a runnable pipeline. See [Phase 4](#phase-4-deploying-the-python-half--in-progress).
 5. **Verification pipeline.** An OpenHEXA pipeline that hashes what's actually in the workspace
    filesystem, compares it against a release manifest, and reports which release (or "modified" /
    "unknown") each tracked file currently matches.
@@ -50,7 +52,9 @@ orchestration — into the workspace, all pinned to the same release tag. It man
 * `pipelines/**/reporting/*.ipynb`
 * `pipelines/**/utils/*.r`
 * `code/**/*.r`
-* `**/pipeline.py` (see below — this is new relative to the original plan)
+* `**/pipeline.py` (see below — this is new relative to the original plan). ⚠️ These are
+  **deployed through the OpenHEXA API, not copied into the filesystem** like the R files — see
+  [Phase 4](#phase-4-deploying-the-python-half--in-progress).
 
 It explicitly **ignores**:
 * `data/` directory (bootstrapped by pipelines).
@@ -306,3 +310,66 @@ once phase 2 is validated.
 
 **Phase 2 is done.** Next up is phase 3: an OpenHEXA pipeline that fetches a release's tracked
 files (via the GitHub API / release tarball) into a workspace filesystem.
+
+---
+
+## Phase 3: the Workspace Manager pull — done
+
+Built as an OpenHEXA pipeline `snt_workspace_manager` in the **`snt-development-sandbox`**
+workspace (an OpenHEXA workspace created for this work — unrelated to, but confusingly
+similarly named as, the `snt_development_sandbox` *GitHub repo*).
+
+It takes `github_repo`, `release_tag` and `backup_existing`, then:
+
+1. resolves the release via the GitHub API and downloads `release_manifest.json` from its assets;
+2. downloads the release **source tarball** and extracts it;
+3. copies every manifest-tracked file into `workspace.files_path`, archiving any existing copy
+   under `archive/<release_tag>/` first;
+4. writes `{"snt_release": "<tag>"}` into a hidden `.snt_release` file at the workspace root.
+
+**Why the tarball rather than the Contents API:** unauthenticated GitHub API calls are limited to
+60/hour, and a per-file fetch would need ~106 of them for a single release. The tarball is one
+request.
+
+**Result — verified 2026-09-16.** A run against `BLSQ/snt_development_sandbox` @ `v0.0.1-test`
+succeeded in 60s. Verified directly in the workspace filesystem: `.snt_release` correct;
+`code/snt_utils.r`, `code/snt_report.r`, `code/snt_palettes.r` all present at plausible sizes;
+`snt_dhis2_extract/pipeline.py` present at 61,409 bytes.
+
+**Not yet tested:** the `backup_existing` archive path. The verified run was against an empty
+workspace, so nothing existed to archive.
+
+---
+
+## Phase 4: deploying the Python half — in progress
+
+**A correction to the original plan, discovered 2026-09-16.** Phase 3 copies `pipeline.py` into
+the workspace filesystem, and that appeared to complete phase 4. It does not. OpenHEXA does not
+run pipelines from the workspace filesystem — each pipeline is a registered object whose every
+version stores its own zipped copy of the code, and the runner downloads *that*. A `pipeline.py`
+sitting in `workspace/files/` is an inert file that looks authoritative and never executes.
+
+So phase 4 needs a genuine deployment call. The full findings — the three-step mechanism
+(`openhexa pipelines push` reproduced from inside a pipeline run), the exact GraphQL payloads,
+the permission question that is still open, and the several gotchas that cost runs — are written
+up separately in:
+
+> **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md)**
+
+Read that before continuing phase 4. The short version:
+
+* The mechanism is fully understood and requires no CLI and no Docker. Critically,
+  `openhexa.sdk.pipelines.runtime.get_pipeline()` parses a pipeline's parameters by **AST**, not
+  by importing it — so the manager can process all 20 pipelines without their dependencies
+  installed.
+* `HEXA_SERVER_URL` / `HEXA_TOKEN` are present inside every pipeline run, so a run can call the
+  API as itself.
+* **Open blocker:** whether a run's own token is *permitted* to call `uploadPipeline`. Reads are
+  confirmed allowed; `createPipeline` fails with an opaque server-side 500; `uploadPipeline` is
+  tested but its result was never read back. A fallback credential (a CUSTOM connection `oh`
+  holding a workspace API token) is already in place in the sandbox workspace if needed.
+
+**Open design decision this raises:** once pipelines are deployed properly, should
+`pipeline.py` still be copied into the workspace filesystem at all? It becomes redundant, and
+possibly misleading. This needs settling before phase 5, because it determines what the
+verification pipeline should be hashing.

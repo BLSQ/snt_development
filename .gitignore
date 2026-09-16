@@ -42,6 +42,13 @@ __pycache__/
 # pattern wins, so this must come last or the file never reaches a clone.
 !dev/environment.yml
 
+# GitHub Actions workflows ------------------------
+# Negated after *.yaml (line 7) for the same reason as dev/environment.yml
+# above — otherwise a newly added .github/workflows/*.yaml never reaches a
+# clone. Existing push_snt_*.yaml files predate the *.yaml rule and were
+# already tracked, so this only matters for files added from now on.
+!.github/workflows/*.yaml
+
 # # Claude Code -----------------
 # CLAUDE.md
 # .claude/

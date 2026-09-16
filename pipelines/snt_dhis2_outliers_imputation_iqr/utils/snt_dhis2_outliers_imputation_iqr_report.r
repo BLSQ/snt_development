@@ -1,5 +1,8 @@
 # Report helpers for the IQR outliers pipeline.
 
+# Load base utils
+source(file.path("~/workspace/code", "snt_utils.r"))   
+
 `%||%` <- function(x, y) if (!is.null(x)) x else y
 
 # Pull in bootstrap + shared non-report helpers (same folder).

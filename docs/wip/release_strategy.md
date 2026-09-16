@@ -262,29 +262,47 @@ jobs:
 > [phase 4 decision](#opting-out-of-openhexas-template-auto-update) to track Python orchestration
 > files in the same manifest as the R engine.
 
-### Step 4: Commit and push to the sandbox
+### Step 4: Commit and push — done, split across two branches
+
+The `.gitignore` fix is a real, repo-wide correction (not sandbox-specific), so it was committed on
+**both** branches independently rather than only living on the disposable test branch:
 
 ```bash
-# 1. Stage the files (note: docs/wip/release_strategy.md is part of the real SNT25-670 ticket
-#    work and lives on that branch too — the .gitignore fix and the workflow file are sandbox-
-#    only until they're deliberately ported to a real PR against origin/main)
-git add .gitignore .github/workflows/generate_manifest.yaml docs/wip/release_strategy.md
+# On SNT25-670 (the real ticket branch — this doc + the .gitignore fix belong here,
+# to eventually PR into origin/main):
+git checkout SNT25-670
+git add docs/wip/release_strategy.md .gitignore
+git commit -m "..."
 
-# 2. Commit them
-git commit -m "Add release strategy and manifest generation workflow"
-
-# 3. Push this branch specifically to the "sandbox" remote — never to origin
-git push sandbox feature/release-manifest-test
+# On feature/release-manifest-test (branched from main, disposable, sandbox-only):
+git checkout feature/release-manifest-test
+git checkout SNT25-670 -- .gitignore   # re-apply the same fix here
+git add .gitignore .github/workflows/generate_manifest.yaml
+git commit -m "..."
+git push sandbox feature/release-manifest-test   # never to origin
 ```
 
-### Step 5: Cut a test release and verify the manifest
+`release_strategy.md` intentionally does **not** exist on `feature/release-manifest-test` — it
+isn't needed for the Action to run, and keeping the sandbox branch minimal makes it easy to discard
+once phase 2 is validated.
 
-1. On `https://github.com/BLSQ/snt_development_sandbox`, create a GitHub Release from the
-   `feature/release-manifest-test` branch (e.g. tag `v0.0.1-test`).
-2. Confirm the Action runs (Actions tab) and that `release_manifest.json` is attached to the
-   release.
-3. Spot-check the manifest content: does it list a `pipeline.py` per pipeline, and the expected
-   `pipelines/**/code/*.ipynb` / `code/**/*.r` files, with plausible sha256 hashes?
+### Step 5: Cut a test release and verify the manifest — done
 
-This closes the loop on phase 2 of the roadmap. Phases 3–5 (the OpenHEXA-side pull and
-verification pipelines) are not yet started.
+1. On `https://github.com/BLSQ/snt_development_sandbox`, created a GitHub Release from the
+   `feature/release-manifest-test` branch, tag `v0.0.1-test`.
+2. Confirmed the Action ran (Actions tab) and `release_manifest.json` was attached to the release.
+3. Spot-checked the manifest content (`ignore/release_manifest.json`, downloaded from the release):
+
+**Result — verified 2026-09-16:**
+* `"version"` correctly read `v0.0.1-test`, not `"unknown"` — confirms the
+  `github.event.release.tag_name || github.ref` checkout fallback works for a real `release` event.
+* 106 files tracked, every hash a valid 64-character sha256.
+* All 20 `pipeline.py` files matched 1:1 against a local `find . -name pipeline.py` (excluding
+  `deprecated/`) — the phase-4 addition works.
+* Country-specific notebook variants (e.g. `snt_seasonality_rainfall_NER.ipynb`,
+  `NER_pyramid_format.ipynb`) are captured like any other file, undistinguished — expected; telling
+  those apart from a generic file is the future verification pipeline's job (phase 5), not the
+  manifest generator's.
+
+**Phase 2 is done.** Next up is phase 3: an OpenHEXA pipeline that fetches a release's tracked
+files (via the GitHub API / release tarball) into a workspace filesystem.

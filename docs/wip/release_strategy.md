@@ -12,9 +12,9 @@ solely on the Python/R codebase for now.)*
 
 ## The Roadmap (5 phases)
 
-This is the plan end to end. Each phase's design detail lives in the sections below; the
-**Sandbox Setup** section is where we're currently validating phase 2 in isolation before touching
-the real repo.
+This is the plan end to end. Each phase's design detail lives in the sections below. Phases 1–4 are
+done and validated in the sandbox; **phase 5 is next**, and is blocked on widening the manifest
+(see [Gap found](#gap-found-the-manifest-under-describes-what-is-deployed)).
 
 1. **Sandbox environment.** An independent copy of this repo to experiment in safely — deliberately
    *not* a GitHub fork (see [Why not a fork?](#why-not-a-fork) below).
@@ -27,7 +27,7 @@ the real repo.
    `pipeline.py` for every pipeline from the release — see [why this replaces the Template
    mechanism](#opting-out-of-openhexas-template-auto-update). **Note the wording change from
    "pull" to "deploy":** copying `pipeline.py` into the workspace filesystem is *not* enough to
-   make it a runnable pipeline. See [Phase 4](#phase-4-deploying-the-python-half--in-progress).
+   make it a runnable pipeline. See [Phase 4](#phase-4-deploying-the-python-half--done).
 5. **Verification pipeline.** An OpenHEXA pipeline that hashes what's actually in the workspace
    filesystem, compares it against a release manifest, and reports which release (or "modified" /
    "unknown") each tracked file currently matches.
@@ -54,7 +54,7 @@ orchestration — into the workspace, all pinned to the same release tag. It man
 * `code/**/*.r`
 * `**/pipeline.py` (see below — this is new relative to the original plan). ⚠️ These are
   **deployed through the OpenHEXA API, not copied into the filesystem** like the R files — see
-  [Phase 4](#phase-4-deploying-the-python-half--in-progress).
+  [Phase 4](#phase-4-deploying-the-python-half--done).
 
 It explicitly **ignores**:
 * `data/` directory (bootstrapped by pipelines).
@@ -341,7 +341,7 @@ workspace, so nothing existed to archive.
 
 ---
 
-## Phase 4: deploying the Python half — in progress
+## Phase 4: deploying the Python half — done
 
 **A correction to the original plan, discovered 2026-09-16.** Phase 3 copies `pipeline.py` into
 the workspace filesystem, and that appeared to complete phase 4. It does not. OpenHEXA does not
@@ -356,20 +356,69 @@ up separately in:
 
 > **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md)**
 
-Read that before continuing phase 4. The short version:
+The short version, all now verified:
 
-* The mechanism is fully understood and requires no CLI and no Docker. Critically,
+* The mechanism requires no CLI and no Docker. Critically,
   `openhexa.sdk.pipelines.runtime.get_pipeline()` parses a pipeline's parameters by **AST**, not
-  by importing it — so the manager can process all 20 pipelines without their dependencies
-  installed.
-* `HEXA_SERVER_URL` / `HEXA_TOKEN` are present inside every pipeline run, so a run can call the
-  API as itself.
-* **Open blocker:** whether a run's own token is *permitted* to call `uploadPipeline`. Reads are
-  confirmed allowed; `createPipeline` fails with an opaque server-side 500; `uploadPipeline` is
-  tested but its result was never read back. A fallback credential (a CUSTOM connection `oh`
-  holding a workspace API token) is already in place in the sandbox workspace if needed.
+  by importing it — so the manager processes all 20 pipelines without their dependencies
+  installed. Confirmed against the real 20, not a toy.
+* **The blocker is resolved.** A run's own `HEXA_TOKEN` is refused with `PERMISSION_DENIED`; a
+  workspace API token read from the `oh` CUSTOM connection is accepted. Same payload, same code —
+  only the header differs. `createPipeline` works with that token too, including the nested form
+  that creates a pipeline and its first version atomically, so **empty-workspace bootstrap needs
+  no manual UI step.**
+* `snt_workspace_manager` **v3** implements it and was proven end to end: two real SNT pipelines
+  bootstrapped from `v0.0.1-test`, correct codes, parameters round-tripped, and the deployed
+  `pipeline.py` byte-identical to the manifest's sha256.
 
-**Open design decision this raises:** once pipelines are deployed properly, should
-`pipeline.py` still be copied into the workspace filesystem at all? It becomes redundant, and
-possibly misleading. This needs settling before phase 5, because it determines what the
-verification pipeline should be hashing.
+**Design decision, settled 2026-09-16:** `pipeline.py` is **no longer copied into the workspace
+filesystem.** Deployment goes through the API; a filesystem copy would be inert while looking
+authoritative — the exact confusion that made phase 3 appear finished. Phase 5 therefore hashes
+two sources: the filesystem for R analytics, and each pipeline version's stored zip for the Python
+half (read back via `get_pipeline`, which returns the full file contents).
+
+### Gap found: the manifest under-describes what is deployed
+
+The manifest's `*/pipeline.py` pattern tracks only that one file per pipeline, but deployment zips
+the **whole directory**. `snt_map_extracts` was deployed with `utils.py`, `worldpopclient.py`, the
+`malariaAtlasProject/` package, `readme.md` and `requirements.txt` — none of them in the manifest,
+none of them verifiable by phase 5, and a change to any of them would not alter a single manifest
+hash.
+
+`requirements.txt` is the sharpest case: it pins the two unpinned Git dependencies the repo already
+worries about (see CLAUDE.md's "Pin the two Git dependencies"), and it ships in the zip while being
+invisible to the manifest.
+
+Fix before phase 5 — widen the `patterns` list in `.github/workflows/generate_manifest.yaml` to
+cover everything that ends up in a pipeline version's zip, i.e. the same suffix set the SDK uses
+(`.py`, `.ipynb`, `.txt`, `.md`, `.r`, `.sql`) under each pipeline directory:
+
+```python
+patterns = [
+    'pipelines/**/code/*.ipynb',
+    'pipelines/**/reporting/*.ipynb',
+    'pipelines/**/utils/*.r',
+    'code/**/*.r',
+    '*/pipeline.py',
+    '*/requirements.txt',     # <- ships in the zip, currently untracked
+    '*/readme.md',            # <- ships in the zip, currently untracked
+    '*/**/*.py',              # <- helper modules, currently untracked
+]
+```
+
+This needs care: `*/**/*.py` would also sweep up unrelated top-level directories (`dev/`,
+`deprecated/`), so it should be anchored to the directories that actually contain a `pipeline.py`.
+
+---
+
+## Phase 5: verification — not started
+
+Design inputs now settled by phase 4:
+
+* Two sources to hash, per the table above — filesystem for R, version zip for Python.
+* `.snt_release` records the tag the workspace was last deployed to, so the verifier knows which
+  manifest to compare against without being told.
+* Country-specific notebook variants (`<generic>_<CC>.ipynb`) appear in the manifest
+  undistinguished from generic files; telling them apart is phase 5's job, as noted in phase 2.
+* Blocked on the manifest gap above — verifying against a manifest that describes a third of what
+  is deployed would give false assurance.

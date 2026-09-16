@@ -3,8 +3,10 @@
 Companion to [`release_strategy.md`](release_strategy.md). Written for a fresh agent session
 picking up phases 3–4 of the release roadmap.
 
-**Status: investigation in progress, one blocking question still open.** Read
-[Open question](#open-question--can-a-run-push-a-pipeline-version) before building anything.
+**Status: resolved and proven end to end, 2026-09-16.** The blocking question is answered — a run's
+own token cannot deploy, a workspace API token supplied through a connection can. See
+[The credential answer](#3-the-credential-answer--settled). The mechanism is implemented in
+`snt_workspace_manager` v3 and verified against two real SNT pipelines.
 
 ---
 
@@ -103,56 +105,69 @@ the permission question below.
 
 ---
 
-## 3. Open question — can a run push a pipeline version?
+## 3. The credential answer — settled
 
-**This is the blocker. Do not design around an assumed answer.**
+**It is a credential-scope question, not a mechanism question.** Probe v5 ran the *identical*
+upload twice in one run, changing only the `Authorization` header:
 
-What is established:
-
-| Capability | Result | Evidence |
+| Credential | `uploadPipeline` | Evidence |
 |---|---|---|
-| **READ** (`pipelines`, `pipelineByCode`) | **Allowed** | Probe logged the workspace pipeline count and successfully looked up a pipeline by code. |
-| **CREATE** (`createPipeline`) | **Fails** | HTTP 200 with `{'message': 'An unknown error occurred.', 'path': ['createPipeline']}` — an unhandled server-side exception, *not* a clean `success: false` denial. Reproduced with input byte-identical to what the CLI sends (`{workspaceSlug, name}` only). |
-| **UPLOAD** (`uploadPipeline`) | **Unverified — probably failed** | See below. |
+| Run's own `HEXA_TOKEN` | **DENIED** | `errors: ['PERMISSION_DENIED']` — a clean, named refusal. |
+| Workspace API token from the `oh` connection | **ALLOWED** | Registered version 2 of `zz-deploy-target`; independently confirmed by re-reading the pipeline. |
 
-On UPLOAD: probe v4 ran to completion (status `success`, 2026-09-16 13:47 UTC), but the target
-pipeline `zz-deploy-target` was **still at version 1** afterwards. Since v4 wraps each check in a
-non-fatal `run_check()`, a failed upload would be swallowed into a warning and the run would still
-report success — which matches what we see. **But the run's `current_run` messages were never
-read**, so the actual error is not yet known. That is the first thing to do next.
+Both tokens are 95 characters, so they are indistinguishable by shape — only by scope.
 
-To read them: `get_pipeline(workspace_slug="snt-development-sandbox", pipeline_code=
-"snt-deploy-probe", runs_per_page=1)` to get the run id, then `get_pipeline_run(run_id=...)`,
-which returns the `messages` list. Note the container stdout shown in the OH run log does **not**
-include `current_run.log_*` output — those are separate, and reading only stdout is what caused
-confusion in this session.
+Probe v6 then retested `createPipeline` with the connection token, since the earlier opaque 500
+had only ever been seen with the run token:
 
-### The fallback, already prepared
+| Form | Result |
+|---|---|
+| `createPipeline {workspaceSlug, name}` | **ALLOWED** |
+| `createPipeline {workspaceSlug, name, version {...}}` | **ALLOWED** — pipeline and its first version in one atomic call |
 
-The user created a **CUSTOM connection named `oh`** in `snt-development-sandbox`
-(slug `oh`, one secret field `token`, description "Token for pipelines to write pipelines"). If
-the run token turns out to lack write scope, the Workspace Manager uses a workspace API key
-instead:
+So the earlier `{'message': 'An unknown error occurred.'}` **was the permission failure surfacing
+as an unhandled server-side exception.** Worth reporting to the OpenHEXA devs — a permission check
+should return `PERMISSION_DENIED` the way `uploadPipeline` does, not a 500 — but it is no longer a
+blocker for us.
+
+**Consequence: empty-workspace bootstrap can be fully automated.** The manual once-per-pipeline UI
+step anticipated in the earlier draft of this document is not needed.
+
+### The credential, in practice
+
+A **CUSTOM connection named `oh`** in `snt-development-sandbox` (slug `oh`, one secret field
+`token`). The Workspace Manager reads it as:
 
 ```python
-conn = workspace.custom_connection("oh")
-headers = {"Authorization": f"Bearer {conn.token}"}
+token = workspace.custom_connection("oh").token
+headers = {"Authorization": f"Bearer {token}"}
 ```
 
-This is the same class of credential CI already uses for `openhexa pipelines push`, so it is not
-a new trust assumption — just an explicit one.
+This is the same class of credential CI already uses for `openhexa pipelines push`, so it is not a
+new trust assumption — just an explicit one. Note it is a **workspace-scoped** token: deploying to
+a country workspace means that workspace holding such a connection, which is a real operational
+question for the rollout (who mints it, where it is stored, how it is rotated).
 
-### Why UPLOAD matters far more than CREATE
+### Verified end to end
 
-In a real country workspace all 20 SNT pipelines **already exist**. The Workspace Manager's job
-is to push *new versions* of them — that is `uploadPipeline`. `createPipeline` is only needed to
-bootstrap a pipeline that is not there yet, which is a once-per-pipeline event a human can do
-from the UI. **If UPLOAD works and CREATE does not, the strategy still stands**, with a documented
-manual bootstrap step. So establish UPLOAD first.
+`snt_workspace_manager` v3 bootstrapped `snt_dhis2_extract` and `snt_map_extracts` into
+`snt-development-sandbox` from release `v0.0.1-test`:
 
-The `createPipeline` 500 is worth raising with the OpenHEXA devs regardless of the outcome: a
-permission check should return a named error, not an unhandled exception. We cannot tell from the
-client side whether it is a permission issue or a backend bug — that needs their server logs.
+* Both pipelines were created with codes `snt-dhis2-extract` / `snt-map-extracts`, matching the
+  `--code` slugs this repo's CI uses. The slug rule (`_` → `-`) was cross-checked against all 20
+  `push_snt_*.yaml` workflows: **20/20 match**.
+* Parameters round-tripped through `Parameter.to_dict()`, including the `dhis2_connection`
+  connection-typed parameter.
+* The deployed `snt_dhis2_extract/pipeline.py` read back with sha256
+  `44290bd9…d77755cd` — **byte-identical to the release manifest's recorded hash.**
+* The zip carried the **whole pipeline directory**, not just `pipeline.py`: `snt_map_extracts`
+  arrived with `utils.py`, `worldpopclient.py`, the `malariaAtlasProject/` package, `readme.md`
+  and `requirements.txt`. This matters — see the manifest gap in
+  [`release_strategy.md`](release_strategy.md).
+
+**Not verified:** whether `externalLink` is stored. It is sent in the payload, but the MCP
+`get_pipeline` query does not select that field, so its absence from the response is not evidence
+either way. Check it in the OpenHEXA UI's version list.
 
 ---
 
@@ -174,6 +189,15 @@ client side whether it is a permission issue or a backend bug — that needs the
 5. **`@task` is not used anywhere in this repo.** The MCP `create_pipeline` tool's generic
    cheat-sheet suggests `@<pipeline_name>.task`; this codebase uses plain helper functions called
    from the `@pipeline` function. Follow the repo, not the tool hint (and see CLAUDE.md **R3**).
+6. **`default=""` is rejected by the SDK.** A `str` parameter with an empty-string default raises
+   `ParameterValueError("Empty values are not accepted.")` at parse time, which in a workspace
+   means the deploy fails rather than the run. Use `default=None`. Caught locally by running
+   `get_pipeline(Path(...))` before pushing — worth doing for every pipeline edit, since it is the
+   same AST parse the backend performs.
+7. **A version's `files` list is the ground truth for what was deployed.** `get_pipeline` returns
+   the full zip contents, so you can hash the deployed `pipeline.py` and compare it to the release
+   manifest. That is how the byte-identity check above was done, and it is the obvious basis for
+   the phase 5 verification pipeline.
 
 ---
 
@@ -183,34 +207,57 @@ All disposable. None of this is in git yet.
 
 | Object | Code / slug | State |
 |---|---|---|
-| Workspace Manager (phase 3/4 pull) | `snt-workspace-manager` | v1, file-sync only, **no deployment step yet**. Verified working for R + file copy. |
-| Deployment probe | `snt-deploy-probe` | v4 `v4-capability-matrix`. Diagnostic only — delete once the question is settled. |
-| Probe target | `zz-deploy-target` | v1. Exists only so the probe can attempt an upload against it. Delete with the probe. |
-| Connection | `oh` (CUSTOM, secret field `token`) | Fallback credential. Keep. |
+| Workspace Manager | `snt-workspace-manager` | **v3 `v3-scoped-deploy`** — analytics sync + pipeline deployment + dry run + `only_pipelines`. Keep. |
+| Connection | `oh` (CUSTOM, secret field `token`) | The deployment credential. Keep. |
+| Deployment probe | `snt-deploy-probe` | v6. Diagnostic only, question now settled — **delete.** |
+| Probe target | `zz-deploy-target` | v2. **Delete** with the probe. |
+| Probe leftovers | `zz-created-bare`, `zz-created-nested` | Created by probe v6 to test bootstrap. **Delete.** |
+| Bootstrap test output | `snt-dhis2-extract`, `snt-map-extracts` | Real pipelines at `v0.0.1-test`, created by the scoped bootstrap test. Keep or delete depending on whether the sandbox is kept. |
 
-The probe's full source is not in git; the current version can be recovered with
+Deleting pipelines is a UI action — this repo's rules keep agents away from destructive operations,
+so do it by hand.
+
+Neither probe's source is in git; any version can be recovered with
 `get_pipeline(workspace_slug="snt-development-sandbox", pipeline_code="snt-deploy-probe")`.
+The Workspace Manager's source is not in git either — **that is the main outstanding gap.**
 
 ---
 
-## 6. Suggested next steps, in order
+## 6. Next steps, in order
 
-1. **Read the v4 probe run's messages** and establish the UPLOAD answer (see §3). One tool call.
-2. If UPLOAD is denied with the run token, re-test using the `oh` connection's token. That
-   isolates *permission scope* from *mechanism* — if the connection token works, the mechanism is
-   proven and only the credential source changes.
-3. Once UPLOAD is proven by either credential, extend `snt_workspace_manager` with a deployment
-   step: for each `<name>/pipeline.py` in the extracted release tarball, AST-parse it, zip the
-   directory, and `uploadPipeline` under code `<name-with-hyphens>`. Use the release tag as the
-   version `name` and the GitHub release URL as `externalLink`, so the OpenHEXA version list
-   becomes a readable deployment history (the same reasoning as CLAUDE.md's note on
-   `--description` / `--link`).
-4. **Decide whether `pipeline.py` should still be copied into the workspace filesystem at all.**
-   Once pipelines are deployed via `uploadPipeline`, the filesystem copy is redundant and
-   arguably harmful: it looks authoritative but is not what runs. Options: stop copying it; or
-   keep it read-only for diffing in phase 5. This needs a decision before phase 5 is designed,
-   because it changes what the verification pipeline should hash.
-5. Clean up the probe and target pipelines.
+Steps 1–4 of the earlier list are **done**: the credential question is settled, the deployment step
+is built and proven, and the filesystem-copy decision is made (see below). What remains:
+
+1. **Commit `snt_workspace_manager` to this repo.** It exists only as a version in the sandbox
+   workspace, which is exactly the "no version-propagation story" problem this whole project is
+   meant to fix. It needs a home (`snt_workspace_manager/pipeline.py` + `requirements.txt` +
+   `readme.md` per the "Adding or changing a pipeline" checklist), minus a `push_*.yaml` workflow
+   until the R5 question below is settled.
+2. **Run the full 20-pipeline bootstrap** once, to confirm nothing in the remaining 18 trips the
+   deployer. The scoped test covered 2 of 20.
+3. **Close the manifest gap** (see [`release_strategy.md`](release_strategy.md)): the manifest
+   tracks only `<name>/pipeline.py`, but deployment ships the whole directory. Until the manifest
+   covers `requirements.txt`, `readme.md` and helper modules, phase 5 cannot verify most of what
+   is actually deployed.
+4. **Decide where the `oh` token comes from in a country workspace** — who mints it, how it is
+   stored and rotated. This is the one genuinely new operational requirement the design adds.
+5. **Clean up the probe and throwaway pipelines** (§5).
+
+### Decided: `pipeline.py` is no longer copied into the workspace filesystem
+
+Confirmed with Giulia, 2026-09-16. Deployment happens through the API; the filesystem copy is
+inert, looks authoritative, and is precisely the confusion that made phase 3 look finished when it
+was not. `split_manifest()` in the Workspace Manager routes `<name>/pipeline.py` entries to the
+deployer and everything else to the filesystem sync.
+
+For phase 5 this means the verification pipeline has **two sources to hash, not one**:
+
+| What runs | Where it lives | How phase 5 checks it |
+|---|---|---|
+| R analytics | workspace filesystem | hash the file, compare to the manifest |
+| Python orchestration | the pipeline version's stored zip | read it back via `get_pipeline`, hash `pipeline.py`, compare to the manifest |
+
+The second is proven to work — the byte-identity check in §3 is exactly that comparison.
 
 ### One design consequence worth flagging early
 

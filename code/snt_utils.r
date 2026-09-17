@@ -153,7 +153,7 @@ load_snt_config <- function(snt_config_path) {
     # config file path 
     config_json <- tryCatch({ jsonlite::fromJSON(snt_config_path) },
       error = function(e) {
-          stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
+          stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}\nDetails: {conditionMessage(e)}"))
       })    
     log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
     return(config_json)    
@@ -173,8 +173,8 @@ load_snt_config <- function(snt_config_path) {
 load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
     data <- tryCatch({ 
             get_latest_dataset_file_in_memory(dataset_id, filename) 
-        }, error = function(e) {
-            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
+        }, error = function(e) {            
+            stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}\nDetails: {conditionMessage(e)}"))
     })
 
     if (verbose) {        
@@ -196,7 +196,7 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 load_csv_file <- function(csv_file_path) {
     csv_data <- tryCatch({ read.csv(csv_file_path) },
         error = function(e) {
-            stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}"))
+            stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}\nDetails: {conditionMessage(e)}"))
         }
     )
     log_msg(glue::glue("File loaded: {csv_file_path}"))
@@ -225,7 +225,7 @@ read_geojson_safe <- function(file_path) {
     # 2. Try to read the file and catch corruption/parsing errors
     geo_data <- tryCatch({ sf::read_sf(file_path, quiet = TRUE)}, 
         error = function(e) {
-            log_msg(glue("Failed to parse the GeoJSON file. It may be corrupted. R says: {e$message}"), "error")
+            log_msg(glue("Failed to parse the GeoJSON file. It may be corrupted. \nDetails: {conditionMessage(e)}"), "error")
             return(NULL)
         })
     

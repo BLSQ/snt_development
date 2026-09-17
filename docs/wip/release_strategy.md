@@ -29,6 +29,22 @@ and the OpenHEXA Template subscription for `pipeline.py`. Python and R then only
 on the same tag, through the same mechanism. This is a replacement, not a parallel path — a
 workspace must not receive `pipeline.py` from both the Template system and the Workspace Manager.
 
+### Release tags are never moved
+
+Making the tag the source of truth only works if a tag means one thing forever. Git does not
+enforce that — `git tag -f` plus a force-push re-points a tag at a different commit, and deleting a
+release on GitHub and re-creating it under the same name does the same thing. It is a tempting
+thing to do while iterating, to avoid accumulating `v0.0.1-test2`, `-test3`, `-test4`.
+
+The convention, therefore: **a published release tag is never moved.** If something is wrong, cut a
+new one. Bumping a number is cheap; a tag that means two different things is expensive — every
+`.snt_release` marker, every manifest comparison and every deployed pipeline version named after
+that tag becomes ambiguous at once.
+
+GitHub can enforce this rather than leaving it to discipline: **Settings → Rules → tag rulesets**,
+with "Restrict updates" and "Restrict deletions" on a pattern like `v*`. Worth doing on the real
+repo once this is past prototyping.
+
 ### What is in scope
 
 Tracked and delivered:

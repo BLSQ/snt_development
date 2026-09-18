@@ -3,160 +3,79 @@
 # Each piece of code is wrapped in a function to keep the notebook clean.
 
 message("This step sets up the environment for the DHIS2 incidence pipeline, including paths, config, and utility functions.
-It basically handles all the boring stuff so that you can focus on the code that matters :)
-")
+It basically handles all the boring stuff so that you can focus on the code that matters :)")
 
-# Check that PIPELINE_NAME is defined. This myst be defined at the top of each code notebook!
-if (!exists("PIPELINE_NAME")) stop("PIPELINE_NAME is not defined")
+# Load base functions
+source(file.path("~/workspace/code", "snt_utils.r"))
 
-setup_paths <- function() {
-SNT_ROOT_PATH <<- "/home/hexa/workspace"
-CODE_PATH <<- file.path(SNT_ROOT_PATH, 'code')
-PIPELINE_PATH <<- file.path(SNT_ROOT_PATH, 'pipelines', PIPELINE_NAME)
-CONFIG_PATH <<- file.path(SNT_ROOT_PATH, 'configuration')
-DATA_PATH <<- file.path(SNT_ROOT_PATH, 'data', 'dhis2', 'incidence')
-INTERMEDIATE_DATA_PATH <<- file.path(DATA_PATH, "intermediate_results")
-message("Paths set up:")
-message("SNT_ROOT_PATH", SNT_ROOT_PATH)
-message("CODE_PATH: ", CODE_PATH)
-message("PIPELINE_PATH: ", PIPELINE_PATH)
-message("CONFIG_PATH: ", CONFIG_PATH)
-message("DATA_PATH: ", DATA_PATH)
-message("INTERMEDIATE_DATA_PATH: ", INTERMEDIATE_DATA_PATH)
-}
-
-create_intermediate_data_dir <- function() {
-if (!dir.exists(INTERMEDIATE_DATA_PATH)) {
-dir.create(INTERMEDIATE_DATA_PATH, recursive = TRUE)
-log_msg(glue("Created directory for intermediate results: {INTERMEDIATE_DATA_PATH}"))
-}
-}
-
-load_utils <- function() {
-utils_path <- "/home/hexa/workspace/code/snt_utils.r"
-palettes_path <- "/home/hexa/workspace/code/snt_palettes.r"
-source("/home/hexa/workspace/code/snt_utils.r")
-message("Utils loaded from: ", utils_path)
-source("/home/hexa/workspace/code/snt_palettes.r")
-message("Palettes loaded from: ", palettes_path)
-}
-
-set_env_openhexa <- function() {
-Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
-Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
-Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-message("Python config:")
-print(reticulate::py_config())
-openhexa <<- import("openhexa.sdk")
-message("Openhexa SDK imported successfully.")
-}
-
-import_config_json <- function() {
-config_path <- file.path(CONFIG_PATH, "SNT_config.json")
-config_json <<- tryCatch({ fromJSON(config_path) },
-error = function(e) {
-msg <- paste0("[ERROR] Error while loading configuration: ", conditionMessage(e))
-cat(msg)
-stop(msg)
-})
-log_msg(glue::glue("SNT configuration loaded from: {config_path}"))
-}
-
-config_generic <- function() {
-COUNTRY_CODE <<- config_json$SNT_CONFIG$COUNTRY_CODE
-ADMIN_1 <<- toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_1)
-ADMIN_2 <<- toupper(config_json$SNT_CONFIG$DHIS2_ADMINISTRATION_2)
-log_msg(glue::glue("Configuration values set: COUNTRY_CODE={COUNTRY_CODE}, ADMIN_1={ADMIN_1}, ADMIN_2={ADMIN_2}"))
-}
-
-config_incidence <- function() {
-DHIS2_INDICATORS <<- names(config_json$DHIS2_DATA_DEFINITIONS$DHIS2_INDICATOR_DEFINITIONS)
-log_msg(glue::glue("DHIS2 indicators set: {paste(DHIS2_INDICATORS, collapse=', ')}"))
-}
-
-set_fixed_cols <- function() {
-fixed_cols <<- c('OU_ID','PERIOD', 'YEAR', 'MONTH', 'ADM1_ID', 'ADM2_ID')
-log_msg(glue::glue("Fixed routine data ('dhis2_routine') columns set: {paste(fixed_cols, collapse=', ')}"))
-}
 
 resolve_routine_filename <- function() {
-if (ROUTINE_DATA_CHOICE == "raw") return("_routine.parquet")
-is_removed <<- FALSE
-if (ROUTINE_DATA_CHOICE == "raw_without_outliers") is_removed <<- TRUE
-removed_status <<- if (is_removed) "removed" else "imputed"
-return(glue::glue("_routine_outliers_{removed_status}.parquet"))
+    if (ROUTINE_DATA_CHOICE == "raw") {
+        return("_routine.parquet")
+    }
+    removed_status <- if (ROUTINE_DATA_CHOICE == "raw_without_outliers") "removed" else "imputed"
+    glue::glue("_routine_outliers_{removed_status}.parquet")
 }
 
-select_routine_dataset_and_filename <- function() {
-if (ROUTINE_DATA_CHOICE == "raw") {
-routine_dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
-routine_name <<- resolve_routine_filename()
-routine_filename <<- paste0(COUNTRY_CODE, routine_name)
-} else {
-routine_dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_OUTLIERS_IMPUTATION
-routine_name <<- resolve_routine_filename()
-routine_filename <<- paste0(COUNTRY_CODE, routine_name)
-}
-log_msg(glue::glue("Selected routine dataset: {routine_dataset_name}, filename: {routine_filename}"))
+
+select_routine_dataset_and_filename <- function(config_json) {
+    routine_dataset_name <- if (ROUTINE_DATA_CHOICE == "raw") {
+        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
+    } else {
+        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_OUTLIERS_IMPUTATION
+    }
+    routine_filename <- paste0(COUNTRY_CODE, resolve_routine_filename())
+
+    log_msg(glue::glue("Selected routine dataset: {routine_dataset_name}, filename: {routine_filename}"))
+
+    list(routine_dataset_name = routine_dataset_name, routine_filename = routine_filename)
 }
 
-load_dhis2_routine_data <- function() {
-dhis2_routine <<- tryCatch({ get_latest_dataset_file_in_memory(routine_dataset_name, routine_filename) },
-error = function(e) {
-if (grepl("does not exist", conditionMessage(e), ignore.case = TRUE)) {
-msg <- paste0("[ERROR] File not found! 🛑 The file ", routine_filename, " does not exist in ",  routine_dataset_name, ". To generate it, execute the pipeline DHIS2 Outliers Removal and Imputation.")
-} else {
-msg <- paste0("[ERROR] 🛑 Error while loading DHIS2 routine data file : ", routine_filename, ". [ERROR DETAILS] " , conditionMessage(e))
-}
-stop(msg)
-})
-log_msg(glue::glue("DHIS2 routine data : {routine_filename} loaded. Dims: {paste(dim(dhis2_routine), collapse=', ')}"))
-return(head(dhis2_routine, 3))
+ 
+check_fixed_cols_in_routine <- function(dhis2_routine) {
+    actual_cols <- colnames(dhis2_routine)
+    missing_cols <- setdiff(fixed_cols, actual_cols)
+    if (length(missing_cols) == 0) {
+        log_msg(glue::glue("All expected 'fixed' columns present."))
+    } else {
+        log_msg(glue::glue("🚨 Missing Columns: {paste(missing_cols, collapse = ', ')}"), "warning")
+    }
 }
 
-check_fixed_cols_in_routine <- function() {
-actual_cols <- colnames(dhis2_routine)
-missing_cols <- setdiff(fixed_cols, actual_cols)
-if (length(missing_cols) == 0) {
-log_msg(glue::glue("All expected 'fixed' columns present."))
-} else {
-log_msg(glue::glue("🚨 Missing Columns: {paste(missing_cols, collapse = ', ')}"), "warning")
-}
-}
-
-check_dhis2_indicators_cols_in_routine <- function() {
-actual_cols <- colnames(dhis2_routine)
-missing_cols <- setdiff(DHIS2_INDICATORS, actual_cols)
-if (length(missing_cols) == 0) {
-log_msg(glue::glue("All DHIS2 indicators present in 'dhis2_routine'."))
-} else {
-log_msg(glue::glue("🚨 Missing DHIS2 INDICATORS: {paste(missing_cols, collapse = ', ')}"), "warning")
-}
+check_dhis2_indicators_cols_in_routine <- function(dhis2_routine) {
+    actual_cols <- colnames(dhis2_routine)
+    missing_cols <- setdiff(DHIS2_INDICATORS, actual_cols)
+    if (length(missing_cols) == 0) {
+        log_msg(glue::glue("All DHIS2 indicators present in 'dhis2_routine'."))
+    } else {
+        log_msg(glue::glue("🚨 Missing DHIS2 INDICATORS: {paste(missing_cols, collapse = ', ')}"), "warning")
+    }
 }
 
-check_PRES_col <- function() {
-if (exists("N1_METHOD") && N1_METHOD == "PRES") {
-pres_in_routine <- any(names(dhis2_routine) == "PRES")
-pres_in_config <- any(DHIS2_INDICATORS == "PRES")
+check_pres_col <- function(dhis2_routine) {
+    if (exists("N1_METHOD") && N1_METHOD == "PRES") {
+        pres_in_routine <- any(names(dhis2_routine) == "PRES")        
     if (!pres_in_routine) {
         log_msg(glue::glue("🛑 Column `PRES` missing from routine data!"), "error")
         stop()
     }
-    log_msg(glue::glue("Column `PRES` is present. Proceeding."))
-} else {
+        log_msg(glue::glue("Column `PRES` is present. Proceeding."))
+    } else {
         # This is just for the nb, no need to long in pipeline run
         print("N1_METHOD is not set to 'PRES'. No need to check for `PRES` column.")
     }
 }
 
-load_population_data <- function() {
-dhis2_pop_dataset <- if (USE_TRANSFORMED_POPULATION) config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION else config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
-
-dhis2_population_adm2 <<- get_latest_dataset_file_in_memory(dhis2_pop_dataset, paste0(COUNTRY_CODE, "_population.parquet"))
-log_msg(glue::glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))
-return(head(dhis2_population_adm2, 3))
-
-
+load_population_data <- function(config_json) {
+    dhis2_pop_dataset <- if (USE_TRANSFORMED_POPULATION) {
+        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION
+    } else {
+        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED        
+    }
+        
+    dhis2_population_adm2 <- load_dataset_file(dataset_id=dhis2_pop_dataset, filename= paste0(COUNTRY_CODE, "_population.parquet"))
+    log_msg(glue::glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))
+    return(dhis2_population_adm2)
 }
 
 # --- DISAGGREGATION LOGIC --- --- --- --- --- --- ---
@@ -167,7 +86,7 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
     log_msg(glue::glue("Starting preparation of disaggregated indicators for selection '{DISAGGREGATION_SELECTION}' and N1_METHOD '{N1_METHOD}'."))
 
   # Initialize the flag locally
-  DISAGGREGATED_INDICATORS_FOUND <<- FALSE 
+  DISAGGREGATED_INDICATORS_FOUND <<- FALSE # AVOID (!)
 
   if (!is.null(DISAGGREGATION_SELECTION) && N1_METHOD %in% c("SUSP-TEST", "PRES")) {
     # Determine the expected column names based on the disaggregation selection and method
@@ -199,8 +118,8 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
     # Print just in nb (not in pipeline logs)
     print("Indicator Disaggregation: No disaggregation applied based on the current configuration.")
   }
-  # return(dhis2_routine)
-    dhis2_routine <<- dhis2_routine
+    
+  return(dhis2_routine)
 }
 
 # Rewrote select_population_column() to be mapping the DISAGGREGATION_SELECTION 
@@ -231,6 +150,7 @@ load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = conf
     # 1. Prepare identifiers
     dataset_name <- config$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
     file_name    <- glue::glue("{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
+    
     # 2. Attempt to load
     data <- tryCatch({
         get_latest_dataset_file_in_memory(dataset_name, file_name)
@@ -238,12 +158,13 @@ load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = conf
         # log_msg(paste("🛑 Error loading DHS data:", conditionMessage(e)), "error")
         return(NULL)
     })
+    
     # 3. Validation & Logging
     if (!is.null(data)) {
         log_msg(glue::glue("✅ Care Seeking data: {file_name} loaded from {dataset_name}"))
         log_msg(glue::glue("Dimensions: {nrow(data)} rows, {ncol(data)} columns."))
         # Keep this global becuase it's needed for the final log summary (at the end of the script)
-        careseeking_file_name <<- file_name 
+        careseeking_file_name <<- file_name # AVOID SETTING GLOBALS IN FUNCTIONS (!)
         return(data)
     } else {
         log_msg("Loading of careseeking data from DHS failed. Returning NULL.", "warning")
@@ -252,15 +173,17 @@ load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = conf
 }
 
 
-validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
+validate_and_format_careseeking_data <- function(data, from_file) {
     if (is.null(data)) {
         print("No careseeking data to validate.")
         return(NULL)
     }
     log_msg("Validating careseeking data...")
+    
     # 1. Determine which column we expect based on the source
     # This keeps the logic modular and avoids repeating column-specific checks
-    target_col <- if (from_file) "CARESEEKING_PCT" else if (from_dhs) "PCT_PUBLIC_CARE" else NULL
+    target_col <- if (from_file) "CARESEEKING_PCT" else "PCT_PUBLIC_CARE"
+        
     # 2. Check for ADM1_ID and the source-specific percentage column
     required_cols <- c("ADM1_ID", target_col)
     missing_cols  <- setdiff(required_cols, colnames(data))
@@ -268,6 +191,7 @@ validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
         log_msg(paste("Required columns missing:", paste(missing_cols, collapse = ", ")), "error")
         return(NULL)
     }
+    
     # 3. Ensure the percentage column is numeric
     if (!is.numeric(data[[target_col]])) {
         log_msg(paste("Column", target_col, "is not numeric. Attempting conversion..."), "warning")
@@ -279,6 +203,7 @@ validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
         }
         data[[target_col]] <- converted_vals
     }
+    
     # 4. Handle Range Adjustment (0-1 to 0-100)
     # We check if the maximum is <= 1 to see if it's likely a proportion
     max_val <- max(data[[target_col]], na.rm = TRUE)
@@ -286,6 +211,7 @@ validate_and_format_careseeking_data <- function(data, from_file, from_dhs) {
         log_msg(paste("Values in", target_col, "appear to be 0-1. Scaling to 0-100."), "warning")
         data[[target_col]] <- data[[target_col]] * 100
     }
+    
     # 5. STANDARDIZATION STEP: Rename to CARESEEKING_PCT
     if (target_col != "CARESEEKING_PCT") {
         log_msg(paste("Renaming source column", target_col, "to standardized name 'CARESEEKING_PCT'."))
@@ -303,7 +229,7 @@ join_careseeking_data <- function(main_df, careseeking_data) {
   } else if ("ADM1_ID" %in% colnames(careseeking_data)) {
     join_key <- "ADM1_ID"
   } else {
-    log_msg("Input data must contain 'ADM1_ID' or 'ADM2_ID'.", "error")
+    stop("[ERROR] Input data must contain 'ADM1_ID' or 'ADM2_ID'.")
   }
   # --- 2. Robust Safeguard: Collapse the user data to the join_key level ---
   # This handles 'broadcasted' duplicates by ensuring only 1 row exists per ID   
@@ -407,121 +333,6 @@ handle_zeros_in_reporting_rate <- function() {
 }
 
 
-build_monthly_cases <- function(
-    routine_data,
-    reporting_rate_data,
-    N1_METHOD,
-    care_seeking_data_f = NULL,
-    careseeking_data = NULL
-) {
-    monthly_cases <- routine_data |>
-        dplyr::group_by(ADM1_ID, ADM2_ID, YEAR, MONTH) |>
-        dplyr::summarise(
-            CONF = sum(CONF, na.rm = TRUE),
-            TEST = sum(TEST, na.rm = TRUE),
-            SUSP = sum(SUSP, na.rm = TRUE),
-            dplyr::across(dplyr::any_of("PRES"), ~sum(., na.rm = TRUE), .names = "PRES"),
-            .groups = "drop"
-        ) |>
-        dplyr::mutate(TEST = ifelse(N1_METHOD == "SUSP-TEST" & !is.na(SUSP) & (TEST > SUSP), SUSP, TEST)) |>
-        dplyr::left_join(reporting_rate_data, by = c("ADM2_ID", "YEAR", "MONTH")) |>
-        dplyr::mutate(TPR = ifelse(!is.na(CONF) & !is.na(TEST) & (TEST != 0), CONF / TEST, 1))
-
-    if (N1_METHOD == "SUSP-TEST") {
-        monthly_cases <- monthly_cases %>%
-            dplyr::mutate(N1 = CONF + ((SUSP - TEST) * TPR))
-        log_msg("Calculating N1 as `N1 = CONF + ((SUSP - TEST) * TPR)`")
-    } else if (N1_METHOD == "PRES") {
-        if ("PRES" %in% names(monthly_cases) && !all(is.na(monthly_cases$PRES))) {
-            monthly_cases <- monthly_cases %>%
-                dplyr::mutate(N1 = CONF + (PRES * TPR))
-            log_msg("ℹ️ Calculating N1 as `N1 = CONF + (PRES * TPR)`")
-        } else {
-            log_msg("🚨 Warning: 'PRES' not found in routine data or contains all `NA` values! 🚨 Calculating N1 using 'SUSP-TEST' method instead.")
-            monthly_cases <- monthly_cases %>%
-                dplyr::mutate(N1 = CONF + ((SUSP - TEST) * TPR))
-        }
-    } else {
-        log_msg("Invalid N1_METHOD. Please use 'PRES' or 'SUSP-TEST'.")
-    }
-
-    monthly_cases <- monthly_cases %>%
-        dplyr::mutate(N2 = ifelse(REPORTING_RATE == 0, NA_real_, N1 / REPORTING_RATE))
-
-    if (!is.null(care_seeking_data_f)) {
-        monthly_cases <- monthly_cases %>%
-            dplyr::left_join(care_seeking_data_f %>% dplyr::select(ADM1_ID, PCT), by = c("ADM1_ID")) %>%
-            dplyr::mutate(N3 = N2 / PCT) %>%
-            dplyr::select(-PCT)
-        log_msg("N2 adjusted by care seeking data (NER Specific).")
-    }
-
-    if (!is.null(careseeking_data)) {
-        monthly_cases <- monthly_cases |>
-            dplyr::mutate(YEAR = as.numeric(YEAR)) |>
-            dplyr::left_join(careseeking_data, by = c("ADM1_ID")) |>
-            dplyr::mutate(
-                N3 = N2 + (N2 * PCT_PRIVATE_CARE / PCT_PUBLIC_CARE) + (N2 * PCT_NO_CARE / PCT_PUBLIC_CARE)
-            )
-    } else {
-        print("🦘 Careseeking data not available, skipping calculation of N3.")
-    }
-
-    monthly_cases
-}
-
-
-build_yearly_incidence <- function(monthly_cases, dhis2_population_adm2, care_seeking_data_f = NULL, careseeking_data = NULL) {
-    monthly_cases <- monthly_cases %>%
-        dplyr::mutate(dplyr::across(where(is.numeric), as.numeric))
-
-    population_data <- dhis2_population_adm2 %>%
-        dplyr::mutate(dplyr::across(c(YEAR, POPULATION), as.numeric))
-
-    yearly_incidence <- monthly_cases %>%
-        dplyr::group_by(ADM2_ID, YEAR) %>%
-        dplyr::summarise(
-            dplyr::across(c(CONF, N1, N2), ~sum(.)),
-            .groups = "drop"
-        ) %>%
-        dplyr::left_join(
-            population_data,
-            by = c("ADM2_ID", "YEAR")
-        ) %>%
-        dplyr::mutate(
-            INCIDENCE_CRUDE = CONF / POPULATION * 1000,
-            INCIDENCE_ADJ_TESTING = N1 / POPULATION * 1000,
-            INCIDENCE_ADJ_REPORTING = N2 / POPULATION * 1000
-        ) |>
-        dplyr::ungroup()
-
-    if (!is.null(care_seeking_data_f) && "N3" %in% names(monthly_cases)) {
-        n3_data <- monthly_cases %>%
-            dplyr::group_by(ADM2_ID, YEAR) %>%
-            dplyr::summarise(N3 = sum(N3, na.rm = TRUE), .groups = "drop") |>
-            dplyr::ungroup()
-
-        yearly_incidence <- yearly_incidence %>%
-            dplyr::left_join(n3_data, by = c("ADM2_ID", "YEAR")) %>%
-            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = N3 / POPULATION * 1000)
-    } else if (!is.null(careseeking_data) && "N3" %in% names(monthly_cases)) {
-        n3_data <- monthly_cases %>%
-            dplyr::group_by(ADM2_ID, YEAR) %>%
-            dplyr::summarise(N3 = sum(N3, na.rm = TRUE), .groups = "drop") |>
-            dplyr::ungroup()
-
-        yearly_incidence <- yearly_incidence %>%
-            dplyr::left_join(n3_data, by = c("ADM2_ID", "YEAR")) %>%
-            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = N3 / POPULATION * 1000)
-    } else {
-        yearly_incidence <- yearly_incidence |>
-            dplyr::mutate(INCIDENCE_ADJ_CARESEEKING = NA)
-    }
-
-    yearly_incidence
-}
-
-
 export_monthly_cases <- function(monthly_cases) {
     file_path <- file.path(INTERMEDIATE_DATA_PATH, paste0(COUNTRY_CODE, "_monthly_cases.parquet"))
     arrow::write_parquet(monthly_cases, file_path)
@@ -567,7 +378,7 @@ coherence_check_CONF_TEST <- function(monthly_cases) {
 }
 
 
-coherence_checkes_yearly_incidence <- function(yearly_incidence, incidence_col_1, incidence_col_2) {
+coherence_check_yearly_incidence <- function(yearly_incidence, incidence_col_1, incidence_col_2) {
     nr_of_impossible_values <<- yearly_incidence |>
       mutate(IMPOSSIBLE_VALUE = if_else(!!sym(incidence_col_2) < !!sym(incidence_col_1), TRUE, FALSE)) |>
       pull(IMPOSSIBLE_VALUE) |>

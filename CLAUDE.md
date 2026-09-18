@@ -527,8 +527,13 @@ Keep these names and behaviours identical across pipelines — operators rely on
   is mapped to OpenHEXA severity by
   `error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}`. A `[WARNING]`-labelled
   failure suppresses HTML report generation but does **not** fail the run — so labelling a real
-  data-loss condition `[WARNING]` hides it. Keep messages actionable: name the missing file, the
-  dataset, and the pipeline that produces it (see `load_dhis2_routine_data()` for the house style).
+  data-loss condition `[WARNING]` hides it. Keep messages actionable: at minimum, name the missing
+  file — `load_dataset_file()` in `code/snt_utils.r` (the shared loader most pipelines call to read
+  a dataset file) does this by default. It has no way to know which upstream pipeline produces a
+  given file, so when that context is useful, add it in the caller: see the routine-data load cell
+  in `pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb`, which wraps
+  `load_dataset_file()` in its own `tryCatch` to name the specific upstream pipeline ("DHIS2
+  Outliers Removal and Imputation") when the routine file is missing.
 
 ### Notebook hygiene
 

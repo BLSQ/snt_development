@@ -89,6 +89,7 @@ install_and_load <- function(packages) {
 }
 
 
+
 #' Initialize SNT Workspace Setup
 #'
 #' Initializes workspace paths, installs and loads required R packages,
@@ -103,16 +104,17 @@ install_and_load <- function(packages) {
 #' @export
 init_snt_workspace <- function(
     snt_pipeline_name,
-    snt_root_path='~/workspace',    
-    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
+    snt_root_path='~/workspace',
+    packages=c()
 ) {
     # Validate snt_pipeline_name
     if (missing(snt_pipeline_name) || is.null(snt_pipeline_name) || 
         !nzchar(trimws(snt_pipeline_name))) {
         stop("`snt_pipeline_name` must be provided and cannot be empty.", call. = FALSE)
     }
-    # List required pcks
-    required_packages <- unique(c(packages, "reticulate"))
+    # List required pcks 
+    base_packages <- c("arrow", "dplyr", "tidyr", "stringr", "stringi", "httr", "glue", "jsonlite", "reticulate")
+    required_packages <- unique(c(packages, base_packages))
     install_and_load(required_packages)
 
     # Set environment to load openhexa.sdk from the right environment
@@ -139,6 +141,7 @@ init_snt_workspace <- function(
 }
 
 
+
 #' Load the SNT Configuration File
 #'
 #' Reads and parses the SNT configuration JSON file at the given path,
@@ -150,13 +153,30 @@ init_snt_workspace <- function(
 #'
 #' @export
 load_snt_config <- function(snt_config_path) {
-    # config file path 
-    config_json <- tryCatch({ jsonlite::fromJSON(snt_config_path) },
-      error = function(e) {
-          stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}\nDetails: {conditionMessage(e)}"))
-      })    
-    log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
-    return(config_json)    
+    load_json(snt_config_path, label = "SNT configuration")
+}
+
+
+#' Load a JSON File
+#'
+#' Reads and parses a JSON file at the given path, logging a message on
+#' success and stopping with a clear error (including the underlying cause)
+#' if loading fails.
+#'
+#' @param json_path Character. Full path to the JSON file.
+#' @param label Character. Optional label used in the log/error messages to
+#'   describe what's being loaded (e.g. "SNT configuration"). Default: "JSON file".
+#' @return List. The parsed JSON content.
+#'
+#' @export
+load_json <- function(json_path, label = "JSON file") {
+    parsed_json <- tryCatch({
+        jsonlite::fromJSON(json_path)
+    }, error = function(e) {
+        stop(glue::glue("[ERROR] Error while loading {label}: {json_path}\nDetails: {conditionMessage(e)}"))
+    })
+    log_msg(paste0(label, " loaded from: ", json_path))
+    return(parsed_json)
 }
 
 
@@ -174,7 +194,7 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
     data <- tryCatch({ 
             get_latest_dataset_file_in_memory(dataset_id, filename) 
         }, error = function(e) {            
-            stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}\nDetails: {conditionMessage(e)}"))
+            stop(glue::glue("[ERROR] Error while loading file {filename}\nDetails: {conditionMessage(e)}"))
     })
 
     if (verbose) {        

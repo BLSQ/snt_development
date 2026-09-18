@@ -41,9 +41,26 @@ new one. Bumping a number is cheap; a tag that means two different things is exp
 `.snt_release` marker, every manifest comparison and every deployed pipeline version named after
 that tag becomes ambiguous at once.
 
-GitHub can enforce this rather than leaving it to discipline: **Settings → Rules → tag rulesets**,
-with "Restrict updates" and "Restrict deletions" on a pattern like `v*`. Worth doing on the real
-repo once this is past prototyping.
+GitHub enforces this rather than leaving it to discipline. **Done on
+`BLSQ/snt_development_sandbox` (2026-09-18)**; repeat it on `BLSQ/snt_development` before the first
+real release.
+
+Settings → Rules → Rulesets → New ruleset → New **tag** ruleset:
+
+| Field | Value |
+|---|---|
+| Ruleset Name | `Protect release tags` |
+| Enforcement status | Active |
+| Bypass list | **empty** |
+| Target tags | Include by pattern → `v*` |
+| Rules | ☑ Restrict updates, ☑ Restrict deletions, ☐ Restrict creations |
+
+Two things that are easy to get wrong:
+
+* **Leave the bypass list empty.** Anyone on it — including "Repository admin" — can still move a
+  tag, which defeats the point.
+* **Leave "Restrict creations" unchecked.** Checking it blocks creating new tags, i.e. blocks every
+  future release.
 
 ### What is in scope
 

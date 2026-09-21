@@ -34,6 +34,11 @@ jobs:
 
           Tracking only `*/pipeline.py`, as this script used to, left `requirements.txt`,
           `readme.md` and every helper module unverifiable.
+
+          `files` stays a flat `{repository path: sha256}` map, unchanged in shape. The sibling
+          `pipelines` block says which of those paths are deployed inside which pipeline zip, and
+          under what name once inside it, so a consumer does not have to re-derive the rule this
+          script applies.
           """
 
           import hashlib
@@ -132,8 +137,30 @@ jobs:
               return found
 
 
+          def pipeline_code(pipeline_dir: Path) -> str:
+              """Derive the OpenHEXA pipeline code from its directory name.
+
+              The directory name with underscores replaced by hyphens. This is the slug the
+              20 push_snt_*.yaml workflows pass to `openhexa pipelines push --code`, and the
+              same rule snt_workspace_manager applies when it deploys through the API. A
+              consumer needs it to look the pipeline up, and cannot get it from the manifest
+              any other way.
+
+              Parameters
+              ----------
+              pipeline_dir : Path
+                  A directory, relative to the repository root, containing a `pipeline.py`.
+
+              Returns
+              -------
+              str
+                  The pipeline code, e.g. `snt-map-extracts`.
+              """
+              return pipeline_dir.name.replace("_", "-")
+
+
           def build_manifest(root: Path, version: str) -> dict:
-              """Collect and hash every tracked file.
+              """Collect and hash every tracked file, and describe the pipeline zips.
 
               Parameters
               ----------
@@ -145,19 +172,30 @@ jobs:
               Returns
               -------
               dict
-                  The manifest, as `{"version": str, "files": {path: sha256}}`.
+                  The manifest: `version`, a flat `files` map of `{path: sha256}`, and a
+                  `pipelines` map describing what each deployment zip contains.
               """
               tracked = set()
 
               for pattern in FILESYSTEM_PATTERNS:
                   tracked.update(p.relative_to(root) for p in root.glob(pattern) if p.is_file())
 
+              pipelines = {}
               for pipeline_dir in pipeline_directories(root):
-                  tracked.update(zipped_files(root, pipeline_dir))
+                  in_zip = zipped_files(root, pipeline_dir)
+                  tracked.update(in_zip)
+                  pipelines[pipeline_dir.as_posix()] = {
+                      "code": pipeline_code(pipeline_dir),
+                      # Paths as they appear inside the zip, i.e. relative to the pipeline
+                      # directory. Prefix one with its key to get back the repository path,
+                      # which is the key into `files`.
+                      "zip_files": [p.relative_to(pipeline_dir).as_posix() for p in in_zip],
+                  }
 
               return {
                   "version": version,
                   "files": {p.as_posix(): hash_file(root / p) for p in sorted(tracked)},
+                  "pipelines": pipelines,
               }
 
 
@@ -169,10 +207,9 @@ jobs:
               with Path("release_manifest.json").open("w", encoding="utf-8") as f:
                   json.dump(manifest, f, indent=2)
 
-              pipeline_dirs = pipeline_directories(root)
-              print(f"Pipeline directories: {len(pipeline_dirs)}")
-              for pipeline_dir in pipeline_dirs:
-                  print(f"  {pipeline_dir.as_posix()}")
+              print(f"Pipeline directories: {len(manifest['pipelines'])}")
+              for name, entry in manifest["pipelines"].items():
+                  print(f"  {name} -> {entry['code']} ({len(entry['zip_files'])} files in zip)")
               print(f"Generated manifest with {len(manifest['files'])} files.")
 
 
@@ -188,8 +225,9 @@ jobs:
           python - << 'EOF'
           import json
           manifest = json.load(open("release_manifest.json"))
-          print(f"version: {manifest['version']}")
-          print(f"files:   {len(manifest['files'])}")
+          print(f"version:   {manifest['version']}")
+          print(f"files:     {len(manifest['files'])}")
+          print(f"pipelines: {len(manifest['pipelines'])}")
           EOF
 
       - name: Upload Manifest to Release (If published release)

@@ -160,6 +160,10 @@ through `Parameter.to_dict()` including the `dhis2_connection` connection-typed 
 deployed `snt_dhis2_extract/pipeline.py` read back at sha256 `44290bd9…d77755cd`, **byte-identical
 to the release manifest's hash.**
 
+> `v0.0.1-test` was deleted in the 2026-09-21 sandbox reset (`release_strategy.md` §"Sandbox
+> reset"). The result above stands as a record; re-running it means re-running against the new
+> fixture series, which starts at `v0.1.0-test`.
+
 Not verified:
 
 * **The remaining 18 pipelines.** Only 2 of 20 have been through the deployer.

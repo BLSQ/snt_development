@@ -92,9 +92,14 @@ are deployed and correct — a false alarm in the one component whose job is to 
   `snt_workspace_manager`'s own derivation.
 
 `files` keeps its exact previous shape, so this is additive: a reader that ignores `pipelines`
-behaves as before. Manifests from `v0.0.1-test` / `v0.0.2-test` have no such block, and consumers
-must fall back to deriving pipeline directories from `<name>/pipeline.py` entries —
-`split_manifest()` in `snt_workspace_manager` is the reference for that fallback.
+behaves as before. Pre-phase-0 manifests have no such block, and a consumer meeting one must fall
+back to deriving pipeline directories from `<name>/pipeline.py` entries — `split_manifest()` in
+`snt_workspace_manager` is the reference for that fallback.
+
+Since the sandbox reset of 2026-09-21 **no live release lacks the block** (the two that did,
+`v0.0.1-test` and `v0.0.2-test`, were deleted with the repo). So the fallback is currently
+unreachable in testing. Whether to keep it against a legacy manifest fixture or drop it is an open
+question — see [`release_strategy.md`](release_strategy.md) §"Closed issue".
 
 ## 3. What the checker observes
 
@@ -122,7 +127,7 @@ versions; only one of them, the **current version**, is what a run actually exec
   would run, and reporting on them would drown the report in files nobody can act on.
 * **Each version has a *name*, which is free text.** `snt_workspace_manager` sets it to the release
   tag it deployed from, so in the normal case a pipeline whose current version is called
-  `v0.0.2-test` really does contain `v0.0.2-test`'s code.
+  `v0.2.0-test` really does contain `v0.2.0-test`'s code.
 
 The name is metadata someone typed; the hash is evidence. They can disagree, and the ways they
 disagree are exactly the ways the old system failed silently:
@@ -291,13 +296,13 @@ Shape (v1 — to be frozen at the end of phase 4, §6):
   "workspace": "<slug>",
   "repo": "BLSQ/snt_development_sandbox",
   "mode": "attribution | verification",
-  "target_release": {"tag": "v0.0.2-test", "resolved_from": "parameter | marker", "published_at": "..."},
-  "declared_release": {"tag": "v0.0.1-test", "source": ".snt_release"},
+  "target_release": {"tag": "v0.2.0-test", "resolved_from": "parameter | marker", "published_at": "..."},
+  "declared_release": {"tag": "v0.1.0-test", "source": ".snt_release"},
   "releases_considered": [{"tag": "...", "published_at": "...", "manifest_available": true}],
   "incomplete": false,
   "summary": {
     "by_status": {"match": 101, "mismatch_known": 3, "untracked": 2},
-    "attribution": {"v0.0.1-test": 0.97, "v0.0.2-test": 0.027, "unknown": 0.003}
+    "attribution": {"v0.1.0-test": 0.97, "v0.2.0-test": 0.027, "unknown": 0.003}
   },
   "entries": [
     {
@@ -307,9 +312,9 @@ Shape (v1 — to be frozen at the end of phase 4, §6):
       "status": "mismatch_known",
       "observed_sha256": "...",
       "target_sha256": "...",
-      "matching_releases": ["v0.0.1-test"],
+      "matching_releases": ["v0.1.0-test"],
       "position": "older",
-      "remediation": "Run snt_workspace_manager at v0.0.2-test to update; the current copy is archived first."
+      "remediation": "Run snt_workspace_manager at v0.2.0-test to update; the current copy is archived first."
     }
   ],
   "errors": [{"scope": "...", "message": "..."}]
@@ -330,6 +335,7 @@ still open.
 | **0** | **Close the manifest gap** (§7.1): widen `patterns` in `generate_manifest.yaml`, anchored to directories that actually contain a `pipeline.py`. Cut fresh sandbox fixture releases (§6.1). | A new sandbox release whose manifest covers every file the deploy zip ships, verified against one real zip. | — |
 | | ↳ **generator: DONE** 2026-09-21. Verified against all 21 real SDK zips locally (0 uncovered members), not just one. | | |
 | | ↳ **fixtures: NOT DONE.** They need pushes and `gh release create` against the sandbox, which R19 bars an agent from running. Commands prepared for manual execution: `ignore/SNT25-670/sandbox_fixture_plan.md`. | | |
+| | ↳ **sandbox reset: DONE** 2026-09-21. Repo deleted and recreated, seeded from `snt_development` @ `551ddd8`; one branch, no tags. Fixture tags restart at `v0.1.0-test` (§6.1). | | |
 | **1** | Checker skeleton: verification mode against a single target release, both sources hashed, statuses `match` / `unknown_content` / `missing` / `unreadable`, report written. | A workspace freshly deployed by `snt_workspace_manager` at tag T reports all-`match`. | 0, and the token question in §7.3 |
 | **2** | Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
@@ -339,9 +345,11 @@ still open.
 
 ### 6.1 Test fixtures needed in the sandbox
 
-`BLSQ/snt_development_sandbox` currently has `v0.0.1-test` and `v0.0.2-test`. Do **not** create a
-release named `latest`: GitHub's `/releases/latest` endpoint already resolves to the newest
-non-prerelease release automatically.
+`BLSQ/snt_development_sandbox` was **reset on 2026-09-21** and now holds one branch, one commit and
+no releases at all (`release_strategy.md` §"Sandbox reset"). The fixture series therefore starts
+from scratch at **`v0.1.0-test`**; `v0.0.1-test` / `v0.0.2-test` are retired names and are not
+reused. Do **not** create a release named `latest` either: GitHub's `/releases/latest` endpoint
+already resolves to the newest non-prerelease release automatically.
 
 What is needed is a fixture set that produces every status at least once:
 
@@ -350,7 +358,20 @@ What is needed is a fixture set that produces every status at least once:
 * a file **removed** in the newer release → `removed_in_target`;
 * a **pipeline added** and a **pipeline removed** between releases;
 * a file **unchanged across all releases** → attribution to several releases at once;
+* a file **changed and then reverted** → `position: both`, and the only non-contiguous
+  attribution span (§5.1.2, §7.8);
+* a release published with **no manifest asset** → `manifest_available: false` and
+  `incomplete: true` (§5.4, §5.5), made by disabling the generator workflow for one release;
 * one hand-edited file in the workspace → `unknown_content`.
+
+Four cases are **not** release fixtures and are made in the workspace immediately before a check
+run: `unknown_content`, `untracked`, `unreadable`, and the §5.3 untracked-inside-a-pipeline-zip
+case. One more, `position: unordered`, is not reachable at all — GitHub always sets `published_at`
+— so it is a unit test against a stubbed release list, not a fixture.
+
+The full command-by-command plan, with the expected status for each fixture in each of three check
+runs, is `ignore/SNT25-670/sandbox_fixture_plan.md` (local, not committed — it contains `git`/`gh`
+commands for a human to run).
 
 ## 7. Open decisions
 
@@ -375,7 +396,9 @@ same change: `snt_workspace_manager.split_manifest()` treated every entry that w
 deployment files would have been littered across the workspace bucket, inert, in exactly the way
 §3.1 warns about. It now excludes by *directory*, reading the `pipelines` block where present and
 falling back to the old derivation for pre-phase-0 manifests. Both paths verified against the real
-`v0.0.1-test` and `v0.0.2-test` manifests: 86 analytics files before and after, unchanged.
+`v0.0.1-test` and `v0.0.2-test` manifests: 86 analytics files before and after, unchanged. Those
+two releases were deleted in the 2026-09-21 sandbox reset, so that verification stands as a record
+but is no longer repeatable (§2.1).
 
 Phase 1 remains blocked only by the token question in §7.3.
 

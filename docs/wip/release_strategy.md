@@ -42,8 +42,12 @@ new one. Bumping a number is cheap; a tag that means two different things is exp
 that tag becomes ambiguous at once.
 
 GitHub enforces this rather than leaving it to discipline. **Done on
-`BLSQ/snt_development_sandbox` (2026-09-18)**; repeat it on `BLSQ/snt_development` before the first
-real release.
+`BLSQ/snt_development_sandbox` (2026-09-18, and recreated after the 2026-09-21 reset)**; repeat it
+on `BLSQ/snt_development` before the first real release.
+
+A ruleset is a property of the repository, so deleting the repository deletes it. It is also the
+reason a sandbox cannot be cleaned up in place: *Restrict deletions* with an empty bypass list
+stops an admin deleting the very tags they want gone.
 
 Settings → Rules → Rulesets → New ruleset → New **tag** ruleset:
 
@@ -104,11 +108,36 @@ All of this was built against a disposable sandbox rather than the real repo or 
 distinct things with confusingly similar names:
 
 * `BLSQ/snt_development_sandbox` — the **GitHub repo**. An independent repo, not a fork. Local
-  remote is named `sandbox`. Work started on `feature/release-manifest-test`, but the changes
-  behind `v0.0.2-test` were pushed to **`main`**, which is now ahead of that branch. **Cut further
-  fixture releases from `main`** — tagging the stale branch would bake the drift into a release and
-  contaminate the fixture set. See `ignore/SNT25-670/sandbox_fixture_plan.md` §"Which branch".
+  remote is named `sandbox`. **Reset 2026-09-21** (see below): it now holds one branch, `main`, one
+  commit, and no tags. Cut every fixture release from `main`.
 * `snt-development-sandbox` — the **OpenHEXA workspace** the Workspace Manager pipeline runs in.
+  It was **not** reset, so it still holds pipelines and a `.snt_release` marker naming a tag that no
+  longer exists — harmless, and itself a usable test of how the checker handles an unresolvable
+  declared release.
+
+#### Sandbox reset — 2026-09-21
+
+The sandbox had accumulated two branches, two manifest generations and a fixture set built in
+stages; disentangling it was worth less than restarting. The repo was deleted and recreated under
+the same name, then seeded with a single parentless commit carrying the tree of `snt_development`
+@ `551ddd8` — minus the 20 `push_snt_*.yaml` deployment workflows, which target the **real**
+`snt-development` workspace via `secrets.OH_TOKEN` and must never fire from a sandbox.
+
+What this changes for anyone reading the rest of this document:
+
+* **`v0.0.1-test` and `v0.0.2-test` no longer exist.** Every verification below that names them
+  happened and still stands as a record; it just cannot be re-run against those tags.
+* **The new fixture tag series starts at `v0.1.0-test`.** The old numbers are deliberately not
+  reused — they are attached in writing to a 106-file legacy manifest, and reusing them would make
+  a tag mean two things, which is the exact failure the tag-protection convention above exists to
+  prevent.
+* **Only one manifest generation is live.** Every release in the reset sandbox carries a phase-0
+  manifest with a `pipelines` block, so `split_manifest()`'s back-compat path (below) has no live
+  release left to exercise. Either keep a legacy manifest as a local test fixture or delete the
+  fallback deliberately; do not leave it half-trusted.
+
+Procedure and fixture plan: `ignore/SNT25-670/sandbox_reset_runbook.md` and
+`ignore/SNT25-670/sandbox_fixture_plan.md`.
 
 ### Manifest generation — done
 
@@ -360,6 +389,12 @@ failure this whole effort exists to detect. Fixed in the same change: the split 
 falling back to the old `<name>/pipeline.py` derivation for `v0.0.1-test` and `v0.0.2-test`.
 Checked against both of those real manifests and the new one: **86 analytics files in all three**,
 so old releases deploy exactly as they did.
+
+> Since the 2026-09-21 reset, those two releases no longer exist and **no live release exercises
+> that fallback**. The check above stands as a record, but it cannot be repeated end to end. Decide
+> deliberately: keep a copy of a legacy manifest as a local test fixture, or remove the fallback in
+> a PR of its own. Untested back-compat code for a case that can no longer occur is worse than
+> either.
 
 That is the general shape of the risk here — the manifest is an interface, and widening it changes
 the behaviour of everything that reads it. `snt_workspace_manager` was the only consumer today.

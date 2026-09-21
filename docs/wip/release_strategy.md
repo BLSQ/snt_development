@@ -104,7 +104,10 @@ All of this was built against a disposable sandbox rather than the real repo or 
 distinct things with confusingly similar names:
 
 * `BLSQ/snt_development_sandbox` — the **GitHub repo**. An independent repo, not a fork. Local
-  remote is named `sandbox`; work branch `feature/release-manifest-test`, cut from `main`.
+  remote is named `sandbox`. Work started on `feature/release-manifest-test`, but the changes
+  behind `v0.0.2-test` were pushed to **`main`**, which is now ahead of that branch. **Cut further
+  fixture releases from `main`** — tagging the stale branch would bake the drift into a release and
+  contaminate the fixture set. See `ignore/SNT25-670/sandbox_fixture_plan.md` §"Which branch".
 * `snt-development-sandbox` — the **OpenHEXA workspace** the Workspace Manager pipeline runs in.
 
 ### Manifest generation — done

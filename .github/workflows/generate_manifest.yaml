@@ -1,0 +1,208 @@
+name: Generate Release Manifest
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Allows manual triggering from the UI without creating a release
+
+jobs:
+  generate-manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Generate Manifest Script
+        run: |
+          cat << 'EOF' > generate_manifest.py
+          """Build the release manifest: every file a release ships, with its sha256.
+
+          Two halves, because an SNT release reaches a workspace by two routes:
+
+          * the **filesystem** half - R notebooks and the shared R library, copied into
+            `workspace.files_path` by snt_workspace_manager;
+          * the **deployment** half - everything the OpenHEXA SDK puts inside a pipeline's
+            version zip, which is the whole pipeline directory and not just `pipeline.py`.
+
+          Tracking only `*/pipeline.py`, as this script used to, left `requirements.txt`,
+          `readme.md` and every helper module unverifiable.
+          """
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          # Suffixes the OpenHEXA SDK puts in a pipeline deployment zip.
+          # Source: openhexa/cli/api.py -> generate_zip_file(). The comparison there is
+          # case-insensitive (path.suffix.lower()), so this set is matched the same way.
+          ZIP_SUFFIXES = {".py", ".ipynb", ".txt", ".md", ".r", ".sql"}
+
+          # Directory the SDK excludes from the zip (it would break the bucket mount).
+          ZIP_EXCLUDED_DIRS = {"workspace"}
+
+          # The R half: analytics notebooks and the shared R library. These are pulled into
+          # the workspace filesystem by snt_workspace_manager and ship in no zip.
+          FILESYSTEM_PATTERNS = (
+              "pipelines/**/code/*.ipynb",
+              "pipelines/**/reporting/*.ipynb",
+              "pipelines/**/utils/*.r",
+              "code/**/*.r",
+          )
+
+
+          def hash_file(filepath: Path) -> str:
+              """Compute the sha256 of a file, read in chunks.
+
+              Parameters
+              ----------
+              filepath : Path
+                  The file to hash.
+
+              Returns
+              -------
+              str
+                  The hex digest.
+              """
+              hasher = hashlib.sha256()
+              with filepath.open("rb") as f:
+                  while chunk := f.read(8192):
+                      hasher.update(chunk)
+              return hasher.hexdigest()
+
+
+          def pipeline_directories(root: Path) -> list[Path]:
+              """Find the top-level directories that are deployable OpenHEXA pipelines.
+
+              A directory qualifies only if it holds a `pipeline.py` directly, which is
+              what the push_snt_*.yaml workflows point `openhexa pipelines push` at.
+              Anchoring on that file is what keeps `dev/` and `deprecated/` out of the
+              manifest: `deprecated/` nests its pipelines one level deeper, so
+              `*/pipeline.py` never matches inside it.
+
+              Parameters
+              ----------
+              root : Path
+                  The repository root.
+
+              Returns
+              -------
+              list[Path]
+                  The pipeline directories, relative to `root`, sorted by name.
+              """
+              return sorted(p.parent.relative_to(root) for p in root.glob("*/pipeline.py"))
+
+
+          def zipped_files(root: Path, pipeline_dir: Path) -> list[Path]:
+              """List every file the SDK would place in this pipeline's deployment zip.
+
+              Mirrors `generate_zip_file()`: a recursive walk of the pipeline directory
+              keeping only the zipped suffixes, minus the excluded `workspace/` subtree.
+
+              Parameters
+              ----------
+              root : Path
+                  The repository root.
+              pipeline_dir : Path
+                  A directory, relative to `root`, containing a `pipeline.py`.
+
+              Returns
+              -------
+              list[Path]
+                  Repository-relative paths of the files that ship in the zip.
+              """
+              found = []
+              for path in sorted((root / pipeline_dir).rglob("*")):
+                  if not path.is_file():
+                      continue
+                  if path.suffix.lower() not in ZIP_SUFFIXES:
+                      continue
+                  relative = path.relative_to(root / pipeline_dir)
+                  if ZIP_EXCLUDED_DIRS.intersection(relative.parts):
+                      continue
+                  found.append(pipeline_dir / relative)
+              return found
+
+
+          def build_manifest(root: Path, version: str) -> dict:
+              """Collect and hash every tracked file.
+
+              Parameters
+              ----------
+              root : Path
+                  The repository root.
+              version : str
+                  The release tag this manifest describes.
+
+              Returns
+              -------
+              dict
+                  The manifest, as `{"version": str, "files": {path: sha256}}`.
+              """
+              tracked = set()
+
+              for pattern in FILESYSTEM_PATTERNS:
+                  tracked.update(p.relative_to(root) for p in root.glob(pattern) if p.is_file())
+
+              for pipeline_dir in pipeline_directories(root):
+                  tracked.update(zipped_files(root, pipeline_dir))
+
+              return {
+                  "version": version,
+                  "files": {p.as_posix(): hash_file(root / p) for p in sorted(tracked)},
+              }
+
+
+          def main() -> None:
+              """Write `release_manifest.json` for the checked-out tag."""
+              root = Path.cwd()
+              manifest = build_manifest(root, os.environ.get("GITHUB_REF_NAME", "unknown"))
+
+              with Path("release_manifest.json").open("w", encoding="utf-8") as f:
+                  json.dump(manifest, f, indent=2)
+
+              pipeline_dirs = pipeline_directories(root)
+              print(f"Pipeline directories: {len(pipeline_dirs)}")
+              for pipeline_dir in pipeline_dirs:
+                  print(f"  {pipeline_dir.as_posix()}")
+              print(f"Generated manifest with {len(manifest['files'])} files.")
+
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
+      - name: Run Script
+        run: python generate_manifest.py
+
+      - name: Show Manifest Summary
+        run: |
+          python - << 'EOF'
+          import json
+          manifest = json.load(open("release_manifest.json"))
+          print(f"version: {manifest['version']}")
+          print(f"files:   {len(manifest['files'])}")
+          EOF
+
+      - name: Upload Manifest to Release (If published release)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release_manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifact (If triggered manually)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: release_manifest.json

@@ -148,7 +148,7 @@ def snt_workspace_manager(
 
     release = get_release(github_repo, release_tag)
     manifest = download_manifest(release)
-    analytics_files, pipeline_dirs = split_manifest(manifest["files"])
+    analytics_files, pipeline_dirs = split_manifest(manifest["files"], manifest.get("pipelines"))
     current_run.log_info(
         f"Release {github_repo}@{release_tag} tracks {len(manifest['files'])} files: "
         f"{len(analytics_files)} analytics file(s) and {len(pipeline_dirs)} pipeline(s)."
@@ -252,26 +252,46 @@ def download_manifest(release: dict) -> dict:
     return response.json()
 
 
-def split_manifest(tracked_files: dict) -> tuple[dict, list[str]]:
+def split_manifest(tracked_files: dict, pipelines: dict | None = None) -> tuple[dict, list[str]]:
     """Separate the manifest into filesystem-synced analytics and API-deployed pipelines.
 
-    A manifest entry of the form `<name>/pipeline.py` identifies a pipeline to deploy; it
-    is deliberately excluded from the filesystem sync, because OpenHEXA runs pipelines
-    from their registered version's zip and never from the workspace bucket.
+    Everything under a pipeline directory is deliberately excluded from the filesystem
+    sync, because OpenHEXA runs pipelines from their registered version's zip and never
+    from the workspace bucket. A copy in the bucket is inert and actively misleading.
+
+    Two manifest generations are handled. Releases from 2026-09-21 onward carry a
+    `pipelines` block naming the directories outright. Older manifests tracked only
+    `<name>/pipeline.py`, so the directories are recovered from those entries instead;
+    the exclusion is by directory either way, which is what keeps this correct if an old
+    manifest is ever read alongside a new one.
+
+    Parameters
+    ----------
+    tracked_files : dict
+        The manifest's `files` map, `{repository path: sha256}`.
+    pipelines : dict | None
+        The manifest's `pipelines` block, if the release has one.
 
     Returns
     -------
     tuple[dict, list[str]]
         (the analytics files to copy, keyed by path; the pipeline directory names to deploy).
     """
-    analytics, pipeline_dirs = {}, []
-    for rel_path, checksum in tracked_files.items():
-        parts = Path(rel_path).parts
-        if len(parts) == 2 and parts[1] == "pipeline.py":
-            pipeline_dirs.append(parts[0])
-        else:
-            analytics[rel_path] = checksum
-    return analytics, sorted(set(pipeline_dirs))
+    if pipelines:
+        pipeline_dirs = set(pipelines)
+    else:
+        pipeline_dirs = {
+            Path(p).parts[0]
+            for p in tracked_files
+            if len(Path(p).parts) == 2 and Path(p).parts[1] == "pipeline.py"
+        }
+
+    analytics = {
+        rel_path: checksum
+        for rel_path, checksum in tracked_files.items()
+        if Path(rel_path).parts[0] not in pipeline_dirs
+    }
+    return analytics, sorted(pipeline_dirs)
 
 
 def filter_pipelines(pipeline_dirs: list[str], only_pipelines: str | None) -> list[str]:
@@ -455,7 +475,8 @@ def build_version_input(pipeline_dir: Path, parsed: Pipeline, release: dict) -> 
     """Build the GraphQL version input for a pipeline directory, the way the CLI does.
 
     The whole directory is zipped, so `requirements.txt` and `readme.md` travel with the
-    code even though the release manifest tracks only `pipeline.py`.
+    code. Since 2026-09-21 the release manifest describes all of them, and lists them per
+    pipeline in its `pipelines` block, so what ships here is verifiable after the fact.
 
     Returns
     -------

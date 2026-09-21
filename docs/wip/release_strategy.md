@@ -262,11 +262,18 @@ Design inputs already settled:
 * `.snt_release` tells the verifier which manifest to fetch, without being told.
 * Country-specific variants must be recognised as deliberate overrides rather than drift.
 
-**Blocked on the open issue below.**
+~~Blocked on the open issue below.~~ **Unblocked 2026-09-21** — see the closed issue below. The
+checker's requirements now live in [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md).
 
 ---
 
-## Open issue: the manifest under-describes what is deployed
+## Closed issue: the manifest under-described what is deployed
+
+> **Resolved 2026-09-21** (PRODUCT_SPEC phase 0). The widened generator is committed at
+> [`.github/workflows/generate_manifest.yaml`](../../.github/workflows/generate_manifest.yaml) in
+> *this* repo; the sandbox copy is applied by hand — see
+> `ignore/SNT25-670/sandbox_fixture_plan.md`. The problem statement below is kept for the record,
+> with the actual fix after it.
 
 The manifest's `*/pipeline.py` pattern tracks one file per pipeline, but deployment zips the
 **whole pipeline directory**. `snt_map_extracts` was deployed with `utils.py`, `worldpopclient.py`,
@@ -297,6 +304,71 @@ anchor it to the directories that actually contain a `pipeline.py`.
 
 Verifying against a manifest that describes a third of what is deployed would give false assurance,
 which is worse than no verification.
+
+### How it was actually fixed
+
+Not with a wider glob list. A glob list restates the SDK's rule in a second, drifting dialect —
+one pattern per suffix *per depth* — and the list proposed above is already incomplete: it has no
+`.sql` pattern at all, and its `*/requirements.txt` and `*/readme.md` only reach the pipeline root,
+so an equivalent file one directory down (inside `malariaAtlasProject/`, say) would still ship
+unverified. Every future nesting or suffix needs another line nobody will remember to add.
+
+Instead the generator now **reimplements the SDK's own selection rule** and is anchored on
+`*/pipeline.py`:
+
+1. **Filesystem half** — the four original R/notebook patterns, unchanged.
+2. **Deployment half** — for each top-level directory holding a `pipeline.py`, walk it recursively
+   and keep every file whose suffix is in `{.py, .ipynb, .txt, .md, .r, .sql}`, minus the
+   `workspace/` subtree. That is a line-for-line mirror of `generate_zip_file()` in
+   `openhexa/cli/api.py`, the constants are commented with that provenance, and the suffix test is
+   case-insensitive there and here.
+
+Anchoring on `*/pipeline.py` is what excludes `dev/` and `deprecated/` without naming them:
+`deprecated/` nests its eight pipelines one level deeper, so `*/pipeline.py` never matches inside
+it. Nothing is excluded by a denylist that a new top-level directory could slip past.
+
+**Verified 2026-09-21** against `snt_development` @ `SNT25-670`. Coverage was checked by building
+all 21 deployment zips with the SDK's *real* `generate_zip_file()` and asserting every zip member
+resolves to a manifest entry:
+
+```
+manifest files: 156 | zip members: 70 | zip members NOT in manifest: 0
+```
+
+Delta against the old patterns: **107 → 156 files, 49 added, none dropped** — 21 `readme.md`,
+21 `requirements.txt` and 7 helper `.py` modules (`snt_map_extracts/utils.py`, the three-file
+`snt_map_extracts/malariaAtlasProject/` package, and the three copies of `worldpopclient.py` in
+`snt_map_extracts`, `snt_worldpop_extract` and `snt_healthcare_access`).
+The embedded script passes `ruff check` and `ruff format --check` under the repo's `pyproject.toml`.
+
+### The `pipelines` block, and the consumer it broke
+
+The manifest also gained a sibling key to `files`, described in
+[`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §2.1: per pipeline directory, its OpenHEXA `code` slug and the
+list of paths inside its zip. `files` is byte-compatible with before, so this is purely additive.
+
+It is not decoration. Widening the manifest silently changed what an existing consumer does:
+`split_manifest()` in `snt_workspace_manager` classified every entry that was not
+`<name>/pipeline.py` as an analytics file and **copied it into the workspace bucket**. Under the
+widened manifest that meant 49 `readme.md` / `requirements.txt` / helper-module files strewn across
+the workspace filesystem, where OpenHEXA never reads them — the precise "inert and misleading copy"
+failure this whole effort exists to detect. Fixed in the same change: the split is now by
+*directory*, taking the directory list from the `pipelines` block when the release has one and
+falling back to the old `<name>/pipeline.py` derivation for `v0.0.1-test` and `v0.0.2-test`.
+Checked against both of those real manifests and the new one: **86 analytics files in all three**,
+so old releases deploy exactly as they did.
+
+That is the general shape of the risk here — the manifest is an interface, and widening it changes
+the behaviour of everything that reads it. `snt_workspace_manager` was the only consumer today.
+
+Two further consequences worth knowing:
+
+* `snt_workspace_manager` is itself a pipeline directory, so the release manifest now describes the
+  deployer as well. That is wanted — it means a workspace can be told its manager is out of date —
+  but it does mean the manager can deploy a new version of itself.
+* If the SDK ever changes its suffix list, this generator goes stale silently. The checker's
+  `not_covered` status (§5.1 of the spec) is the tripwire for exactly that, which is why the spec
+  keeps it after phase 0 rather than deleting it.
 
 ---
 

@@ -111,10 +111,13 @@ Every entry in the report carries which source it came from.
 | `filesystem` | Files under `workspace.files_path` at their repository-relative paths | Where the R analytics live |
 | `pipeline_version` | The files inside each OpenHEXA pipeline's **current registered version zip** | `pipeline.py` is *never* on the filesystem — a copy there is inert and misleading (`pipeline_deployment_mechanism.md`) |
 
-Both are read from v1 (decision D7). The zip is readable via `get_pipeline`, which returns full
-file contents. **Unverified:** whether reading pipeline versions works with a run's own
-`HEXA_TOKEN`, or needs the `oh` connection token as *deployment* does. This must be established
-early — it decides whether an unattended check needs a workspace-scoped credential (§7.3).
+Both are read from v1 (decision D7). The zip is readable through the GraphQL field
+`pipelineByCode.currentVersion.zipfile`, which returns the base64 of the whole archive — the same
+read the SDK's `download_pipeline_sourcecode()` performs.
+
+**Verified 2026-09-22:** a run's own `HEXA_TOKEN` reads that field in full, so the checker needs
+**no workspace credential**. Reading and deploying have different credential requirements, and only
+deploying needs the `oh` connection (§7.3, [`HISTORY.md`](HISTORY.md) §2.4).
 
 #### Which pipeline version is hashed, and why the version name is not evidence
 
@@ -332,7 +335,7 @@ still open.
 | # | Deliverable | Exit criterion | Blocked by |
 |---|---|---|---|
 | **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
-| **1** | Checker skeleton: verification mode against a single target release, both sources hashed, statuses `match` / `unknown_content` / `missing` / `unreadable`, report written. | A workspace freshly deployed by `snt_workspace_manager` at tag T reports all-`match`. | 0, and the token question in §7.3 |
+| **1** | Checker skeleton: verification mode against a single target release, both sources hashed, statuses `match` / `unknown_content` / `missing` / `unreadable`, report written. | A workspace freshly deployed by `snt_workspace_manager` at tag T reports all-`match`. | 0 — **unblocked**, §7.3a closed |
 | **2** | Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
 | **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
@@ -391,7 +394,8 @@ What the problem was, why a wider glob list was rejected, and the consumer it br
 [`HISTORY.md`](HISTORY.md) §2.1–2.2. What the generator does now:
 [`release_strategy.md`](release_strategy.md) § "Manifest generation".
 
-Phase 1 is therefore blocked only by the token question in §7.3.
+Phase 1 was left blocked only by the token question in §7.3, which closed on 2026-09-22. **Phase 1
+is unblocked and ready to start.**
 
 ### 7.2 How to obtain every release's manifest — **blocks phase 3**
 
@@ -399,16 +403,30 @@ Attribution mode needs the manifest of every release. Unauthenticated GitHub API
 per hour and this project has already hit that wall once ([`HISTORY.md`](HISTORY.md) §1). With ~20
 releases and a per-workspace daily check, a naive implementation breaks. Candidate answers —
 workspace-side manifest cache keyed by tag (safe, because tags never move), a cumulative index
-asset published by the Action, or an authenticated token (which re-opens §7.3). **Deferred by the
-user to a dedicated session (2026-09-18).**
+asset published by the Action, or an authenticated **GitHub** token — which would give the checker a
+credential to hold after all, undoing the credential-free result of §7.3a. That is a point against
+the token option, not a blocker. **Deferred by the user to a dedicated session (2026-09-18).**
 
-### 7.3 Credentials in a country workspace — blocks production use of either component
+### 7.3 Credentials in a country workspace — **low priority**, and no longer blocks the checker
 
-Deployment requires a workspace API token from a CUSTOM connection named `oh`; a run's own
-`HEXA_TOKEN` is refused. Who mints it, where it is stored and how it is rotated is undecided
-(`pipeline_deployment_mechanism.md` §"Authentication"). Sub-question this spec adds: **does
-*reading* a pipeline version need the same credential?** If not, the checker can run unattended in
-a workspace that holds no token at all — a materially better story. Establish it in phase 1.
+Two questions, and the one that gated phase 1 is answered.
+
+**7.3a — does *reading* a pipeline version need the `oh` token? No. Closed 2026-09-22.** A run's own
+`HEXA_TOKEN` returns `currentVersion.zipfile` in full. The checker is therefore **credential-free**:
+it can run unattended in a country workspace that holds no connection at all, which also keeps the
+daily-check story in §7.6 alive. Evidence and method: [`HISTORY.md`](HISTORY.md) §2.4.
+
+**7.3b — where the `oh` token comes from in a country workspace. Open, deliberately low priority.**
+Only `snt_workspace_manager` needs it. What it is, is now known: the **workspace access token** that
+OpenHEXA shows under *Pipelines → Create → "From OpenHEXA CLI"*, the same string
+`openhexa workspaces add <workspace>` asks for. It is workspace-scoped rather than personal, and the
+UI reveals it only to members with the **Editor** or **Admin** role. Today it is copy-pasted by hand
+into a CUSTOM connection named `oh` — which works, but means a manual step per country workspace and
+no rotation story.
+
+Deliberately **not** being solved now: the goal is a working checker and manager to demonstrate, and
+this is the kind of thing to take to the OpenHEXA devs once there is something to show. Revisit
+before real production rollout, not before.
 
 ### 7.4 Enriching `.snt_release`
 

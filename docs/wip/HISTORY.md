@@ -72,6 +72,9 @@ The API answers `PERMISSION_DENIED`. Same payload, same code, a workspace API to
 they are indistinguishable by shape. **If a deployment call 403s, check which token is in the header
 before anything else.**
 
+This is about **writing** only. The same run token reads a version's zip contents perfectly well —
+see §2.4, which is why the checker needs no credential.
+
 ---
 
 ## 2. Closed issues
@@ -137,6 +140,39 @@ exactly the "no version-propagation story" problem this project exists to fix. C
 `5cb7995`, widened in `16bd149`; it now lives at [`snt_workspace_manager/`](../../snt_workspace_manager/)
 with `pipeline.py`, `requirements.txt` and `readme.md`. No `push_*.yaml` workflow yet, pending the
 R5 wording question (`pipeline_deployment_mechanism.md`).
+
+### 2.4 Does *reading* a pipeline version need the `oh` token? — closed 2026-09-22
+
+*Was: `PRODUCT_SPEC.md` §7.3, the last thing blocking phase 1.*
+
+**The question.** Deployment is refused with a run's own `HEXA_TOKEN` (§1, above). If *reading* a
+version's zip were refused too, the checker would need a workspace-scoped credential in every
+country workspace — which would have chained the read-only checker to the unsolved operational
+problem in §7.3b, and taken the unattended daily check (`PRODUCT_SPEC.md` §7.6) with it.
+
+**The answer: no. `HEXA_TOKEN` reads `currentVersion.zipfile` in full.** The checker needs no
+credential.
+
+**How it was established.** A throwaway read-only pipeline, `snt-token-probe`, deployed to
+`snt-development-sandbox` and run once (run `07d90db2-6aae-4963-8fd9-8f78b2d9d423`, 2026-09-22).
+It ran two queries per credential against two pipelines deployed at `v0.3.0-test`:
+
+| Credential | Pipeline | metadata | `zipfile` |
+|---|---|---|---|
+| run's `HEXA_TOKEN` | `snt-dhis2-extract` | ok (v1) | **full**, 65345 B, `pipeline.py` `readme.md` `requirements.txt` |
+| run's `HEXA_TOKEN` | `snt-dhis2-population-transformation` | ok (v2) | **full**, 20295 B, same three |
+| `oh` connection | both | ok | full, byte-identical sizes |
+
+Two design points worth keeping, because they are why the result is trustworthy:
+
+* **A 200 OK proves nothing.** GraphQL field-level denial typically returns `zipfile: null` inside a
+  successful response. The probe's pass condition was that the field decodes from base64, opens as a
+  `ZipFile`, and its `namelist()` contains `pipeline.py` — not that the request succeeded.
+* **Two queries, not one.** A metadata-only query alongside the zipfile query separates "cannot see
+  the pipeline at all" from "can see it but not its contents". Both came back `ok`, so neither
+  failure mode is in play.
+
+The probe source is `ignore/SNT25-670/token_probe/` (local, not committed — `ignore/` is gitignored).
 
 ---
 
@@ -277,4 +313,4 @@ workspace, so there was nothing to archive. That gap is still open.
 | 2026-09-16 | Legacy manifest generator verified; `snt_workspace_manager` v3 proven end to end against `v0.0.1-test`; API deployment mechanism written up. |
 | 2026-09-18 | `product_spec_draft.md` reviewed with Giulia; decisions D1–D9, D11, D12 taken; `PRODUCT_SPEC.md` written. §7.2 (obtaining every manifest) deferred to a dedicated session. Tag-protection ruleset created on the sandbox. |
 | 2026-09-21 | Phase 0: manifest generator rewritten to mirror the SDK's zip rule (107 → 156 files) and given a `pipelines` block; `split_manifest()` fixed in the same change. Sandbox repo reset; fixture releases `v0.1.0-test` … `v0.4.0-test` cut. |
-| 2026-09-22 | `docs/wip/` split: current state in the three live documents, history consolidated here. |
+| 2026-09-22 | `docs/wip/` split: current state in the three live documents, history consolidated here. §7.3a closed by the `snt-token-probe` run (§2.4): a run's own `HEXA_TOKEN` reads pipeline version zips, so the checker is credential-free and **phase 1 is unblocked**. §7.3b (placing the `oh` token in a country workspace) parked as low priority. |

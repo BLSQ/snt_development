@@ -3,6 +3,10 @@
 > Status: work in progress. Manifest generation, the Workspace Manager and Python deployment are
 > built and verified in a sandbox; the verification pipeline is not started. Nothing here is live
 > in a country workspace yet.
+>
+> This document describes the **current** design and state. Superseded designs, closed problems,
+> dead ends and verifications against deleted fixtures are in [`HISTORY.md`](HISTORY.md) — read that
+> before re-investigating anything here.
 
 ## The problem
 
@@ -41,13 +45,12 @@ new one. Bumping a number is cheap; a tag that means two different things is exp
 `.snt_release` marker, every manifest comparison and every deployed pipeline version named after
 that tag becomes ambiguous at once.
 
-GitHub enforces this rather than leaving it to discipline. **Done on
-`BLSQ/snt_development_sandbox` (2026-09-18, and recreated after the 2026-09-21 reset)**; repeat it
-on `BLSQ/snt_development` before the first real release.
+GitHub enforces this rather than leaving it to discipline. **Active on
+`BLSQ/snt_development_sandbox`**; repeat it on `BLSQ/snt_development` before the first real release.
 
-A ruleset is a property of the repository, so deleting the repository deletes it. It is also the
-reason a sandbox cannot be cleaned up in place: *Restrict deletions* with an empty bypass list
-stops an admin deleting the very tags they want gone.
+A ruleset is a property of the repository, so deleting the repository deletes it — and it is also
+why a sandbox cannot be cleaned up in place: *Restrict deletions* with an empty bypass list stops an
+admin deleting the very tags they want gone.
 
 Settings → Rules → Rulesets → New ruleset → New **tag** ruleset:
 
@@ -91,7 +94,7 @@ Explicitly out of scope:
   and Python via the API. The user then configures the workspace to unblock everything else.
 * **Diff / check** — hash what is actually in the workspace and compare against the release
   manifest, flagging edited files. Country-specific notebook variants (`<generic>_<CC>.ipynb`) are
-  flagged as deliberate overrides, not as drift.
+  flagged as deliberate overrides, not as drift — deferred past v1, see `PRODUCT_SPEC.md` §1.2.
 * **Update / downgrade** — back up modified files into `archive/<release_tag>/`, then overwrite
   with the target release.
 
@@ -107,147 +110,72 @@ root, so anything downstream can tell which manifest to compare against.
 All of this was built against a disposable sandbox rather than the real repo or its CI. Two
 distinct things with confusingly similar names:
 
-* `BLSQ/snt_development_sandbox` — the **GitHub repo**. An independent repo, not a fork. Local
-  remote is named `sandbox`. **Reset 2026-09-21** (see below): it now holds one branch, `main`, one
-  commit, and no tags. Cut every fixture release from `main`.
-* `snt-development-sandbox` — the **OpenHEXA workspace** the Workspace Manager pipeline runs in.
-  It was **not** reset, so it still holds pipelines and a `.snt_release` marker naming a tag that no
-  longer exists — harmless, and itself a usable test of how the checker handles an unresolvable
-  declared release.
+* `BLSQ/snt_development_sandbox` — the **GitHub repo**. An independent repo, not a fork; local
+  remote is named `sandbox`. It holds one branch, `main`, seeded from `snt_development` @ `551ddd8`
+  minus the 20 `push_snt_*.yaml` deployment workflows (those target the real `snt-development`
+  workspace and must never fire from a sandbox). Cut every fixture release from `main`.
+* `snt-development-sandbox` — the **OpenHEXA workspace** the Workspace Manager pipeline runs in. Its
+  `.snt_release` marker names a tag that no longer exists — harmless, and itself a usable test of how
+  the checker handles an unresolvable declared release.
 
-#### Sandbox reset — 2026-09-21
-
-The sandbox had accumulated two branches, two manifest generations and a fixture set built in
-stages; disentangling it was worth less than restarting. The repo was deleted and recreated under
-the same name, then seeded with a single parentless commit carrying the tree of `snt_development`
-@ `551ddd8` — minus the 20 `push_snt_*.yaml` deployment workflows, which target the **real**
-`snt-development` workspace via `secrets.OH_TOKEN` and must never fire from a sandbox.
-
-What this changes for anyone reading the rest of this document:
-
-* **`v0.0.1-test` and `v0.0.2-test` no longer exist.** Every verification below that names them
-  happened and still stands as a record; it just cannot be re-run against those tags.
-* **The new fixture tag series starts at `v0.1.0-test`.** The old numbers are deliberately not
-  reused — they are attached in writing to a 106-file legacy manifest, and reusing them would make
-  a tag mean two things, which is the exact failure the tag-protection convention above exists to
-  prevent.
-* **Only one manifest generation is live.** Every release in the reset sandbox carries a phase-0
-  manifest with a `pipelines` block, so `split_manifest()`'s back-compat path (below) has no live
-  release left to exercise. Either keep a legacy manifest as a local test fixture or delete the
-  fallback deliberately; do not leave it half-trusted.
-
-Procedure and fixture plan: `ignore/SNT25-670/sandbox_reset_runbook.md` and
-`ignore/SNT25-670/sandbox_fixture_plan.md`.
+Fixture releases are listed in `PRODUCT_SPEC.md` §6.1; the tag series starts at `v0.1.0-test`.
+Earlier tag names are retired and must not be reused ([`HISTORY.md`](HISTORY.md) §4).
 
 ### Manifest generation — done
 
-`.github/workflows/generate_manifest.yaml` runs on `release: published` (and
-`workflow_dispatch` for manual testing). It hashes every tracked file and attaches
-`release_manifest.json` to the release.
+[`.github/workflows/generate_manifest.yaml`](../../.github/workflows/generate_manifest.yaml) runs on
+`release: published` (and `workflow_dispatch` for manual testing). It hashes every file a release
+ships and attaches `release_manifest.json` to the release. The workflow is committed in *this* repo;
+the sandbox copy is applied by hand.
 
-```yaml
-name: Generate Release Manifest
+The generator has two halves, because a release reaches a workspace by two routes:
 
-on:
-  release:
-    types: [published]
-  workflow_dispatch: # Allows manual triggering from the UI without creating a release
+1. **Filesystem half** — four glob patterns: `pipelines/**/code/*.ipynb`,
+   `pipelines/**/reporting/*.ipynb`, `pipelines/**/utils/*.r`, `code/**/*.r`.
+2. **Deployment half** — for each top-level directory holding a `pipeline.py`, walk it recursively
+   and keep every file whose suffix is in `{.py, .ipynb, .txt, .md, .r, .sql}`, minus the
+   `workspace/` subtree. That is a line-for-line mirror of `generate_zip_file()` in
+   `openhexa/cli/api.py`; the constants are commented with that provenance, and the suffix test is
+   case-insensitive there and here.
 
-jobs:
-  generate-manifest:
-    runs-on: ubuntu-latest
+**Why it mirrors the SDK rather than listing globs.** A glob list restates the SDK's rule in a
+second, drifting dialect — one pattern per suffix *per depth* — and needs a new line for every
+future nesting or suffix. Anchoring on `*/pipeline.py` also excludes `dev/` and `deprecated/`
+without naming them: `deprecated/` nests its eight pipelines one level deeper, so `*/pipeline.py`
+never matches inside it. Nothing is excluded by a denylist that a new top-level directory could slip
+past. (The rejected alternative is recorded in [`HISTORY.md`](HISTORY.md) §2.1.)
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
+The manifest also carries a `pipelines` block alongside `files` — per pipeline directory, its
+OpenHEXA `code` slug and the list of paths inside its zip. Shape and rationale:
+[`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §2.1. `files` is byte-compatible with the pre-phase-0 shape, so
+the block is purely additive.
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+**Verified 2026-09-21** against `snt_development` @ `SNT25-670`, by building all 21 deployment zips
+with the SDK's *real* `generate_zip_file()` and asserting every zip member resolves to a manifest
+entry:
 
-      - name: Generate Manifest Script
-        run: |
-          cat << 'EOF' > generate_manifest.py
-          import os
-          import json
-          import hashlib
-          import glob
-
-          def hash_file(filepath):
-              hasher = hashlib.sha256()
-              with open(filepath, 'rb') as f:
-                  while chunk := f.read(8192):
-                      hasher.update(chunk)
-              return hasher.hexdigest()
-
-          def main():
-              version = os.environ.get('GITHUB_REF_NAME', 'unknown')
-              manifest = {
-                  "version": version,
-                  "files": {}
-              }
-
-              # Directories to track based on our strategy
-              patterns = [
-                  'pipelines/**/code/*.ipynb',
-                  'pipelines/**/reporting/*.ipynb',
-                  'pipelines/**/utils/*.r',
-                  'code/**/*.r',
-                  '*/pipeline.py',
-              ]
-
-              tracked_files = []
-              for pattern in patterns:
-                  tracked_files.extend(glob.glob(pattern, recursive=True))
-
-              tracked_files = list(set(tracked_files)) # Deduplicate
-
-              for fpath in tracked_files:
-                  standard_path = fpath.replace('\\', '/')
-                  manifest["files"][standard_path] = hash_file(fpath)
-
-              with open('release_manifest.json', 'w') as f:
-                  json.dump(manifest, f, indent=2)
-
-              print(f"Generated manifest with {len(manifest['files'])} files.")
-
-          if __name__ == '__main__':
-              main()
-          EOF
-
-      - name: Run Script
-        run: python generate_manifest.py
-
-      - name: Upload Manifest to Release (If published release)
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release_manifest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Artifact (If triggered manually)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-manifest
-          path: release_manifest.json
+```
+manifest files: 156 | zip members: 70 | zip members NOT in manifest: 0
 ```
 
-**Verified 2026-09-16** against release `v0.0.1-test`: `"version"` read the tag correctly (not
-`"unknown"`), 106 files tracked, every hash a valid 64-char sha256, and all 20 `pipeline.py` files
-matched a local `find . -name pipeline.py` excluding `deprecated/`.
+The embedded script passes `ruff check` and `ruff format --check` under the repo's `pyproject.toml`.
+
+Two consequences worth knowing:
+
+* `snt_workspace_manager` is itself a pipeline directory, so the manifest now describes the deployer
+  as well. That is wanted — a workspace can be told its manager is out of date — but it does mean
+  the manager can deploy a new version of itself.
+* If the SDK ever changes its suffix list, this generator goes stale silently. The checker's
+  `not_covered` status (`PRODUCT_SPEC.md` §5.1) is the tripwire for exactly that, which is why the
+  spec keeps it after phase 0 rather than deleting it.
 
 Country-specific notebook variants appear in the manifest undistinguished from generic files. That
 is intended — telling them apart is the verification pipeline's job, not the generator's.
 
-### Workspace Manager — done
+### Workspace Manager — done (prototype)
 
-`snt_workspace_manager`, an OpenHEXA pipeline in `snt-development-sandbox`. Parameters:
-`github_repo`, `release_tag`, `backup_existing`. It:
+[`snt_workspace_manager/`](../../snt_workspace_manager/), an OpenHEXA pipeline running in
+`snt-development-sandbox`. Parameters: `github_repo`, `release_tag`, `backup_existing`. It:
 
 1. resolves the release via the GitHub API and downloads `release_manifest.json` from its assets;
 2. downloads the release **source tarball** and extracts it;
@@ -256,10 +184,14 @@ is intended — telling them apart is the verification pipeline's job, not the g
 4. deploys each pipeline through the OpenHEXA API (see below);
 5. writes `.snt_release`.
 
-**Verified 2026-09-16.** A run against `BLSQ/snt_development_sandbox` @ `v0.0.1-test` completed in
-60s; `.snt_release`, the three shared `code/*.r` files and the pipeline code were all confirmed in
-the workspace. **`backup_existing` is still untested** — the verified run was against an empty
-workspace, so there was nothing to archive.
+`split_manifest()` decides which manifest entries are filesystem analytics and which are deployed
+inside a zip. It splits by *directory*, reading the manifest's `pipelines` block where present and
+falling back to a `<name>/pipeline.py` derivation for pre-phase-0 manifests. **No live release
+exercises that fallback any more** — whether to keep it against a legacy fixture or drop it is open
+(`PRODUCT_SPEC.md` §2.1).
+
+Still unverified: **`backup_existing`** — every verified run so far was against an empty workspace,
+so there was nothing to archive. Past verification runs: [`HISTORY.md`](HISTORY.md) §4.2.
 
 ### Python deployment — done
 
@@ -268,8 +200,7 @@ the filesystem: each pipeline is a registered object and each of its versions st
 copy of the code, which is what the runner downloads.
 
 The full mechanism — the three-step API sequence, exact GraphQL payloads, token handling and
-gotchas — is written up in **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md)**.
-In short:
+gotchas — is in **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md)**. In short:
 
 * No CLI and no Docker needed. `openhexa.sdk.pipelines.runtime.get_pipeline()` parses a pipeline's
   parameters by **AST**, not by importing it, so the manager handles all 20 pipelines without their
@@ -278,168 +209,20 @@ In short:
   own `HEXA_TOKEN` is refused.
 * `createPipeline` accepts the nested form that creates a pipeline and its first version atomically,
   so **bootstrapping an empty workspace needs no manual UI step.**
-* `snt_workspace_manager` v3 was proven end to end: two real SNT pipelines bootstrapped from
-  `v0.0.1-test`, correct codes, parameters round-tripped, deployed `pipeline.py` byte-identical to
-  the manifest sha256.
+
+Proven for **2 of 20** pipelines, byte-identical to the manifest hash. The other 18 have never been
+through the deployer.
 
 ### Verification pipeline — not started
 
 An OpenHEXA pipeline that hashes what is actually in a workspace, compares it against the release
-manifest, and reports per file: which release it matches, or "modified" / "unknown".
+manifests, and reports per file which release it matches, or that it matches none.
 
-Design inputs already settled:
+Its requirements, statuses, report contract and build phases live in
+[`PRODUCT_SPEC.md`](PRODUCT_SPEC.md). Design inputs settled here:
 
 * **Two sources to hash** — the filesystem for R analytics, and each pipeline version's stored zip
   for the Python half (readable via `get_pipeline`, which returns full file contents).
 * `.snt_release` tells the verifier which manifest to fetch, without being told.
-* Country-specific variants must be recognised as deliberate overrides rather than drift.
-
-~~Blocked on the open issue below.~~ **Unblocked 2026-09-21** — see the closed issue below. The
-checker's requirements now live in [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md).
-
----
-
-## Closed issue: the manifest under-described what is deployed
-
-> **Resolved 2026-09-21** (PRODUCT_SPEC phase 0). The widened generator is committed at
-> [`.github/workflows/generate_manifest.yaml`](../../.github/workflows/generate_manifest.yaml) in
-> *this* repo; the sandbox copy is applied by hand — see
-> `ignore/SNT25-670/sandbox_fixture_plan.md`. The problem statement below is kept for the record,
-> with the actual fix after it.
-
-The manifest's `*/pipeline.py` pattern tracks one file per pipeline, but deployment zips the
-**whole pipeline directory**. `snt_map_extracts` was deployed with `utils.py`, `worldpopclient.py`,
-the `malariaAtlasProject/` package, `readme.md` and `requirements.txt` — none of them in the
-manifest, none verifiable, and a change to any of them alters no manifest hash.
-
-`requirements.txt` is the sharpest case: it carries the two unpinned Git dependencies the repo
-already worries about, ships in the zip, and is invisible to the manifest.
-
-Fix before building verification — widen `patterns` in `generate_manifest.yaml` to the same suffix
-set the SDK zips (`.py`, `.ipynb`, `.txt`, `.md`, `.r`, `.sql`) under each pipeline directory:
-
-```python
-patterns = [
-    'pipelines/**/code/*.ipynb',
-    'pipelines/**/reporting/*.ipynb',
-    'pipelines/**/utils/*.r',
-    'code/**/*.r',
-    '*/pipeline.py',
-    '*/requirements.txt',     # <- ships in the zip, currently untracked
-    '*/readme.md',            # <- ships in the zip, currently untracked
-    '*/**/*.py',              # <- helper modules, currently untracked
-]
-```
-
-Careful: `*/**/*.py` also sweeps up unrelated top-level directories (`dev/`, `deprecated/`), so
-anchor it to the directories that actually contain a `pipeline.py`.
-
-Verifying against a manifest that describes a third of what is deployed would give false assurance,
-which is worse than no verification.
-
-### How it was actually fixed
-
-Not with a wider glob list. A glob list restates the SDK's rule in a second, drifting dialect —
-one pattern per suffix *per depth* — and the list proposed above is already incomplete: it has no
-`.sql` pattern at all, and its `*/requirements.txt` and `*/readme.md` only reach the pipeline root,
-so an equivalent file one directory down (inside `malariaAtlasProject/`, say) would still ship
-unverified. Every future nesting or suffix needs another line nobody will remember to add.
-
-Instead the generator now **reimplements the SDK's own selection rule** and is anchored on
-`*/pipeline.py`:
-
-1. **Filesystem half** — the four original R/notebook patterns, unchanged.
-2. **Deployment half** — for each top-level directory holding a `pipeline.py`, walk it recursively
-   and keep every file whose suffix is in `{.py, .ipynb, .txt, .md, .r, .sql}`, minus the
-   `workspace/` subtree. That is a line-for-line mirror of `generate_zip_file()` in
-   `openhexa/cli/api.py`, the constants are commented with that provenance, and the suffix test is
-   case-insensitive there and here.
-
-Anchoring on `*/pipeline.py` is what excludes `dev/` and `deprecated/` without naming them:
-`deprecated/` nests its eight pipelines one level deeper, so `*/pipeline.py` never matches inside
-it. Nothing is excluded by a denylist that a new top-level directory could slip past.
-
-**Verified 2026-09-21** against `snt_development` @ `SNT25-670`. Coverage was checked by building
-all 21 deployment zips with the SDK's *real* `generate_zip_file()` and asserting every zip member
-resolves to a manifest entry:
-
-```
-manifest files: 156 | zip members: 70 | zip members NOT in manifest: 0
-```
-
-Delta against the old patterns: **107 → 156 files, 49 added, none dropped** — 21 `readme.md`,
-21 `requirements.txt` and 7 helper `.py` modules (`snt_map_extracts/utils.py`, the three-file
-`snt_map_extracts/malariaAtlasProject/` package, and the three copies of `worldpopclient.py` in
-`snt_map_extracts`, `snt_worldpop_extract` and `snt_healthcare_access`).
-The embedded script passes `ruff check` and `ruff format --check` under the repo's `pyproject.toml`.
-
-### The `pipelines` block, and the consumer it broke
-
-The manifest also gained a sibling key to `files`, described in
-[`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §2.1: per pipeline directory, its OpenHEXA `code` slug and the
-list of paths inside its zip. `files` is byte-compatible with before, so this is purely additive.
-
-It is not decoration. Widening the manifest silently changed what an existing consumer does:
-`split_manifest()` in `snt_workspace_manager` classified every entry that was not
-`<name>/pipeline.py` as an analytics file and **copied it into the workspace bucket**. Under the
-widened manifest that meant 49 `readme.md` / `requirements.txt` / helper-module files strewn across
-the workspace filesystem, where OpenHEXA never reads them — the precise "inert and misleading copy"
-failure this whole effort exists to detect. Fixed in the same change: the split is now by
-*directory*, taking the directory list from the `pipelines` block when the release has one and
-falling back to the old `<name>/pipeline.py` derivation for `v0.0.1-test` and `v0.0.2-test`.
-Checked against both of those real manifests and the new one: **86 analytics files in all three**,
-so old releases deploy exactly as they did.
-
-> Since the 2026-09-21 reset, those two releases no longer exist and **no live release exercises
-> that fallback**. The check above stands as a record, but it cannot be repeated end to end. Decide
-> deliberately: keep a copy of a legacy manifest as a local test fixture, or remove the fallback in
-> a PR of its own. Untested back-compat code for a case that can no longer occur is worse than
-> either.
-
-That is the general shape of the risk here — the manifest is an interface, and widening it changes
-the behaviour of everything that reads it. `snt_workspace_manager` was the only consumer today.
-
-Two further consequences worth knowing:
-
-* `snt_workspace_manager` is itself a pipeline directory, so the release manifest now describes the
-  deployer as well. That is wanted — it means a workspace can be told its manager is out of date —
-  but it does mean the manager can deploy a new version of itself.
-* If the SDK ever changes its suffix list, this generator goes stale silently. The checker's
-  `not_covered` status (§5.1 of the spec) is the tripwire for exactly that, which is why the spec
-  keeps it after phase 0 rather than deleting it.
-
----
-
-## Log: what did not work, and why
-
-Kept so nobody repeats the troubleshooting.
-
-**`.gitignore` silently swallows new workflow files.** The repo has blanket `*.yml` *and* `*.yaml`
-ignore rules, grouped with the data-export rules. A new workflow file does not even show as
-untracked — `git add` just does nothing. The existing `push_snt_*.yaml` files are tracked only
-because they predate the rule. `git add -f` is forbidden by this repo's rules. Fixed with a
-negation mirroring the existing `!configuration/SNT_config_*.json` pattern:
-
-```
-# GitHub Actions workflows ------------------------
-!.github/workflows/*.yaml
-```
-
-Two consequences worth remembering: use `.yaml`, never `.yml` (no negation exists for `.yml`), and
-this fix is repo-wide — it also unblocks any future `push_<name>.yaml`, so call it out in the PR
-description as an unrelated bonus.
-
-**Per-file GitHub API fetches hit the rate limit.** Unauthenticated GitHub API calls are capped at
-60/hour, and pulling a release file-by-file via the Contents API needs ~106 for a single release.
-Fix: download the release **source tarball** — one request — and extract.
-
-**Copying `pipeline.py` into the workspace filesystem does nothing.** This looked like a completed
-deployment and was not. OpenHEXA runs each pipeline from its registered version's stored zip, never
-from `workspace/files/`. A `pipeline.py` sitting there is inert while looking authoritative — the
-most misleading failure mode encountered in this work. Fix: deploy through the API, and deliberately
-do *not* leave a filesystem copy.
-
-**A pipeline run's own `HEXA_TOKEN` cannot deploy pipelines.** The API answers `PERMISSION_DENIED`.
-Same payload, same code, a workspace API token read from the `oh` CUSTOM connection → accepted.
-Only the header differs. If a deployment call 403s, check which token is in the header before
-anything else.
+* Country-specific variants should eventually be recognised as deliberate overrides rather than
+  drift — deferred past v1 (decision D5).

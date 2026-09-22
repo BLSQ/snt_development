@@ -3,8 +3,11 @@
 Companion to [`release_strategy.md`](release_strategy.md), which explains *why* the Workspace
 Manager deploys `pipeline.py` instead of copying it. This document is the *how*.
 
-> Verified end to end 2026-09-16, implemented in `snt_workspace_manager` v3 in the
-> `snt-development-sandbox` workspace.
+> Implemented in [`snt_workspace_manager/`](../../snt_workspace_manager/), running in the
+> `snt-development-sandbox` workspace. Verified end to end for 2 of 20 pipelines.
+>
+> This document describes the **current** mechanism. Past verifications against deleted fixtures,
+> dead ends and closed problems are in [`HISTORY.md`](HISTORY.md).
 
 ## Why a file copy is not a deployment
 
@@ -55,8 +58,8 @@ The zip is base64-encoded into the `zipfile` input field.
 
 Note the zip carries the **whole directory**, not just `pipeline.py` — `snt_map_extracts` deploys
 with `utils.py`, `worldpopclient.py`, the `malariaAtlasProject/` package, `readme.md` and
-`requirements.txt`. This is the origin of the manifest gap described in
-[`release_strategy.md`](release_strategy.md).
+`requirements.txt`. The release manifest mirrors this rule so that everything deployed is also
+verifiable — see [`release_strategy.md`](release_strategy.md) § "Manifest generation".
 
 ### Step 3 — call the GraphQL mutation
 
@@ -154,17 +157,13 @@ undecided.
 
 ## What has been proven, and what has not
 
-Verified: `snt_workspace_manager` v3 bootstrapped `snt_dhis2_extract` and `snt_map_extracts` into
-`snt-development-sandbox` from release `v0.0.1-test`. Correct codes; parameters round-tripped
-through `Parameter.to_dict()` including the `dhis2_connection` connection-typed parameter; the
-deployed `snt_dhis2_extract/pipeline.py` read back at sha256 `44290bd9…d77755cd`, **byte-identical
-to the release manifest's hash.**
+**Proven:** the three-step sequence above bootstrapped `snt_dhis2_extract` and `snt_map_extracts`
+into `snt-development-sandbox`, with correct pipeline codes, parameters round-tripped through
+`Parameter.to_dict()` (including the `dhis2_connection` connection-typed parameter), and the deployed
+`pipeline.py` byte-identical to the release manifest's sha256. Run details and the fixture it used:
+[`HISTORY.md`](HISTORY.md) §4.2.
 
-> `v0.0.1-test` was deleted in the 2026-09-21 sandbox reset (`release_strategy.md` §"Sandbox
-> reset"). The result above stands as a record; re-running it means re-running against the new
-> fixture series, which starts at `v0.1.0-test`.
-
-Not verified:
+**Not verified:**
 
 * **The remaining 18 pipelines.** Only 2 of 20 have been through the deployer.
 * **Whether `externalLink` is stored.** It is sent in the payload, but the MCP `get_pipeline` query
@@ -175,17 +174,15 @@ Not verified:
 
 ## Open items
 
-1. **Commit `snt_workspace_manager` to this repo.** It currently exists *only* as a version in the
-   sandbox workspace — exactly the "no version-propagation story" problem this project is meant to
-   fix. It needs `snt_workspace_manager/pipeline.py` + `requirements.txt` + `readme.md` per the
-   "Adding or changing a pipeline" checklist, minus a `push_*.yaml` workflow until item 4 is
-   settled. **This is the main outstanding gap.**
-2. **Run the full 20-pipeline bootstrap** once, to confirm nothing in the other 18 trips the
+1. **Run the full 20-pipeline bootstrap** once, to confirm nothing in the other 18 trips the
    deployer.
-3. **Close the manifest gap** — see [`release_strategy.md`](release_strategy.md). Until the manifest
-   covers `requirements.txt`, `readme.md` and helper modules, verification cannot check most of
-   what is actually deployed.
-4. **Decide where the `oh` token comes from in a country workspace** (minting, storage, rotation).
+2. **Decide where the `oh` token comes from in a country workspace** (minting, storage, rotation).
+   This is the one genuinely new operational requirement the design adds, and it blocks production
+   use — `PRODUCT_SPEC.md` §7.3.
+3. **Establish whether *reading* a pipeline version needs the `oh` token too**, or whether a run's
+   own `HEXA_TOKEN` suffices. If it does, the checker can run unattended in a workspace that holds
+   no token at all.
+4. **Add a `push_snt_workspace_manager.yaml` workflow**, once the R5 question below is settled.
 
 ### R5 needs rewording, not violating
 

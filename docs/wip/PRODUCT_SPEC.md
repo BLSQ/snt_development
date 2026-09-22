@@ -1,10 +1,10 @@
 # SNT Release Management — Product Spec
 
-> Status: specification, work in progress. Written 2026-09-18 from
-> [`product_spec_draft.md`](product_spec_draft.md) plus decisions taken in review (§8). It
-> supersedes the draft as the place where requirements live; [`release_strategy.md`](release_strategy.md)
-> keeps the *why* and the history, and [`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md)
-> the deployment *how*.
+> Status: specification, work in progress. This is where the checker's **requirements** live;
+> [`release_strategy.md`](release_strategy.md) keeps the *why* and the state of what is built,
+> [`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md) the deployment *how*, and
+> [`HISTORY.md`](HISTORY.md) everything that is no longer true — superseded designs, closed issues,
+> dead ends and deleted fixtures. Check `HISTORY.md` before reopening any question here.
 >
 > Nothing specified here is live in a country workspace. Sections marked **BUILT** describe code
 > that exists and has been verified in a sandbox; everything else is a requirement, not a report.
@@ -29,7 +29,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 |---|---|---|
 | `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
 | `snt_workspace_check` *(proposed name)* | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | Not started — the subject of this spec |
-| Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — widened in phase 0 to cover everything the deploy zip ships (§7.1) |
+| Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
 
 The checker and `snt_workspace_manager` are **separate pipelines** (decision D2). The checker
@@ -66,7 +66,7 @@ Out of scope, and to be stated as blind spots in the report:
 
 ### 2.1 The manifest's `pipelines` block
 
-Added in phase 0, 2026-09-21. `files` alone does not say *where* an entry lives in a workspace, and
+`files` alone does not say *where* an entry lives in a workspace, and
 the two answers are not interchangeable: `code/snt_utils.r` is a file on the filesystem, while
 `snt_map_extracts/utils.py` exists **only** inside a pipeline's registered version zip and is at no
 path on the filesystem at all. Without the block, every consumer has to re-derive that split by
@@ -91,15 +91,14 @@ are deployed and correct — a false alarm in the one component whose job is to 
   manifest. Verified against all 20 `push_snt_*.yaml` `--code` values and against
   `snt_workspace_manager`'s own derivation.
 
-`files` keeps its exact previous shape, so this is additive: a reader that ignores `pipelines`
-behaves as before. Pre-phase-0 manifests have no such block, and a consumer meeting one must fall
-back to deriving pipeline directories from `<name>/pipeline.py` entries — `split_manifest()` in
+`files` keeps its exact previous shape, so the block is additive: a reader that ignores `pipelines`
+behaves as before. Legacy manifests have no such block, and a consumer meeting one must fall back to
+deriving pipeline directories from `<name>/pipeline.py` entries — `split_manifest()` in
 `snt_workspace_manager` is the reference for that fallback.
 
-Since the sandbox reset of 2026-09-21 **no live release lacks the block** (the two that did,
-`v0.0.1-test` and `v0.0.2-test`, were deleted with the repo). So the fallback is currently
-unreachable in testing. Whether to keep it against a legacy manifest fixture or drop it is an open
-question — see [`release_strategy.md`](release_strategy.md) §"Closed issue".
+**Open:** no live release lacks the block, so the fallback is unreachable in testing. Either keep a
+legacy manifest as a local test fixture or delete the fallback in a PR of its own — untested
+back-compat code for a case that can no longer occur is worse than either.
 
 ## 3. What the checker observes
 
@@ -165,7 +164,7 @@ The checker has one parameter that decides its mode: an optional target release.
 
 Assess every file and report which release it belongs to, or that it belongs to none. No verdicts,
 no green or red: a factual inventory plus a distribution, so the web app can show e.g. *"97% of
-files are v0.0.1, 2.7% are v0.0.2, 0.3% are of unknown origin."*
+files are v0.1.0-test, 2.7% are v0.2.1-test, 0.3% are of unknown origin."*
 
 This mode needs the manifest of **every** release, which is the open decision in §7.2 — it is on
 this mode's critical path.
@@ -194,7 +193,7 @@ Per entry, exactly one status:
 | `missing` | In the target manifest; absent from both filesystem and pipeline versions | 4.2 |
 | `removed_in_target` | Present, and in an older manifest, but not in the target's | 4.2 |
 | `untracked` | **Unknown path.** This path appears in no manifest of any release — the repo has never shipped a file here | both |
-| `not_covered` | Deployed inside a pipeline zip, but no manifest describes it — the §7.1 gap. Should disappear once the manifest is widened; retained as a safety net | both |
+| `not_covered` | Deployed inside a pipeline zip, but no manifest describes it. Should not occur now the manifest mirrors the SDK's zip rule; retained as the tripwire for that rule drifting | both |
 | `unreadable` | Present but could not be hashed (permissions, I/O, API error) | both |
 
 In attribution mode, files resolve to `matching_releases` (see §5.1.2), `unknown_content`, or
@@ -332,10 +331,7 @@ still open.
 
 | # | Deliverable | Exit criterion | Blocked by |
 |---|---|---|---|
-| **0** | **Close the manifest gap** (§7.1): widen `patterns` in `generate_manifest.yaml`, anchored to directories that actually contain a `pipeline.py`. Cut fresh sandbox fixture releases (§6.1). | A new sandbox release whose manifest covers every file the deploy zip ships, verified against one real zip. | — |
-| | ↳ **generator: DONE** 2026-09-21. Verified against all 21 real SDK zips locally (0 uncovered members), not just one. | | |
-| | ↳ **fixtures: DONE** 2026-09-21. Five releases cut by hand against the reset sandbox (§6.1); every manifest verified against a local run of the same generator. Recipe and as-built record: `ignore/SNT25-670/sandbox_fixture_plan.md`. | | |
-| | ↳ **sandbox reset: DONE** 2026-09-21. Repo deleted and recreated, seeded from `snt_development` @ `551ddd8`; one branch, no tags. Fixture tags restart at `v0.1.0-test` (§6.1). | | |
+| **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
 | **1** | Checker skeleton: verification mode against a single target release, both sources hashed, statuses `match` / `unknown_content` / `missing` / `unreadable`, report written. | A workspace freshly deployed by `snt_workspace_manager` at tag T reports all-`match`. | 0, and the token question in §7.3 |
 | **2** | Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
@@ -343,14 +339,12 @@ still open.
 | **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
 | **6** | Web app. | Out of scope for this spec. | 5 |
 
-### 6.1 Test fixtures needed in the sandbox
+### 6.1 Test fixtures in the sandbox
 
-`BLSQ/snt_development_sandbox` was **reset on 2026-09-21** (`release_strategy.md` §"Sandbox reset")
-and the fixture set was then cut on top of it. `v0.0.1-test` / `v0.0.2-test` are retired names and
-are not reused. Do **not** create a release named `latest` either: GitHub's `/releases/latest`
-endpoint already resolves to the newest non-prerelease release automatically.
-
-**Built 2026-09-21** — the fixture releases now exist and are verified:
+The fixture releases exist in `BLSQ/snt_development_sandbox` and are verified. Two naming rules:
+earlier `-test` tags are retired and must not be reused ([`HISTORY.md`](HISTORY.md) §4.2), and do
+**not** create a release named `latest` — GitHub's `/releases/latest` endpoint already resolves to
+the newest non-prerelease release automatically.
 
 | Tag | Asset | Role |
 |---|---|---|
@@ -390,35 +384,19 @@ commands for a human to run).
 
 Blocking ones name the phase they block. None may be resolved by guessing.
 
-### 7.1 The manifest under-described what is deployed — ~~blocks phase 1~~ **RESOLVED 2026-09-21**
+### 7.1 ~~The manifest under-described what is deployed~~ — **closed**
 
-The manifest tracked `*/pipeline.py`, but deployment zips the whole pipeline directory
-(`requirements.txt`, `readme.md`, helper modules, `malariaAtlasProject/`). Verifying against a
-manifest that describes a third of what is deployed gives false assurance, which is worse than no
-verification. **Decision taken (D10): close it first, as phase 0.**
+Closed as phase 0. Kept as a numbered heading only so the §7.x references elsewhere still line up.
+What the problem was, why a wider glob list was rejected, and the consumer it broke:
+[`HISTORY.md`](HISTORY.md) §2.1–2.2. What the generator does now:
+[`release_strategy.md`](release_strategy.md) § "Manifest generation".
 
-**Done.** `.github/workflows/generate_manifest.yaml` (now committed in `snt_development`, not only
-in the sandbox) reimplements the SDK's own zip-selection rule rather than widening the glob list,
-anchored on the directories that hold a `pipeline.py`. Coverage 107 → 156 files, verified against
-all 21 real SDK-built zips with zero uncovered members. The manifest also gained the `pipelines`
-block (§2.1). Full write-up: [`release_strategy.md`](release_strategy.md) §"Closed issue".
-
-Widening the manifest **changed the meaning of an existing consumer** and required fixing it in the
-same change: `snt_workspace_manager.split_manifest()` treated every entry that was not
-`<name>/pipeline.py` as an analytics file to copy onto the filesystem, so the 49 newly-tracked
-deployment files would have been littered across the workspace bucket, inert, in exactly the way
-§3.1 warns about. It now excludes by *directory*, reading the `pipelines` block where present and
-falling back to the old derivation for pre-phase-0 manifests. Both paths verified against the real
-`v0.0.1-test` and `v0.0.2-test` manifests: 86 analytics files before and after, unchanged. Those
-two releases were deleted in the 2026-09-21 sandbox reset, so that verification stands as a record
-but is no longer repeatable (§2.1).
-
-Phase 1 remains blocked only by the token question in §7.3.
+Phase 1 is therefore blocked only by the token question in §7.3.
 
 ### 7.2 How to obtain every release's manifest — **blocks phase 3**
 
 Attribution mode needs the manifest of every release. Unauthenticated GitHub API is 60 requests
-per hour and this project has already hit that wall once (`release_strategy.md`, "Log"). With ~20
+per hour and this project has already hit that wall once ([`HISTORY.md`](HISTORY.md) §1). With ~20
 releases and a per-workspace daily check, a naive implementation breaks. Candidate answers —
 workspace-side manifest cache keyed by tag (safe, because tags never move), a cumulative index
 asset published by the Action, or an authenticated token (which re-opens §7.3). **Deferred by the
@@ -486,7 +464,8 @@ retention/pruning.
 
 ## 8. Decisions taken
 
-Recorded so they are not re-litigated. All 2026-09-18, by Giulia, in review of the draft.
+Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1–D9, D11, D12) and
+2026-09-21 (D10).
 
 | # | Decision |
 |---|---|

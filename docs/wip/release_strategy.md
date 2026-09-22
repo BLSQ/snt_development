@@ -193,6 +193,21 @@ exercises that fallback any more** — whether to keep it against a legacy fixtu
 Still unverified: **`backup_existing`** — every verified run so far was against an empty workspace,
 so there was nothing to archive. Past verification runs: [`HISTORY.md`](HISTORY.md) §4.2.
 
+**Known defect — re-deploying a tag always fails: `DUPLICATE_PIPELINE_VERSION_NAME`.** The manager
+names each new pipeline version after the release tag (`build_version_input`), and OpenHEXA requires
+version names to be unique *within* a pipeline. So deploying a tag a pipeline has already been
+deployed at is refused by the API — which is exactly what re-running to converge after a partial run
+does. Observed 2026-09-22 on `snt-dhis2-population-transformation` during the phase-1 setup run: the
+other 21 pipelines deployed, that one stayed at the version it already had, and the run ended in the
+`RuntimeError` the manager raises for partial deployments.
+
+The behaviour wanted is **idempotence**: if the pipeline's current version already carries that tag
+*and* its contents hash to the release manifest, the deploy is a no-op and should be logged as one;
+if the name is taken but the contents differ, that is the misleading-label case
+([`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §3.1) and needs a disambiguated name plus a loud warning. Not
+fixed yet — it belongs to the manager, not to the checker. The non-destructive workaround meanwhile
+is to **rename** the colliding version in the OpenHEXA UI and re-run with `only_pipelines`.
+
 ### Python deployment — done
 
 `pipeline.py` is **not** copied into the workspace filesystem. OpenHEXA does not run pipelines from
@@ -213,10 +228,22 @@ gotchas — is in **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mec
 Proven for **2 of 20** pipelines, byte-identical to the manifest hash. The other 18 have never been
 through the deployer.
 
-### Verification pipeline — not started
+### Verification pipeline — phase 1 done
 
 An OpenHEXA pipeline that hashes what is actually in a workspace, compares it against the release
 manifests, and reports per file which release it matches, or that it matches none.
+
+[`snt_workspace_check/`](../../snt_workspace_check/) holds the phase-1 build: verification against a
+single target release, both sources hashed, the four statuses `match` / `unknown_content` /
+`missing` / `unreadable`, and the report written to `snt_status/`. It is credential-free, and it
+iterates over the **target manifest** rather than walking the filesystem — which is what keeps it to
+one manifest fetch and therefore clear of the open §7.2 question.
+
+**Verified 2026-09-22** in `snt-development-sandbox`, deployed at `v0.1.0-test` and checked against
+it: **163/163 `match`**, 89 filesystem + 74 pipeline-version entries, `incomplete: false`, no errors.
+The run also caught a real defect in the checker itself — see
+[`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §6.2 for what it established and
+[`HISTORY.md`](HISTORY.md) §1 for the version-name gotcha behind it.
 
 Its requirements, statuses, report contract and build phases live in
 [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md). Design inputs settled here:

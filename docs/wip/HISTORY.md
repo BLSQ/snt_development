@@ -57,6 +57,22 @@ tarball** — one request — and extract.
 This limit is not only a historical annoyance: it is the live constraint behind the open decision
 on how attribution mode obtains every release's manifest (`PRODUCT_SPEC.md` §7.2).
 
+### A pipeline version's name does not read back as it was submitted
+
+OpenHEXA appends the version number to the name. A version deployed by `snt_workspace_manager` as
+`v0.1.0-test` comes back from `currentVersion.versionName` as **`v0.1.0-test [v1]`**. (A version
+pushed by the CLI with no name of its own reads back as just `v3`.)
+
+`snt_workspace_check` compared that field to the target tag with `==`, so the comparison was never
+true and `version_name_matches_content` came back `null` for all 22 pipelines — the entire
+name-versus-content check of `PRODUCT_SPEC.md` §3.1 was silently switched off while the report looked
+perfectly healthy. Caught on the checker's first real run (2026-09-22) only because *every* pipeline
+reported `null`, which is not a plausible distribution.
+
+Fixed by stripping a trailing ` [v<number>]` before comparing, and by reporting the raw name and the
+parsed tag side by side (`current_version_name`, `current_version_claims_tag`) so the parsing is
+visible rather than implied. **Do not compare a version name to a tag with `==`.**
+
 ### Copying `pipeline.py` into the workspace filesystem does nothing
 
 This looked like a completed deployment and was not. OpenHEXA runs each pipeline from its registered
@@ -313,4 +329,4 @@ workspace, so there was nothing to archive. That gap is still open.
 | 2026-09-16 | Legacy manifest generator verified; `snt_workspace_manager` v3 proven end to end against `v0.0.1-test`; API deployment mechanism written up. |
 | 2026-09-18 | `product_spec_draft.md` reviewed with Giulia; decisions D1–D9, D11, D12 taken; `PRODUCT_SPEC.md` written. §7.2 (obtaining every manifest) deferred to a dedicated session. Tag-protection ruleset created on the sandbox. |
 | 2026-09-21 | Phase 0: manifest generator rewritten to mirror the SDK's zip rule (107 → 156 files) and given a `pipelines` block; `split_manifest()` fixed in the same change. Sandbox repo reset; fixture releases `v0.1.0-test` … `v0.4.0-test` cut. |
-| 2026-09-22 | `docs/wip/` split: current state in the three live documents, history consolidated here. §7.3a closed by the `snt-token-probe` run (§2.4): a run's own `HEXA_TOKEN` reads pipeline version zips, so the checker is credential-free and **phase 1 is unblocked**. §7.3b (placing the `oh` token in a country workspace) parked as low priority. |
+| 2026-09-22 | `docs/wip/` split: current state in the three live documents, history consolidated here. §7.3a closed by the `snt-token-probe` run (§2.4): a run's own `HEXA_TOKEN` reads pipeline version zips, so the checker is credential-free and **phase 1 is unblocked**. §7.3b (placing the `oh` token in a country workspace) parked as low priority. **Phase 1 built and verified**: `snt_workspace_check` reports 163/163 `match` in the sandbox at `v0.1.0-test` (`PRODUCT_SPEC.md` §6.2). Two defects surfaced on the way — the version-name `[vN]` suffix (§1 above, fixed) and the manager's `DUPLICATE_PIPELINE_VERSION_NAME` on re-deploy (`release_strategy.md`, open). |

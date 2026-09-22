@@ -28,7 +28,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 | Component | Role | State |
 |---|---|---|
 | `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
-| `snt_workspace_check` *(proposed name)* | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | Not started — the subject of this spec |
+| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 1 — verified in the sandbox, 163/163 `match` (§6.2). Phases 2–3 not started |
 | Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
 
@@ -99,6 +99,12 @@ deriving pipeline directories from `<name>/pipeline.py` entries — `split_manif
 **Open:** no live release lacks the block, so the fallback is unreachable in testing. Either keep a
 legacy manifest as a local test fixture or delete the fallback in a PR of its own — untested
 back-compat code for a case that can no longer occur is worse than either.
+
+`snt_workspace_check` deliberately does **not** carry the fallback: it refuses a manifest with no
+`pipelines` block, naming the phase-0 cutover in the error. That makes the two components disagree on
+purpose, and the disagreement is the argument — one of them has untested code for an impossible case
+and the other does not. Resolve §2.1 in the manager's favour or the checker's, but do not copy the
+fallback across to make them match.
 
 ## 3. What the checker observes
 
@@ -335,7 +341,7 @@ still open.
 | # | Deliverable | Exit criterion | Blocked by |
 |---|---|---|---|
 | **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
-| **1** | Checker skeleton: verification mode against a single target release, both sources hashed, statuses `match` / `unknown_content` / `missing` / `unreadable`, report written. | A workspace freshly deployed by `snt_workspace_manager` at tag T reports all-`match`. | 0 — **unblocked**, §7.3a closed |
+| **1** | ✅ **DONE** 2026-09-22 — checker skeleton in [`snt_workspace_check/`](../../snt_workspace_check/): verification mode against a single target release, both sources hashed, four statuses, report written (§6.2). | Met: `snt-development-sandbox` at `v0.1.0-test` reported **163/163 `match`**. | — |
 | **2** | Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
 | **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
@@ -382,6 +388,32 @@ case. One more, `position: unordered`, is not reachable at all — GitHub always
 The full command-by-command plan, with the expected status for each fixture in each of three check
 runs, is `ignore/SNT25-670/sandbox_fixture_plan.md` (local, not committed — it contains `git`/`gh`
 commands for a human to run).
+
+### 6.2 Phase 1, as verified
+
+Run 2026-09-22 against `snt-development-sandbox`, deployed by `snt_workspace_manager` at
+`v0.1.0-test`, checked with `release_tag=v0.1.0-test`:
+
+```
+163/163 match   |   89 filesystem + 74 pipeline_version   |   incomplete: false, errors: []
+148 distinct observed hashes, no null hashes
+21/22 pipelines version_name_matches_content: true
+```
+
+Three things that run established, beyond the exit criterion itself:
+
+* **A version name does not read back as it was submitted.** OpenHEXA appends the version number, so
+  `v0.1.0-test` returns as `v0.1.0-test [v1]`. An `==` comparison silently disabled the §3.1
+  name-versus-content check on the first run — the exact silent-success failure this product exists
+  to catch, in the checker itself. Fixed; recorded in [`HISTORY.md`](HISTORY.md) §1. The report now
+  carries the raw name and the parsed tag side by side.
+* **§5.1.2 is not a theoretical concern.** `snt_dhis2_population_transformation` sits at
+  `v0.3.0-test` and correctly reports all-`match` against `v0.1.0-test`: nothing in its directory
+  changed between the two, so its bytes belong to both releases. "Belongs to release X" really is a
+  set, and a workspace can be labelled one release while being genuinely at another.
+* **The checker does not describe itself.** `snt_workspace_check` is not in any release yet, so it
+  appears in no manifest and in no `pipelines` block. From phase 2 it will report as `untracked` —
+  and once it ships in a release, as a pipeline that can check its own deployment.
 
 ## 7. Open decisions
 

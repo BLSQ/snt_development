@@ -8,7 +8,8 @@ Guardrails for anyone (human or agent) changing code in this repository.
 - Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
 - Domain vocabulary: [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 - Writing a pipeline `readme.md`: [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md).
-- `SNT_metadata.json` layer format (schema + reasoning, WIP): [`docs/schemas/`](docs/schemas/README.md).
+- `SNT_metadata.json` layer format (schema + reasoning, WIP):
+  [`docs/schemas/snt_metadata_json/`](docs/schemas/snt_metadata_json/README.md).
 - Who to ask / how review works: [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
 
 ---
@@ -368,7 +369,7 @@ Not implemented — recorded here so they can be assessed:
   name instead of the *key* produces a layer that silently fails to load. That already happened:
   six of the seven entries in the 2026-09-08 `SNT_metadata.json` draft pointed at
   `SNT_DHIS2_INCIDENCE` / `SNT_DHIS2_REPORTING_RATE`, neither of which is a key
-  ([`docs/schemas/README.md` §2.5](docs/schemas/README.md)).
+  ([`docs/schemas/snt_metadata_json/README.md` §2.5](docs/schemas/snt_metadata_json/README.md)).
 
   Two parts, separable: (a) agree one convention and apply it to the keys; (b) decide whether the
   key should simply *equal* the OpenHEXA dataset name, which would remove the trap entirely. Note
@@ -531,7 +532,7 @@ Keep these names and behaviours identical across pipelines — operators rely on
   `pyramid["level"].max()` as the existing tasks do.
 - A results column must be declared in `configuration/SNT_metadata.json` or
   `snt_assemble_results` **silently drops it**. Adding an indicator means editing that file too.
-- **Every published output table carries a `YEAR` column** (**R20**). Data points are always
+- **Every published output table carries a `YEAR` column** (**R21**). Data points are always
   attached to a year, so this costs nothing — and the SNT Explorer imports `YEAR` alongside the
   layer's value column to let the user choose which year to display. A table without it cannot be
   displayed over time, and the omission surfaces only when the layer fails to load. Applies to
@@ -542,7 +543,8 @@ Keep these names and behaviours identical across pipelines — operators rely on
 - **`SNT_metadata.json` is mid-format-change.** The file in `configuration/` is the old shape and
   is what runs today. The **target** shape — one entry per SNT Explorer data layer, with a
   `SOURCE_DATA` pointer and bilingual labels — is specified in
-  [`docs/schemas/`](docs/schemas/README.md), with a JSON Schema as its source of truth. Write new
+  [`docs/schemas/snt_metadata_json/`](docs/schemas/snt_metadata_json/README.md), with a JSON Schema as its
+  source of truth. Write new
   metadata entries to that schema, and read its **Open questions** before assuming a field's
   meaning: the format is still being validated with the IASO developers.
 

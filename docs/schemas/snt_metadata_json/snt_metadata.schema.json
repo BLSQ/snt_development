@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/BLSQ/snt_development/docs/schemas/snt_metadata.schema.json",
+    "$id": "https://github.com/BLSQ/snt_development/docs/schemas/snt_metadata_json/snt_metadata.schema.json",
     "title": "SNT_metadata.json (shape of 2026-09-08)",
-    "description": "Declares the data layers the SNT Explorer offers to a user, for one country. Each top-level property is one layer: SOURCE_DATA says where its values come from, the remaining fields say how it is presented. Work in progress — being validated with the IASO developers. Rationale, conventions and open questions: docs/schemas/README.md.",
+    "description": "Declares the data layers the SNT Explorer offers to a user, for one country. Each top-level property is one layer: SOURCE_DATA says where its values come from, the remaining fields say how it is presented. Work in progress — being validated with the IASO developers. Rationale, conventions and open questions: docs/schemas/snt_metadata_json/README.md.",
     "type": "object",
     "minProperties": 1,
     "propertyNames": {

@@ -144,14 +144,14 @@ remove_path_duplicates <- function(dhis2_routine_long) {
 #' behavior rather than true anomaly.
 #'
 #' @param dhis2_routine_outliers Routine table with OUTLIER_TREND and stats.
-#' @param MEAN_DEVIATION Deviation multiplier used in PATH thresholds.
+#' @param DEVIATION_MEAN Deviation multiplier used in PATH thresholds.
 #' @return Data frame of flagged stock-out exception keys.
-detect_possible_stockout <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
+detect_possible_stockout <- function(dhis2_routine_outliers, DEVIATION_MEAN) {
     low_testing_periods <- dhis2_routine_outliers %>%
         dplyr::filter(INDICATOR == "TEST") %>%
         dplyr::mutate(
             low_testing = dplyr::case_when(VALUE < MEAN_80 ~ TRUE, TRUE ~ FALSE),
-            upper_limit_tested = MEAN_80 + MEAN_DEVIATION * SD_80
+            upper_limit_tested = MEAN_80 + DEVIATION_MEAN * SD_80
         ) %>%
         dplyr::select(dplyr::all_of(c("ADM1_ID", "ADM2_ID", "OU_ID", "PERIOD", "low_testing", "upper_limit_tested")))
 
@@ -170,13 +170,13 @@ detect_possible_stockout <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
 #' as reporting anomalies.
 #'
 #' @param dhis2_routine_outliers Routine table with OUTLIER_TREND and stats.
-#' @param MEAN_DEVIATION Deviation multiplier used in PATH thresholds.
+#' @param DEVIATION_MEAN Deviation multiplier used in PATH thresholds.
 #' @return Data frame of flagged epidemic exception keys.
-detect_possible_epidemic <- function(dhis2_routine_outliers, MEAN_DEVIATION) {
+detect_possible_epidemic <- function(dhis2_routine_outliers, DEVIATION_MEAN) {
     dhis2_routine_outliers %>%
         dplyr::filter(INDICATOR == "TEST" | INDICATOR == "CONF") %>%
         dplyr::rename(total = VALUE) %>%
-        dplyr::mutate(max_value = MEAN_80 + MEAN_DEVIATION * SD_80) %>%
+        dplyr::mutate(max_value = MEAN_80 + DEVIATION_MEAN * SD_80) %>%
         dplyr::select(-c("MEAN_80", "SD_80")) %>%
         tidyr::pivot_wider(names_from = INDICATOR, values_from = c(total, max_value, OUTLIER_TREND)) %>%
         tidyr::unnest(cols = dplyr::everything()) %>%

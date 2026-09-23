@@ -1,33 +1,52 @@
-# Report helpers for mean outliers imputation pipeline.
-.this_file <- tryCatch(normalizePath(sys.frame(1)$ofile), error = function(e) NA_character_)
-.candidate_files <- unique(c(
-    if (exists("PIPELINE_PATH", inherits = TRUE)) {
-        file.path(get("PIPELINE_PATH", inherits = TRUE), "utils", "snt_dhis2_outliers_imputation_mean.r")
-    } else {
-        character(0)
-    },
-    if (!is.na(.this_file)) {
-        file.path(dirname(.this_file), "snt_dhis2_outliers_imputation_mean.r")
-    } else {
-        character(0)
-    },
-    file.path(getwd(), "snt_dhis2_outliers_imputation_mean.r")
-))
-.target_file <- .candidate_files[file.exists(.candidate_files)][1]
-if (is.na(.target_file)) {
-    stop(paste0(
-        "Could not locate snt_dhis2_outliers_imputation_mean.r. Tried: ",
-        paste(.candidate_files, collapse = " | ")
-    ))
-}
-source(.target_file)
+# ================================================
+# Title: Report helpers for the mean outliers imputation pipeline
+# Description: Plotting and coherence-metric helpers sourced by the reporting notebook.
+# Dependencies: ggplot2, dplyr, tidyr, tibble, purrr, rlang, forcats, viridis, grid, stats, sf
+# ================================================
 
+# Load base snt utils
+source(file.path("~/workspace", "code", "snt_utils.r"))
+
+#' Null-Coalescing Operator
+#'
+#' Returns the left-hand side when it is not NULL, otherwise the right-hand side.
+#'
+#' @param x Any R object. Value returned when not NULL.
+#' @param y Any R object. Fallback value used when `x` is NULL.
+#' @return `x` when it is not NULL, otherwise `y`.
+#'
+#' @export
 `%||%` <- function(x, y) if (!is.null(x)) x else y
 
+
+#' Print the Dimensions of a Data Frame
+#'
+#' Writes the number of rows and columns of a table to the console, prefixed by
+#' the table name, for quick inspection inside reporting notebooks.
+#'
+#' @param df Data frame. Table whose dimensions are printed.
+#' @param name Character. Label used in the printed message. Defaults to the
+#'   deparsed expression passed as `df`.
+#' @return No return value, called for its console output.
+#'
+#' @export
 printdim <- function(df, name = deparse(substitute(df))) {
     cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
 }
 
+
+#' Plot Detected Outliers for One Indicator
+#'
+#' Draws a scatter plot of all values of a single indicator against the year,
+#' highlighting in red the observations flagged as outliers.
+#'
+#' @param ind_name Character. Name of the indicator to plot (matched on INDICATOR).
+#' @param df Data frame. Routine data containing INDICATOR, YEAR, VALUE and the
+#'   outlier flag column.
+#' @param outlier_col Character. Name of the logical column flagging outliers.
+#' @return A ggplot object.
+#'
+#' @export
 plot_outliers <- function(ind_name, df, outlier_col) {
     df_ind <- df %>% dplyr::filter(INDICATOR == ind_name)
     df_ind <- df_ind %>% dplyr::filter(!is.na(YEAR), !is.na(VALUE), is.finite(VALUE))
@@ -50,6 +69,19 @@ plot_outliers <- function(ind_name, df, outlier_col) {
         ggplot2::theme_minimal(base_size = 14)
 }
 
+
+#' Plot Detected Outliers by District, Faceted by Year
+#'
+#' Draws one panel per year showing the values of a single indicator across
+#' districts, highlighting in red the observations flagged as outliers.
+#'
+#' @param ind_name Character. Name of the indicator to plot (matched on INDICATOR).
+#' @param df Data frame. Routine data containing INDICATOR, ADM2_ID, YEAR, VALUE
+#'   and the outlier flag column.
+#' @param outlier_col Character. Name of the logical column flagging outliers.
+#' @return A ggplot object, or NULL when the indicator has no plottable rows.
+#'
+#' @export
 plot_outliers_by_district_facet_year <- function(ind_name, df, outlier_col) {
     df_ind <- df %>%
         dplyr::filter(
@@ -78,7 +110,29 @@ plot_outliers_by_district_facet_year <- function(ind_name, df, outlier_col) {
         ggplot2::theme_minimal(base_size = 12)
 }
 
-plot_coherence_heatmap <- function(df, selected_year, agg_level = "ADM1_NAME", filename = NULL, do_plot = TRUE) {
+
+#' Plot a Coherence Heatmap for a Single Year
+#'
+#' Draws a heatmap of the percentage of coherent records per coherence check and
+#' aggregation unit for one year, optionally saving it to disk.
+#'
+#' @param df Data frame. Long coherence table with YEAR, check_label, pct_coherent
+#'   and the aggregation column.
+#' @param selected_year Integer or character. Year to display.
+#' @param agg_level Character. Name of the aggregation column (e.g. "ADM1_NAME").
+#' @param filename Character. Optional output path; the plot is saved when provided.
+#' @param do_plot Logical. Print the plot when TRUE.
+#' @return Invisibly, a ggplot object, or NULL when the required columns or rows
+#'   are missing.
+#'
+#' @export
+plot_coherence_heatmap <- function(
+    df,
+    selected_year,
+    agg_level = "ADM1_NAME",
+    filename = NULL,
+    do_plot = TRUE
+) {
     if (!all(c("YEAR", "check_label", "pct_coherent") %in% names(df))) return(NULL)
     if (!agg_level %in% names(df)) return(NULL)
 
@@ -122,6 +176,20 @@ plot_coherence_heatmap <- function(df, selected_year, agg_level = "ADM1_NAME", f
     invisible(p)
 }
 
+
+#' Map a Coherence Indicator
+#'
+#' Draws a choropleth map of one coherence column over the supplied spatial
+#' features, on a fixed 0-100 scale.
+#'
+#' @param map_data sf object. Spatial features carrying the coherence column.
+#' @param col_name Character. Name of the column to map.
+#' @param indicator_label Character. Optional label used for the title and legend;
+#'   defaults to `col_name`.
+#' @return A ggplot object, or NULL when `map_data` is not an sf object or the
+#'   column is missing.
+#'
+#' @export
 plot_coherence_map <- function(map_data, col_name, indicator_label = NULL) {
     if (!inherits(map_data, "sf")) return(NULL)
     if (!col_name %in% names(map_data)) return(NULL)
@@ -142,6 +210,16 @@ plot_coherence_map <- function(map_data, col_name, indicator_label = NULL) {
         )
 }
 
+
+#' Get the Coherence Check Definitions
+#'
+#' Returns the pairs of indicators compared by each coherence check, together
+#' with the human-readable labels used in reports.
+#'
+#' @return Named list with two elements: `checks`, a named list of indicator
+#'   pairs, and `check_labels`, a named character vector of display labels.
+#'
+#' @export
 get_coherence_definitions <- function() {
     checks <- list(
         allout_susp = c("ALLOUT", "SUSP"),
@@ -164,7 +242,22 @@ get_coherence_definitions <- function() {
     list(checks = checks, check_labels = check_labels)
 }
 
-compute_national_coherency_metrics <- function(df, checks, check_labels) {
+
+#' Compute National Coherence Metrics
+#'
+#' Evaluates each coherence check on the routine data and summarises, per year,
+#' the percentage of records satisfying it.
+#'
+#' @param df Data frame. Routine data in wide format, with YEAR and one column
+#'   per indicator involved in the checks.
+#' @param checks Named list. Indicator pairs per check, as returned by
+#'   `get_coherence_definitions()`.
+#' @param check_labels Named character vector. Display labels per check.
+#' @return Data frame with YEAR, check_type, pct_coherent and check_label; empty
+#'   when none of the checks can be evaluated.
+#'
+#' @export
+compute_national_coherence_metrics <- function(df, checks, check_labels) {
     df_checks <- df %>%
         dplyr::mutate(
             !!!lapply(names(checks), function(check_name) {
@@ -210,12 +303,28 @@ compute_national_coherency_metrics <- function(df, checks, check_labels) {
                 !!!stats::setNames(check_labels, sub("^pct_coherent_", "", names(check_labels)))
             ),
             check_label = factor(.data$check_label, levels = unique(.data$check_label)),
-            check_label = forcats::fct_reorder(.data$check_label, .data$pct_coherent, .fun = median, na.rm = TRUE)
+            check_label = forcats::fct_reorder(
+                .data$check_label,
+                .data$pct_coherent,
+                .fun = median,
+                na.rm = TRUE
+            )
         )
 }
 
-plot_national_coherence_heatmap <- function(coherency_metrics) {
-    ggplot2::ggplot(coherency_metrics, ggplot2::aes(
+
+#' Plot the National Coherence Heatmap
+#'
+#' Draws a year-by-check heatmap of national coherence percentages, annotated
+#' with the rounded percentage inside each tile.
+#'
+#' @param coherence_metrics Data frame. Output of
+#'   `compute_national_coherence_metrics()`.
+#' @return A ggplot object.
+#'
+#' @export
+plot_national_coherence_heatmap <- function(coherence_metrics) {
+    ggplot2::ggplot(coherence_metrics, ggplot2::aes(
         x = factor(.data$YEAR),
         y = .data$check_label,
         fill = .data$pct_coherent
@@ -251,6 +360,23 @@ plot_national_coherence_heatmap <- function(coherency_metrics) {
         )
 }
 
+
+#' Compute District-Level Coherence Metrics
+#'
+#' Evaluates each coherence check per district and year, keeping only districts
+#' with enough reports, and returns both the wide and long representations.
+#'
+#' @param df Data frame. Routine data in wide format, with ADM1_NAME, ADM2_NAME,
+#'   ADM2_ID, YEAR and one column per indicator involved in the checks.
+#' @param checks Named list. Indicator pairs per check, as returned by
+#'   `get_coherence_definitions()`.
+#' @param check_labels Named character vector. Display labels per check.
+#' @param min_reports Integer. Minimum number of reports required to keep a
+#'   district-year. Defaults to 5.
+#' @return Named list with `adm_coherence` (one row per district-year, one
+#'   percentage column per check) and `adm_long` (the same data pivoted long).
+#'
+#' @export
 compute_adm_coherence_long <- function(df, checks, check_labels, min_reports = 5) {
     df_checks <- df %>%
         dplyr::mutate(

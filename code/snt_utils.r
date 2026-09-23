@@ -641,6 +641,16 @@ match_column_classes <- function(input_dt, reference_dt) {
 }
 
 
+#' Helper sum to preserve groups with all-NA values (instead of the default 0)
+#'
+#' Like basic sum(x, na.rm = TRUE), but returns NA instead of 0 when every value is missing
+#' "no data" should stay distinguishable from a true zero
+#'
+#' @param x integer or vector
+#' @return either the sum of non-missing values or NA_real_ if all values are missing
+safe_sum <- function(x) if (all(is.na(x))) NA_real_ else as.numeric(sum(x, na.rm = TRUE))
+
+
 #' Build a Cartesian Product of Admin Units and Monthly Periods
 #'
 #' Creates the full cross join of unique administrative units and a

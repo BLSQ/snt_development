@@ -1,0 +1,343 @@
+{
+    "POPULATION": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Total population (SNIS)",
+            "FR": "Population totale (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Total number of people living in a given area.",
+            "FR": "Nombre total de personnes vivant dans une zone spécifique."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
+        },
+        "CATEGORY": {
+            "EN": "Variable of population and health",
+            "FR": "Variables de population et de santé"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POPULATION_FE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_PREGNANT_WOMEN"
+        },
+        "LABEL": {
+            "EN": "Pregnant women population (SNIS)",
+            "FR": "Population femmes enceintes (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Total number of pregnant women living in a given area.",
+            "FR": "Nombre total de femmes enceintes vivant dans une zone spécifique."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
+        },
+        "CATEGORY": {
+            "EN": "Variable of population and health",
+            "FR": "Variables de population et de santé"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10000,
+            20000,
+            30000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POPULATION_U5": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_UNDER_5"
+        },
+        "LABEL": {
+            "EN": "Population of children under 5 years old (SNIS)",
+            "FR": "Population des enfants de moins de 5 ans (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Total number of children under 5 years old living in a given area.",
+            "FR": "Nombre total d'enfants de moins de 5 ans vivant dans une zone spécifique."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
+        },
+        "CATEGORY": {
+            "EN": "Variable of population and health",
+            "FR": "Variables de population et de santé"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            30000,
+            60000,
+            90000,
+            120000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "REPORTING_RATE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_REPORTING_RATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
+            "COLUMN": "REPORTING_RATE"
+        },
+        "LABEL": {
+            "EN": "Reporting rate (SNIS)",
+            "FR": "Taux de rapportage (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Share of health facilities that reported data, out of those active over the year.",
+            "FR": "Taux de rapportage sur base de l'activité des FOSAs."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Proportion",
+            "FR": "Proportion"
+        },
+        "CATEGORY": {
+            "EN": "Data quality",
+            "FR": "Qualité des données"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.5,
+            0.8,
+            0.9,
+            0.95
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_CRUDE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_CRUDE"
+        },
+        "LABEL": {
+            "EN": "Crude incidence (SNIS)",
+            "FR": "Incidence brute (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population.",
+            "FR": "Nombre de nouveaux cas de paludisme, rapportés à la population."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            100,
+            250,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_TESTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_TESTING"
+        },
+        "LABEL": {
+            "EN": "Incidence adjusted for testing (SNIS)",
+            "FR": "Incidence ajustée pour le dépistage (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate.",
+            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de positivité des tests."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            100,
+            250,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_REPORTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_REPORTING"
+        },
+        "LABEL": {
+            "EN": "Incidence adjusted for reporting rate (SNIS)",
+            "FR": "Incidence ajustée pour le taux de rapportage (SNIS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate and reporting rate.",
+            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de positivité des tests et le taux de rapportage."
+        },
+        "SOURCE": {
+            "EN": "SNIS",
+            "FR": "SNIS"
+        },
+        "UNITS": {
+            "EN": "Per 1000 people",
+            "FR": "Pour 1000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "Epidemiological indicators",
+            "FR": "Indicateurs épidémiologiques"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            100,
+            250,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONALITY_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONALITY_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Rainfall seasonality (ERA5)",
+            "FR": "Saisonnalité des précipitations (ERA5)"
+        },
+        "DESCRIPTION": {
+            "EN": "Classification of seasonal malaria transmission based on rainfall, used to identify areas eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des précipitations, pour identifier les régions éligibles pour des interventions saisonnières."
+        },
+        "SOURCE": {
+            "EN": "ERA5",
+            "FR": "ERA5"
+        },
+        "UNITS": {
+            "EN": "Not seasonal (0), Seasonal (1)",
+            "FR": "Pas saisonnier (0), Saisonnier (1)"
+        },
+        "CATEGORY": {
+            "EN": "Environmental indicators",
+            "FR": "Indicateurs environnementaux"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            0,
+            1
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONAL_BLOCK_DURATION_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Duration of the seasonal transmission period (ERA5)",
+            "FR": "Durée de la période saisonnière de transmission (ERA5)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of consecutive months with a high amount of rainfall.",
+            "FR": "Nombre de mois consécutifs avec une quantité élevée de précipitations."
+        },
+        "SOURCE": {
+            "EN": "ERA5",
+            "FR": "ERA5"
+        },
+        "UNITS": {
+            "EN": "Number of months",
+            "FR": "Nombre de mois"
+        },
+        "CATEGORY": {
+            "EN": "Environmental indicators",
+            "FR": "Indicateurs environnementaux"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            3,
+            4,
+            5
+        ],
+        "UNIT_SYMBOL": null
+    }
+}

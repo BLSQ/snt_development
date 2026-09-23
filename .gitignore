@@ -53,6 +53,10 @@ __pycache__/
 # ...or the shared Claude Code settings, which must reach every clone for the
 # destructive-git guardrail to be active (see CLAUDE.md "Agent guardrails").
 !.claude/settings.json
+# ...or the JSON Schema for SNT_metadata.json and its reference example. These are
+# documentation, not country data: the example holds no real values, only the layer
+# catalogue and the {COUNTRY_CODE} placeholder (see docs/schemas/README.md).
+!docs/schemas/*.json
 
 # R ----------------------------------------
 *.rds

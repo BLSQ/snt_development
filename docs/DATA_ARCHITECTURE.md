@@ -413,7 +413,10 @@ deliberate migration rather than a quiet rename.
 >
 > Two practical consequences right now:
 > - **`configuration/SNT_metadata.json` is mid-change** and is deliberately *not* audited in this
->   document. Treat its current structure as unstable; do not encode assumptions about it.
+>   document. Treat its current structure as unstable; do not encode assumptions about it. The
+>   *target* shape it is moving to is specified in [`docs/schemas/`](schemas/README.md) — a JSON
+>   Schema plus the reasoning behind it, including what is still undecided. That is the format the
+>   Explorer will import layers from; the file in `configuration/` is the old one.
 > - The description below documents the pipeline **as it stands today**, for operators still
 >   running it — not as a design to extend or replicate.
 >

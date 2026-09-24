@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace
@@ -8,8 +9,8 @@ from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     run_notebook,
     run_report_notebook,
-    validate_config,
     save_pipeline_parameters,
+    validate_config,
 )
 
 
@@ -79,15 +80,21 @@ def snt_dhis2_outliers_imputation_path(
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
     except Exception as e:
-        current_run.log_error(f"Failed to load or validate SNT configuration: {e}")
+        current_run.log_error(f"Failed to load and validate configuration: {e}")
         raise
 
     if not run_report_only:
         input_params = {
-            "ROOT_PATH": Path(workspace.files_path).as_posix(),
+            "ROOT_PATH": root_path.as_posix(),
             "DEVIATION_MEAN": deviation_mean,
         }
+        expected_outputs = [
+            data_path / f"{country_code}_routine_outliers_detected.parquet",
+            data_path / f"{country_code}_routine_outliers_imputed.parquet",
+            data_path / f"{country_code}_routine_outliers_removed.parquet",
+        ]
 
+        run_start_ts = time.time()
         try:
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_outliers_imputation_path.ipynb",
@@ -101,6 +108,8 @@ def snt_dhis2_outliers_imputation_path(
             current_run.log_error(f"Failed to run outliers imputation notebook: {e}")
             raise
 
+        check_outputs_generated(file_paths=expected_outputs, run_start_ts=run_start_ts)
+
         try:
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_dhis2_outliers_imputation_path",
@@ -112,16 +121,10 @@ def snt_dhis2_outliers_imputation_path(
             current_run.log_error(f"Failed to save pipeline parameters: {e}")
             raise
 
-        dataset_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
         add_files_to_dataset(
-            dataset_id=dataset_id,
+            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
             country_code=country_code,
-            file_paths=[
-                data_path / f"{country_code}_routine_outliers_detected.parquet",
-                data_path / f"{country_code}_routine_outliers_imputed.parquet",
-                data_path / f"{country_code}_routine_outliers_removed.parquet",
-                parameters_file,
-            ],
+            file_paths=[*expected_outputs, parameters_file],
         )
 
         # Create consolidated outliers DB table
@@ -132,7 +135,7 @@ def snt_dhis2_outliers_imputation_path(
                     file_path=data_path / f"{country_code}_routine_outliers_detected.parquet",
                 )
             except Exception as e:
-                current_run.log_error(f"Failed to push outliers_detected to DB: {e}")
+                current_run.log_error(f"Failed to push data to DB table: {e}")
 
     else:
         current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")
@@ -149,6 +152,31 @@ def snt_dhis2_outliers_imputation_path(
         raise
 
     current_run.log_info("Pipeline finished successfully.")
+
+
+def check_outputs_generated(file_paths: list[Path], run_start_ts: float) -> None:
+    """Raise if any expected output was not written during the current run.
+
+    Guards against publishing stale files: all outliers imputation pipelines write the same
+    filenames, so a leftover file may come from a previous run of another method.
+
+    Parameters
+    ----------
+    file_paths : list[Path]
+        Output files the notebook is expected to produce.
+    run_start_ts : float
+        Timestamp taken just before the notebook ran; files modified earlier are stale.
+
+    Raises
+    ------
+    RuntimeError
+        If a file is missing or was last modified before ``run_start_ts``.
+    """
+    missing = [p.name for p in file_paths if not p.exists() or p.stat().st_mtime < run_start_ts]
+    if missing:
+        msg = f"Expected output files were not generated during this run: {', '.join(missing)}"
+        current_run.log_error(msg)
+        raise RuntimeError(msg)
 
 
 if __name__ == "__main__":

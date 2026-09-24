@@ -26,14 +26,38 @@
   },
   "DHIS2_DATA_DEFINITIONS": {
     "POPULATION_INDICATOR_DEFINITIONS": {
-      "POPULATION": { "ids": [], "type": "dataElement" },
-      "POP_UNDER_5": { "ids": [], "type": "dataElement" },
-      "POP_PREGNANT_WOMEN": { "ids": [], "type": "dataElement" },
-      "POP_0_1_Y": { "ids": [], "type": "dataElement" },
-      "POP_1_2_Y": { "ids": [], "type": "dataElement" },
-      "POP_5_10_Y": { "ids": [], "type": "dataElement" },
-      "POP_5_36_M": { "ids": [], "type": "dataElement" },
-      "POP_50_PLUS": { "ids": [], "type": "dataElement" }
+      "POPULATION": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_UNDER_5": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_PREGNANT_WOMEN": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_0_1_Y": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_1_2_Y": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_5_10_Y": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_5_36_M": {
+        "ids": [],
+        "type": "dataElement"
+      },
+      "POP_50_PLUS": {
+        "ids": [],
+        "type": "dataElement"
+      }
     },
     "DHIS2_INDICATOR_DEFINITIONS": {
       "SUSP": [],
@@ -56,8 +80,19 @@
       "PRES_PREGNANT_WOMAN": []
     },
     "DHIS2_REPORTING_RATES": {
-      "REPORTING_DATASETS": [],
-      "REPORTING_INDICATORS": {}
+      "REPORTING_DATASETS": [
+        {
+          "DATASET": "",
+          "METRICS": {
+            "ACTUAL_REPORTS": "float",
+            "EXPECTED_REPORTS": "float"
+          }
+        }
+      ],
+      "REPORTING_INDICATORS": {
+        "ACTUAL_REPORTS": "",
+        "EXPECTED_REPORTS": ""
+      }
     }
   }
 }

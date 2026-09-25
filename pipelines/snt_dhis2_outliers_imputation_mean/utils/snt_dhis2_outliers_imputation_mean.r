@@ -1,8 +1,8 @@
 # ================================================
 # Title: Main helpers for the mean outliers imputation pipeline
-# Description: Loading and output-formatting helpers sourced by the pipeline notebook (imputation:
-#   impute_outliers() in code/snt_utils.r).
-# Dependencies: dplyr, tidyr, glue
+# Description: Routine data loading helper sourced by the pipeline notebook (imputation and output
+#   formatters: code/snt_utils.r).
+# Dependencies: glue
 # ================================================
 
 # Load base snt utils
@@ -65,45 +65,4 @@ load_routine_data <- function(
     }
 
     dhis2_routine
-}
-
-
-#' Build the Final Routine Output Table (Imputed or Removed)
-#'
-#' Reshapes long-format routine values back to wide indicator columns, joins
-#' location names, and standardizes the output columns expected by downstream
-#' datasets and reporting.
-#'
-#' @param df Data frame. Long-format routine data including VALUE_IMPUTED.
-#' @param outlier_column Character. Outlier flag column used to filter removed records.
-#' @param DHIS2_INDICATORS Character vector. Indicator columns to keep in the final table.
-#' @param fixed_cols Character vector. Fixed identifier/date columns in long format.
-#' @param pyramid_names Data frame. Mapping table carrying the ADM/OU names.
-#' @param remove Logical. Return outlier-removed data when TRUE, imputed data otherwise.
-#' @return Wide routine data frame ready for export.
-#'
-#' @export
-format_routine_data_selection <- function(
-    df,
-    outlier_column,
-    DHIS2_INDICATORS,
-    fixed_cols,
-    pyramid_names,
-    remove = FALSE
-) {
-    if (remove) {
-        df <- df %>% dplyr::filter(!.data[[outlier_column]])
-    }
-    target_cols <- c(
-        "PERIOD", "YEAR", "MONTH", "ADM1_NAME", "ADM1_ID",
-        "ADM2_NAME", "ADM2_ID", "OU_ID", "OU_NAME", DHIS2_INDICATORS
-    )
-    output <- df %>%
-        dplyr::select(-VALUE) %>%
-        dplyr::rename(VALUE = VALUE_IMPUTED) %>%
-        dplyr::select(dplyr::all_of(fixed_cols), INDICATOR, VALUE) %>%
-        dplyr::mutate(VALUE = ifelse(is.nan(VALUE), NA_real_, VALUE)) %>%
-        tidyr::pivot_wider(names_from = "INDICATOR", values_from = "VALUE") %>%
-        dplyr::left_join(pyramid_names, by = c("ADM1_ID", "ADM2_ID", "OU_ID"))
-    return(output %>% dplyr::select(dplyr::all_of(intersect(target_cols, names(output)))))
 }

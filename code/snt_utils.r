@@ -316,9 +316,12 @@ prepare_routine_long <- function(routine_df, fixed_cols, indicators, deduplicate
 #' Impute Flagged Outliers Using a Centered Moving Statistic
 #'
 #' For each ADM/OU/indicator time series, values marked as outliers are
-#' replaced by a centered moving mean or median (ceiling), preserving
-#' non-outlier observations. Shared by the `snt_dhis2_outliers_imputation_*`
-#' pipelines.
+#' replaced by a centered moving mean or median (ceiling) of the neighbouring
+#' values that are neither outliers nor missing. Only flagged outliers are
+#' replaced: every other value, including missing ones, is kept as reported
+#' (an NA flag counts as not an outlier). An outlier with no usable neighbour
+#' in its window, or at the first or last period of a series, becomes NA.
+#' Shared by the `snt_dhis2_outliers_imputation_*` pipelines.
 #'
 #' @param dt Data frame or data.table. Routine data in long format.
 #' @param outlier_col Character. Name of the logical outlier flag column.
@@ -344,9 +347,307 @@ impute_outliers <- function(dt, outlier_col, n = 3, stat = c("mean", "median")) 
         },
         align = "center"
     )), by = .(ADM1_ID, ADM2_ID, OU_ID, INDICATOR)]
-    dt[, VALUE_IMPUTED := data.table::fifelse(is.na(TO_IMPUTE), MOVING_STAT, TO_IMPUTE)]
+    # Replace flagged outliers only; missing values that were not outliers stay missing
+    dt[, VALUE_IMPUTED := data.table::fifelse(get(outlier_col) %in% TRUE, MOVING_STAT, as.numeric(VALUE))]
     dt[, c("TO_IMPUTE", "MOVING_STAT") := NULL]
     return(as.data.frame(data.table::copy(dt)))
+}
+
+
+#' Build the ADM1/ADM2/OU Name Lookup for Outliers Output Tables
+#'
+#' Extracts the location names from the routine data, unchanged (no country-specific
+#' cleaning), as character columns, keeping one row per ADM1_ID x ADM2_ID x OU_ID so
+#' a join on those IDs can never duplicate rows. Stops with an [ERROR] message if a
+#' name or ID column is missing.
+#'
+#' @param routine_df Data frame or data.table. Formatted routine data.
+#' @return Data frame with ADM1_ID, ADM1_NAME, ADM2_ID, ADM2_NAME, OU_ID and OU_NAME.
+#'
+#' @export
+get_outliers_pyramid_names <- function(routine_df) {
+    name_cols <- c("ADM1_ID", "ADM1_NAME", "ADM2_ID", "ADM2_NAME", "OU_ID", "OU_NAME")
+    missing_name_cols <- setdiff(name_cols, colnames(routine_df))
+    if (length(missing_name_cols) > 0) {
+        msg <- paste("[ERROR] Routine data is missing name column(s):", paste(missing_name_cols, collapse = ", "))
+        log_msg(msg, "error")
+        stop(msg)
+    }
+
+    as.data.frame(routine_df) %>%
+        dplyr::select(dplyr::all_of(name_cols)) %>%
+        dplyr::mutate(dplyr::across(dplyr::everything(), as.character)) %>%
+        dplyr::distinct(ADM1_ID, ADM2_ID, OU_ID, .keep_all = TRUE)
+}
+
+
+#' Cast PERIOD Values to Integer
+#'
+#' Converts YYYYMM periods (character, factor or numeric) to integer, and stops with
+#' an [ERROR] message if any non-missing value cannot be converted, rather than
+#' silently producing NA periods.
+#'
+#' @param period Vector. PERIOD values.
+#' @return Integer vector of the same length.
+#'
+#' @export
+cast_period_to_integer <- function(period) {
+    period_int <- suppressWarnings(as.integer(as.character(period)))
+    n_bad_periods <- sum(is.na(period_int) & !is.na(period))
+    if (n_bad_periods > 0) {
+        msg <- glue::glue("[ERROR] {n_bad_periods} PERIOD value(s) cannot be converted to integer (expected YYYYMM).")
+        log_msg(msg, "error")
+        stop(msg)
+    }
+    period_int
+}
+
+
+#' Standardize Long-Format Outliers Data Before Formatting
+#'
+#' Shared first step of the outliers output formatters, so every output table types its
+#' key columns the same way. Checks that the key columns (and any `extra_cols`) are
+#' present, casts PERIOD with `cast_period_to_integer()`, YEAR and MONTH to integer,
+#' ADM1_ID, ADM2_ID, OU_ID and INDICATOR to character and VALUE to double, and writes
+#' NaN values as NA. Other columns are kept unchanged. Duplicated keys are not checked
+#' here: deduplicate upstream, in the notebook.
+#'
+#' @param outliers_long Data frame or data.table. Long-format data with PERIOD, YEAR,
+#'   MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR and VALUE.
+#' @param extra_cols Character vector or NULL. Additional columns that must be present
+#'   (e.g. the outlier flag column). Default: NULL.
+#' @return Data frame. `outliers_long` with standardized key column types.
+#'
+#' @export
+standardize_outliers_long <- function(outliers_long, extra_cols = NULL) {
+    key_cols <- c("PERIOD", "YEAR", "MONTH", "ADM1_ID", "ADM2_ID", "OU_ID", "INDICATOR", "VALUE")
+    missing_cols <- setdiff(c(key_cols, extra_cols), colnames(outliers_long))
+    if (length(missing_cols) > 0) {
+        msg <- paste("[ERROR] Outliers table is missing column(s):", paste(missing_cols, collapse = ", "))
+        log_msg(msg, "error")
+        stop(msg)
+    }
+
+    outliers_long <- as.data.frame(outliers_long)
+    outliers_long$PERIOD <- cast_period_to_integer(outliers_long$PERIOD)
+
+    outliers_long %>%
+        dplyr::mutate(
+            YEAR = as.integer(YEAR),
+            MONTH = as.integer(MONTH),
+            ADM1_ID = as.character(ADM1_ID),
+            ADM2_ID = as.character(ADM2_ID),
+            OU_ID = as.character(OU_ID),
+            INDICATOR = as.character(INDICATOR),
+            VALUE = as.double(VALUE),
+            VALUE = dplyr::if_else(is.nan(VALUE), NA_real_, VALUE)
+        )
+}
+
+
+#' Format the Routine Outliers Detection Output Table
+#'
+#' Builds the standard `{CC}_routine_outliers_detected.parquet` table, method-agnostic and
+#' shared by all `snt_dhis2_outliers_imputation_*` pipelines. Key columns are typed by
+#' `standardize_outliers_long()`. It uses one flag column as OUTLIER_DETECTED (NA
+#' counted as not an outlier), stamps the method, adds a DATE column (first day of the
+#' month), joins ADM1/ADM2/OU names taken unchanged from the routine data, and fixes
+#' column order and row order:
+#' PERIOD, YEAR, MONTH (integer), DATE (Date), ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID,
+#' OU_ID, OU_NAME, INDICATOR (character), VALUE (double), OUTLIER_DETECTED (logical),
+#' OUTLIER_METHOD (character). Location and period columns follow the same order as
+#' the imputed and removed routine tables.
+#'
+#' @param outliers_long Data frame or data.table. Long-format detection results with
+#'   PERIOD, YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, VALUE and the flag column.
+#' @param outlier_col Character. Name of the logical flag column in `outliers_long`.
+#' @param method Character. Value written to OUTLIER_METHOD (e.g. "MAGIC_GLASSES_PARTIAL").
+#' @param routine_df Data frame or data.table. Formatted routine data, used as the
+#'   source of ADM1_NAME, ADM2_NAME and OU_NAME.
+#' @return Data frame. One row per facility, period and indicator, sorted by ADM1_ID,
+#'   ADM2_ID, OU_ID, INDICATOR and PERIOD.
+#'
+#' @export
+format_outliers_detected_table <- function(outliers_long, outlier_col, method, routine_df) {
+    pyramid_names <- get_outliers_pyramid_names(routine_df)
+
+    detected <- standardize_outliers_long(outliers_long, extra_cols = outlier_col) %>%
+        dplyr::mutate(
+            OUTLIER_DETECTED = dplyr::coalesce(as.logical(.data[[outlier_col]]), FALSE),
+            OUTLIER_METHOD = as.character(method),
+            DATE = as.Date(sprintf("%04d-%02d-01", YEAR, MONTH))
+        ) %>%
+        dplyr::left_join(pyramid_names, by = c("ADM1_ID", "ADM2_ID", "OU_ID")) %>%
+        dplyr::select(
+            PERIOD, YEAR, MONTH, DATE,
+            ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID, OU_ID, OU_NAME,
+            INDICATOR, VALUE, OUTLIER_DETECTED, OUTLIER_METHOD
+        ) %>%
+        dplyr::arrange(ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD)
+
+    log_msg(glue::glue("{method}: detection table formatted ({sum(detected$OUTLIER_DETECTED)} outliers out of {nrow(detected)} values)."))
+    detected
+}
+
+
+#' Pivot Long Outliers Routine Data to the Standard Wide Routine Layout
+#'
+#' Shared layout step of `format_outliers_imputed_table()` and
+#' `format_outliers_removed_table()`, so both tables always have the same structure.
+#' Key columns are typed by `standardize_outliers_long()`. Pivots the VALUE column to
+#' one column per indicator, joins ADM1/ADM2/OU names unchanged from the routine data,
+#' and fixes column order and row order:
+#' PERIOD, YEAR, MONTH (integer), ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID, OU_ID,
+#' OU_NAME (character), then one double column per indicator in `indicators` order.
+#'
+#' The rows are taken from `routine_df`, not from `routine_long`: the output has exactly
+#' one row per facility x period of the formatted routine data, whatever rows the
+#' notebook passes in. A facility x period missing from `routine_long` (e.g. because its
+#' outlier rows were dropped instead of set to NA) comes back with NA values; input rows
+#' that are not in the routine data are dropped, and their count is logged; if none of
+#' the input rows match the routine data, it stops with an [ERROR] (key mismatch). An indicator
+#' with no values at all is added as an all-NA column. Facility x period x indicator keys
+#' must be unique: deduplicate upstream, in the notebook.
+#'
+#' @param routine_long Data frame or data.table. Long-format routine data with PERIOD,
+#'   YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR and VALUE (the value to publish).
+#' @param indicators Character vector. Indicator columns of the output, in order;
+#'   indicators of `routine_long` not listed here are dropped.
+#' @param routine_df Data frame or data.table. Formatted routine data, used as the
+#'   source of the output rows (facility x period) and of ADM1_NAME, ADM2_NAME and OU_NAME.
+#' @return Data frame. One row per facility and period of `routine_df`, sorted by
+#'   ADM1_ID, ADM2_ID, OU_ID and PERIOD.
+#'
+#' @export
+to_outliers_routine_wide <- function(routine_long, indicators, routine_df) {
+    row_cols <- c("PERIOD", "YEAR", "MONTH", "ADM1_ID", "ADM2_ID", "OU_ID")
+
+    missing_row_cols <- setdiff(row_cols, colnames(routine_df))
+    if (length(missing_row_cols) > 0) {
+        msg <- paste("[ERROR] Routine data is missing row key column(s):", paste(missing_row_cols, collapse = ", "))
+        log_msg(msg, "error")
+        stop(msg)
+    }
+
+    pyramid_names <- get_outliers_pyramid_names(routine_df)
+
+    # Output rows: every facility x period of the routine data, typed like the long table
+    row_keys <- as.data.frame(routine_df) %>%
+        dplyr::select(dplyr::all_of(row_cols)) %>%
+        dplyr::mutate(
+            PERIOD = cast_period_to_integer(PERIOD),
+            YEAR = as.integer(YEAR),
+            MONTH = as.integer(MONTH),
+            ADM1_ID = as.character(ADM1_ID),
+            ADM2_ID = as.character(ADM2_ID),
+            OU_ID = as.character(OU_ID)
+        ) %>%
+        dplyr::distinct()
+
+    routine_long <- standardize_outliers_long(routine_long) %>%
+        dplyr::select(dplyr::all_of(c(row_cols, "INDICATOR", "VALUE")))
+
+    input_row_keys <- routine_long %>% dplyr::distinct(dplyr::across(dplyr::all_of(row_cols)))
+    n_extra_rows <- input_row_keys %>%
+        dplyr::anti_join(row_keys, by = row_cols) %>%
+        nrow()
+
+    # No input row matching the routine data can only be a key mismatch (e.g. ID types),
+    # which would otherwise publish a table with all indicator values NA
+    if (nrow(input_row_keys) > 0 && n_extra_rows == nrow(input_row_keys)) {
+        msg <- glue::glue("[ERROR] None of the {n_extra_rows} facility x period row(s) of the outliers table match the routine data; check PERIOD, YEAR, MONTH, ADM1_ID, ADM2_ID and OU_ID.")
+        log_msg(msg, "error")
+        stop(msg)
+    }
+    if (n_extra_rows > 0) {
+        log_msg(glue::glue("{n_extra_rows} facility x period row(s) not present in the routine data were dropped from the wide table."))
+    }
+
+    routine_wide <- routine_long %>%
+        dplyr::filter(INDICATOR %in% indicators) %>%
+        tidyr::pivot_wider(names_from = "INDICATOR", values_from = "VALUE")
+    routine_wide <- row_keys %>%
+        dplyr::left_join(routine_wide, by = row_cols)
+
+    for (indicator in setdiff(indicators, colnames(routine_wide))) {
+        routine_wide[[indicator]] <- NA_real_
+    }
+
+    routine_wide %>%
+        dplyr::left_join(pyramid_names, by = c("ADM1_ID", "ADM2_ID", "OU_ID")) %>%
+        dplyr::select(
+            PERIOD, YEAR, MONTH,
+            ADM1_NAME, ADM1_ID, ADM2_NAME, ADM2_ID, OU_ID, OU_NAME,
+            dplyr::all_of(indicators)
+        ) %>%
+        dplyr::arrange(ADM1_ID, ADM2_ID, OU_ID, PERIOD)
+}
+
+
+#' Format the Routine Outliers Imputed Output Table
+#'
+#' Builds the standard `{CC}_routine_outliers_imputed.parquet` table, method-agnostic and
+#' shared by all `snt_dhis2_outliers_imputation_*` pipelines. It only formats: the imputation itself
+#' is method-specific and must already be in `value_col`. Layout, types and checks are
+#' those of `to_outliers_routine_wide()`.
+#'
+#' @param outliers_long Data frame or data.table. Long-format routine data with PERIOD,
+#'   YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR and `value_col`.
+#' @param indicators Character vector. Indicator columns of the output, in order.
+#' @param routine_df Data frame or data.table. Formatted routine data, used as the
+#'   source of ADM1_NAME, ADM2_NAME and OU_NAME.
+#' @param value_col Character. Column holding the imputed values. Default: "VALUE_IMPUTED".
+#' @return Data frame. Wide routine table ready to be saved as
+#'   `{CC}_routine_outliers_imputed.parquet`.
+#'
+#' @export
+format_outliers_imputed_table <- function(outliers_long, indicators, routine_df, value_col = "VALUE_IMPUTED") {
+    if (!value_col %in% colnames(outliers_long)) {
+        msg <- glue::glue("[ERROR] Outliers imputed table is missing the imputed value column: {value_col}")
+        log_msg(msg, "error")
+        stop(msg)
+    }
+
+    routine_long <- as.data.frame(outliers_long)
+    routine_long$VALUE <- routine_long[[value_col]]
+
+    imputed <- to_outliers_routine_wide(routine_long, indicators, routine_df)
+    log_msg(glue::glue("Imputed table formatted: {nrow(imputed)} rows, {length(indicators)} indicators."))
+    imputed
+}
+
+
+#' Format the Routine Outliers Removed Output Table
+#'
+#' Builds the standard `{CC}_routine_outliers_removed.parquet` table, method-agnostic and
+#' shared by all `snt_dhis2_outliers_imputation_*` pipelines. It only formats: the removal itself
+#' (setting outlier values to NA) is done in the notebook and must already be in
+#' `value_col`. Layout, types and checks are those of `to_outliers_routine_wide()`.
+#'
+#' @param outliers_long Data frame or data.table. Long-format routine data with PERIOD,
+#'   YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR and `value_col`.
+#' @param indicators Character vector. Indicator columns of the output, in order.
+#' @param routine_df Data frame or data.table. Formatted routine data, used as the
+#'   source of ADM1_NAME, ADM2_NAME and OU_NAME.
+#' @param value_col Character. Column holding the values with outliers removed (NA).
+#'   Default: "VALUE_REMOVED".
+#' @return Data frame. Wide routine table ready to be saved as
+#'   `{CC}_routine_outliers_removed.parquet`.
+#'
+#' @export
+format_outliers_removed_table <- function(outliers_long, indicators, routine_df, value_col = "VALUE_REMOVED") {
+    if (!value_col %in% colnames(outliers_long)) {
+        msg <- glue::glue("[ERROR] Outliers removed table is missing the removed value column: {value_col}")
+        log_msg(msg, "error")
+        stop(msg)
+    }
+
+    routine_long <- as.data.frame(outliers_long)
+    routine_long$VALUE <- routine_long[[value_col]]
+
+    removed <- to_outliers_routine_wide(routine_long, indicators, routine_df)
+    log_msg(glue::glue("Removed table formatted: {nrow(removed)} rows, {length(indicators)} indicators."))
+    removed
 }
 
 

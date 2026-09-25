@@ -14,7 +14,7 @@ from snt_lib.snt_pipeline_utils import (
 )
 
 
-@pipeline("snt_dhis2_outliers_imputation_magic_glasses")
+@pipeline("snt_dhis2_outliers_imputation_magic_glasses", timeout=28800)
 @parameter(
     "mode",
     name="Detection mode",
@@ -63,12 +63,11 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         raise ValueError('mode must be "partial" or "complete".')
     run_mg_complete = mode_clean == "complete"
     current_run.log_info(f"Selected detection mode: {mode_clean}")
-    current_run.log_info(f"RUN_MAGIC_GLASSES_COMPLETE={run_mg_complete}")
+
     if run_mg_complete:
         current_run.log_warning(
             "Complete mode selected: seasonal detection is very slow and can take several hours to run."
         )
-    seasonal_workers = 1  # default: sequential execution of seasonal detection
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -105,7 +104,6 @@ def snt_dhis2_outliers_imputation_magic_glasses(
             "DEVIATION_MAD10": 10,
             "DEVIATION_SEASONAL5": 5,
             "DEVIATION_SEASONAL3": 3,
-            "SEASONAL_WORKERS": seasonal_workers,
         }
         expected_outputs = [
             data_path / f"{country_code}_routine_outliers_detected.parquet",

@@ -316,9 +316,12 @@ prepare_routine_long <- function(routine_df, fixed_cols, indicators, deduplicate
 #' Impute Flagged Outliers Using a Centered Moving Statistic
 #'
 #' For each ADM/OU/indicator time series, values marked as outliers are
-#' replaced by a centered moving mean or median (ceiling), preserving
-#' non-outlier observations. Shared by the `snt_dhis2_outliers_imputation_*`
-#' pipelines.
+#' replaced by a centered moving mean or median (ceiling) of the neighbouring
+#' values that are neither outliers nor missing. Only flagged outliers are
+#' replaced: every other value, including missing ones, is kept as reported
+#' (an NA flag counts as not an outlier). An outlier with no usable neighbour
+#' in its window, or at the first or last period of a series, becomes NA.
+#' Shared by the `snt_dhis2_outliers_imputation_*` pipelines.
 #'
 #' @param dt Data frame or data.table. Routine data in long format.
 #' @param outlier_col Character. Name of the logical outlier flag column.
@@ -344,7 +347,8 @@ impute_outliers <- function(dt, outlier_col, n = 3, stat = c("mean", "median")) 
         },
         align = "center"
     )), by = .(ADM1_ID, ADM2_ID, OU_ID, INDICATOR)]
-    dt[, VALUE_IMPUTED := data.table::fifelse(is.na(TO_IMPUTE), MOVING_STAT, TO_IMPUTE)]
+    # Replace flagged outliers only; missing values that were not outliers stay missing
+    dt[, VALUE_IMPUTED := data.table::fifelse(get(outlier_col) %in% TRUE, MOVING_STAT, as.numeric(VALUE))]
     dt[, c("TO_IMPUTE", "MOVING_STAT") := NULL]
     return(as.data.frame(data.table::copy(dt)))
 }

@@ -1,45 +1,76 @@
 # SNT DHIS2 Outliers Imputation (Magic Glasses) Pipeline
 
-Magic Glasses runs a staged outlier workflow on formatted DHIS2 routine data: median ± MAD screens at two strictness levels, optionally followed by seasonal decomposition rules when “complete” mode is selected. The pipeline clears stale Parquet artifacts before each compute run, exports the standard detection / imputed / removed trio, and registers them on the shared outliers dataset.
+The **SNT DHIS2 Outliers Imputation (Magic Glasses)** pipeline flags outliers in the formatted DHIS2 routine data with a staged median ± MAD screen (MAD15 → MAD10), optionally followed by two seasonal passes (seasonal5 → seasonal3) in complete mode. It builds a detection table plus imputed and removed versions of the routine data, publishes them to **`DHIS2_OUTLIERS_IMPUTATION`**, and runs the Magic Glasses reporting notebook.
 
 ## Parameters
 
 * **`mode`** (str, Optional):
   * **Name:** Detection mode
-  * **Description:** **`partial`** runs MAD-based stages only (MAD15 then MAD10). **`complete`** adds seasonal detection passes (seasonal5 then seasonal3) on the remaining rows, which is far slower.
-  * **Choices/Default:** `partial`, `complete`. Default: `partial`.
+  * **Description:** Detection passes to run.
+    * `partial`: MAD15 then MAD10 only. Fast (about 7 minutes, per the UI help text).
+    * `complete`: `partial`, then seasonal5 then seasonal3 on the values not yet flagged. Can take several hours; the pipeline logs a warning when selected.
+  * **Choices:** `partial`, `complete`. The value is trimmed and lower-cased before use; any other value stops the run with a `ValueError`.
+  * **Default:** `partial`.
 * **`push_db`** (bool, Optional):
   * **Name:** Push to Shiny database
-  * **Description:** When true, loads the detection Parquet into `outliers_detected` for the Shiny outliers explorer.
-  * **Choices/Default:** Default: `false` (unlike the classic mean/median/IQR pipelines).
+  * **Description:** When true, loads **`[COUNTRY_CODE]_routine_outliers_detected.parquet`** into the workspace database table **`outliers_detected`** (for the Shiny outliers explorer), replacing whatever the last outliers pipeline pushed there.
+  * **Default:** `false`.
+
+`run_report_only` and `pull_scripts` behave as in the other SNT pipelines. In report-only mode nothing is computed or published: only the reporting notebook runs, on the files already in the dataset.
 
 ## Functionality Overview
 
-1. Normalise `mode`, reject unknown strings, log whether **`RUN_MAGIC_GLASSES_COMPLETE`** is true, and warn when complete mode is chosen because seasonal work can take hours.
-2. Optionally pull notebooks from the repository, then ensure pipeline and `data/dhis2/outliers_imputation` directories exist and load `SNT_config.json`.
-3. When not in report-only mode, delete any existing `{COUNTRY_CODE}_routine_outliers_*.parquet` in the output folder to avoid publishing stale files.
-4. Pass **`ROOT_PATH`**, **`RUN_MAGIC_GLASSES_COMPLETE`**, fixed MAD thresholds (**15**, **10**), seasonal thresholds (**5**, **3**), and **`SEASONAL_WORKERS = 1`** into `code/snt_dhis2_outliers_imputation_magic_glasses.ipynb`.
-5. Load `{COUNTRY_CODE}_routine.parquet` from **`SNT_DATASET_IDENTIFIERS.DHIS2_DATASET_FORMATTED`**, melt configured indicators to long form at **ADM1 × ADM2 × OU × PERIOD/YEAR/MONTH × INDICATOR**, and drop duplicate keys on that grain.
-6. Run **`run_magic_glasses_outlier_detection`**: compute median and MAD with `constant = 1` **by YEAR, OU_ID, and INDICATOR** for MAD passes; MAD15 runs on all rows, MAD10 on rows not flagged by MAD15, then merge into **`OUTLIER_MAD15_MAD10`**. When complete, run seasonal detectors sequentially on rows still not flagged, producing **`OUTLIER_SEASONAL5_SEASONAL3`**.
-7. Export via **`export_magic_glasses_outputs`**: attach **`OUTLIER_MAGIC_GLASSES_PARTIAL`** and (if complete) **`OUTLIER_MAGIC_GLASSES_COMPLETE`**, choose the active flag column, write `{COUNTRY_CODE}_routine_outliers_detected.parquet` with **`OUTLIER_DETECTED`**, **`OUTLIER_METHOD`**, and a **`DATE`** column; build imputed wide data using a **three-month centred `frollapply` mean (ceiling)** on non-outlier values **by (ADM1_ID, ADM2_ID, OU_ID, INDICATOR)**; build removed wide data by nulling flagged values.
-8. After successful outputs, save the expanded parameter JSON (including injected thresholds), upload the three Parquet files plus JSON to **`SNT_DATASET_IDENTIFIERS.DHIS2_OUTLIERS_IMPUTATION`**, optionally push `outliers_detected`, and render `reporting/snt_dhis2_outliers_imputation_magic_glasses_report.ipynb`.
+1. **Mode:** Normalise **`mode`**, reject unknown values, and set **`RUN_MAGIC_GLASSES_COMPLETE`** (`true` for `complete`).
+2. **Configuration:** Load and validate **`SNT_config.json`**, resolve **`COUNTRY_CODE`**, and create `pipelines/snt_dhis2_outliers_imputation_magic_glasses/` and `data/dhis2/outliers_imputation/` if missing.
+3. **Detection and imputation** (skipped when `run_report_only`): run **`code/snt_dhis2_outliers_imputation_magic_glasses.ipynb`** with **`ROOT_PATH`**, **`RUN_MAGIC_GLASSES_COMPLETE`** and the fixed thresholds **`DEVIATION_MAD15 = 15`**, **`DEVIATION_MAD10 = 10`**, **`DEVIATION_SEASONAL5 = 5`**, **`DEVIATION_SEASONAL3 = 3`** (the thresholds are not exposed as parameters). The notebook:
+   1. Loads **`[COUNTRY_CODE]_routine.parquet`** from **`DHIS2_DATASET_FORMATTED`** and stops if a configured indicator column is missing.
+   2. Reshapes it to long format at **facility (`OU_ID`) × month (`PERIOD`) × `INDICATOR`**, and removes rows duplicated on that key (first row kept; logged).
+   3. **MAD15 → MAD10:** flags values outside `median ± k × MAD` (`MAD` with `constant = 1`), computed **per `YEAR` × `OU_ID` × `INDICATOR`**. MAD10 runs only on the values MAD15 did not flag.
+   4. **Seasonal5 → seasonal3** (complete mode only): for each **`OU_ID` × `INDICATOR`** monthly series, flags values whose residual from `forecast::tsclean()`, scaled by the series MAD, is at least `k`. Runs only on the values not flagged by the MAD passes, in parallel on (available cores − 1) workers.
+   5. Combines the passes into one flag, **`OUTLIER_DETECTED`**, and writes the detected, imputed and removed tables (see Outputs).
+4. **Output check:** stop with an error if any of the three Parquet files is missing or was not rewritten during this run. All outliers imputation pipelines write the same filenames, so this prevents publishing a file left by an earlier run of another method.
+5. **Publish:** save the pipeline parameters JSON (the injected notebook parameters) and upload the three Parquet files plus that JSON to **`DHIS2_OUTLIERS_IMPUTATION`**.
+6. **Database** (only when `push_db`): push the detection table to **`outliers_detected`**.
+7. **Reporting:** run **`reporting/snt_dhis2_outliers_imputation_magic_glasses_report.ipynb`**, in every mode including report-only.
 
 ## Inputs
 
-* **`configuration/SNT_config.json`**.
-* **`{COUNTRY_CODE}_routine.parquet`** from `DHIS2_DATASET_FORMATTED` (all indicators declared under `DHIS2_INDICATOR_DEFINITIONS`).
+* **`[COUNTRY_CODE]_routine.parquet`** on **`DHIS2_DATASET_FORMATTED`**: required; the notebook stops with an `[ERROR]` if it cannot be loaded or lacks a configured indicator column.
+* **`configuration/SNT_config.json`** for:
+  * **`SNT_CONFIG.COUNTRY_CODE`** (and **`SNT_CONFIG.COUNTRY_NAME`** in the report)
+  * **`DHIS2_DATA_DEFINITIONS.DHIS2_INDICATOR_DEFINITIONS`**: its keys are the indicators screened
+  * **`SNT_DATASET_IDENTIFIERS.DHIS2_DATASET_FORMATTED`** and **`SNT_DATASET_IDENTIFIERS.DHIS2_OUTLIERS_IMPUTATION`**
+* The reporting notebook reads **`[COUNTRY_CODE]_routine_outliers_detected.parquet`** back from **`DHIS2_OUTLIERS_IMPUTATION`**.
 
 ## Outputs
 
-* **`data/dhis2/outliers_imputation/{COUNTRY_CODE}_routine_outliers_detected.parquet`**
-* **`data/dhis2/outliers_imputation/{COUNTRY_CODE}_routine_outliers_imputed.parquet`**
-* **`data/dhis2/outliers_imputation/{COUNTRY_CODE}_routine_outliers_removed.parquet`**
-* **Pipeline parameters JSON** (saved after output validation; includes `RUN_MAGIC_GLASSES_COMPLETE`, MAD and seasonal constants, worker count).
-* **Dataset:** **`SNT_DATASET_IDENTIFIERS.DHIS2_OUTLIERS_IMPUTATION`**.
+**Workspace filesystem**
+
+* **`data/dhis2/outliers_imputation/[COUNTRY_CODE]_routine_outliers_detected.parquet`**
+* **`data/dhis2/outliers_imputation/[COUNTRY_CODE]_routine_outliers_imputed.parquet`**
+* **`data/dhis2/outliers_imputation/[COUNTRY_CODE]_routine_outliers_removed.parquet`**
+* **Pipeline parameters JSON** in the same directory
+* Executed notebook under **`pipelines/snt_dhis2_outliers_imputation_magic_glasses/papermill_outputs/`**; report outputs under **`pipelines/snt_dhis2_outliers_imputation_magic_glasses/reporting/outputs/`**
+
+**Published to `DHIS2_OUTLIERS_IMPUTATION`** (not in report-only mode)
+
+* The three Parquet files above and the pipeline parameters JSON. No `.csv` twins are written.
+
+**Database** (only when `push_db`)
+
+* Table **`outliers_detected`**, loaded from the detection Parquet.
 
 > **Notes for the Data Analyst:**
 >
-> - **`OUTLIER_MAGIC_GLASSES_PARTIAL`**: Result after MAD15 → MAD10 chaining (any row still flagged remains an outlier in partial mode exports).
-> - **`OUTLIER_MAGIC_GLASSES_COMPLETE`**: Present only in complete mode; incorporates seasonal passes after MAD filtering.
-> - **`OUTLIER_DETECTED` / `OUTLIER_METHOD`**: Final boolean used for imputation/removal and textual label (**`MAGIC_GLASSES_PARTIAL`** or **`MAGIC_GLASSES_COMPLETE`**).
-> - **MAD stages**: Median and MAD are computed **per calendar YEAR × OU × INDICATOR**, while imputation smoothing runs **along monthly PERIOD order within OU × INDICATOR**.
+> - **Last run wins:** all five outliers imputation pipelines publish the same three filenames to **`DHIS2_OUTLIERS_IMPUTATION`**. Downstream uses whichever ran last; check **`OUTLIER_METHOD`** or the parameters JSON to see which method produced the files.
+> - **Detection table** (long format, one row per facility × month × indicator of the routine data; rows sorted by `ADM1_ID`, `ADM2_ID`, `OU_ID`, `INDICATOR`, `PERIOD`), columns in order:
+>   - **`PERIOD`** (integer, `YYYYMM`), **`YEAR`**, **`MONTH`** (integer), **`DATE`** (date, first day of the month)
+>   - **`ADM1_NAME`**, **`ADM1_ID`**, **`ADM2_NAME`**, **`ADM2_ID`**, **`OU_ID`**, **`OU_NAME`** (character; names unchanged from the routine data), **`INDICATOR`** (character)
+>   - **`VALUE`** (double): original reported value.
+>   - **`OUTLIER_DETECTED`** (logical, never missing): `TRUE` if flagged by any pass of the selected mode. Missing values are never flagged.
+>   - **`OUTLIER_METHOD`** (character): `MAGIC_GLASSES_PARTIAL` or `MAGIC_GLASSES_COMPLETE`. A file holds one mode only; comparing the two modes needs two runs.
+> - **Imputed and removed tables** (wide routine format, one row per facility × month of the routine data, kept even when all values are missing; rows sorted by `ADM1_ID`, `ADM2_ID`, `OU_ID`, `PERIOD`), columns in order: **`PERIOD`**, **`YEAR`**, **`MONTH`** (integer), **`ADM1_NAME`**, **`ADM1_ID`**, **`ADM2_NAME`**, **`ADM2_ID`**, **`OU_ID`**, **`OU_NAME`** (character), then one double column per configured indicator (all missing if the indicator has no data).
+>   - **Imputed:** flagged values are replaced by a centred 3-row moving mean (rounded up) of the non-flagged values in the same `OU_ID` × `INDICATOR` series, ordered by `PERIOD`. The value stays missing when both neighbours are flagged or missing, and at the first and last month of a series.
+>   - **Removed:** flagged values are set to missing; rows are kept.
+> - **Grain:** facility × month. MAD statistics are computed per calendar year; seasonal detection and imputation run along the whole monthly series of each facility × indicator.
+> - **Gaps in `PERIOD`:** seasonal detection and the imputation window treat consecutive rows as consecutive months. A series with missing months logs a warning in complete mode, and its seasonal flags and imputed values may be misaligned.

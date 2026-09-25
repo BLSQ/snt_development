@@ -1,4 +1,9 @@
-# Helpers for PATH outliers imputation notebook.
+# ================================================
+# Title: Main helpers for the PATH outliers imputation pipeline
+# Description: Loading, deduplication, exception (stock-out, epidemic) and imputation helpers
+#   sourced by the pipeline notebook.
+# Dependencies: dplyr, tidyr, glue
+# ================================================
 
 # Load base snt utils 
 source(file.path("~/workspace", "code", "snt_utils.r"))

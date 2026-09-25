@@ -1,4 +1,9 @@
-# Helpers for the magic glasses outliers report notebook.
+# ================================================
+# Title: Report helpers for the Magic Glasses outliers imputation pipeline
+# Description: Method label, outlier summary and bar-chart helpers sourced by the reporting
+#   notebook.
+# Dependencies: dplyr, ggplot2, scales, stats
+# ================================================
 
 # Load base utils
 source(file.path("~/workspace", "code", "snt_utils.r"))

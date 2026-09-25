@@ -1,4 +1,9 @@
-# Report helpers for the IQR outliers pipeline.
+# ================================================
+# Title: Report helpers for the IQR outliers imputation pipeline
+# Description: Plotting and coherence-metric helpers sourced by the reporting notebook; also sources
+#   snt_dhis2_outliers_imputation_iqr.r.
+# Dependencies: ggplot2, dplyr, tidyr, purrr, rlang, forcats, viridis, grid, stats, sf
+# ================================================
 
 # Load base utils
 source(file.path("~/workspace/code", "snt_utils.r"))   

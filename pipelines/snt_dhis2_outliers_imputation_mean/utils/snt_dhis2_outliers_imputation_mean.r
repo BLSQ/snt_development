@@ -1,7 +1,8 @@
 # ================================================
 # Title: Main helpers for the mean outliers imputation pipeline
-# Description: Loading, imputation and formatting helpers sourced by the pipeline notebook.
-# Dependencies: data.table, dplyr, tidyr, glue, rlang
+# Description: Loading and output-formatting helpers sourced by the pipeline notebook (imputation:
+#   impute_outliers() in code/snt_utils.r).
+# Dependencies: dplyr, tidyr, glue
 # ================================================
 
 # Load base snt utils
@@ -64,42 +65,6 @@ load_routine_data <- function(
     }
 
     dhis2_routine
-}
-
-
-#' Impute Flagged Outliers Using a Centered Moving Statistic
-#'
-#' For each ADM/OU/indicator time series, values marked as outliers are
-#' replaced by a centered moving mean or median (ceiling), preserving
-#' non-outlier observations.
-#'
-#' @param dt Data frame or data.table. Routine data in long format.
-#' @param outlier_col Character. Name of the logical outlier flag column.
-#' @param n Integer. Size of the centered rolling window, in periods. Default: 3.
-#' @param stat Character. Either "mean" or "median". Default: "mean".
-#' @return Data frame with a VALUE_IMPUTED column added and the TO_IMPUTE /
-#'   MOVING_STAT helper columns removed.
-#'
-#' @export
-impute_outliers <- function(dt, outlier_col, n = 3, stat = c("mean", "median")) {
-    stat <- match.arg(stat)
-    stat_fun <- if (stat == "mean") mean else median
-
-    dt <- data.table::as.data.table(dt)
-    data.table::setorder(dt, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, PERIOD, YEAR, MONTH)
-    dt[, TO_IMPUTE := data.table::fifelse(get(outlier_col) == TRUE, NA_real_, VALUE)]
-    dt[, MOVING_STAT := as.numeric(data.table::frollapply(
-        TO_IMPUTE,
-        N = n,
-        FUN = function(x) {
-            m <- stat_fun(x, na.rm = TRUE)
-            if (is.nan(m)) NA_real_ else ceiling(m)
-        },
-        align = "center"
-    )), by = .(ADM1_ID, ADM2_ID, OU_ID, INDICATOR)]
-    dt[, VALUE_IMPUTED := data.table::fifelse(is.na(TO_IMPUTE), MOVING_STAT, TO_IMPUTE)]
-    dt[, c("TO_IMPUTE", "MOVING_STAT") := NULL]
-    return(as.data.frame(data.table::copy(dt)))
 }
 
 

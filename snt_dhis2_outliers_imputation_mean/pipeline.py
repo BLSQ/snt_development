@@ -119,11 +119,15 @@ def snt_dhis2_outliers_imputation_mean(
             current_run.log_error(f"Failed to save pipeline parameters: {e}")
             raise
 
-        add_files_to_dataset(
-            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
-            country_code=country_code,
-            file_paths=[*expected_outputs, parameters_file],
-        )
+        try:
+            add_files_to_dataset(
+                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
+                country_code=country_code,
+                file_paths=[*expected_outputs, parameters_file],
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to add files to dataset: {e}")
+            raise
 
         if push_db:
             try:

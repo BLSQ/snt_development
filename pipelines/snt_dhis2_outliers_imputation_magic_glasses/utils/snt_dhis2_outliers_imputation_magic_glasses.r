@@ -175,44 +175,6 @@ detect_seasonal_outliers <- function(dt, deviation, frequency = 12, workers = 1)
 }
 
 
-#' Convert Long Routine Data to Wide Export Format
-#'
-#' Casts indicators to columns, joins ADM1/ADM2/OU names, adds any expected
-#' column that is missing as NA of the appropriate type, and orders columns as
-#' in the routine export.
-#'
-#' @param dt_long data.table. Long-format routine data with INDICATOR and VALUE.
-#' @param indicators_to_keep Character vector. Indicator columns expected in the output.
-#' @param pyramid_names Data frame or data.table. Mapping of ADM1/ADM2/OU IDs to names.
-#' @return data.table. Wide routine table: PERIOD, YEAR, MONTH, ADM and OU columns,
-#'   then one column per indicator.
-#'
-#' @export
-to_routine_wide <- function(dt_long, indicators_to_keep, pyramid_names) {
-    routine_wide <- data.table::dcast(
-        dt_long[, .(PERIOD, YEAR, MONTH, ADM1_ID, ADM2_ID, OU_ID, INDICATOR, VALUE)],
-        PERIOD + YEAR + MONTH + ADM1_ID + ADM2_ID + OU_ID ~ INDICATOR,
-        value.var = "VALUE"
-    )
-
-    routine_wide <- merge(routine_wide, unique(pyramid_names), by = c("ADM1_ID", "ADM2_ID", "OU_ID"), all.x = TRUE)
-
-    target_cols <- c("PERIOD", "YEAR", "MONTH", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID", "OU_ID", "OU_NAME", indicators_to_keep)
-    for (col in setdiff(target_cols, names(routine_wide))) {
-        if (col %in% indicators_to_keep) {
-            routine_wide[, (col) := NA_real_]
-        } else if (col %in% c("YEAR", "MONTH")) {
-            routine_wide[, (col) := NA_integer_]
-        } else {
-            routine_wide[, (col) := NA_character_]
-        }
-    }
-    cols_to_keep <- intersect(target_cols, names(routine_wide))
-    routine_wide <- routine_wide[, ..cols_to_keep]
-    routine_wide
-}
-
-
 #' Combine Magic Glasses Outlier Flags into a Single Column
 #'
 #' Joins the partial flags (MAD15 -> MAD10) onto the long routine data and, in
@@ -554,46 +516,6 @@ format_outliers_removed_table <- function(outliers_long, indicators, routine_df,
     removed <- to_outliers_routine_wide(routine_long, indicators, routine_df)
     log_msg(glue::glue("Removed table formatted: {nrow(removed)} rows, {length(indicators)} indicators."))
     removed
-}
-
-
-#' Format the Magic Glasses Imputed Routine Output Table
-#'
-#' Replaces flagged outliers with a centered 3-period moving mean (see
-#' `impute_outliers()`) and reshapes the result to the wide routine format.
-#'
-#' @param flags data.table. Output of `build_magic_glasses_flags()`.
-#' @param indicators_to_keep Character vector. Indicator columns expected in the output.
-#' @param pyramid_names Data frame or data.table. Mapping of ADM1/ADM2/OU IDs to names.
-#' @return data.table. Wide routine table ready to be saved as
-#'   `{CC}_routine_outliers_imputed.parquet`.
-#'
-#' @export
-format_magic_glasses_imputed <- function(flags, indicators_to_keep, pyramid_names) {
-    imputed <- data.table::as.data.table(
-        impute_outliers(flags, outlier_col = "OUTLIER_DETECTED", n = 3, stat = "mean")
-    )
-    imputed[, VALUE := VALUE_IMPUTED]
-    to_routine_wide(imputed, indicators_to_keep, pyramid_names)
-}
-
-
-#' Format the Magic Glasses Removed Routine Output Table
-#'
-#' Sets flagged outliers to NA and reshapes the result to the wide routine
-#' format.
-#'
-#' @param flags data.table. Output of `build_magic_glasses_flags()`.
-#' @param indicators_to_keep Character vector. Indicator columns expected in the output.
-#' @param pyramid_names Data frame or data.table. Mapping of ADM1/ADM2/OU IDs to names.
-#' @return data.table. Wide routine table ready to be saved as
-#'   `{CC}_routine_outliers_removed.parquet`.
-#'
-#' @export
-format_magic_glasses_removed <- function(flags, indicators_to_keep, pyramid_names) {
-    removed <- data.table::copy(flags)
-    removed[OUTLIER_DETECTED == TRUE, VALUE := NA_real_]
-    to_routine_wide(removed, indicators_to_keep, pyramid_names)
 }
 
 

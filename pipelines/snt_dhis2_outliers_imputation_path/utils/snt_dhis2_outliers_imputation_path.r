@@ -206,7 +206,8 @@ impute_path_outliers <- function(routine_data_outliers_clean) {
         tidyr::pivot_longer(
             cols = dplyr::starts_with("VALUE_OLD_") | dplyr::starts_with("VALUE_IMPUTED_") | dplyr::starts_with("OUTLIER_TREND_"),
             names_to = c(".value", "INDICATOR"),
-            names_pattern = "(.*)_(.*)$"
+            # Split on the known prefixes, not the last underscore: indicator names can contain "_"
+            names_pattern = "^(VALUE_OLD|VALUE_IMPUTED|OUTLIER_TREND)_(.+)$"
         ) %>%
         dplyr::arrange(ADM1_ID, ADM2_ID, OU_ID, PERIOD, INDICATOR) %>%
         dplyr::select(dplyr::all_of(c("PERIOD", "YEAR", "MONTH", "ADM1_ID", "ADM2_ID", "OU_ID", "INDICATOR", "VALUE_OLD", "VALUE_IMPUTED", "OUTLIER_TREND")))

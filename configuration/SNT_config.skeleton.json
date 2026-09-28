@@ -1,9 +1,9 @@
 {
   "SNT_CONFIG": {
-    "COUNTRY_CODE": "",
-    "COUNTRY_NAME": "",
-    "DHIS2_ADMINISTRATION_1": "",
-    "DHIS2_ADMINISTRATION_2": "",
+    "COUNTRY_CODE": null,
+    "COUNTRY_NAME": null,
+    "DHIS2_ADMINISTRATION_1": null,
+    "DHIS2_ADMINISTRATION_2": null,
     "ANALYTICS_ORG_UNITS_LEVEL": null,
     "REPORTING_RATE_PRODUCT_UID": []
   },
@@ -82,7 +82,7 @@
     "DHIS2_REPORTING_RATES": {
       "REPORTING_DATASETS": [
         {
-          "DATASET": "",
+          "DATASET": null,
           "METRICS": {
             "ACTUAL_REPORTS": "float",
             "EXPECTED_REPORTS": "float"
@@ -90,8 +90,8 @@
         }
       ],
       "REPORTING_INDICATORS": {
-        "ACTUAL_REPORTS": "",
-        "EXPECTED_REPORTS": ""
+        "ACTUAL_REPORTS": null,
+        "EXPECTED_REPORTS": null
       }
     }
   }

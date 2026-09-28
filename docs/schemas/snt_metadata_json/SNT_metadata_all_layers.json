@@ -1,0 +1,2258 @@
+{
+    "POPULATION": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POPULATION",
+            "FR": "Placeholder text for POPULATION"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POPULATION",
+            "FR": "Placeholder text for POPULATION"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POPULATION",
+            "FR": "Placeholder text for POPULATION"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POPULATION",
+            "FR": "Placeholder text for POPULATION"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_UNDER_5": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_UNDER_5"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_UNDER_5",
+            "FR": "Placeholder text for POP_UNDER_5"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_UNDER_5",
+            "FR": "Placeholder text for POP_UNDER_5"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_UNDER_5",
+            "FR": "Placeholder text for POP_UNDER_5"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_UNDER_5",
+            "FR": "Placeholder text for POP_UNDER_5"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            30000,
+            60000,
+            90000,
+            120000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_PREGNANT_WOMEN": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_PREGNANT_WOMEN"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10000,
+            20000,
+            30000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_0_1_Y": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_0_1_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_0_1_Y",
+            "FR": "Placeholder text for POP_0_1_Y"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_0_1_Y",
+            "FR": "Placeholder text for POP_0_1_Y"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_0_1_Y",
+            "FR": "Placeholder text for POP_0_1_Y"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_0_1_Y",
+            "FR": "Placeholder text for POP_0_1_Y"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_1_2_Y": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_1_2_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_1_2_Y",
+            "FR": "Placeholder text for POP_1_2_Y"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_1_2_Y",
+            "FR": "Placeholder text for POP_1_2_Y"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_1_2_Y",
+            "FR": "Placeholder text for POP_1_2_Y"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_1_2_Y",
+            "FR": "Placeholder text for POP_1_2_Y"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_5_10_Y": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_5_10_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_5_10_Y",
+            "FR": "Placeholder text for POP_5_10_Y"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_5_10_Y",
+            "FR": "Placeholder text for POP_5_10_Y"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_5_10_Y",
+            "FR": "Placeholder text for POP_5_10_Y"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_5_10_Y",
+            "FR": "Placeholder text for POP_5_10_Y"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_5_36_M": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_5_36_M"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_5_36_M",
+            "FR": "Placeholder text for POP_5_36_M"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_5_36_M",
+            "FR": "Placeholder text for POP_5_36_M"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_5_36_M",
+            "FR": "Placeholder text for POP_5_36_M"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_5_36_M",
+            "FR": "Placeholder text for POP_5_36_M"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_50_PLUS": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_DATASET_FORMATTED",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_50_PLUS"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_50_PLUS",
+            "FR": "Placeholder text for POP_50_PLUS"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_50_PLUS",
+            "FR": "Placeholder text for POP_50_PLUS"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_50_PLUS",
+            "FR": "Placeholder text for POP_50_PLUS"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_50_PLUS",
+            "FR": "Placeholder text for POP_50_PLUS"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
+            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POPULATION_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POPULATION_TRANSFORMED",
+            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POPULATION_TRANSFORMED",
+            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POPULATION_TRANSFORMED",
+            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POPULATION_TRANSFORMED",
+            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_UNDER_5_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_UNDER_5"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
+            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
+            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
+            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
+            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            30000,
+            60000,
+            90000,
+            120000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_PREGNANT_WOMEN_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_PREGNANT_WOMEN"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
+            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10000,
+            20000,
+            30000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_0_1_Y_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_0_1_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_1_2_Y_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_1_2_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_5_10_Y_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_5_10_Y"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_5_36_M_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_5_36_M"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
+            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_50_PLUS_TRANSFORMED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_POPULATION_TRANSFORMATION",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population.csv",
+            "COLUMN": "POP_50_PLUS"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
+            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
+            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
+            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
+            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
+            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            5000,
+            10000,
+            20000,
+            40000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "REPORTING_RATE_DATAELEMENT": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_REPORTING_RATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
+            "COLUMN": "REPORTING_RATE"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
+            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
+            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
+            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
+            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_REPORTING_RATE",
+            "FR": "Placeholder text for DHIS2_REPORTING_RATE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.5,
+            0.8,
+            0.9,
+            0.95
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "REPORTING_RATE_DATASET": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_REPORTING_RATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset.csv",
+            "COLUMN": "REPORTING_RATE"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for REPORTING_RATE_DATASET",
+            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for REPORTING_RATE_DATASET",
+            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for REPORTING_RATE_DATASET",
+            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for REPORTING_RATE_DATASET",
+            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_REPORTING_RATE",
+            "FR": "Placeholder text for DHIS2_REPORTING_RATE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.5,
+            0.8,
+            0.9,
+            0.95
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POPULATION_INCIDENCE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POPULATION_INCIDENCE",
+            "FR": "Placeholder text for POPULATION_INCIDENCE"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POPULATION_INCIDENCE",
+            "FR": "Placeholder text for POPULATION_INCIDENCE"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POPULATION_INCIDENCE",
+            "FR": "Placeholder text for POPULATION_INCIDENCE"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POPULATION_INCIDENCE",
+            "FR": "Placeholder text for POPULATION_INCIDENCE"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_INCIDENCE",
+            "FR": "Placeholder text for DHIS2_INCIDENCE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_CRUDE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_CRUDE"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for INCIDENCE_CRUDE",
+            "FR": "Placeholder text for INCIDENCE_CRUDE"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for INCIDENCE_CRUDE",
+            "FR": "Placeholder text for INCIDENCE_CRUDE"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for INCIDENCE_CRUDE",
+            "FR": "Placeholder text for INCIDENCE_CRUDE"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for INCIDENCE_CRUDE",
+            "FR": "Placeholder text for INCIDENCE_CRUDE"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_INCIDENCE",
+            "FR": "Placeholder text for DHIS2_INCIDENCE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_TESTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_TESTING"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_INCIDENCE",
+            "FR": "Placeholder text for DHIS2_INCIDENCE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_REPORTING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_REPORTING"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_INCIDENCE",
+            "FR": "Placeholder text for DHIS2_INCIDENCE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INCIDENCE_ADJ_CARESEEKING": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_INCIDENCE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
+            "COLUMN": "INCIDENCE_ADJ_CARESEEKING"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
+            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_INCIDENCE",
+            "FR": "Placeholder text for DHIS2_INCIDENCE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            150,
+            250,
+            350,
+            450,
+            1000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "TEST_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "TEST"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for TEST_QOC_IMPUTED",
+            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for TEST_QOC_IMPUTED",
+            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for TEST_QOC_IMPUTED",
+            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for TEST_QOC_IMPUTED",
+            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SUSP_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "SUSP"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
+            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
+            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
+            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
+            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALTREAT_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "MALTREAT"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
+            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
+            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
+            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
+            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "CONF_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "CONF"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for CONF_QOC_IMPUTED",
+            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for CONF_QOC_IMPUTED",
+            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for CONF_QOC_IMPUTED",
+            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for CONF_QOC_IMPUTED",
+            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALDTH_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "MALDTH"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALADM_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "MALADM"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
+            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
+            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
+            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
+            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLADM_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "ALLADM"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLDTH_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "ALLDTH"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLOUT_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "ALLOUT"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
+            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PRES_QOC_IMPUTED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_imputed.csv",
+            "COLUMN": "PRES"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PRES_QOC_IMPUTED",
+            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PRES_QOC_IMPUTED",
+            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PRES_QOC_IMPUTED",
+            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PRES_QOC_IMPUTED",
+            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "TEST_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "TEST"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for TEST_QOC_REMOVED",
+            "FR": "Placeholder text for TEST_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for TEST_QOC_REMOVED",
+            "FR": "Placeholder text for TEST_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for TEST_QOC_REMOVED",
+            "FR": "Placeholder text for TEST_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for TEST_QOC_REMOVED",
+            "FR": "Placeholder text for TEST_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SUSP_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "SUSP"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SUSP_QOC_REMOVED",
+            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SUSP_QOC_REMOVED",
+            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SUSP_QOC_REMOVED",
+            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SUSP_QOC_REMOVED",
+            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALTREAT_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "MALTREAT"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
+            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
+            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
+            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
+            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "CONF_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "CONF"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for CONF_QOC_REMOVED",
+            "FR": "Placeholder text for CONF_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for CONF_QOC_REMOVED",
+            "FR": "Placeholder text for CONF_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for CONF_QOC_REMOVED",
+            "FR": "Placeholder text for CONF_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for CONF_QOC_REMOVED",
+            "FR": "Placeholder text for CONF_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALDTH_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "MALDTH"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
+            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
+            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
+            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
+            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "MALADM_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "MALADM"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for MALADM_QOC_REMOVED",
+            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for MALADM_QOC_REMOVED",
+            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for MALADM_QOC_REMOVED",
+            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for MALADM_QOC_REMOVED",
+            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLADM_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "ALLADM"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
+            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
+            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
+            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
+            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLDTH_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "ALLDTH"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
+            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
+            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
+            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
+            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "ALLOUT_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "ALLOUT"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
+            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
+            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
+            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
+            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PRES_QOC_REMOVED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHIS2_QUALITY_OF_CARE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_quality_of_care_district_year_removed.csv",
+            "COLUMN": "PRES"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PRES_QOC_REMOVED",
+            "FR": "Placeholder text for PRES_QOC_REMOVED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PRES_QOC_REMOVED",
+            "FR": "Placeholder text for PRES_QOC_REMOVED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PRES_QOC_REMOVED",
+            "FR": "Placeholder text for PRES_QOC_REMOVED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PRES_QOC_REMOVED",
+            "FR": "Placeholder text for PRES_QOC_REMOVED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
+            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            100,
+            1000,
+            10000,
+            100000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONALITY_CASES": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_CASES",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_cases_seasonality.csv",
+            "COLUMN": "SEASONALITY_CASES"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONALITY_CASES",
+            "FR": "Placeholder text for SEASONALITY_CASES"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONALITY_CASES",
+            "FR": "Placeholder text for SEASONALITY_CASES"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONALITY_CASES",
+            "FR": "Placeholder text for SEASONALITY_CASES"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONALITY_CASES",
+            "FR": "Placeholder text for SEASONALITY_CASES"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
+            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            0,
+            1
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONAL_BLOCK_DURATION_CASES": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_CASES",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_cases_seasonality.csv",
+            "COLUMN": "SEASONAL_BLOCK_DURATION_CASES"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
+            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            3,
+            4,
+            5
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONAL_BLOCK_START_MONTH_CASES": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_CASES",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_cases_seasonality.csv",
+            "COLUMN": "SEASONAL_BLOCK_START_MONTH_CASES"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
+            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "CASES_PROPORTION": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_CASES",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_cases_seasonality.csv",
+            "COLUMN": "CASES_PROPORTION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for CASES_PROPORTION",
+            "FR": "Placeholder text for CASES_PROPORTION"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for CASES_PROPORTION",
+            "FR": "Placeholder text for CASES_PROPORTION"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for CASES_PROPORTION",
+            "FR": "Placeholder text for CASES_PROPORTION"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for CASES_PROPORTION",
+            "FR": "Placeholder text for CASES_PROPORTION"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
+            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.5,
+            0.6,
+            0.7,
+            0.8
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONALITY_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONALITY_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            0,
+            1
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONAL_BLOCK_DURATION_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            3,
+            4,
+            5
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "SEASONAL_BLOCK_START_MONTH_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONAL_BLOCK_START_MONTH_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
+            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "RAIN_PROPORTION": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "RAIN_PROPORTION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for RAIN_PROPORTION",
+            "FR": "Placeholder text for RAIN_PROPORTION"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for RAIN_PROPORTION",
+            "FR": "Placeholder text for RAIN_PROPORTION"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for RAIN_PROPORTION",
+            "FR": "Placeholder text for RAIN_PROPORTION"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for RAIN_PROPORTION",
+            "FR": "Placeholder text for RAIN_PROPORTION"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
+            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            0.5,
+            0.6,
+            0.7,
+            0.8
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PRECIPITATION_MEAN": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "ERA5_DATASET_CLIMATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_total_precipitation_monthly.parquet",
+            "COLUMN": "MEAN"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PRECIPITATION_MEAN",
+            "FR": "Placeholder text for PRECIPITATION_MEAN"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PRECIPITATION_MEAN",
+            "FR": "Placeholder text for PRECIPITATION_MEAN"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PRECIPITATION_MEAN",
+            "FR": "Placeholder text for PRECIPITATION_MEAN"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PRECIPITATION_MEAN",
+            "FR": "Placeholder text for PRECIPITATION_MEAN"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
+            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            25,
+            50,
+            100,
+            200,
+            300
+        ],
+        "UNIT_SYMBOL": "mm"
+    },
+    "PRECIPITATION_MIN": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "ERA5_DATASET_CLIMATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_total_precipitation_monthly.parquet",
+            "COLUMN": "MIN"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PRECIPITATION_MIN",
+            "FR": "Placeholder text for PRECIPITATION_MIN"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PRECIPITATION_MIN",
+            "FR": "Placeholder text for PRECIPITATION_MIN"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PRECIPITATION_MIN",
+            "FR": "Placeholder text for PRECIPITATION_MIN"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PRECIPITATION_MIN",
+            "FR": "Placeholder text for PRECIPITATION_MIN"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
+            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            25,
+            50,
+            100,
+            200,
+            300
+        ],
+        "UNIT_SYMBOL": "mm"
+    },
+    "PRECIPITATION_MAX": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "ERA5_DATASET_CLIMATE",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_total_precipitation_monthly.parquet",
+            "COLUMN": "MAX"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PRECIPITATION_MAX",
+            "FR": "Placeholder text for PRECIPITATION_MAX"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PRECIPITATION_MAX",
+            "FR": "Placeholder text for PRECIPITATION_MAX"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PRECIPITATION_MAX",
+            "FR": "Placeholder text for PRECIPITATION_MAX"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PRECIPITATION_MAX",
+            "FR": "Placeholder text for PRECIPITATION_MAX"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
+            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            25,
+            50,
+            100,
+            200,
+            300
+        ],
+        "UNIT_SYMBOL": "mm"
+    },
+    "POPULATION_WORLDPOP": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "WORLDPOP_DATASET_EXTRACT",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_worldpop_population.csv",
+            "COLUMN": "POPULATION"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POPULATION_WORLDPOP",
+            "FR": "Placeholder text for POPULATION_WORLDPOP"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POPULATION_WORLDPOP",
+            "FR": "Placeholder text for POPULATION_WORLDPOP"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POPULATION_WORLDPOP",
+            "FR": "Placeholder text for POPULATION_WORLDPOP"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POPULATION_WORLDPOP",
+            "FR": "Placeholder text for POPULATION_WORLDPOP"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for WORLDPOP_DATASET_EXTRACT",
+            "FR": "Placeholder text for WORLDPOP_DATASET_EXTRACT"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_TOTAL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_HEALTHCARE_ACCESS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population_covered_health.csv",
+            "COLUMN": "POP_TOTAL"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_TOTAL",
+            "FR": "Placeholder text for POP_TOTAL"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_TOTAL",
+            "FR": "Placeholder text for POP_TOTAL"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_TOTAL",
+            "FR": "Placeholder text for POP_TOTAL"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_TOTAL",
+            "FR": "Placeholder text for POP_TOTAL"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
+            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "POP_COVERED": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_HEALTHCARE_ACCESS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population_covered_health.csv",
+            "COLUMN": "POP_COVERED"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for POP_COVERED",
+            "FR": "Placeholder text for POP_COVERED"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for POP_COVERED",
+            "FR": "Placeholder text for POP_COVERED"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for POP_COVERED",
+            "FR": "Placeholder text for POP_COVERED"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for POP_COVERED",
+            "FR": "Placeholder text for POP_COVERED"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
+            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50000,
+            100000,
+            200000,
+            300000,
+            400000,
+            500000
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PCT_HEALTH_ACCESS": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_HEALTHCARE_ACCESS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_population_covered_health.csv",
+            "COLUMN": "PCT_HEALTH_ACCESS"
+        },
+        "LABEL": {
+            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
+            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+        },
+        "DESCRIPTION": {
+            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
+            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+        },
+        "SOURCE": {
+            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
+            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+        },
+        "UNITS": {
+            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
+            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+        },
+        "CATEGORY": {
+            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
+            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            25,
+            50,
+            75
+        ],
+        "UNIT_SYMBOL": "%"
+    }
+}

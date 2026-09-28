@@ -10,6 +10,7 @@
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
 | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from the old-format `SNT_metadata_20260226.json` on 2026-09-08. Nine layers, schema-valid. Read [§7](#7-the-ner-conversion-2026-09-08) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
+| [`SNT_metadata_all_layers.json`](SNT_metadata_all_layers.json) | **Interoperability test file** (2026-09-28): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. **All text is placeholder** and scales are defaults. Read [§8](#8-the-all-layers-test-file-2026-09-28) for what it leaves out and why. |
 
 > **Format change, 2026-09-08:** `TYPE` now also accepts `"Ordinal"`, and `SCALE` is read differently
 > under it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
@@ -476,6 +477,116 @@ reference copy either way.
 > The negation is `docs/schemas/**/*.json`, not `docs/schemas/*.json`, precisely so a per-file
 > subfolder like this one stays tracked. Do not narrow it when adding a schema for another
 > configuration file — see [`docs/schemas/README.md`](../README.md).
+
+## 8. The all-layers test file (2026-09-28)
+
+[`SNT_metadata_all_layers.json`](SNT_metadata_all_layers.json) exists to test interoperability with
+the SNT Explorer: it declares **every column the current pipelines can publish** that fits this
+format, so the Explorer's ingestion can be exercised end to end. It is **not a catalogue to deploy**.
+`snt_assemble_results` is out of scope (being deprecated).
+
+Every `SOURCE_DATA` pointer was traced to the code that writes the column (`pipeline.py`
+`add_files_to_dataset(...)` calls, and the notebook cells that build the final table). Nothing was
+checked against a live workspace. The file passes the validator in [§5](#5-validating), including
+`DATASET.NAME` resolution against all five country configs.
+
+### What is placeholder
+
+- **All text.** `LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` read `"Placeholder text for <layer id>"`
+  in both languages. `CATEGORY` reads `"Placeholder text for <DATASET.NAME>"` so layers from one
+  dataset still share a group in the Explorer. Writing the real text is a separate task.
+- **`SCALE`.** No data was inspected. Where a layer already exists in
+  [`SNT_metadata.example.json`](SNT_metadata.example.json) or [`SNT_metadata_NER.json`](SNT_metadata_NER.json)
+  its scale is reused; otherwise it is a generic default for the unit traced in the code:
+
+  | Unit (from the code) | `TYPE` | `SCALE` | `UNIT_SYMBOL` |
+  |---|---|---|---|
+  | Total population (count) | Threshold | example `POPULATION` bins | `null` |
+  | `POP_UNDER_5` / `POP_PREGNANT_WOMEN` | Threshold | NER bins | `null` |
+  | Other `POP_*` sub-populations | Threshold | `[5000, 10000, 20000, 40000]` | `null` |
+  | Reporting rate, 0–1 | Threshold | NER bins `[0.5, 0.8, 0.9, 0.95]` | `null` |
+  | Incidence, per 1000 | Threshold | example bins | `null` |
+  | Case / death counts per ADM2-year | Threshold | `[10, 100, 1000, 10000, 100000]` | `null` |
+  | Seasonality flag | Ordinal | `[0, 1]` | `null` |
+  | Seasonal block duration, months | Ordinal | `[3, 4, 5]` (the block-size parameter choices) | `null` |
+  | Seasonal block start month | Ordinal | `[1 … 12]` | `null` |
+  | Share captured by the seasonal block, 0–1 | Threshold | `[0.5, 0.6, 0.7, 0.8]` | `null` |
+  | Precipitation, mm per month | Threshold | `[25, 50, 100, 200, 300]` | `"mm"` |
+  | Percentage, 0–100 | Threshold | `[25, 50, 75]` | `"%"` |
+
+### How layer ids were chosen
+
+The layer id is the column name, plus a qualifier where two layers would otherwise collide
+([§2.2](#22-the-layer-id-is-not-the-column-name)). Ids already in the example are kept.
+
+| Layers | Dataset key | File | Pipeline |
+|---|---|---|---|
+| `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
+| `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
+| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_{dataelement,dataset}.csv` | `snt_dhis2_reporting_rate_*` |
+| `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
+| `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
+| `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |
+| `PRECIPITATION_{MEAN,MIN,MAX}` | `ERA5_DATASET_CLIMATE` | `{COUNTRY_CODE}_total_precipitation_monthly.parquet` | `snt_era5_climate_data` |
+| `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
+| `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
+
+The population ids differ from Niger's file (`POP_UNDER_5` here, `POPULATION_U5` there). Reconcile
+them before either file is published.
+
+### Layers that will not load everywhere
+
+"Every column that *can* be published" includes columns that only some countries or parameter
+choices produce. Expect those layers to fail to load where the column is absent:
+
+- **`POP_*` in the formatted population** exist only where `POPULATION_INDICATOR_DEFINITIONS` gives
+  that key DHIS2 ids. In the reference configs that is CMR (`UNDER_5`, `PREGNANT_WOMEN`, `0_1_Y`,
+  `1_2_Y`, `50_PLUS`) and NER (`UNDER_5`, `PREGNANT_WOMEN`). `POP_5_10_Y` and `POP_5_36_M` have no ids
+  in any reference config.
+- **`POP_*_TRANSFORMED`** exist only when the operator sets the matching disaggregation parameter,
+  or supplies a disaggregation file (the only route to `POP_50_PLUS`).
+- **The quality-of-care counts** are written only if the column is in the routine data, so they vary
+  with each country's `DHIS2_INDICATOR_DEFINITIONS` (`ALLADM`, `ALLDTH`, `ALLOUT` in particular).
+- **Only one variant of an alternative is present at a time.** Quality of care writes the `imputed`
+  or the `removed` file, per run. Both reporting-rate files can coexist, but see the dataset-version
+  caveat below.
+- **`INCIDENCE_ADJ_CARESEEKING`** is always written, but is all `NA` when no care-seeking data was
+  available.
+
+### Tables that break other assumptions of the format
+
+Included, but likely to exercise open questions:
+
+- **No `YEAR` column:** both seasonality tables and the healthcare-access table
+  ([Open question #9](#open-questions)). Healthcare access is computed for a single WorldPop year,
+  which is not stored in the table.
+- **Monthly grain** (`YEAR` + `MONTH`): both reporting-rate tables and ERA5
+  ([Open question #7](#open-questions)).
+- **`YEAR` stored as text:** the WorldPop table.
+- **Parquet only:** ERA5 publishes no `.csv` twin, so its `FILENAME` is the `.parquet`.
+- **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the
+  files of that run, `"latest"` on `DHIS2_REPORTING_RATE` holds only the variant run last, and the
+  same goes for the two quality-of-care files.
+
+### What was left out, and why
+
+| Left out | Pipeline | Why |
+|---|---|---|
+| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year — see [§7](#the-three-map-layers-were-omitted). |
+| All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column (the survey year is computed but not written). Excluded until the ADM1 question is agreed with the IASO developers. |
+| The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects (and which breaks repo rule R10). Restoring them needs a pipeline change to uppercase names. |
+| `non_malaria_all_cause_outpatients`, `presumed_cases` | `snt_dhis2_quality_of_care` | Lowercase, as above, and copies of `ALLOUT` / `PRES`, which are included. |
+| Routine indicators (`{CC}_routine.*`) | `snt_dhis2_formatting` | **Facility × month** grain, not ADM2. The Explorer would need aggregation the format cannot express. |
+| `{CC}_routine_outliers_imputed.parquet`, `…_removed.parquet` | the five `snt_dhis2_outliers_imputation_*` | Facility × month grain, as above. |
+| `{CC}_routine_outliers_detected.parquet` | the five `snt_dhis2_outliers_imputation_*` | Long format (`INDICATOR` / `VALUE`), facility grain. |
+| `{CC}_reporting.*` | `snt_dhis2_formatting` | Long format (`PRODUCT_METRIC` / `VALUE`). |
+| `{CC}_pyramid.*` | `snt_dhis2_formatting` | Facility list (coordinates, opening/closing dates); no values to map. |
+| All raw extracts (`{CC}_dhis2_raw_*.parquet`) | `snt_dhis2_extract` | Long format, raw DHIS2 ids, no `YEAR`. |
+| Extra columns from an uploaded disaggregation file | `snt_dhis2_population_transformation` | Arbitrary operator-chosen names, not uppercased. Only the template's `POP_*` columns are included. |
+| Seasonality admin columns `ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME` | `snt_seasonality_*`, `snt_healthcare_access` | Admin columns. |
+| `SNT_RESULTS` | `snt_assemble_results` | Out of scope (being deprecated). |
+
+`snt_workspace_check` publishes nothing to a dataset.
 
 ## Open questions
 

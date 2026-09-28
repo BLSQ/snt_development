@@ -3,10 +3,8 @@
 # Description: Loading, MAD and seasonal detection, and flag-combination helpers sourced by the
 #   pipeline notebook (imputation and output formatters: code/snt_utils.r).
 # Dependencies: data.table, glue, forecast, future.apply, stats
+# Requires: code/snt_utils.r, loaded by the notebook before this file.
 # ================================================
-
-# Load base utils
-source(file.path("~/workspace/code", "snt_utils.r"))
 
 
 #' Load DHIS2 Routine Data with Validation

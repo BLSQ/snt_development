@@ -3,10 +3,8 @@
 # Description: Routine data loading helper sourced by the pipeline notebook (imputation and output
 #   formatters: code/snt_utils.r).
 # Dependencies: glue
+# Requires: code/snt_utils.r, loaded by the notebook before this file.
 # ================================================
-
-# Load base utils
-source(file.path("~/workspace/code", "snt_utils.r"))   
 
 
 #' Load DHIS2 Routine Input Data with Validation and Logging

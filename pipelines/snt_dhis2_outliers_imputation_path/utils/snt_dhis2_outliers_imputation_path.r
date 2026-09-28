@@ -3,10 +3,8 @@
 # Description: Loading, deduplication, exception (stock-out, epidemic) and imputation helpers
 #   sourced by the pipeline notebook.
 # Dependencies: dplyr, tidyr, glue
+# Requires: code/snt_utils.r, loaded by the notebook before this file.
 # ================================================
-
-# Load base snt utils 
-source(file.path("~/workspace", "code", "snt_utils.r"))
 
 
 #' Load DHIS2 Routine Input Data with Validation and Logging

@@ -2,10 +2,8 @@
 # Title: Report helpers for the mean outliers imputation pipeline
 # Description: Plotting and coherence-metric helpers sourced by the reporting notebook.
 # Dependencies: ggplot2, dplyr, tidyr, tibble, purrr, rlang, forcats, viridis, grid, stats, sf
+# Requires: code/snt_utils.r, loaded by the reporting notebook before this file.
 # ================================================
-
-# Load base snt utils
-source(file.path("~/workspace", "code", "snt_utils.r"))
 
 #' Null-Coalescing Operator
 #'

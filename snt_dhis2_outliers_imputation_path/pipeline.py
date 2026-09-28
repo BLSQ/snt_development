@@ -18,7 +18,7 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "deviation_mean",
     name="Number of SD around the mean",
-    help="Number of standard deviations around the mean (PATH deault: 10)",
+    help="Number of standard deviations around the mean (PATH default: 10)",
     type=int,
     default=10,
     required=False,
@@ -121,11 +121,15 @@ def snt_dhis2_outliers_imputation_path(
             current_run.log_error(f"Failed to save pipeline parameters: {e}")
             raise
 
-        add_files_to_dataset(
-            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
-            country_code=country_code,
-            file_paths=[*expected_outputs, parameters_file],
-        )
+        try:
+            add_files_to_dataset(
+                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"],
+                country_code=country_code,
+                file_paths=[*expected_outputs, parameters_file],
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to add files to dataset: {e}")
+            raise
 
         # Create consolidated outliers DB table
         if push_db:
@@ -136,6 +140,7 @@ def snt_dhis2_outliers_imputation_path(
                 )
             except Exception as e:
                 current_run.log_error(f"Failed to push data to DB table: {e}")
+                raise
 
     else:
         current_run.log_info("Skipping outliers calculations, running only the reporting notebook.")

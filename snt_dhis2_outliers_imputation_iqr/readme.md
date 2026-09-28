@@ -13,8 +13,6 @@ The **SNT DHIS2 Outliers Imputation (IQR)** pipeline flags outliers in the forma
   * **Description:** When true, loads **`[COUNTRY_CODE]_routine_outliers_detected.parquet`** into the workspace database table **`outliers_detected`** (for the Shiny outliers explorer), replacing whatever the last outliers pipeline pushed there.
   * **Default:** `true`.
 
-`run_report_only` and `pull_scripts` behave as in the other SNT pipelines. In report-only mode nothing is computed or published: only the reporting notebook runs, on the files already in the datasets.
-
 ## Functionality Overview
 
 1. **Configuration:** Load and validate **`SNT_config.json`**, resolve **`COUNTRY_CODE`**, and create `pipelines/snt_dhis2_outliers_imputation_iqr/` and `data/dhis2/outliers_imputation/` if missing.
@@ -73,3 +71,4 @@ The **SNT DHIS2 Outliers Imputation (IQR)** pipeline flags outliers in the forma
 > - **Quartiles are ceiling-rounded** (rounded up to whole numbers) before the fence is built, so the fence can differ from a textbook Tukey fence on the raw quartiles. The difference is at most about 1 + *m* and only matters for low-count series.
 > - **IQR of zero:** when Q1 and Q3 are equal (typically when more than half of a series' values are identical), the fence collapses to that single value and **every value different from it is flagged**. Series with a very stable reported value are therefore heavily flagged by this method.
 > - **Gaps in `PERIOD`:** the imputation window counts rows, not calendar months, so a series with missing months treats the months on either side of a gap as neighbours.
+> - **Guarded execution:** nothing is skipped silently. The notebook stops with an `[ERROR]` if the routine file cannot be loaded or a configured indicator column is missing; the run stops before publishing if any of the three Parquet files was not rewritten during the run; a failed dataset upload or database push also stops the run. The database push comes after the dataset upload, so a failed push leaves the new files already published.

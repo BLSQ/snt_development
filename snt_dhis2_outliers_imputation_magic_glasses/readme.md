@@ -8,17 +8,13 @@ The **SNT DHIS2 Outliers Imputation (Magic Glasses)** pipeline flags outliers in
   * **Name:** Detection mode
   * **Description:** Detection passes to run.
     * `partial`: MAD15 then MAD10 only. Fast (about 7 minutes, per the UI help text).
-    * `complete`: `partial`, then seasonal5 then seasonal3 on the values not yet flagged. Can take several hours; the pipeline logs a warning when selected, and the run is stopped after **8 hours** (see Run timeout below).
+    * `complete`: `partial`, then seasonal5 then seasonal3 on the values not yet flagged. Can take several hours; the pipeline logs a warning when selected, and the run is stopped after **8 hours** (see **Run timeout** in the Notes).
   * **Choices:** `partial`, `complete`. The value is trimmed and lower-cased before use; any other value stops the run with a `ValueError`.
   * **Default:** `partial`.
 * **`push_db`** (bool, Optional):
   * **Name:** Push to Shiny database
   * **Description:** When true, loads **`[COUNTRY_CODE]_routine_outliers_detected.parquet`** into the workspace database table **`outliers_detected`** (for the Shiny outliers explorer), replacing whatever the last outliers pipeline pushed there.
   * **Default:** `false`.
-
-`run_report_only` and `pull_scripts` behave as in the other SNT pipelines. In report-only mode nothing is computed or published: only the reporting notebook runs, on the files already in the dataset.
-
-**Run timeout:** the pipeline sets an explicit timeout of **8 hours** (`timeout=28800` seconds in `@pipeline(...)`), because complete mode can legitimately run for hours: the seasonal passes fit one `tsclean()` model per `OU_ID` × `INDICATOR` series, twice (seasonal5, then seasonal3), so run time grows with the number of facilities × indicators and falls with the number of CPU cores available (the passes use cores − 1 workers). A run still going after 8 hours is stopped by OpenHEXA. Outputs are only written at the end of the notebook and published after it, so a stopped run writes and publishes **nothing**: **`DHIS2_OUTLIERS_IMPUTATION`** keeps whatever the last successful outliers run published, which may come from another method.
 
 ## Functionality Overview
 
@@ -76,3 +72,6 @@ The **SNT DHIS2 Outliers Imputation (Magic Glasses)** pipeline flags outliers in
 >   - **Removed:** flagged values are set to missing; rows are kept.
 > - **Grain:** facility × month. MAD statistics are computed per calendar year; seasonal detection and imputation run along the whole monthly series of each facility × indicator.
 > - **Gaps in `PERIOD`:** seasonal detection and the imputation window treat consecutive rows as consecutive months. A series with missing months logs a warning in complete mode, and its seasonal flags and imputed values may be misaligned.
+> - **MAD of zero:** in MAD15 / MAD10, a year × facility × indicator group whose MAD is `0` (typically when more than half of its values are identical) has an accepted interval equal to its median, so **every value different from the median is flagged**, whatever the threshold. The seasonal passes do the opposite: a series whose MAD is `0`, or with fewer than 2 values, is never flagged.
+> - **Run timeout:** the pipeline sets an explicit timeout of **8 hours** (`timeout=28800` seconds in `@pipeline(...)`), because complete mode can legitimately run for hours: the seasonal passes fit one `tsclean()` model per `OU_ID` × `INDICATOR` series, twice (seasonal5, then seasonal3), so run time grows with the number of facilities × indicators and falls with the number of CPU cores available (the passes use cores − 1 workers). A run still going after 8 hours is stopped by OpenHEXA. Outputs are only written at the end of the notebook and published after it, so a stopped run writes and publishes **nothing**: **`DHIS2_OUTLIERS_IMPUTATION`** keeps whatever the last successful outliers run published, which may come from another method.
+> - **Guarded execution:** nothing is skipped silently. The notebook stops with an `[ERROR]` if the routine file cannot be loaded or a configured indicator column is missing; the run stops before publishing if any of the three Parquet files was not rewritten during the run; a failed dataset upload or database push also stops the run. The database push comes after the dataset upload, so a failed push leaves the new files already published.

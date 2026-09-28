@@ -3,10 +3,8 @@
 # Description: Method label, outlier summary and bar-chart helpers sourced by the reporting
 #   notebook.
 # Dependencies: dplyr, ggplot2, scales, stats
+# Requires: code/snt_utils.r, loaded by the reporting notebook before this file.
 # ================================================
-
-# Load base utils
-source(file.path("~/workspace", "code", "snt_utils.r"))
 
 
 #' Get the Display Label of a Magic Glasses Method

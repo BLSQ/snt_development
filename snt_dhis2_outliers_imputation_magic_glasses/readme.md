@@ -8,7 +8,7 @@ The **SNT DHIS2 Outliers Imputation (Magic Glasses)** pipeline flags outliers in
   * **Name:** Detection mode
   * **Description:** Detection passes to run.
     * `partial`: MAD15 then MAD10 only. Fast (about 7 minutes, per the UI help text).
-    * `complete`: `partial`, then seasonal5 then seasonal3 on the values not yet flagged. Can take several hours; the pipeline logs a warning when selected.
+    * `complete`: `partial`, then seasonal5 then seasonal3 on the values not yet flagged. Can take several hours; the pipeline logs a warning when selected, and the run is stopped after **8 hours** (see Run timeout below).
   * **Choices:** `partial`, `complete`. The value is trimmed and lower-cased before use; any other value stops the run with a `ValueError`.
   * **Default:** `partial`.
 * **`push_db`** (bool, Optional):
@@ -17,6 +17,8 @@ The **SNT DHIS2 Outliers Imputation (Magic Glasses)** pipeline flags outliers in
   * **Default:** `false`.
 
 `run_report_only` and `pull_scripts` behave as in the other SNT pipelines. In report-only mode nothing is computed or published: only the reporting notebook runs, on the files already in the dataset.
+
+**Run timeout:** the pipeline sets an explicit timeout of **8 hours** (`timeout=28800` seconds in `@pipeline(...)`), because complete mode can legitimately run for hours: the seasonal passes fit one `tsclean()` model per `OU_ID` × `INDICATOR` series, twice (seasonal5, then seasonal3), so run time grows with the number of facilities × indicators and falls with the number of CPU cores available (the passes use cores − 1 workers). A run still going after 8 hours is stopped by OpenHEXA. Outputs are only written at the end of the notebook and published after it, so a stopped run writes and publishes **nothing**: **`DHIS2_OUTLIERS_IMPUTATION`** keeps whatever the last successful outliers run published, which may come from another method.
 
 ## Functionality Overview
 

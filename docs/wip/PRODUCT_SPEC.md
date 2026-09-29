@@ -28,7 +28,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 | Component | Role | State |
 |---|---|---|
 | `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
-| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 2 — full taxonomy verified in the sandbox (§6.3). Phase 3 not started |
+| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 3 — both modes verified in the sandbox (§6.3, §6.5). Phase 4 (schema freeze, readme) next |
 | Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
 
@@ -171,23 +171,28 @@ The checker has one parameter that decides its mode: an optional target release.
 
 ### 4.1 Attribution mode — no target release given
 
-Assess every file and report which release it belongs to, or that it belongs to none. No verdicts,
-no green or red: a factual inventory plus a distribution, so the web app can show e.g. *"97% of
-files are v0.1.0-test, 2.7% are v0.2.1-test, 0.3% are of unknown origin."*
+Assess every file and report which releases it belongs to, or that it belongs to none. No verdicts,
+no green or red: a factual inventory plus **two scores per release** (D15, §7.10), each judged only on
+the paths that release ships. So the web app can show e.g. *"best fit v0.3.0-test: of its files
+found here, 100% have its exact bytes (agreement); 98.2% of its files are here (completeness); 4
+files here are ones it does not ship."* The scores do not add up to 100% across releases: a file
+unchanged across releases agrees with each of them.
 
-This mode needs the manifest of **every** release. The checker already loads them all as of phase 2
-(§7.2, closed). What the percentages *mean* is still open, because a file usually matches several
-releases at once (§7.10).
+This mode needs the manifest of **every** release. The checker loads them all as of phase 2 (§7.2,
+closed).
 
 ### 4.2 Verification mode — target release given
 
-Everything attribution mode reports, plus a qualitative layer per file relative to the target.
+Everything attribution mode reports, plus a qualitative layer per file relative to the target. The
+per-release scores are computed in this mode too.
 
-The target release is resolved in this order, and the report always records which was used:
+The target release is resolved in this order, and the report always records which was used
+(`target_release.resolved_from`):
 
-1. the `release_tag` parameter, if given;
+1. the `release_tag` parameter, if given. The reserved value **`none`** (any case) means no target →
+   mode 4.1, whatever the marker says (D17);
 2. otherwise `.snt_release`, if present → mode 4.2;
-3. otherwise no target → mode 4.1.
+3. otherwise no target → mode 4.1 (`resolved_from: "nothing_given"`).
 
 ## 5. Requirements
 
@@ -199,6 +204,7 @@ Per entry, exactly one status:
 |---|---|---|
 | `match` | Present; hash equals the target manifest's | 4.2 |
 | `mismatch_known` | Present; hash differs from target but matches ≥1 other release. Carries `matching_releases` and `position` (`older` / `newer` / `both` / `unordered`) | 4.2 |
+| `attributed` | Present at a tracked path; hash matches ≥1 release. Carries `matching_releases` over **all** of them; `position` is `null`. Added in phase 3 (D16) | 4.1 |
 | `unknown_content` | **Known path, unknown content.** The path is tracked, but its hash matches no release. Edited by hand, or corrupted | both |
 | `missing` | In the target manifest; absent from both filesystem and pipeline versions | 4.2 |
 | `removed_in_target` | Present, and in an older manifest, but not in the target's | 4.2 |
@@ -207,8 +213,8 @@ Per entry, exactly one status:
 | `not_covered` | Deployed inside a pipeline zip, but no manifest describes it. Should not occur now the manifest mirrors the SDK's zip rule; retained as the tripwire for that rule drifting | both |
 | `unreadable` | Present but could not be hashed (permissions, I/O, API error) | both |
 
-In attribution mode, files resolve to `matching_releases` (see §5.1.2), `unknown_content`, or
-`untracked`.
+In attribution mode, files resolve to `attributed` (with `matching_releases`, see §5.1.2),
+`unknown_content`, `untracked`, `not_covered` or `unreadable`.
 
 #### 5.1.1 `unknown_content` vs `untracked` — two different questions
 
@@ -307,13 +313,27 @@ Shape (v1 — to be frozen at the end of phase 4, §6):
   "workspace": "<slug>",
   "repo": "BLSQ/snt_development_sandbox",
   "mode": "attribution | verification",
-  "target_release": {"tag": "v0.2.1-test", "resolved_from": "parameter | marker", "published_at": "..."},
+  "target_release": {"tag": "v0.2.1-test | null", "resolved_from": "parameter | marker | nothing_given", "published_at": "... | null"},
   "declared_release": {"tag": "v0.1.0-test", "source": ".snt_release"},
   "releases_considered": [{"tag": "...", "published_at": "...", "manifest_available": true}],
   "incomplete": false,
   "summary": {
     "by_status": {"match": 101, "mismatch_known": 3, "untracked": 2},
-    "attribution": {"v0.1.0-test": 0.97, "v0.2.1-test": 0.027, "unknown": 0.003}
+    "attribution": {
+      "files_scored": 164,
+      "rule": "<human-readable statement of how every number below was computed>",
+      "by_release": [
+        {"tag": "v0.1.0-test", "published_at": "...", "manifest_available": true,
+         "shipped": 163, "present": 163, "agreeing": 162, "extra": 1, "agreement": 0.9939, "completeness": 1.0},
+        {"tag": "v0.3.0-test", "published_at": "...", "manifest_available": true,
+         "shipped": 163, "present": 160, "agreeing": 160, "extra": 4, "agreement": 1.0, "completeness": 0.9816},
+        {"tag": "v0.4.0-test", "published_at": "...", "manifest_available": false,
+         "shipped": null, "present": null, "agreeing": null, "extra": null, "agreement": null, "completeness": null}
+      ],
+      "best_fit": {"tag": "v0.3.0-test", "agreement": 1.0, "completeness": 0.9816},
+      "matches_no_release": {"count": 0, "share": 0.0},
+      "unreadable": {"count": 0, "share": 0.0}
+    }
   },
   "entries": [
     {
@@ -346,7 +366,7 @@ still open.
 | **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
 | **1** | ✅ **DONE** 2026-09-22 — checker skeleton in [`snt_workspace_check/`](../../snt_workspace_check/): verification mode against a single target release, both sources hashed, four statuses, report written (§6.2). | Met: `snt-development-sandbox` at `v0.1.0-test` reported **163/163 `match`**. | — |
 | **2** | ✅ **DONE** 2026-09-29 — taxonomy verified in the sandbox, D9 decided (§6.3). Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
-| **3** | Attribution mode: all releases, ordering, distribution summary. **Handover: §6.4.** | A mixed workspace produces a correct per-release percentage breakdown. | §7.10, §7.11 — **open** (§7.2 closed 2026-09-29) |
+| **3** | ✅ **DONE** 2026-09-29 — attribution mode, per-release agreement and completeness in both modes, D15–D17 (§6.4, §6.5). | Met: the mixed sandbox workspace scores `v0.3.0-test` as best fit, agreement 1.0, completeness 0.9816. | — |
 | **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
 | **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
 | **6** | Web app. | Out of scope for this spec. | 5 |
@@ -496,8 +516,16 @@ closest thing this work has to a test suite. Extend it rather than starting a ne
 
 ### 6.4 Phase 3 — handover
 
-Written 2026-09-29 for the session that builds phase 3. **Start by settling §7.10 and §7.11.** Both
-are blocking and neither is a coding question.
+Written 2026-09-29 for the session that builds phase 3.
+
+> **Status, 2026-09-29 (later the same day):** §7.10 and §7.11 decided (D15–D17). Items 1–7 below
+> are **built**. The stub test (`ignore/SNT25-670/test_workspace_check_stub.py`) asserts the whole
+> list, including the exit-criterion breakdown for the mixed workspace described under *Test design*.
+> Two things were built beyond the list. The per-release scores are computed in **verification mode
+> too**, as §4.2 promises ("everything attribution mode reports"). They are taken from the observed
+> bytes, not from statuses, so both modes use one definition. And `target_release` stays an object
+> in attribution mode, with `tag: null` and `resolved_from` giving the reason. The first sandbox run
+> led to D15 being revised, and the second verified the revision (§6.5). **Phase 3 is done.**
 
 **What already exists, and does not need building.** Everything the old §7.2 worry was about.
 `list_releases()` and `load_manifests()` fetch every release's manifest on each run.
@@ -530,8 +558,8 @@ release its name claims. Phase 3 therefore adds a **mode**, not new machinery.
 
 **Test design — exit criterion "a mixed workspace produces a correct per-release breakdown".**
 
-* The checker never writes, so forcing attribution mode means having no marker, and today that means
-  removing `.snt_release` by hand (fixture plan, Run 3). §7.11 asks whether to add a switch instead.
+* Attribution mode is forced with `release_tag=none` (D17). The marker no longer needs removing by
+  hand.
 * Expected with the workspace as it is now (analytics at `v0.1.0-test`, one pipeline at
   `v0.3.0-test`): `code/fixture_stable.r` gets **one span of 4**, `v0.1.0-test..v0.3.0-test`.
   `v0.4.0-test` has no manifest, but it is the newest release, so it ends the list without breaking
@@ -552,12 +580,54 @@ release its name claims. Phase 3 therefore adds a **mode**, not new machinery.
   Alternatively, deploy just `snt_dhis2_incidence` at `v0.2.1-test` with `only_pipelines`, so its
   helper holds B and matches `v0.2.1-test` alone. That tag has never been used on that pipeline, so
   the `DUPLICATE_PIPELINE_VERSION_NAME` defect does not bite. **Either manager run rewrites
-  `.snt_release`**, so check the marker afterwards, or attribution mode will not be reached (§7.11).
+  `.snt_release`**, which no longer matters with `release_tag=none` (D17).
 * Add the attribution cases to the stub test first, and let it define the expected numbers before
   the sandbox run.
 
 **Unchanged constraints to keep in mind:** the checker is read-only (§5.4); `status` values are
 added, never renamed (§5.5); `schema_version` stays 1 until phase 4.
+
+### 6.5 Phase 3, as verified
+
+**Run 1**, 2026-09-29 (report `status_2026-09-29T13-18-04Z.json`). `snt-development-sandbox` after
+`snt_workspace_manager` at `v0.3.0-test` with pipeline deployment off, checked with
+`release_tag=none`:
+
+```
+mode: attribution, resolved_from: parameter (marker v0.3.0-test present and ignored, as D17 intends)
+164 attributed | 1 untracked   |   90 filesystem + 74 pipeline_version
+incomplete: true — solely v0.4.0-test (no manifest), as designed
+```
+
+**Every per-file span is the one §6.4 predicts.** 157 files carry the single span
+`v0.1.0-test..v0.3.0-test`. `fixture_changing.r` is `v0.3.0-test` alone, and `fixture_added.r` is
+`v0.2.1-test..v0.3.0-test`. The leftover `fixture_removed.r` and the three files of the still-deployed
+`snt_fixture_pipeline_removed` are `v0.1.0-test..v0.2.0-test`. `fixture_reverted.py` has two spans.
+Every pipeline block has `in_target: null`. `snt_palettes.r` was restored by the manager run, so the
+run had no `unknown_content`. The stub test covers that case.
+
+**The headline was wrong, and that revised D15.** Under the first D15 each release was scored out of
+all 164 files. The best fit came out as **`v0.2.0-test` (162/164)** over `v0.3.0-test` (160/164),
+for a workspace just upgraded to `v0.3.0-test`. The arithmetic was correct. The definition was not.
+The four files holding `v0.3.0-test` down were leftovers of files it removed, which the manager never
+deletes and a pipeline cannot delete. So every upgrade would name an older release as the best fit,
+and more so with each release that removes something. D15 was revised the same day: each release is
+judged only on the paths it ships, with completeness beside agreement (§7.10).
+
+**Run 2 — verified 2026-09-29** (report `status_2026-09-29T13-39-32Z.json`), same workspace,
+revised checker, `release_tag=none`. Every number matches the prediction written beforehand.
+Unchanged from run 1: 164 `attributed` and 1 `untracked`, no file matching no release, none
+unreadable, and `incomplete` solely because of `v0.4.0-test`.
+
+| Release | Agreement | Completeness | Extra |
+|---|---|---|---|
+| **`v0.3.0-test`, best fit** | 1.0 (160/160) | 0.9816 (160/163) | 4 |
+| `v0.1.0-test`, `v0.2.0-test` | 0.9939 (162/163) | 1.0 | 1 |
+| `v0.2.1-test` | 0.9875 (158/160) | 0.9816 | 4 |
+
+The three files absent for `v0.3.0-test` are the never-deployed `snt_fixture_pipeline_added`. The
+exit criterion is met: the mixed workspace gets a correct per-release breakdown, and the best fit is
+the release it was actually upgraded to.
 
 ## 7. Open decisions
 
@@ -670,9 +740,30 @@ retention/pruning. Also parked until one of them blocks something (Giulia, 2026-
   names would show whether they are country variants, renamed notebooks or scratch work, which is
   input for D5. Not collected.
 
-### 7.10 What an attribution percentage means — **blocks phase 3**
+### 7.10 ~~What an attribution percentage means~~ — **closed 2026-09-29 (D15)**
 
-Found while writing the phase-3 handover, 2026-09-29. §4.1 promises *"97% of files are v0.1.0-test,
+**Answer: D, coverage per release plus a best fit**, as recommended below, **revised the same day
+after sandbox run 1** (§6.5). Each release is judged **only on the paths it ships**:
+
+| Field | Meaning |
+|---|---|
+| `present` | Files found here at paths the release ships. The pool is every entry for a present file except `untracked`, both sources together. |
+| `agreeing` | Of those, how many have exactly the release's bytes. |
+| `extra` | Files found here at paths the release does not ship. They count neither for nor against it. |
+| `agreement` | `agreeing / present` |
+| `completeness` | `present / shipped` |
+
+Best fit: highest agreement, then highest completeness, then newest. Files matching no release and
+unreadable files are also reported on their own.
+
+**Why it was revised.** As first built, every release was scored over the whole pool, so a file at a
+path the release does not ship counted as disagreement. The leftovers of removed files then dragged
+the newest release down, and run 1 named `v0.2.0-test` as the best fit for a workspace just upgraded
+to `v0.3.0-test`. Judging on shipped paths alone would let a near-empty workspace agree 100% with
+everything, which is why completeness was added beside agreement. §4.1 has been reworded to match.
+What was weighed originally:
+
+Found while writing the phase-3 handover, 2026-09-29. §4.1 promised *"97% of files are v0.1.0-test,
 2.7% are v0.2.1-test"*, figures that add up to 100%, so each file is counted once. But
 attribution is a **set** (§5.1.2). `code/fixture_stable.r` matches all four releases with a
 manifest, and most files in a real workspace will be like it. Which single release does such a file
@@ -692,7 +783,10 @@ v0.2.1, 98% of it would agree", which is the question an operator is actually as
 `unknown_content` share is reported beside it. This replaces the 100%-summing example in §4.1, so
 the §4.1 wording has to change if D is chosen.
 
-### 7.11 Two small attribution-mode choices — **blocks phase 3**
+### 7.11 ~~Two small attribution-mode choices~~ — **closed 2026-09-29 (D16, D17)**
+
+**Answers:** the status is **`attributed`** (D16), and attribution mode is forced with the reserved
+value **`release_tag=none`** (D17), both as recommended below.
 
 * **The status name for "matches ≥1 release".** §5.1 says attribution-mode files "resolve to
   `matching_releases`", but a status is a stable enum and needs a value. Recommended:
@@ -708,7 +802,7 @@ the §4.1 wording has to change if D is chosen.
 ## 8. Decisions taken
 
 Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1–D9, D11, D12) and
-2026-09-21 (D10), and 2026-09-29 (D9 resolved, D13, D14).
+2026-09-21 (D10), and 2026-09-29 (D9 resolved, D13–D17).
 
 | # | Decision |
 |---|---|
@@ -726,3 +820,6 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D12 | The status formerly called `mismatch_unknown` is renamed **`unknown_content`**, to stop it reading as a synonym of `untracked`: one is about the bytes at a known path, the other about a path we never shipped (§5.1.1). |
 | D13 | New status **`added_after_target`** (2026-09-29): a present path that only releases newer than the target ship. Without it, a workspace ahead of its target would read as `removed_in_target` (§5.1). |
 | D14 | Attribution representation (2026-09-29, §7.8): spans `{from, to, count}` in `published_at` order; a single match is a span of one; any release outside the set breaks a span, including one whose manifest is unreadable; in verification mode, carried only on entries that are not `match`. |
+| D15 | Attribution scores (2026-09-29, §7.10), **revised the same day after sandbox run 1** (§6.5). Each release is judged **only on the paths it ships**. **Agreement** = files here with exactly its bytes ÷ its files found here. **Completeness** = its files found here ÷ its files shipped. Files at paths it does not ship are **extra**, neither for nor against it. A file counts towards every release it matches, so nothing sums to 100%. Best fit = highest agreement, then completeness, then newest. The pool is every entry for a present file except `untracked`, both sources together, and the rule is stated in the report. Files matching no release and unreadable files are also shown on their own. *Superseded form:* one share per release over the whole pool, which counted leftovers of removed files against the release that removed them. |
+| D16 | New status **`attributed`** (2026-09-29, §7.11): attribution mode's "known path, bytes match ≥1 release", with spans over all matching releases and `position: null`. |
+| D17 | The reserved `release_tag` value **`none`** (any case) forces attribution mode even when `.snt_release` exists (2026-09-29, §7.11), so a scheduled attribution check never requires deleting the marker. |

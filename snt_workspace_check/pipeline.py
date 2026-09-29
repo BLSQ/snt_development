@@ -4,12 +4,14 @@ Read-only. This pipeline writes its own report and nothing else - it never delet
 overwrites, deploys or archives. `snt_workspace_manager` is the only component that changes
 workspace state (docs/wip/PRODUCT_SPEC.md section 5.4).
 
-Phase 2 of the build plan (PRODUCT_SPEC.md section 6): verification mode against one target
-release, judged in the light of EVERY release's manifest, with the full status taxonomy.
-Deliberately not here:
+Phase 3 of the build plan (PRODUCT_SPEC.md section 6). Two modes (decision D11):
 
-    attribution mode (no target at all)   phase 3
-    per-file attribution of `match` files  phase 3 - representation still open (section 7.8)
+    verification  a target release is given: every file gets a verdict relative to it, judged
+                  in the light of EVERY release's manifest, with the full status taxonomy
+    attribution   no target: every file is attributed to the releases its bytes match, and the
+                  workspace gets a per-release coverage score (decision D15)
+
+Both modes carry the coverage summary; attribution mode is verification without the verdicts.
 
 Every release's manifest is fetched on each run. The release list is ONE GitHub API request
 (per_page=100), and the manifests are downloaded from `browser_download_url` on github.com,
@@ -54,6 +56,11 @@ LATEST_REPORT_NAME = "status_latest.json"
 RELEASE_MARKER_NAME = ".snt_release"
 MANIFEST_ASSET_NAME = "release_manifest.json"
 
+# The reserved `release_tag` value that forces attribution mode even when .snt_release exists
+# (decision D17). Without it, attribution mode would be unreachable once snt_workspace_manager
+# has run, short of deleting the marker by hand. Compared case-insensitively.
+NO_TARGET_TAG = "none"
+
 GITHUB_HEADERS = {"User-Agent": "snt-workspace-check"}
 GITHUB_PAGE_SIZE = 100
 
@@ -86,6 +93,7 @@ VERSION_NUMBER_SUFFIX = re.compile(r"\s*\[v\d+\]\s*$")
 # Human-readable display text, never parsed by a consumer (PRODUCT_SPEC.md section 5.5).
 REMEDIATION = {
     "match": None,
+    "attributed": None,
     "mismatch_known": (
         "This copy is another release's version of the file - see matching_releases and position. "
         "Run snt_workspace_manager at the target release to bring it into line (the current copy is "
@@ -93,8 +101,8 @@ REMEDIATION = {
     ),
     "unknown_content": (
         "This copy is not any version a release ever shipped - it was edited in place, or it is "
-        "corrupt. Run snt_workspace_manager at the target release to restore it; the current copy "
-        "is archived first."
+        "corrupt. Run snt_workspace_manager at the target release (or, with no target, at the release "
+        "you want) to restore it; the current copy is archived first."
     ),
     "missing": (
         "The target release ships this file and the workspace does not have it. Run "
@@ -173,7 +181,9 @@ PIPELINE_REMEDIATION = {
     name="Target release tag",
     help=(
         "Release to check this workspace against (e.g. v0.2.1-test). Leave empty to use the tag "
-        "recorded in .snt_release by the last snt_workspace_manager run."
+        "recorded in .snt_release by the last snt_workspace_manager run; with neither, the "
+        "workspace is attributed to releases without a target. Enter 'none' to force that "
+        "attribution mode even when .snt_release exists."
     ),
     type=str,
     default=None,
@@ -189,24 +199,40 @@ def snt_workspace_check(github_repo: str, release_tag: str | None) -> None:
 
     declared_tag = read_release_marker(snt_root_path)
     target_tag, resolved_from = resolve_target(release_tag, declared_tag)
-    current_run.log_info(
-        f"Checking workspace '{workspace.slug}' against {github_repo}@{target_tag} "
-        f"(target resolved from the {resolved_from})."
-    )
-    if declared_tag and declared_tag != target_tag:
-        current_run.log_warning(
-            f"The workspace declares release '{declared_tag}' but is being checked against "
-            f"'{target_tag}'. The declaration records intent, not verified fact."
+    if target_tag is None:
+        current_run.log_info(
+            f"Attribution mode: assessing workspace '{workspace.slug}' against every release of "
+            f"{github_repo}, with no target ({describe_no_target(resolved_from)})."
         )
+        if declared_tag:
+            current_run.log_info(
+                f"The workspace declares release '{declared_tag}'; it is not used as a target in "
+                "this mode, and the coverage summary shows how far the files bear it out."
+            )
+    else:
+        current_run.log_info(
+            f"Verification mode: checking workspace '{workspace.slug}' against "
+            f"{github_repo}@{target_tag} (target resolved from the {resolved_from})."
+        )
+        if declared_tag and declared_tag != target_tag:
+            current_run.log_warning(
+                f"The workspace declares release '{declared_tag}' but is being checked against "
+                f"'{target_tag}'. The declaration records intent, not verified fact."
+            )
 
     releases = list_releases(github_repo)
     manifests, releases_considered, errors = load_manifests(releases)
-    target_release = require_target(target_tag, releases, manifests, errors)
+    target_release = require_target(target_tag, releases, manifests, errors) if target_tag else None
     index = build_index(manifests, releases, target_tag)
-    current_run.log_info(
+    target_part = (
         f"Release {target_tag} tracks {len(index.target_files)} file(s) across "
-        f"{len(index.target_pipelines)} pipeline(s); {len(manifests)} of {len(releases)} release(s) "
-        f"have a usable manifest, together tracking {len(index.paths)} distinct path(s)."
+        f"{len(index.target_pipelines)} pipeline(s); "
+        if target_tag
+        else ""
+    )
+    current_run.log_info(
+        f"{target_part}{len(manifests)} of {len(releases)} release(s) have a usable manifest, "
+        f"together tracking {len(index.paths)} distinct path(s)."
     )
 
     fs_entries, inert_copies = check_filesystem(snt_root_path, index)
@@ -217,6 +243,7 @@ def snt_workspace_check(github_repo: str, release_tag: str | None) -> None:
 
     report = build_report(
         entries=fs_entries + zip_entries,
+        index=index,
         pipeline_reports=pipeline_reports,
         inert_copies=inert_copies,
         errors=errors,
@@ -236,27 +263,40 @@ def snt_workspace_check(github_repo: str, release_tag: str | None) -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def resolve_target(release_tag: str | None, declared_tag: str | None) -> tuple[str, str]:
-    """Decide which release this run checks against, and record where that came from.
+def resolve_target(release_tag: str | None, declared_tag: str | None) -> tuple[str | None, str]:
+    """Decide which release this run checks against - if any - and record where that came from.
 
     The order is fixed by PRODUCT_SPEC.md section 4.2: the parameter, then the .snt_release
-    marker. The third case - neither given - is attribution mode, which is phase 3, so here
-    it stops with an explanation rather than silently checking against nothing.
+    marker, then no target at all, which is attribution mode. The reserved parameter value
+    `none` (decision D17) selects attribution mode outright, ahead of the marker, so a
+    scheduled attribution check never needs the marker deleted first.
 
     Returns
     -------
-    tuple[str, str]
-        (the target release tag, the source it was resolved from: "parameter" or "marker").
+    tuple[str | None, str]
+        (the target release tag, or None in attribution mode; where that was resolved from:
+        "parameter", "marker", or "nothing_given" when neither named a target).
     """
     if release_tag and release_tag.strip():
+        if release_tag.strip().lower() == NO_TARGET_TAG:
+            return None, "parameter"
         return release_tag.strip(), "parameter"
     if declared_tag:
         return declared_tag, "marker"
-    raise ValueError(
-        f"No target release: the 'Target release tag' parameter is empty and this workspace has "
-        f"no {RELEASE_MARKER_NAME} marker. Attribution mode - assessing a workspace with no target "
-        "at all - is not built yet (PRODUCT_SPEC.md phase 3). Name a release tag to continue."
-    )
+    return None, "nothing_given"
+
+
+def describe_no_target(resolved_from: str) -> str:
+    """Say in words why a run has no target release, for the log.
+
+    Returns
+    -------
+    str
+        A short explanation.
+    """
+    if resolved_from == "parameter":
+        return f"the 'Target release tag' parameter is '{NO_TARGET_TAG}'"
+    return f"the 'Target release tag' parameter is empty and there is no {RELEASE_MARKER_NAME} marker"
 
 
 def read_release_marker(snt_root_path: Path) -> str | None:
@@ -516,8 +556,8 @@ class ReleaseIndex:
 
     Attributes
     ----------
-    target_tag : str
-        The release being checked against.
+    target_tag : str | None
+        The release being checked against, or None in attribution mode.
     published_at : dict
         {tag: timezone-aware datetime or None}, for every release with a usable manifest.
     ordered_tags : list
@@ -533,7 +573,7 @@ class ReleaseIndex:
         {tag: manifest}.
     """
 
-    target_tag: str
+    target_tag: str | None
     published_at: dict
     ordered_tags: list
     all_tags: list
@@ -543,28 +583,41 @@ class ReleaseIndex:
 
     @property
     def target_files(self) -> dict:
-        """The target manifest's `files`, {repository path: sha256}.
+        """The target manifest's `files`, {repository path: sha256}; empty with no target.
 
         Returns
         -------
         dict
             The target's tracked files.
         """
-        return self.manifests[self.target_tag]["files"]
+        return self.manifests[self.target_tag]["files"] if self.target_tag else {}
 
     @property
     def target_pipelines(self) -> dict:
-        """The target manifest's `pipelines` block.
+        """The target manifest's `pipelines` block; empty with no target.
 
         Returns
         -------
         dict
             {pipeline directory: {"code": ..., "zip_files": [...]}}.
         """
-        return self.manifests[self.target_tag]["pipelines"]
+        return self.manifests[self.target_tag]["pipelines"] if self.target_tag else {}
+
+    def releases_holding(self, rel_path: str, observed: str | None) -> list[str]:
+        """List the releases whose manifest holds exactly these bytes at this path.
+
+        Returns
+        -------
+        list[str]
+            Tags in `published_at` order; empty for an absent file or an unknown path.
+        """
+        by_tag = self.paths.get(rel_path)
+        if observed is None or by_tag is None:
+            return []
+        return [tag for tag in self.ordered_tags if by_tag.get(tag) == observed]
 
 
-def build_index(manifests: dict, releases: list[dict], target_tag: str) -> ReleaseIndex:
+def build_index(manifests: dict, releases: list[dict], target_tag: str | None) -> ReleaseIndex:
     """Re-key the usable manifests by path, so each observed file costs one lookup.
 
     Returns
@@ -636,6 +689,10 @@ def classify(rel_path: str, observed: str | None, index: ReleaseIndex) -> dict:
     manifest holds exactly the observed bytes at this path, as spans (see `to_spans`). It is
     carried only on entries that are not `match` - decision D14, section 7.8.
 
+    With no target (attribution mode) there is nothing to be behind, ahead of, missing from
+    or removed in, so a known path whose bytes match any release is `attributed` (decision
+    D16), with spans over ALL its matching releases and no position.
+
     Returns
     -------
     dict
@@ -645,13 +702,19 @@ def classify(rel_path: str, observed: str | None, index: ReleaseIndex) -> dict:
     if by_tag is None:
         return verdict("untracked")
 
+    if index.target_tag is None:
+        matching = index.releases_holding(rel_path, observed)
+        if matching:
+            return verdict("attributed", None, to_spans(matching, index))
+        return verdict("unknown_content")
+
     target_sha = by_tag.get(index.target_tag)
     if observed is None:
         return verdict("missing", target_sha)
     if observed == target_sha:
         return verdict("match", target_sha)
 
-    matching = [tag for tag in index.ordered_tags if tag != index.target_tag and by_tag.get(tag) == observed]
+    matching = [tag for tag in index.releases_holding(rel_path, observed) if tag != index.target_tag]
     matching_position = position_of(matching, index) if matching else None
     spans = to_spans(matching, index) if matching else None
 
@@ -826,7 +889,8 @@ def check_filesystem(snt_root_path: Path, index: ReleaseIndex) -> tuple[list[dic
     the content question is never asked for them. Files inside a pipeline directory never
     execute, so they are returned separately as inert copies and not classified. Tracked
     target paths the walk did not see are then checked directly, so a file the exclusions
-    happened to hide is still found rather than reported `missing`.
+    happened to hide is still found rather than reported `missing`. With no target there are
+    no target paths, and absence means nothing, so that second pass is skipped.
 
     Returns
     -------
@@ -844,6 +908,9 @@ def check_filesystem(snt_root_path: Path, index: ReleaseIndex) -> tuple[list[dic
             continue
         seen.add(rel_path)
         entries.append(classify_file(rel_path, snt_root_path / rel_path, index))
+
+    if index.target_tag is None:
+        return entries, inert_copies
 
     for rel_path in sorted(index.target_files):
         if rel_path in seen or PurePosixPath(rel_path).parts[0] in pipeline_dirs:
@@ -872,7 +939,7 @@ def classify_file(rel_path: str, file_path: Path, index: ReleaseIndex) -> dict:
         observed = sha256_bytes(file_path.read_bytes())
     except OSError as exception:
         current_run.log_warning(f"[WARNING] Could not read {rel_path}: {exception}")
-        target_sha = index.paths[rel_path].get(index.target_tag)
+        target_sha = index.target_files.get(rel_path)
         return make_entry(rel_path, "filesystem", None, None, verdict("unreadable", target_sha))
 
     return make_entry(rel_path, "filesystem", None, observed, classify(rel_path, observed, index))
@@ -903,8 +970,11 @@ def check_pipeline_versions(index: ReleaseIndex, token: str) -> tuple[list[dict]
     pipeline_reports: list[dict] = []
     errors: list[dict] = []
 
+    has_target = index.target_tag is not None
     for dir_name, code in sorted(index.pipeline_codes.items()):
-        in_target = dir_name in index.target_pipelines
+        # None, not False, with no target: "not in the target" would be a verdict about a target
+        # that does not exist.
+        in_target = (dir_name in index.target_pipelines) if has_target else None
         expected_members = index.target_pipelines[dir_name]["zip_files"] if in_target else []
 
         try:
@@ -938,14 +1008,14 @@ def check_pipeline_versions(index: ReleaseIndex, token: str) -> tuple[list[dict]
                     entries.append(classify_zip_member(dir_name, member, None, index))
                 pipeline_reports.append(pipeline_report(dir_name, code, True, None, None, "not_deployed"))
             else:
-                current_run.log_debug(f"{code}: not in the target release and not deployed - nothing to do.")
+                current_run.log_debug(f"{code}: not deployed, and no target expects it - nothing to do.")
             continue
 
         for member in sorted(set(expected_members) | set(members)):
             entries.append(classify_zip_member(dir_name, member, members.get(member), index))
 
         name = version["versionName"]
-        if not in_target:
+        if in_target is False:
             current_run.log_warning(
                 f"[WARNING] {code}: deployed (current version '{name}') but not part of the target "
                 "release. Left in place - a pipeline cannot delete another pipeline."
@@ -957,11 +1027,11 @@ def check_pipeline_versions(index: ReleaseIndex, token: str) -> tuple[list[dict]
                 in_target,
                 name,
                 name_matches_content(dir_name, name, members, index),
-                None if in_target else "not_in_target",
+                "not_in_target" if in_target is False else None,
             )
         )
 
-    unknown, listing_error = list_unknown_pipelines(token, set(index.pipeline_codes.values()))
+    unknown, listing_error = list_unknown_pipelines(token, set(index.pipeline_codes.values()), has_target)
     if listing_error:
         errors.append(listing_error)
     pipeline_reports.extend(unknown)
@@ -1023,13 +1093,17 @@ def fetch_current_version(token: str, code: str) -> dict | None:
     return data["currentVersion"]
 
 
-def list_unknown_pipelines(token: str, known_codes: set[str]) -> tuple[list[dict], dict | None]:
+def list_unknown_pipelines(
+    token: str, known_codes: set[str], has_target: bool
+) -> tuple[list[dict], dict | None]:
     """Name the pipelines deployed in this workspace that no release describes.
 
     Their contents are not read: they are not the release's business. Before the checker
     ships in a release, it appears here itself (PRODUCT_SPEC.md section 6.2). A failure is an
     error that makes the report incomplete, but does not stop the run - every pipeline a
-    release describes has already been checked by code.
+    release describes has already been checked by code. `in_target` is False when there is a
+    target (no release describes them, so the target does not either) and None when there is
+    none.
 
     Returns
     -------
@@ -1060,7 +1134,8 @@ def list_unknown_pipelines(token: str, known_codes: set[str]) -> tuple[list[dict
         if item["code"] in known_codes:
             continue
         name = (item.get("currentVersion") or {}).get("versionName")
-        unknown.append(pipeline_report(None, item["code"], False, name, None, "not_in_any_release"))
+        in_target = False if has_target else None
+        unknown.append(pipeline_report(None, item["code"], in_target, name, None, "not_in_any_release"))
     return unknown, None
 
 
@@ -1160,7 +1235,7 @@ def name_matches_content(dir_name: str, version_name: str, members: dict, index:
 def pipeline_report(
     dir_name: str | None,
     code: str,
-    in_target: bool,
+    in_target: bool | None,
     version_name: str | None,
     matches_content: bool | None,
     remediation_key: str | None,
@@ -1195,13 +1270,118 @@ def pipeline_report(
 # --------------------------------------------------------------------------------------------
 
 
+def attribution_summary(entries: list[dict], index: ReleaseIndex, releases_considered: list[dict]) -> dict:
+    """Score every release on how far the workspace agrees with it, and how much of it is there.
+
+    Decision D15, revised (PRODUCT_SPEC.md section 7.10). Each release is judged only on the
+    paths it ships. A present file at a path the release does not ship is `extra` for it -
+    neither agreement nor disagreement. Counting such files as disagreement made every
+    leftover of a removed file (the manager removes nothing, and a pipeline cannot delete
+    another) drag the newest release down, so a freshly upgraded workspace read as an older
+    release (sandbox run of 2026-09-29).
+
+    Judging only on shipped paths would let a near-empty workspace agree 100% with
+    everything, so completeness is reported beside agreement:
+
+        agreement     agreeing / present   of the release's paths found here, the share whose
+                                           bytes are exactly that release's
+        completeness  present / shipped    the share of the release's paths found here at all
+
+    A file unchanged across releases agrees with each of them, so no column sums to 1. The
+    best fit is the highest agreement, then the highest completeness, then the newest
+    release - identical content across releases is the normal case, and the newest is the
+    least surprising label for it.
+
+    "Present" means an entry for a file in the workspace, both sources together, except
+    `untracked` (no release has an opinion about the path) and `missing` (no bytes). An
+    unreadable file is present but never agrees; it and the files matching no release at
+    all are also reported on their own. Scores come from the observed bytes, not from each
+    entry's status, so they mean the same thing in both modes.
+
+    Returns
+    -------
+    dict
+        The `summary.attribution` block.
+    """
+    counted = [entry for entry in entries if entry["status"] not in ("untracked", "missing")]
+    total = len(counted)
+
+    def ratio(part: int, whole: int) -> float | None:
+        return round(part / whole, 4) if whole else None
+
+    matches_none = sum(
+        1
+        for entry in counted
+        if entry["observed_sha256"] is not None
+        and not index.releases_holding(entry["path"], entry["observed_sha256"])
+    )
+    unreadable = sum(1 for entry in counted if entry["observed_sha256"] is None)
+
+    by_release = []
+    for release in releases_considered:
+        row = {
+            "tag": release["tag"],
+            "published_at": release["published_at"],
+            "manifest_available": release["manifest_available"],
+            "shipped": None,
+            "present": None,
+            "agreeing": None,
+            "extra": None,
+            "agreement": None,
+            "completeness": None,
+        }
+        if release["manifest_available"]:
+            files = index.manifests[release["tag"]]["files"]
+            at_shipped = [entry for entry in counted if entry["path"] in files]
+            agreeing = sum(1 for entry in at_shipped if entry["observed_sha256"] == files[entry["path"]])
+            row.update(
+                shipped=len(files),
+                present=len(at_shipped),
+                agreeing=agreeing,
+                extra=total - len(at_shipped),
+                agreement=ratio(agreeing, len(at_shipped)),
+                completeness=ratio(len(at_shipped), len(files)),
+            )
+        by_release.append(row)
+
+    best = None
+    for row in by_release:  # oldest first, so `>=` hands a full tie to the newest
+        if not row["agreeing"]:
+            continue
+        key = (row["agreement"], row["completeness"])
+        if best is None or key >= (best["agreement"], best["completeness"]):
+            best = row
+
+    return {
+        "files_scored": total,
+        "rule": (
+            "Each release is judged only on the paths it ships. present = files found here at those "
+            "paths; agreeing = those whose bytes are exactly the release's; extra = files found here "
+            "at paths it does not ship. agreement = agreeing / present; completeness = present / "
+            "shipped. Files are every entry for a file present in the workspace, filesystem and "
+            "pipeline versions together, except `untracked` and `missing`. A file unchanged across "
+            "releases agrees with each of them, so no column adds up to 1. Best fit: highest "
+            "agreement, then highest completeness, then newest."
+        ),
+        "by_release": by_release,
+        "best_fit": (
+            {"tag": best["tag"], "agreement": best["agreement"], "completeness": best["completeness"]}
+            if best
+            else None
+        ),
+        "matches_no_release": {"count": matches_none, "share": ratio(matches_none, total)},
+        "unreadable": {"count": unreadable, "share": ratio(unreadable, total)},
+    }
+
+
 def build_report(
     entries: list[dict],
+    index: ReleaseIndex,
     pipeline_reports: list[dict],
     inert_copies: list[str],
     errors: list[dict],
     github_repo: str,
-    release: dict,
+    release: dict | None,
     releases_considered: list[dict],
     resolved_from: str,
     declared_tag: str | None,
@@ -1222,7 +1402,6 @@ def build_report(
         or any(entry["status"] == "unreadable" for entry in entries)
         or not all(r["manifest_available"] for r in releases_considered)
     )
-    target_tag = release["tag_name"]
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -1232,18 +1411,21 @@ def build_report(
         "checker_version": None,
         "workspace": workspace.slug,
         "repo": github_repo,
-        "mode": "verification",
+        "mode": "verification" if release else "attribution",
+        # Always an object, so a consumer reads `resolved_from` the same way in both modes. In
+        # attribution mode `tag` is null and `resolved_from` says why: "parameter" (the reserved
+        # value 'none') or "nothing_given" (empty parameter, no marker).
         "target_release": {
-            "tag": target_tag,
+            "tag": release["tag_name"] if release else None,
             "resolved_from": resolved_from,
-            "published_at": release.get("published_at"),
+            "published_at": release.get("published_at") if release else None,
         },
         "declared_release": ({"tag": declared_tag, "source": RELEASE_MARKER_NAME} if declared_tag else None),
         "releases_considered": releases_considered,
         "incomplete": incomplete,
         "summary": {
             "by_status": dict(sorted(by_status.items())),
-            "attribution": None,  # phase 3
+            "attribution": attribution_summary(entries, index, releases_considered),
         },
         "pipelines": pipeline_reports,
         "entries": entries,
@@ -1253,8 +1435,8 @@ def build_report(
         # Named so the report never reads as a clean bill of health for things it never
         # looked at (PRODUCT_SPEC.md sections 1.2 and 5.4).
         "blind_spots": [
-            "Attribution mode - assessing a workspace with no target release - is not built (phase 3). "
-            "matching_releases is carried only on entries that are not `match`.",
+            "In verification mode, matching_releases is carried only on entries that are not `match` "
+            "(decision D14); summary.attribution still counts every file.",
             "Files on the filesystem inside a pipeline directory never execute; they are listed in "
             "inert_filesystem_copies, not classified.",
             "Pipelines no release describes are named in `pipelines`, but their contents are not read.",
@@ -1291,23 +1473,64 @@ def write_report(snt_root_path: Path, report: dict) -> Path:
     return report_path
 
 
+def percent(value: float | None) -> str:
+    """Format a 0-1 ratio for the log, or 'n/a' when there was nothing to divide by.
+
+    Returns
+    -------
+    str
+        e.g. "97.6%".
+    """
+    return f"{value:.1%}" if value is not None else "n/a"
+
+
 def log_summary(report: dict, report_path: Path) -> None:
     """Log the shape of the result, leaving the per-file detail to the JSON.
 
     Every actionable entry gets one line. Untracked files on the filesystem are not
     actionable (decision D6) and can number in the hundreds in a real workspace, so they are
-    counted with a short sample rather than listed (PRODUCT_SPEC.md section 5.4).
+    counted with a short sample rather than listed (PRODUCT_SPEC.md section 5.4). Neither are
+    `match` and `attributed` entries - they are the normal case - so the coverage scores
+    stand in for them: one line per release.
     """
     by_status = report["summary"]["by_status"]
     total = sum(by_status.values())
+    against = report["target_release"]["tag"] or "no target (attribution mode)"
     current_run.log_info(
-        f"Checked {total} file(s) against {report['target_release']['tag']}: "
+        f"Checked {total} file(s) against {against}: "
         + ", ".join(f"{count} {status}" for status, count in by_status.items())
+    )
+
+    attribution = report["summary"]["attribution"]
+    current_run.log_info(
+        f"Per release, over {attribution['files_scored']} file(s) present and tracked. Agreement: of "
+        "the release's files found here, the share with exactly its bytes. Completeness: the share of "
+        "its files found here at all. Extra: files here it does not ship."
+    )
+    for row in attribution["by_release"]:
+        if not row["manifest_available"]:
+            current_run.log_info(f"  {row['tag']}: no usable manifest, not scored")
+            continue
+        current_run.log_info(
+            f"  {row['tag']}: agreement {percent(row['agreement'])} ({row['agreeing']}/{row['present']}), "
+            f"completeness {percent(row['completeness'])} ({row['present']}/{row['shipped']}), "
+            f"{row['extra']} extra"
+        )
+    no_match, unreadable = attribution["matches_no_release"], attribution["unreadable"]
+    best = attribution["best_fit"]
+    headline = (
+        f"Best fit: {best['tag']} (agreement {percent(best['agreement'])}, completeness "
+        f"{percent(best['completeness'])})."
+        if best
+        else "No best fit: no file matches any release."
+    )
+    current_run.log_info(
+        f"{headline} Matching no release: {no_match['count']}; unreadable: {unreadable['count']}."
     )
 
     stray = []
     for entry in report["entries"]:
-        if entry["status"] == "match":
+        if entry["status"] in ("match", "attributed"):
             continue
         if entry["status"] == "untracked" and entry["source"] == "filesystem":
             stray.append(entry["path"])
@@ -1318,7 +1541,7 @@ def log_summary(report: dict, report_path: Path) -> None:
                 span["from"] if span["count"] == 1 else f"{span['from']}..{span['to']}"
                 for span in entry["matching_releases"]
             )
-            detail = f", matches {spans} ({entry['position']})"
+            detail = f", matches {spans}" + (f" ({entry['position']})" if entry["position"] else "")
         current_run.log_warning(f"[WARNING] {entry['status']}: {entry['path']} ({entry['source']}{detail})")
 
     if stray:

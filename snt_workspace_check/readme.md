@@ -1,14 +1,24 @@
 # SNT Workspace Check Pipeline
 
-Reports what is actually deployed in this OpenHEXA workspace, compared against one GitHub release
-of the SNT codebase. Every other release is considered alongside it. It is **read-only**: it
-writes a status report and changes nothing else. Installing and updating is `snt_workspace_manager`'s job. The report is a JSON file on the
+Reports what is actually deployed in this OpenHEXA workspace, compared against the GitHub releases
+of the SNT codebase. It is **read-only**: it writes a status report and changes nothing else.
+Installing and updating is `snt_workspace_manager`'s job. The report is a JSON file on the
 workspace filesystem under **`snt_status/`**, not an OpenHEXA dataset (decision D3).
 
-> **Phase 2 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** Verification against a
-> target release with the full status taxonomy. Attribution mode (no target at all) is phase 3. The
-> report shape is provisional until `schema_version: 1` is frozen at phase 4, and this readme is
-> re-verified against the code then.
+It runs in one of two modes (decision D11):
+
+* **Verification**: a target release is given. Every file gets a verdict relative to it (up to
+  date, behind, ahead, edited, missing…), judged against every other release too.
+* **Attribution**: no target. Every file is attributed to the releases whose bytes it holds, with no
+  verdicts. Each release gets two scores (decision D15). **Agreement** answers "of the files v0.3.0
+  ships that are here, 100% have its exact bytes". **Completeness** answers "98.2% of v0.3.0's files
+  are here".
+
+Both modes report the per-release scores.
+
+> **Phase 3 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** The report shape is
+> provisional until `schema_version: 1` is frozen at phase 4, and this readme is re-verified against
+> the code then.
 
 ## Parameters
 
@@ -22,8 +32,10 @@ workspace filesystem under **`snt_status/`**, not an OpenHEXA dataset (decision 
   * **Name:** Target release tag
   * **Description:** The release to check this workspace against, e.g. `v0.2.1-test`. Left empty, the
     pipeline falls back to the tag recorded in `.snt_release` by the last `snt_workspace_manager`
-    run. With neither, it stops with an explanation rather than checking against nothing —
-    attribution mode (assessing a workspace with no target at all) is phase 3.
+    run. With neither, it runs in **attribution mode**. The reserved value **`none`** (any case)
+    forces attribution mode even when `.snt_release` exists (decision D17), so a scheduled
+    attribution check never needs the marker deleted. A release literally tagged `none` could
+    therefore never be targeted.
   * **Default:** none.
 
 This pipeline takes **no credential parameter and needs no connection.** A run's own `HEXA_TOKEN`
@@ -34,8 +46,9 @@ unattended in a country workspace that holds no connection at all.
 
 1. Read `.snt_release` at the workspace root, if present, for the **declared** release. Its absence
    is the normal starting state for every country workspace today and is never an error.
-2. Resolve the **target** release: the `release_tag` parameter, else the declared release, else stop.
-   The report always records which of the two was used.
+2. Resolve the **target** release: `release_tag` = `none` means no target; otherwise the parameter,
+   else the declared release, else no target. No target means attribution mode. The report records
+   the outcome under `target_release.resolved_from`: `parameter`, `marker` or `nothing_given`.
 3. **List every published release** of the repository (one GitHub API request per 100 releases) and
    download each one's **`release_manifest.json`** asset. A release whose manifest is absent, cannot
    be downloaded, or has no `pipelines` block cannot be used for comparison. It is listed with
@@ -44,8 +57,9 @@ unattended in a country workspace that holds no connection at all.
 4. **Filesystem source.** Walk `workspace.files_path`, minus the exclusions below. A file at a path
    no release has ever shipped is `untracked` and is **not read**. A file at a known path is hashed
    and classified. A file inside a pipeline directory is listed in `inert_filesystem_copies` and
-   not classified. Every filesystem path the target ships that the walk did not find is then
-   checked directly, and reported `missing` if it is absent.
+   not classified. In verification mode, every filesystem path the target ships that the walk did
+   not find is then checked directly, and reported `missing` if it is absent. In attribution mode
+   absence means nothing, so this step is skipped.
 5. **Pipeline-version source.** For each pipeline directory described by **any** release, read that
    pipeline's **current registered version** through the OpenHEXA API, decode the stored zip, and
    classify every file inside it, plus every file the target expects there. Older versions are not
@@ -54,8 +68,10 @@ unattended in a country workspace that holds no connection at all.
    and does not stop the others.
 6. **List the workspace's pipelines** to name any that no release describes. Their contents are not
    read.
-7. Write the report twice, and log a summary: one line per actionable file, and a count plus sample
-   for untracked filesystem files.
+7. Score every release on agreement and completeness, judged only on the paths it ships
+   (`summary.attribution`).
+8. Write the report twice, and log a summary: the scores per release and the best fit, one line per
+   actionable file, and a count plus sample for untracked filesystem files.
 
 Each tracked path is read from **exactly one** source. Anything inside a pipeline directory comes
 from the version zip. A copy of the same file on the workspace filesystem is **not** used as
@@ -73,20 +89,21 @@ dot-directory (`.ipynb_checkpoints/`, `.git/`, …) at any depth; `reporting/out
 Every entry has exactly one status. A **path** question comes before a **content** question: a path
 no release has ever shipped is `untracked`, and its bytes are never compared.
 
-| Status | Meaning |
-|---|---|
-| `match` | Hash equals the target manifest's. |
-| `mismatch_known` | The target ships this path. The hash differs from the target's but equals another release's (see `matching_releases`, `position`). |
-| `unknown_content` | The target ships this path, but the bytes match **no** release. Edited in place, or corrupt. |
-| `missing` | In the target; absent from its source. |
-| `removed_in_target` | An older release shipped this path; the target does not. |
-| `added_after_target` | Only releases **newer** than the target ship this path. The workspace is ahead here. |
-| `untracked` | No release has ever shipped this path. On the filesystem: reported only. In a pipeline zip (`source: pipeline_version`): the §5.3 sharper case, because the file **is deployed code**. |
-| `not_covered` | In a pipeline zip, at a path of a type the manifest generator does not hash. It should never appear. It is the alarm that the generator has fallen behind the OpenHEXA SDK's zip rule. |
-| `unreadable` | Present but could not be hashed (permissions, I/O, API error). Always sets `incomplete: true`. |
+| Status | Meaning | Mode |
+|---|---|---|
+| `match` | Hash equals the target manifest's. | verification |
+| `mismatch_known` | The target ships this path. The hash differs from the target's but equals another release's (see `matching_releases`, `position`). | verification |
+| `attributed` | The path is tracked and the bytes match at least one release. `matching_releases` lists **all** of them, as spans (decision D16). | attribution |
+| `unknown_content` | A tracked path whose bytes match **no** release. Edited in place, or corrupt. | both |
+| `missing` | In the target; absent from its source. | verification |
+| `removed_in_target` | An older release shipped this path; the target does not. | verification |
+| `added_after_target` | Only releases **newer** than the target ship this path. The workspace is ahead here. | verification |
+| `untracked` | No release has ever shipped this path. On the filesystem: reported only. In a pipeline zip (`source: pipeline_version`): the §5.3 sharper case, because the file **is deployed code**. | both |
+| `not_covered` | In a pipeline zip, at a path of a type the manifest generator does not hash. It should never appear. It is the alarm that the generator has fallen behind the OpenHEXA SDK's zip rule. | both |
+| `unreadable` | Present but could not be hashed (permissions, I/O, API error). Always sets `incomplete: true`. | both |
 
-`position`, on entries that carry `matching_releases`, places those releases relative to the target by
-GitHub `published_at` (decision D4):
+`position`, on verification-mode entries that carry `matching_releases`, places those releases
+relative to the target by GitHub `published_at` (decision D4). In attribution mode it is `null`.
 
 | `position` | Meaning |
 |---|---|
@@ -102,8 +119,8 @@ GitHub `published_at` (decision D4):
 | Release list | GitHub API, `repos/<repo>/releases` | Yes |
 | `release_manifest.json` of every release | GitHub release assets, via `browser_download_url` | The target's, yes. Others: each missing one makes the report `incomplete` |
 | `.snt_release` | Workspace root, written by `snt_workspace_manager` | No. Only used when `release_tag` is empty |
-| Workspace files | Workspace filesystem | No. Absence is the `missing` finding |
-| Current pipeline version zips, and the pipeline list | OpenHEXA GraphQL API, with the run's own token | No. Absence is the `missing` finding; failure is an `errors` entry |
+| Workspace files | Workspace filesystem | No. In verification mode, absence is the `missing` finding |
+| Current pipeline version zips, and the pipeline list | OpenHEXA GraphQL API, with the run's own token | No. In verification mode, absence is the `missing` finding; failure is an `errors` entry |
 
 This pipeline does **not** read `configuration/SNT_config.json` and takes no country code. It checks
 code, not data, so nothing about it is country-specific.
@@ -125,14 +142,35 @@ Nothing is published to an OpenHEXA dataset.
 > - **`remediation`** is display text for a human. Never parse it. Its wording depends on the
 >   source as well as the status: an `untracked` file in a zip is deployed code, one on the
 >   filesystem is a stray.
-> - **`matching_releases`**: the releases **other than the target** whose manifest holds exactly
->   the observed bytes at that path, collapsed into spans in `published_at` order, e.g.
->   `[{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}]`. A single release is a span of
->   one. Any release outside the set breaks a span, including the target and a release with no
->   readable manifest. **Two spans** for one file means its content was changed and later
->   reverted. It is `null` on `match` entries (decision D14).
+> - **`matching_releases`**: the releases whose manifest holds exactly the observed bytes at that
+>   path, collapsed into spans in `published_at` order, e.g.
+>   `[{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}]`. In verification mode the target
+>   is left out and the field is `null` on `match` entries (decision D14). In attribution mode it
+>   lists **every** matching release. A single release is a span of one. Any release outside the set
+>   breaks a span, including the target and a release with no readable manifest. **Two spans** for
+>   one file means its content was changed and later reverted.
+> - **`summary.attribution`**, in both modes (decision D15). Each release is judged **only on the
+>   paths it ships**. Per release, `by_release` gives:
+>   * `shipped`: the number of files the release ships.
+>   * `present`: how many of those paths are found here.
+>   * `agreeing`: how many of those have exactly the release's bytes.
+>   * `extra`: files found here at paths the release does not ship. Typically these are leftovers of
+>     files it removed. They count neither for nor against it.
+>   * **`agreement`** = `agreeing / present`: "apart from files it has no opinion about, how far does
+>     this workspace agree with the release?"
+>   * **`completeness`** = `present / shipped`: "how much of the release is here at all?"
+>
+>   A file unchanged across releases agrees with each of them, so no column adds up to 1. `best_fit`
+>   is the highest agreement, then the highest completeness, then the newest release. `files_scored`
+>   counts everything present in the workspace except `untracked`, both sources together, and `rule`
+>   restates all of this. Files matching no release (`matches_no_release`) and files that could not
+>   be read (`unreadable`) are also reported on their own. An unreadable file is present but never
+>   agrees. A release with no usable manifest has `null` in every count.
 > - **`incomplete`**: `true` means at least one source or release manifest could not be read. The
 >   report is then a partial account, not a pass.
+> - **`mode`** is `verification` or `attribution`. **`target_release`** is always an object: in
+>   attribution mode its `tag` and `published_at` are `null`, and `resolved_from` says why, either
+>   `parameter` (`release_tag` was `none`) or `nothing_given`.
 > - **`declared_release`** vs **`target_release`**: the declared one is what `.snt_release` says was
 >   last deployed. It is written even after a partial run, so it records **intent, not verified
 >   fact**. When the two disagree, the run logs a warning and checks against the target.
@@ -140,7 +178,8 @@ Nothing is published to an OpenHEXA dataset.
 >   deployed or in the target, plus one per deployed pipeline that no release describes
 >   (`in_any_release: false`, contents not read). `in_target: false` on a deployed pipeline means it
 >   is **not part of the target release and is left in place**. A pipeline cannot delete another
->   pipeline in OpenHEXA (`PRODUCT_SPEC.md` §7.5).
+>   pipeline in OpenHEXA (`PRODUCT_SPEC.md` §7.5). In attribution mode `in_target` is `null`, because
+>   there is no target to be part of.
 > - **`pipelines[].version_name_matches_content`**: a version's *name* is free text somebody typed;
 >   its hash is evidence. It is `true` when the zip holds exactly the files, byte for byte, that the
 >   named release ships for that pipeline, and `false` otherwise. That includes a zip with an extra

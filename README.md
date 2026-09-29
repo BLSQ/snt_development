@@ -46,6 +46,11 @@ data to each other through OpenHEXA **datasets** — never by calling each other
 `C` and `A2` publish usable layers of their own, not just intermediates, and the Explorer will
 increasingly read those datasets directly rather than the assembled table.
 
+Some pipelines also create **blank CSV templates** in the workspace `uploads/` folder, for an
+operator to fill in and upload to a later pipeline. `snt_dhis2_formatting`, for example, writes
+population templates with one row per ADM2. These files are not published to any dataset. See
+that pipeline's `readme.md`.
+
 The full pipeline-by-pipeline inventory is in
 [`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-20-pipelines-at-a-glance), where
 the stage letters above are used throughout (stage `A2` here is written `A′` there).

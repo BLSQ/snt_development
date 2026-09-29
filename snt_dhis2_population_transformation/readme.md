@@ -65,7 +65,7 @@ Only the **`POPULATION`** column extracted from DHIS2 is used as the basis for a
 
 * **`configuration/SNT_config.json`**: administration labels and dataset identifiers.
 * **`{COUNTRY_CODE}_population.parquet`** from **`SNT_DATASET_IDENTIFIERS.DHIS2_DATASET_FORMATTED`**: only the **`POPULATION`** column is used; other indicators are ignored.
-* **Optional `disaggregation_file`**: user CSV with ADM2-level proportion columns.
+* **Optional `disaggregation_file`**: user CSV with ADM2-level proportion columns. Start from **`uploads/{COUNTRY_CODE}_population_disaggregation_template.csv`**, written by **`snt_dhis2_formatting`**.
 
 ## Outputs
 

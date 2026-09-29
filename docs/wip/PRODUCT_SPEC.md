@@ -28,7 +28,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 | Component | Role | State |
 |---|---|---|
 | `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
-| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 1 — verified in the sandbox, 163/163 `match` (§6.2). Phases 2–3 not started |
+| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 2 — full taxonomy verified in the sandbox (§6.3). Phase 3 not started |
 | Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
 
@@ -201,6 +201,7 @@ Per entry, exactly one status:
 | `unknown_content` | **Known path, unknown content.** The path is tracked, but its hash matches no release. Edited by hand, or corrupted | both |
 | `missing` | In the target manifest; absent from both filesystem and pipeline versions | 4.2 |
 | `removed_in_target` | Present, and in an older manifest, but not in the target's | 4.2 |
+| `added_after_target` | Present, not in the target's manifest, and **only** in manifests newer than it — the workspace is ahead. Added in phase 2 (§6.3): without it, "ahead" would read as "removed" | 4.2 |
 | `untracked` | **Unknown path.** This path appears in no manifest of any release — the repo has never shipped a file here | both |
 | `not_covered` | Deployed inside a pipeline zip, but no manifest describes it. Should not occur now the manifest mirrors the SDK's zip rule; retained as the tripwire for that rule drifting | both |
 | `unreadable` | Present but could not be hashed (permissions, I/O, API error) | both |
@@ -342,7 +343,7 @@ still open.
 |---|---|---|---|
 | **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
 | **1** | ✅ **DONE** 2026-09-22 — checker skeleton in [`snt_workspace_check/`](../../snt_workspace_check/): verification mode against a single target release, both sources hashed, four statuses, report written (§6.2). | Met: `snt-development-sandbox` at `v0.1.0-test` reported **163/163 `match`**. | — |
-| **2** | Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
+| **2** | ✅ **DONE** 2026-09-29 — taxonomy verified in the sandbox, D9 decided (§6.3). Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
 | **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
 | **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
@@ -412,8 +413,74 @@ Three things that run established, beyond the exit criterion itself:
   changed between the two, so its bytes belong to both releases. "Belongs to release X" really is a
   set, and a workspace can be labelled one release while being genuinely at another.
 * **The checker does not describe itself.** `snt_workspace_check` is not in any release yet, so it
-  appears in no manifest and in no `pipelines` block. From phase 2 it will report as `untracked` —
-  and once it ships in a release, as a pipeline that can check its own deployment.
+  appears in no manifest and in no `pipelines` block. From phase 2 it reports as a pipeline no
+  release describes (`in_any_release: false`). Expected, not a defect. Both it and
+  `snt_workspace_manager` are to move to a separate repository of their own eventually (Giulia,
+  2026-09-29), so the checker may never describe itself through *these* manifests.
+
+### 6.3 Phase 2, as verified
+
+Written 2026-09-29. **Verified the same day** in `snt-development-sandbox`, deployed at `v0.1.0-test`
+with `code/snt_palettes.r` hand-edited and `scratch_notes.ipynb` created, checked with
+`release_tag=v0.2.1-test`:
+
+```
+157 match | 2 mismatch_known | 3 missing | 4 removed_in_target | 1 unknown_content | 1 untracked
+incomplete: true — solely v0.4.0-test (no manifest), as designed
+```
+
+Every non-`match` entry is the one the Run 1 table predicts, including `fixture_reverted.py` →
+`position: both` and the removed pipeline → `in_target: false`. All 21 deployed release pipelines
+report `version_name_matches_content: true`, including `snt-dhis2-population-transformation` named
+`v0.3.0-test` (only judgeable now that every manifest is loaded). The workspace pipeline-list query
+works: `snt-workspace-check` appears with `in_any_release: false`.
+
+**The run found a real defect.** It listed 55 `inert_filesystem_copies`: every `readme.md`,
+`requirements.txt` and helper module of every pipeline, sitting on the filesystem. No `pipeline.py`
+is among them. That is the signature of the pre-fix `split_manifest()` bug
+([`HISTORY.md`](HISTORY.md) §2.2), which copied everything except `pipeline.py` into the bucket.
+The copies include the fixture pipelines' files, so a manager with that bug ran at `v0.2.x` or
+later. They are leftovers, not something the current manager does. This is exactly the
+failure the checker exists to catch.
+
+**D9 decided 2026-09-29: no normalisation** (§8), from the measurement below.
+
+What changed from phase 1, and why:
+
+* **Every release's manifest is loaded, not only the target's** (Giulia, 2026-09-29).
+  `removed_in_target` and `untracked` are both defined against *any* release. With the target alone,
+  a file removed in the target would be misreported `untracked`. Listing releases is one GitHub API
+  request per 100 releases, the same cost as phase 1's single lookup. Manifests come from
+  `browser_download_url` on github.com, which is believed, **not verified**, to sit outside the
+  60/h API limit (§7.2). Loading them all also makes `mismatch_known` and `position` available now,
+  rather than in phase 3. Phase 3 keeps attribution mode and the distribution.
+* **A release with no usable manifest makes the report `incomplete`**, and it becomes an `errors`
+  entry. A file only that release shipped would otherwise be mislabelled with nothing saying so. The
+  run stops only if the *target* has none.
+* **The filesystem is walked**, minus the §5.3 exclusions. Dot-directories are also excluded,
+  because Jupyter's `.ipynb_checkpoints/` would otherwise double the untracked bucket. The report
+  carries the exclusions as `scan_exclusions`. Untracked files are listed, not read.
+* **`added_after_target`** is a new status (§5.1). A known path that only newer releases ship is
+  "ahead", not "removed". **Proposed by the agent; confirm or reject in review.**
+* **An undescribed zip member is split by the SDK's own zip rule.** If the generator would have
+  hashed it had it ever been in the repo, it is `untracked` in the zip, the §5.3 sharper case, marked
+  by `source: pipeline_version` and its own remediation text. If the generator could never have seen
+  it, it is `not_covered`.
+* **Filesystem copies inside pipeline directories** go to `inert_filesystem_copies`. They are listed
+  and not classified: they never run, and giving them a status would mix them into the verdict.
+* **Every release-described pipeline is probed by code**, which is how a deployed pipeline removed in
+  the target is found. It gets `in_target: false`, report-and-leave (§7.5). The workspace pipeline
+  list is read only to name pipelines no release describes, with
+  `pipelines(...) { totalPages items { code currentVersion { versionName } } }` (verified above).
+* **`version_name_matches_content` now judges any release name**, not only the target's. A zip must
+  hold exactly that release's files for the pipeline; an extra file is a disagreement.
+* `files_in_zip_not_in_manifest` was removed from the pipeline block. Those files are now per-file
+  entries.
+
+**D9 measurement tool:** `ignore/SNT25-670/d9_notebook_drift.py` (local, standard library). It
+compares a downloaded copy of a real workspace's `pipelines/` folder against the repo and puts each
+notebook at the first level where the two become equal: `identical`, `formatting`, `outputs`,
+`metadata` or `source`.
 
 ## 7. Open decisions
 
@@ -438,6 +505,20 @@ workspace-side manifest cache keyed by tag (safe, because tags never move), a cu
 asset published by the Action, or an authenticated **GitHub** token — which would give the checker a
 credential to hold after all, undoing the credential-free result of §7.3a. That is a point against
 the token option, not a blocker. **Deferred by the user to a dedicated session (2026-09-18).**
+
+**Input for that session (2026-09-29):** phase 2 already loads every manifest (§6.3), and the naive
+cost is smaller than feared above. `GET /releases?per_page=100` is **one** API request for up to 100
+releases, and each manifest is fetched from `browser_download_url` on github.com rather than
+api.github.com. If that holds, a check run costs one API request whatever the release count.
+
+A first attempt at measuring this, on 2026-09-29, was **inconclusive**. Two sandbox runs 18 minutes
+apart both logged `remaining: 59`. That value was read *before* the downloads, so neither run
+measured their cost. The second run should have read 58, so consecutive runs evidently do not share
+a counter, most likely because they leave from different egress IPs. Cross-run comparison is
+therefore useless. Each run now also logs the remaining budget read from `/rate_limit`, which is
+free, *after* the downloads. That before/after pair within one run is the evidence to collect. Still open: confirming that asset
+downloads are outside the API budget, and whether a cache is wanted anyway (bandwidth, GitHub
+outages).
 
 ### 7.3 Credentials in a country workspace — **low priority**, and no longer blocks the checker
 
@@ -466,12 +547,11 @@ The marker should arguably record the repository, a timestamp, and whether the r
 cleanly, so a checker can tell "deployed to T" from "attempted T, partially". Changing it means
 changing `snt_workspace_manager` and handling markers written by older versions.
 
-### 7.5 Pipelines removed in the target release
+### 7.5 ~~Pipelines removed in the target release~~ — **closed 2026-09-29**
 
-A file can be archived. An **OpenHEXA pipeline object cannot be removed without a destructive
-action**, and this repo forbids agents from performing those. The only honest behaviour is
-report-and-leave, with the report saying plainly that the pipeline is no longer part of the
-release. Confirm this is what the team wants before phase 2.
+**Report-and-leave**, confirmed by Giulia. A pipeline cannot delete another pipeline in OpenHEXA,
+and agents are forbidden destructive actions anyway. The report says plainly that the pipeline is
+not part of the target (`pipelines[].in_target: false`), and deleting it is a manual UI action.
 
 ### 7.6 Scheduling
 
@@ -527,7 +607,7 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D6 | Untracked files are **reported** in their own bucket, never acted on. |
 | D7 | Both sources — filesystem and pipeline version zips — are read from v1. |
 | D8 | Web apps are out of scope for v1, and named as a blind spot in the report. |
-| D9 | Notebook hash normalisation: **decide after measuring** real drift in phase 2, not up front. |
+| D9 | Notebook hash normalisation: **decide after measuring** real drift in phase 2, not up front. **Decided 2026-09-29: do not normalise** — hash raw bytes. Measured on one real country workspace: of 31 notebooks present in both workspace and repo, 15 identical, 2 metadata-only, 0 outputs or formatting, 14 real source differences. Normalisation would change the verdict for 2 of 31, and would need a second hash definition kept in lock-step between generator and checker (§6.3). |
 | D10 | The manifest gap is closed **before** the checker is built (phase 0). |
 | D11 | Two modes, driven by whether a target release is given: attribution (factual inventory) and verification (qualitative verdicts). |
 | D12 | The status formerly called `mismatch_unknown` is renamed **`unknown_content`**, to stop it reading as a synonym of `untracked`: one is about the bytes at a known path, the other about a path we never shipped (§5.1.1). |

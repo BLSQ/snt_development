@@ -1,13 +1,14 @@
 # SNT Workspace Check Pipeline
 
 Reports what is actually deployed in this OpenHEXA workspace, compared against one GitHub release
-of the SNT codebase. It is **read-only**: it writes a status report and changes nothing else —
-installing and updating is `snt_workspace_manager`'s job. The report is a JSON file on the workspace
-filesystem under **`snt_status/`**, not an OpenHEXA dataset (decision D3).
+of the SNT codebase. Every other release is considered alongside it. It is **read-only**: it
+writes a status report and changes nothing else. Installing and updating is `snt_workspace_manager`'s job. The report is a JSON file on the
+workspace filesystem under **`snt_status/`**, not an OpenHEXA dataset (decision D3).
 
-> **Phase 1 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** Verification against a
-> single target release, four statuses. The report shape is provisional until `schema_version: 1` is
-> frozen at phase 4, and this readme is re-verified against the code then.
+> **Phase 2 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** Verification against a
+> target release with the full status taxonomy. Attribution mode (no target at all) is phase 3. The
+> report shape is provisional until `schema_version: 1` is frozen at phase 4, and this readme is
+> re-verified against the code then.
 
 ## Parameters
 
@@ -35,81 +36,117 @@ unattended in a country workspace that holds no connection at all.
    is the normal starting state for every country workspace today and is never an error.
 2. Resolve the **target** release: the `release_tag` parameter, else the declared release, else stop.
    The report always records which of the two was used.
-3. Fetch the release from the GitHub API and download its **`release_manifest.json`** asset. A target
-   release with no manifest asset stops the run — there is nothing to check against.
-4. Read the manifest's **`pipelines`** block and split the tracked paths **by directory** into two
-   sources. A manifest with no such block (pre-2026-09-21) is refused rather than guessed at.
-5. **Filesystem source** — hash every tracked path under `workspace.files_path` that is *not* inside
-   a pipeline directory: the notebooks, the `utils/*.r` helpers and the shared `code/*.r` library.
-6. **Pipeline-version source** — for each pipeline directory, read its **current registered version**
-   through the OpenHEXA API, decode the stored zip and hash every file inside it. Older versions are
-   not read: they are not what would run. A pipeline the release defines but the workspace has not
-   deployed yields `missing` for all of its files; an API failure yields `unreadable` and does not
-   stop the other pipelines.
-7. Compare each file's sha256 (raw bytes, **no notebook normalisation** — that is decision D9, to be
-   taken after measuring real drift in phase 2) against the target manifest, and assign one status.
-8. Write the report twice, and log a summary plus one line per non-`match` file.
+3. **List every published release** of the repository (one GitHub API request per 100 releases) and
+   download each one's **`release_manifest.json`** asset. A release whose manifest is absent, cannot
+   be downloaded, or has no `pipelines` block cannot be used for comparison. It is listed with
+   `manifest_available: false`, added to `errors`, and the report is marked `incomplete`. The run
+   stops only if the **target** has no usable manifest.
+4. **Filesystem source.** Walk `workspace.files_path`, minus the exclusions below. A file at a path
+   no release has ever shipped is `untracked` and is **not read**. A file at a known path is hashed
+   and classified. A file inside a pipeline directory is listed in `inert_filesystem_copies` and
+   not classified. Every filesystem path the target ships that the walk did not find is then
+   checked directly, and reported `missing` if it is absent.
+5. **Pipeline-version source.** For each pipeline directory described by **any** release, read that
+   pipeline's **current registered version** through the OpenHEXA API, decode the stored zip, and
+   classify every file inside it, plus every file the target expects there. Older versions are not
+   read, because they are not what would run. A pipeline the target ships but the workspace has not
+   deployed yields `missing` for all its files. An API failure yields `unreadable` for that pipeline
+   and does not stop the others.
+6. **List the workspace's pipelines** to name any that no release describes. Their contents are not
+   read.
+7. Write the report twice, and log a summary: one line per actionable file, and a count plus sample
+   for untracked filesystem files.
 
 Each tracked path is read from **exactly one** source. Anything inside a pipeline directory comes
-from the version zip, and a copy of the same file sitting on the workspace filesystem is deliberately
-**not** consulted: OpenHEXA runs pipelines from the registered version and never from the bucket, so
-such a copy is inert, and treating it as evidence would report a file as fine on the strength of
-bytes that never execute.
+from the version zip. A copy of the same file on the workspace filesystem is **not** used as
+evidence. OpenHEXA runs pipelines from the registered version and never from the bucket, so such a
+copy is inert. It is listed, but it cannot make a file look fine.
 
-### Statuses this phase can report
+### Excluded from the filesystem walk
+
+`archive/`, `data/`, `configuration/` and `snt_status/` at the root; `papermill_outputs/` and any
+dot-directory (`.ipynb_checkpoints/`, `.git/`, …) at any depth; `reporting/outputs/`; and the
+`.snt_release` marker. The report repeats this list under `scan_exclusions`.
+
+### Statuses
+
+Every entry has exactly one status. A **path** question comes before a **content** question: a path
+no release has ever shipped is `untracked`, and its bytes are never compared.
 
 | Status | Meaning |
 |---|---|
-| `match` | Present; hash equals the target manifest's. |
-| `unknown_content` | Known path, unexpected bytes — edited in place, corrupt, or simply from a different release. Phase 1 holds only the target manifest, so it cannot yet tell those apart; phase 3 splits the third case out as `mismatch_known`. |
-| `missing` | In the target manifest; absent from both sources. |
+| `match` | Hash equals the target manifest's. |
+| `mismatch_known` | The target ships this path. The hash differs from the target's but equals another release's (see `matching_releases`, `position`). |
+| `unknown_content` | The target ships this path, but the bytes match **no** release. Edited in place, or corrupt. |
+| `missing` | In the target; absent from its source. |
+| `removed_in_target` | An older release shipped this path; the target does not. |
+| `added_after_target` | Only releases **newer** than the target ship this path. The workspace is ahead here. |
+| `untracked` | No release has ever shipped this path. On the filesystem: reported only. In a pipeline zip (`source: pipeline_version`): the §5.3 sharper case, because the file **is deployed code**. |
+| `not_covered` | In a pipeline zip, at a path of a type the manifest generator does not hash. It should never appear. It is the alarm that the generator has fallen behind the OpenHEXA SDK's zip rule. |
 | `unreadable` | Present but could not be hashed (permissions, I/O, API error). Always sets `incomplete: true`. |
 
-`mismatch_known`, `removed_in_target`, `untracked`, `not_covered` and `position` are phase 2/3 and
-are named in the report's `blind_spots` list, so it never reads as a clean bill of health for things
-it did not look at.
+`position`, on entries that carry `matching_releases`, places those releases relative to the target by
+GitHub `published_at` (decision D4):
+
+| `position` | Meaning |
+|---|---|
+| `older` | Every matching release is older than the target. The file is **behind**. |
+| `newer` | Every matching release is newer. The file is **ahead**. |
+| `both` | Matches on both sides, none in the target: the content was changed in the target and later reverted. |
+| `unordered` | A matching release has no usable timestamp, or one identical to the target's. |
 
 ## Inputs
 
 | Input | Source | Required |
 |---|---|---|
-| `release_manifest.json` | GitHub release asset on the target tag | Yes |
-| `.snt_release` | Workspace root, written by `snt_workspace_manager` | No — only used when `release_tag` is empty |
-| Tracked analytics files | Workspace filesystem, at their repository-relative paths | No — absence is the `missing` finding |
-| Current pipeline version zips | OpenHEXA API, `pipelineByCode.currentVersion.zipfile` | No — absence is the `missing` finding |
+| Release list | GitHub API, `repos/<repo>/releases` | Yes |
+| `release_manifest.json` of every release | GitHub release assets, via `browser_download_url` | The target's, yes. Others: each missing one makes the report `incomplete` |
+| `.snt_release` | Workspace root, written by `snt_workspace_manager` | No. Only used when `release_tag` is empty |
+| Workspace files | Workspace filesystem | No. Absence is the `missing` finding |
+| Current pipeline version zips, and the pipeline list | OpenHEXA GraphQL API, with the run's own token | No. Absence is the `missing` finding; failure is an `errors` entry |
 
-This pipeline does **not** read `configuration/SNT_config.json`, and takes no country code: it checks
+This pipeline does **not** read `configuration/SNT_config.json` and takes no country code. It checks
 code, not data, so nothing about it is country-specific.
 
 ## Outputs
 
 Written to the **workspace filesystem** (no dataset, no database table):
 
-* **`snt_status/status_<UTC timestamp>.json`** — the run's report, kept as history.
-* **`snt_status/status_latest.json`** — a byte-identical copy at a stable path. This is the one the
+* **`snt_status/status_<UTC timestamp>.json`**: the run's report, kept as history.
+* **`snt_status/status_latest.json`**: a byte-identical copy at a stable path. This is the one the
   future status web app reads.
 
 Nothing is published to an OpenHEXA dataset.
 
 > **Notes for the Data Analyst:**
 >
-> - **`status`** and **`position`** are stable enums — a value may be added but never renamed, so a
+> - **`status`** and **`position`** are stable enums. A value may be added but is never renamed, so a
 >   consumer can switch on them.
-> - **`remediation`** is display text for a human. Never parse it.
-> - **`incomplete`**: `true` means at least one source could not be read. The report is then a
->   partial account, not a pass.
+> - **`remediation`** is display text for a human. Never parse it. Its wording depends on the
+>   source as well as the status: an `untracked` file in a zip is deployed code, one on the
+>   filesystem is a stray.
+> - **`matching_releases`** lists, in `published_at` order, the releases **other than the target**
+>   whose manifest holds exactly the observed bytes at that path. It is `null` on `match` entries.
+>   Per-file attribution of matching files is phase 3, and its representation is still open
+>   (`PRODUCT_SPEC.md` §7.8). Two releases with identical manifests both appear.
+> - **`incomplete`**: `true` means at least one source or release manifest could not be read. The
+>   report is then a partial account, not a pass.
 > - **`declared_release`** vs **`target_release`**: the declared one is what `.snt_release` says was
 >   last deployed. It is written even after a partial run, so it records **intent, not verified
->   fact** — when the two disagree, the run logs a warning and checks against the target.
-> - **`pipelines[].version_name_matches_content`**: a pipeline version's *name* is free text somebody
->   typed; its hash is evidence. When they disagree the hash wins and the name is flagged as
->   misleading — a workspace whose version labels have stopped meaning anything looks perfectly
->   healthy in the OpenHEXA UI, which shows only names. It is `null` for a version named after some
->   release other than the target, which phase 1 cannot verify either way.
+>   fact**. When the two disagree, the run logs a warning and checks against the target.
+> - **`pipelines[]`** has one block per pipeline that any release describes and that is either
+>   deployed or in the target, plus one per deployed pipeline that no release describes
+>   (`in_any_release: false`, contents not read). `in_target: false` on a deployed pipeline means it
+>   is **not part of the target release and is left in place**. A pipeline cannot delete another
+>   pipeline in OpenHEXA (`PRODUCT_SPEC.md` §7.5).
+> - **`pipelines[].version_name_matches_content`**: a version's *name* is free text somebody typed;
+>   its hash is evidence. It is `true` when the zip holds exactly the files, byte for byte, that the
+>   named release ships for that pipeline, and `false` otherwise. That includes a zip with an extra
+>   file, or a name that points at a release that does not ship the pipeline. It is `null` when the
+>   name is not a release tag with a usable manifest (e.g. `v3` from a plain CLI push).
 > - **`current_version_name`** is the raw API value and **`current_version_claims_tag`** is the
 >   release tag parsed out of it. They differ because OpenHEXA appends the version number:
->   `v0.1.0-test` reads back as `v0.1.0-test [v1]`. Both are reported so the parsing is visible.
-> - **`pipelines[].files_in_zip_not_in_manifest`**: a count only. Per-file reporting of those is
->   phase 2. A non-zero count here is worth a look — it means something ships in a deploy zip that
->   no release describes.
+>   `v0.1.0-test` reads back as `v0.1.0-test [v1]`.
+> - **`inert_filesystem_copies`**: files on the filesystem inside a pipeline directory. They never
+>   execute and are not classified.
 > - Every field that could be absent is present as `null` rather than omitted.

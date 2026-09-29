@@ -125,10 +125,12 @@ Nothing is published to an OpenHEXA dataset.
 > - **`remediation`** is display text for a human. Never parse it. Its wording depends on the
 >   source as well as the status: an `untracked` file in a zip is deployed code, one on the
 >   filesystem is a stray.
-> - **`matching_releases`** lists, in `published_at` order, the releases **other than the target**
->   whose manifest holds exactly the observed bytes at that path. It is `null` on `match` entries.
->   Per-file attribution of matching files is phase 3, and its representation is still open
->   (`PRODUCT_SPEC.md` §7.8). Two releases with identical manifests both appear.
+> - **`matching_releases`**: the releases **other than the target** whose manifest holds exactly
+>   the observed bytes at that path, collapsed into spans in `published_at` order, e.g.
+>   `[{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}]`. A single release is a span of
+>   one. Any release outside the set breaks a span, including the target and a release with no
+>   readable manifest. **Two spans** for one file means its content was changed and later
+>   reverted. It is `null` on `match` entries (decision D14).
 > - **`incomplete`**: `true` means at least one source or release manifest could not be read. The
 >   report is then a partial account, not a pass.
 > - **`declared_release`** vs **`target_release`**: the declared one is what `.snt_release` says was

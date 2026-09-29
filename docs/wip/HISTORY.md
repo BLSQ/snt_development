@@ -54,8 +54,9 @@ Unauthenticated GitHub API calls are capped at **60/hour**, and pulling a releas
 the Contents API needs ~106 requests for a single release. Fix: download the release **source
 tarball** — one request — and extract.
 
-This limit is not only a historical annoyance: it is the live constraint behind the open decision
-on how attribution mode obtains every release's manifest (`PRODUCT_SPEC.md` §7.2).
+The same limit later drove the question of how the checker obtains every release's manifest. That
+turned out not to be a constraint, because asset downloads are not charged per file
+(`PRODUCT_SPEC.md` §7.2, closed 2026-09-29).
 
 ### A pipeline version's name does not read back as it was submitted
 
@@ -90,6 +91,21 @@ before anything else.**
 
 This is about **writing** only. The same run token reads a version's zip contents perfectly well —
 see §2.4, which is why the checker needs no credential.
+
+### Measuring the GitHub rate limit across runs does not work
+
+To test whether manifest downloads count against the 60/hour limit (`PRODUCT_SPEC.md` §7.2), the
+first attempt compared the `X-RateLimit-Remaining` header across two consecutive checker runs, on
+2026-09-29 at 12:25 and 12:43. Both logged **59**. That proved nothing, for two reasons:
+
+* the header was read from the release-list response, **before** any download, so no single run's
+  figure contained the download cost;
+* the second run should have shown 58 if it shared the first run's counter. It evidently did not:
+  runs apparently leave from different egress IPs, so each run starts with a counter of its own.
+
+Fix: read `GET /rate_limit` (which is itself free) **after** the downloads, and compare within one
+run. That settled it the same day (§7.2). The general lesson: on OpenHEXA, **a pipeline run is the
+unit of measurement**. Nothing about a shared-IP budget can be inferred by comparing runs.
 
 ---
 
@@ -273,7 +289,7 @@ The draft's four open questions, and where each landed:
 | Draft question | Resolution |
 |---|---|
 | One pipeline for check + fix, or two? | Two — decision **D1**/**D2**, `PRODUCT_SPEC.md` §8. |
-| A mechanism to import every release's manifest | Still open — `PRODUCT_SPEC.md` §7.2, blocks phase 3. |
+| A mechanism to import every release's manifest | Closed 2026-09-29: fetch all on every run, which costs about one API request (`PRODUCT_SPEC.md` §7.2). |
 | What to do with files not in the manifest ("ignore"?) | Not ignored: **reported** in an `untracked` bucket, never acted on — decision **D6**. |
 | Different releases having different file lists | Covered by the `missing` / `removed_in_target` statuses, `PRODUCT_SPEC.md` §5.1. |
 | Test repo needs a `latest` release | **Rejected.** GitHub's `/releases/latest` endpoint already resolves to the newest non-prerelease release; a release *named* `latest` would collide with it. |
@@ -330,3 +346,4 @@ workspace, so there was nothing to archive. That gap is still open.
 | 2026-09-18 | `product_spec_draft.md` reviewed with Giulia; decisions D1–D9, D11, D12 taken; `PRODUCT_SPEC.md` written. §7.2 (obtaining every manifest) deferred to a dedicated session. Tag-protection ruleset created on the sandbox. |
 | 2026-09-21 | Phase 0: manifest generator rewritten to mirror the SDK's zip rule (107 → 156 files) and given a `pipelines` block; `split_manifest()` fixed in the same change. Sandbox repo reset; fixture releases `v0.1.0-test` … `v0.4.0-test` cut. |
 | 2026-09-22 | `docs/wip/` split: current state in the three live documents, history consolidated here. §7.3a closed by the `snt-token-probe` run (§2.4): a run's own `HEXA_TOKEN` reads pipeline version zips, so the checker is credential-free and **phase 1 is unblocked**. §7.3b (placing the `oh` token in a country workspace) parked as low priority. **Phase 1 built and verified**: `snt_workspace_check` reports 163/163 `match` in the sandbox at `v0.1.0-test` (`PRODUCT_SPEC.md` §6.2). Two defects surfaced on the way — the version-name `[vN]` suffix (§1 above, fixed) and the manager's `DUPLICATE_PIPELINE_VERSION_NAME` on re-deploy (`release_strategy.md`, open). |
+| 2026-09-29 | **Phase 2 built and verified** (`PRODUCT_SPEC.md` §6.3). The checker loads every release's manifest and walks the filesystem; the full taxonomy reported exactly as predicted in the sandbox. That run also found 55 inert filesystem copies left by the pre-fix `split_manifest()` (§2.2), which Giulia deleted by hand. §7.5 closed (report-and-leave). D9 decided (no notebook normalisation), from one real country workspace. §7.8 decided as D14 (spans). `added_after_target` accepted as D13. **§7.2 closed**: manifest downloads are not charged per file, so fetch-all is the design (first measurement attempt failed, §1). Phase-3 handover written (`PRODUCT_SPEC.md` §6.4). Two new blocking decisions for it: §7.10 (what an attribution percentage means) and §7.11 (status name; forcing attribution mode). |

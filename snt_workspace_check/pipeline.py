@@ -13,7 +13,8 @@ Deliberately not here:
 
 Every release's manifest is fetched on each run. The release list is ONE GitHub API request
 (per_page=100), and the manifests are downloaded from `browser_download_url` on github.com,
-not from api.github.com. Whether that scales - and whether to cache - is still section 7.2.
+not from api.github.com - measured 2026-09-29 not to be charged per download, so a run costs
+about one API request whatever the release count (PRODUCT_SPEC.md section 7.2, closed).
 
 Two sources are hashed, and each tracked path is routed to exactly ONE of them:
 
@@ -521,6 +522,9 @@ class ReleaseIndex:
         {tag: timezone-aware datetime or None}, for every release with a usable manifest.
     ordered_tags : list
         The tags of the usable manifests, in `published_at` order.
+    all_tags : list
+        Every release's tag in `published_at` order, including releases with no usable
+        manifest - which is what lets such a release break an attribution span.
     paths : dict
         {repository path: {tag: sha256}} across every usable manifest.
     pipeline_codes : dict
@@ -532,6 +536,7 @@ class ReleaseIndex:
     target_tag: str
     published_at: dict
     ordered_tags: list
+    all_tags: list
     paths: dict
     pipeline_codes: dict
     manifests: dict
@@ -584,6 +589,7 @@ def build_index(manifests: dict, releases: list[dict], target_tag: str) -> Relea
         target_tag=target_tag,
         published_at=published_at,
         ordered_tags=ordered_tags,
+        all_tags=[r["tag_name"] for r in releases],
         paths=paths,
         pipeline_codes=pipeline_codes,
         manifests=manifests,
@@ -626,10 +632,9 @@ def classify(rel_path: str, observed: str | None, index: ReleaseIndex) -> dict:
     The path is asked about before the bytes (PRODUCT_SPEC.md section 5.1.1): a path no
     release ever shipped is `untracked` and its content is never compared at all.
 
-    For a known path, `matching_releases` lists the releases other than the target whose
-    manifest holds exactly the observed bytes at this path, in `published_at` order. It is
-    carried only on entries that are not `match` - how to represent attribution for every
-    file is phase 3's open question (section 7.8).
+    For a known path, `matching_releases` holds the releases other than the target whose
+    manifest holds exactly the observed bytes at this path, as spans (see `to_spans`). It is
+    carried only on entries that are not `match` - decision D14, section 7.8.
 
     Returns
     -------
@@ -648,10 +653,11 @@ def classify(rel_path: str, observed: str | None, index: ReleaseIndex) -> dict:
 
     matching = [tag for tag in index.ordered_tags if tag != index.target_tag and by_tag.get(tag) == observed]
     matching_position = position_of(matching, index) if matching else None
+    spans = to_spans(matching, index) if matching else None
 
     if target_sha is not None:
         if matching:
-            return verdict("mismatch_known", target_sha, matching, matching_position)
+            return verdict("mismatch_known", target_sha, spans, matching_position)
         return verdict("unknown_content", target_sha)
 
     # A path some release shipped and the target does not. Which side of the target the
@@ -659,7 +665,37 @@ def classify(rel_path: str, observed: str | None, index: ReleaseIndex) -> dict:
     # and may match none of them if the copy was also edited.
     shipped_in = [tag for tag in index.ordered_tags if tag in by_tag]
     status = "added_after_target" if position_of(shipped_in, index) == "newer" else "removed_in_target"
-    return verdict(status, None, matching or None, matching_position)
+    return verdict(status, None, spans, matching_position)
+
+
+def to_spans(tags: list[str], index: ReleaseIndex) -> list[dict]:
+    """Collapse a set of releases into contiguous spans, in `published_at` order.
+
+    Decision D14 (PRODUCT_SPEC.md section 7.8): a file unchanged across many releases
+    renders as one span rather than a list that grows with release history. A span is
+    broken by any release outside the set - including the target itself, and including a
+    release whose manifest could not be read, since nothing is known about its content. A
+    single release is a span of one, so a consumer handles one shape only. Two spans for one
+    file is the changed-then-reverted signal.
+
+    Returns
+    -------
+    list[dict]
+        [{"from": tag, "to": tag, "count": int}, ...], oldest span first.
+    """
+    wanted = set(tags)
+    spans: list[dict] = []
+    current: list[str] = []
+    for tag in index.all_tags:
+        if tag in wanted:
+            current.append(tag)
+            continue
+        if current:
+            spans.append({"from": current[0], "to": current[-1], "count": len(current)})
+            current = []
+    if current:
+        spans.append({"from": current[0], "to": current[-1], "count": len(current)})
+    return spans
 
 
 def verdict(
@@ -1278,7 +1314,11 @@ def log_summary(report: dict, report_path: Path) -> None:
             continue
         detail = ""
         if entry["matching_releases"]:
-            detail = f", matches {entry['matching_releases']} ({entry['position']})"
+            spans = ", ".join(
+                span["from"] if span["count"] == 1 else f"{span['from']}..{span['to']}"
+                for span in entry["matching_releases"]
+            )
+            detail = f", matches {spans} ({entry['position']})"
         current_run.log_warning(f"[WARNING] {entry['status']}: {entry['path']} ({entry['source']}{detail})")
 
     if stray:

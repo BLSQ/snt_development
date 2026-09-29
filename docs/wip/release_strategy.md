@@ -236,9 +236,10 @@ manifests, and reports per file which release it matches, or that it matches non
 [`snt_workspace_check/`](../../snt_workspace_check/) holds the phase-1 build: verification against a
 single target release, both sources hashed, the four statuses `match` / `unknown_content` /
 `missing` / `unreadable`, and the report written to `snt_status/`. It is credential-free. Phase 1
-iterated over the target manifest only. **Phase 2 (written 2026-09-29, not yet run)** loads every
-release's manifest and walks the filesystem, which gives the full status taxonomy. What changed and
-why: [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §6.3.
+iterated over the target manifest only. **Phase 2 (built and verified in the sandbox 2026-09-29)**
+loads every release's manifest and walks the filesystem, which gives the full status taxonomy. What
+changed and why: [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §6.3. Phase 3 (attribution mode) is next;
+handover in §6.4.
 
 **Verified 2026-09-22** in `snt-development-sandbox`, deployed at `v0.1.0-test` and checked against
 it: **163/163 `match`**, 89 filesystem + 74 pipeline-version entries, `incomplete: false`, no errors.

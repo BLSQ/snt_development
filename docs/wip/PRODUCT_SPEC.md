@@ -175,8 +175,9 @@ Assess every file and report which release it belongs to, or that it belongs to 
 no green or red: a factual inventory plus a distribution, so the web app can show e.g. *"97% of
 files are v0.1.0-test, 2.7% are v0.2.1-test, 0.3% are of unknown origin."*
 
-This mode needs the manifest of **every** release, which is the open decision in §7.2 — it is on
-this mode's critical path.
+This mode needs the manifest of **every** release. The checker already loads them all as of phase 2
+(§7.2, closed). What the percentages *mean* is still open, because a file usually matches several
+releases at once (§7.10).
 
 ### 4.2 Verification mode — target release given
 
@@ -229,7 +230,7 @@ relative to a target release; attribution on its own is a *set*.
 
 Enumerating that set per file would make the report unreadable — most files are unchanged most of
 the time, so most entries would carry a list of nearly every release that exists. The report must
-collapse it. Proposed representation, **to be confirmed** (§7.8):
+collapse it. Representation, **decided 2026-09-29** (D14, §7.8):
 
 ```json
 "matching_releases": [{"from": "v0.1.0", "to": "v0.6.0", "count": 7}]
@@ -238,7 +239,8 @@ collapse it. Proposed representation, **to be confirmed** (§7.8):
 i.e. contiguous spans in `published_at` order rather than a flat list, with the common case
 rendering as a single span the web app can show as "unchanged since v0.1.0". A non-contiguous set
 (content introduced, changed, then reverted) yields more than one span, which is itself the signal
-worth seeing.
+worth seeing. A single release is a span of one. Any release outside the set breaks a span,
+including the target and a release whose manifest could not be read.
 
 ### 5.2 Ordering: behind vs ahead
 
@@ -321,7 +323,7 @@ Shape (v1 — to be frozen at the end of phase 4, §6):
       "status": "mismatch_known",
       "observed_sha256": "...",
       "target_sha256": "...",
-      "matching_releases": ["v0.1.0-test"],
+      "matching_releases": [{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}],
       "position": "older",
       "remediation": "Run snt_workspace_manager at v0.2.1-test to update; the current copy is archived first."
     }
@@ -344,7 +346,7 @@ still open.
 | **0** | ✅ **DONE** — manifest gap closed, sandbox reset, fixture releases cut (§6.1). Details: [`HISTORY.md`](HISTORY.md) §2.1, §4. | — | — |
 | **1** | ✅ **DONE** 2026-09-22 — checker skeleton in [`snt_workspace_check/`](../../snt_workspace_check/): verification mode against a single target release, both sources hashed, four statuses, report written (§6.2). | Met: `snt-development-sandbox` at `v0.1.0-test` reported **163/163 `match`**. | — |
 | **2** | ✅ **DONE** 2026-09-29 — taxonomy verified in the sandbox, D9 decided (§6.3). Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
-| **3** | Attribution mode: all releases, ordering, distribution summary. | A mixed workspace produces a correct per-release percentage breakdown. | §7.2 — **open** |
+| **3** | Attribution mode: all releases, ordering, distribution summary. **Handover: §6.4.** | A mixed workspace produces a correct per-release percentage breakdown. | §7.10, §7.11 — **open** (§7.2 closed 2026-09-29) |
 | **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
 | **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
 | **6** | Web app. | Out of scope for this spec. | 5 |
@@ -451,8 +453,8 @@ What changed from phase 1, and why:
   `removed_in_target` and `untracked` are both defined against *any* release. With the target alone,
   a file removed in the target would be misreported `untracked`. Listing releases is one GitHub API
   request per 100 releases, the same cost as phase 1's single lookup. Manifests come from
-  `browser_download_url` on github.com, which is believed, **not verified**, to sit outside the
-  60/h API limit (§7.2). Loading them all also makes `mismatch_known` and `position` available now,
+  `browser_download_url` on github.com, which is **measured** not to be charged per download
+  (§7.2, closed). Loading them all also makes `mismatch_known` and `position` available now,
   rather than in phase 3. Phase 3 keeps attribution mode and the distribution.
 * **A release with no usable manifest makes the report `incomplete`**, and it becomes an `errors`
   entry. A file only that release shipped would otherwise be mislabelled with nothing saying so. The
@@ -461,7 +463,11 @@ What changed from phase 1, and why:
   because Jupyter's `.ipynb_checkpoints/` would otherwise double the untracked bucket. The report
   carries the exclusions as `scan_exclusions`. Untracked files are listed, not read.
 * **`added_after_target`** is a new status (§5.1). A known path that only newer releases ship is
-  "ahead", not "removed". **Proposed by the agent; confirm or reject in review.**
+  "ahead", not "removed". Accepted by Giulia 2026-09-29 (D13).
+* **`matching_releases` became spans** once §7.8 was decided (D14). **Verified** in a second sandbox
+  run the same day (report `status_2026-09-29T12-14-49Z.json`): identical counts, and
+  `fixture_reverted.py` carries two spans, `v0.1.0-test..v0.2.0-test` and `v0.3.0-test`. That run
+  also shows `inert_filesystem_copies: []`, because Giulia deleted the 55 leftovers by hand in between.
 * **An undescribed zip member is split by the SDK's own zip rule.** If the generator would have
   hashed it had it ever been in the repo, it is `untracked` in the zip, the §5.3 sharper case, marked
   by `source: pipeline_version` and its own remediation text. If the generator could never have seen
@@ -482,6 +488,77 @@ compares a downloaded copy of a real workspace's `pipelines/` folder against the
 notebook at the first level where the two become equal: `identical`, `formatting`, `outputs`,
 `metadata` or `source`.
 
+**Local stub test:** `ignore/SNT25-670/test_workspace_check_stub.py`. It imports the checker with
+`current_run` stubbed and asserts every status, position and span case against fake manifests shaped
+like the §6.1 fixtures, including `unordered`, which no fixture can reach (§6.1). Run it with
+`conda run -n snt_development python ignore/SNT25-670/test_workspace_check_stub.py`. It is the
+closest thing this work has to a test suite. Extend it rather than starting a new one.
+
+### 6.4 Phase 3 — handover
+
+Written 2026-09-29 for the session that builds phase 3. **Start by settling §7.10 and §7.11.** Both
+are blocking and neither is a coding question.
+
+**What already exists, and does not need building.** Everything the old §7.2 worry was about.
+`list_releases()` and `load_manifests()` fetch every release's manifest on each run.
+`build_index()` re-keys them by path into a `ReleaseIndex`. `to_spans()` produces D14 spans over
+`index.all_tags`, where any non-member breaks a span, including a release with no manifest.
+`position_of()` places a set relative to the target. `classify()` already does the path-before-bytes
+split (`untracked` vs known), and `name_matches_content()` already judges a version against whatever
+release its name claims. Phase 3 therefore adds a **mode**, not new machinery.
+
+**What to build:**
+
+1. `resolve_target()` currently raises in its third case (no parameter, no marker). Return "no
+   target" instead, and let `mode` in the report become `"attribution"`.
+2. Make `ReleaseIndex.target_tag` optional. `target_files` and `target_pipelines` are then empty,
+   and `require_target()` is skipped.
+3. Add an attribution branch to classification. There is no target, so there is no `match`,
+   `mismatch_known`, `missing`, `removed_in_target` or `added_after_target`, and `position` is
+   `null`. A file at a known path whose bytes match ≥1 release gets spans over **all** its matching
+   releases, under the status name §7.11 decides. One whose bytes match none is `unknown_content`.
+   `untracked`, `not_covered` and `unreadable` are unchanged.
+4. Filesystem side: skip the "target paths the walk did not see → `missing`" loop in
+   `check_filesystem()`. Absence has no meaning without a target.
+5. Pipeline side: `check_pipeline_versions()` already probes every release-described pipeline. With
+   no target, `expected_members` is empty and `in_target` should be `null`, not `false`. A pipeline
+   that no release describes is still listed only.
+6. `summary.attribution`: the distribution, computed by the rule §7.10 decides. The denominator must
+   be stated in the report, not implied. Recommended: every classified entry except `untracked`,
+   both sources together, and `unreadable` shown separately rather than hidden.
+7. Update `blind_spots` (drop the "not built" line), `log_summary`, and the readme's statuses table.
+
+**Test design — exit criterion "a mixed workspace produces a correct per-release breakdown".**
+
+* The checker never writes, so forcing attribution mode means having no marker, and today that means
+  removing `.snt_release` by hand (fixture plan, Run 3). §7.11 asks whether to add a switch instead.
+* Expected with the workspace as it is now (analytics at `v0.1.0-test`, one pipeline at
+  `v0.3.0-test`): `code/fixture_stable.r` gets **one span of 4**, `v0.1.0-test..v0.3.0-test`.
+  `v0.4.0-test` has no manifest, but it is the newest release, so it ends the list without breaking
+  the span. `snt_dhis2_incidence/fixture_reverted.py` (content A) gets **two spans**,
+  `v0.1.0-test..v0.2.0-test` and `v0.3.0-test`, broken by `v0.2.1-test`, which holds B.
+  `code/snt_palettes.r` is `unknown_content`.
+* The workspace is **not really mixed yet**. Everything is at `v0.1.0-test`, and the one pipeline
+  labelled `v0.3.0-test` holds bytes identical to `v0.1.0-test`. Between `v0.1.0-test` and
+  `v0.3.0-test` **no pipeline's zip content differs** except the fixture pipelines
+  (`fixture_reverted.py` goes A → B → A). So mix it through the analytics: run the manager at
+  `v0.3.0-test` with pipeline deployment **off**. Expected afterwards:
+  * `code/fixture_changing.r` (C) spans `v0.3.0-test` only;
+  * `pipelines/snt_dhis2_incidence/utils/fixture_added.r` spans `v0.2.1-test..v0.3.0-test`;
+  * `code/fixture_removed.r` remains, since the manager removes nothing, and spans
+    `v0.1.0-test..v0.2.0-test`;
+  * the pipeline zips stay at `v0.1.0-test`.
+
+  Alternatively, deploy just `snt_dhis2_incidence` at `v0.2.1-test` with `only_pipelines`, so its
+  helper holds B and matches `v0.2.1-test` alone. That tag has never been used on that pipeline, so
+  the `DUPLICATE_PIPELINE_VERSION_NAME` defect does not bite. **Either manager run rewrites
+  `.snt_release`**, so check the marker afterwards, or attribution mode will not be reached (§7.11).
+* Add the attribution cases to the stub test first, and let it define the expected numbers before
+  the sandbox run.
+
+**Unchanged constraints to keep in mind:** the checker is read-only (§5.4); `status` values are
+added, never renamed (§5.5); `schema_version` stays 1 until phase 4.
+
 ## 7. Open decisions
 
 Blocking ones name the phase they block. None may be resolved by guessing.
@@ -496,29 +573,25 @@ What the problem was, why a wider glob list was rejected, and the consumer it br
 Phase 1 was left blocked only by the token question in §7.3, which closed on 2026-09-22. **Phase 1
 is unblocked and ready to start.**
 
-### 7.2 How to obtain every release's manifest — **blocks phase 3**
+### 7.2 ~~How to obtain every release's manifest~~ — **closed 2026-09-29**
 
-Attribution mode needs the manifest of every release. Unauthenticated GitHub API is 60 requests
-per hour and this project has already hit that wall once ([`HISTORY.md`](HISTORY.md) §1). With ~20
-releases and a per-workspace daily check, a naive implementation breaks. Candidate answers —
-workspace-side manifest cache keyed by tag (safe, because tags never move), a cumulative index
-asset published by the Action, or an authenticated **GitHub** token — which would give the checker a
-credential to hold after all, undoing the credential-free result of §7.3a. That is a point against
-the token option, not a blocker. **Deferred by the user to a dedicated session (2026-09-18).**
+**Answer: fetch them all, on every run. No cache, no index asset, no GitHub token.** The fear was
+that ~20 releases would exhaust the unauthenticated 60 requests/hour
+([`HISTORY.md`](HISTORY.md) §1). It does not hold:
 
-**Input for that session (2026-09-29):** phase 2 already loads every manifest (§6.3), and the naive
-cost is smaller than feared above. `GET /releases?per_page=100` is **one** API request for up to 100
-releases, and each manifest is fetched from `browser_download_url` on github.com rather than
-api.github.com. If that holds, a check run costs one API request whatever the release count.
+* `GET /repos/<repo>/releases?per_page=100` is **one** API request for up to 100 releases.
+* Manifests are downloaded from each asset's `browser_download_url` on github.com, and those
+  downloads are **not charged per file**. Measured in the sandbox, 2026-09-29 14:14: after listing
+  releases and downloading 4 manifests, `/rate_limit` reported **57** remaining. Listing costs at
+  least 1 request, so the reading before the downloads was at most 59. The 4 downloads therefore cost
+  at most 2 between them. Charged per file, the reading would have been 55 or lower.
 
-A first attempt at measuring this, on 2026-09-29, was **inconclusive**. Two sandbox runs 18 minutes
-apart both logged `remaining: 59`. That value was read *before* the downloads, so neither run
-measured their cost. The second run should have read 58, so consecutive runs evidently do not share
-a counter, most likely because they leave from different egress IPs. Cross-run comparison is
-therefore useless. Each run now also logs the remaining budget read from `/rate_limit`, which is
-free, *after* the downloads. That before/after pair within one run is the evidence to collect. Still open: confirming that asset
-downloads are outside the API budget, and whether a cache is wanted anyway (bandwidth, GitHub
-outages).
+So a check run costs about one API request whatever the release count, and the checker stays
+credential-free (§7.3a). Both readings are logged on every run, so a change on GitHub's side would
+show up in the logs. How the first measurement failed: [`HISTORY.md`](HISTORY.md) §1.
+
+The one question left (whether to cache manifests anyway, against GitHub outages or bandwidth) is
+not blocking, and is parked in §7.9.
 
 ### 7.3 Credentials in a country workspace — **low priority**, and no longer blocks the checker
 
@@ -566,36 +639,76 @@ publication. Pushing a pipeline version into the workspace that runs it creates 
 a different operation. R5 needs rewording, with the team's agreement, before production use —
 see `pipeline_deployment_mechanism.md`.
 
-### 7.8 How to represent attribution without flooding the report — **think this through before phase 3**
+### 7.8 ~~How to represent attribution without flooding the report~~ — **closed 2026-09-29 (D14)**
 
-Raised in review, 2026-09-18, and not fully solved. Most files do not change in most releases, so
-a naive `matching_releases` list means nearly every entry in the report carries nearly every
-release tag that exists — the report grows with release history rather than with what is wrong,
-and the web app inherits the problem.
+The problem: most files do not change in most releases, so a naive `matching_releases` list would
+make nearly every entry carry nearly every tag. The report would then grow with release history
+rather than with what is wrong. Giulia's answers, 2026-09-29:
 
-The span representation proposed in §5.1.2 (`{"from", "to", "count"}` in `published_at` order) is
-the current candidate, not a settled answer. Questions it leaves open:
+| Question | Answer |
+|---|---|
+| Per-file attribution on `match` entries? | **No.** In verification mode, `matching_releases` is carried only on entries that are not `match`, which bounds the representation to the files that are off. |
+| Spans or the full list? | **Spans**: `{"from", "to", "count"}` in `published_at` order (§5.1.2). |
+| A file matching one release? | **A span of one** (`from == to`, `count: 1`), so a consumer handles a single shape. |
+| A release with no readable manifest inside a span? | **It breaks the span.** Nothing is known about its content, so it is not assumed to match. |
 
-* Is a span enough, or does the web app need the full list somewhere for a detail view?
-* What is shown when a file matches a single release — a span of one, or a plain tag?
-* Do spans need to survive a release whose manifest could not be fetched (a hole in the middle of a
-  span is not the same as a break in the span)?
-* Should the report even carry per-file attribution for files that are `match` against the target,
-  or is "matches target" all the web app needs there, with attribution reserved for the entries
-  that are actually off?
-
-The last one is probably the cheapest big win: it bounds the expensive representation to the small
-set of files that are not fine. Decide before building phase 3.
+Built into the verification report straight away (§6.3). Still for phase 3: in **attribution mode**
+there is no target and so no `match`, so every file carries spans. That is the mode's purpose, and
+its distribution summary is what keeps the report readable at a glance.
 
 ### 7.9 Deferred to a later version
 
 Country-specific variant override detection (D5), web app verification (D8), and report history
-retention/pruning.
+retention/pruning. Also parked until one of them blocks something (Giulia, 2026-09-29):
+
+* **A manifest cache**, keyed by tag. Safe, because tags never move. It is no longer needed for the
+  rate limit (§7.2); it would matter only for GitHub outages, bandwidth, or runs with no internet.
+* **The manager's `DUPLICATE_PIPELINE_VERSION_NAME` defect** on re-deploy
+  ([`release_strategy.md`](release_strategy.md)). Its fix is deferred, and it blocks phase 5.
+* **The manager's legacy-manifest fallback** (§2.1): keep a fixture, or delete the code.
+* **The 15 `not_in_repo` notebooks** from the D9 run, one real country workspace, 2026-09-29. Their
+  names would show whether they are country variants, renamed notebooks or scratch work, which is
+  input for D5. Not collected.
+
+### 7.10 What an attribution percentage means — **blocks phase 3**
+
+Found while writing the phase-3 handover, 2026-09-29. §4.1 promises *"97% of files are v0.1.0-test,
+2.7% are v0.2.1-test"*, figures that add up to 100%, so each file is counted once. But
+attribution is a **set** (§5.1.2). `code/fixture_stable.r` matches all four releases with a
+manifest, and most files in a real workspace will be like it. Which single release does such a file
+count towards? The spec never says, and every answer changes what the headline number means:
+
+| Option | A file matching v0.1–v0.3 counts as | Headline reads | Weakness |
+|---|---|---|---|
+| **A. Newest match** | v0.3 | "how far forward each file has got" | An unchanged file looks up to date, whatever else is in the workspace |
+| **B. Oldest match** | v0.1 | "since when unchanged" | A fully up-to-date workspace reads as mostly v0.1 |
+| **C. Split evenly** | ⅓ to each | adds to 100% | Hard to explain; says nothing actionable |
+| **D. Coverage per release** | 1 to *every* release it matches | "98% of files are consistent with v0.2.1-test" | Does **not** add to 100%: each release gets its own score |
+
+**Recommended: D, plus a best fit.** For each release, report the share of classified files whose
+bytes match that release. The release with the highest share is the workspace's **best fit**, with
+ties going to the newest. Reading one row of the table then says "if you called this workspace
+v0.2.1, 98% of it would agree", which is the question an operator is actually asking. The
+`unknown_content` share is reported beside it. This replaces the 100%-summing example in §4.1, so
+the §4.1 wording has to change if D is chosen.
+
+### 7.11 Two small attribution-mode choices — **blocks phase 3**
+
+* **The status name for "matches ≥1 release".** §5.1 says attribution-mode files "resolve to
+  `matching_releases`", but a status is a stable enum and needs a value. Recommended:
+  **`attributed`**, a new value. None of the verification statuses fits, because each is defined
+  relative to a target.
+* **How to force attribution mode in a workspace that has a marker.** The §4.2 order is parameter,
+  then marker, then attribution, so once `snt_workspace_manager` has run, attribution mode is
+  unreachable without deleting `.snt_release` by hand. Options: accept that, and test Run 3 by
+  renaming the marker by hand; or add a reserved `release_tag` value such as `none`. Recommended:
+  **a reserved value**. A daily attribution check must not require an operator to delete a file
+  every time.
 
 ## 8. Decisions taken
 
 Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1–D9, D11, D12) and
-2026-09-21 (D10).
+2026-09-21 (D10), and 2026-09-29 (D9 resolved, D13, D14).
 
 | # | Decision |
 |---|---|
@@ -611,3 +724,5 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D10 | The manifest gap is closed **before** the checker is built (phase 0). |
 | D11 | Two modes, driven by whether a target release is given: attribution (factual inventory) and verification (qualitative verdicts). |
 | D12 | The status formerly called `mismatch_unknown` is renamed **`unknown_content`**, to stop it reading as a synonym of `untracked`: one is about the bytes at a known path, the other about a path we never shipped (§5.1.1). |
+| D13 | New status **`added_after_target`** (2026-09-29): a present path that only releases newer than the target ship. Without it, a workspace ahead of its target would read as `removed_in_target` (§5.1). |
+| D14 | Attribution representation (2026-09-29, §7.8): spans `{from, to, count}` in `published_at` order; a single match is a span of one; any release outside the set breaks a span, including one whose manifest is unreadable; in verification mode, carried only on entries that are not `match`. |

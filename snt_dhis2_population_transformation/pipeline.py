@@ -207,6 +207,8 @@ def snt_dhis2_population_transformation(
         if disaggregation_file and not Path(disaggregation_file.path).exists():
             current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
             raise FileNotFoundError
+        if disaggregation_file:
+            validate_disaggregation_file(Path(disaggregation_file.path), country_code)
 
         years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
         if not years_available:
@@ -362,6 +364,42 @@ def resolve_reference_year(
         return latest_year
 
     return reference_year
+
+
+def validate_disaggregation_file(file_path: Path, country_code: str) -> None:
+    """Validate the header of the user-uploaded disaggregation CSV before running the notebook.
+
+    Accepts comma- or semicolon-separated files (same rule as `load_csv_file()` in R).
+
+    Args:
+        file_path: Path to the disaggregation CSV file.
+        country_code: Country code, used to name the expected template in error messages.
+
+    Raises:
+        ValueError: If ADM2_ID is missing, or YEAR / POPULATION columns are present.
+    """
+    with Path(file_path).open(encoding="utf-8-sig", errors="replace", newline="") as f:
+        header_line = f.readline()
+    sep = ";" if header_line.count(";") > header_line.count(",") else ","
+    columns = {col.strip().strip('"').upper() for col in header_line.split(sep)}
+    expected_template = f"{country_code}_population_disaggregation_template.csv"
+
+    if "ADM2_ID" not in columns:
+        current_run.log_error(
+            f"Disaggregation file {Path(file_path).name} has no ADM2_ID column. "
+            "Check the file is comma- or semicolon-separated and based on "
+            f"{expected_template} (created by the DHIS2 formatting pipeline under uploads/)."
+        )
+        raise ValueError("Invalid disaggregation file: missing ADM2_ID column.")
+
+    unexpected = sorted(columns & {"YEAR", "POPULATION"})
+    if unexpected:
+        current_run.log_error(
+            f"Disaggregation file {Path(file_path).name} contains column(s) {', '.join(unexpected)}. "
+            "This looks like the population user template; "
+            f"please use {expected_template} instead."
+        )
+        raise ValueError(f"Invalid disaggregation file: unexpected column(s) {', '.join(unexpected)}.")
 
 
 if __name__ == "__main__":

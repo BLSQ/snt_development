@@ -208,13 +208,30 @@ load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
 #'
 #' Attempts to read a CSV file from the specified path. If the file cannot be
 #' loaded, it logs a high-level error message and stops execution.
+#' The separator is detected from the header line: comma-separated files are read
+#' with a decimal point, semicolon-separated files (e.g. saved by LibreOffice/Excel
+#' with a French locale) with a decimal comma. A leading UTF-8 BOM is ignored.
 #'
 #' @param csv_file_path Character. Path to the CSV file.
 #' @return Data frame. The contents of the CSV file.
 #'
 #' @export
 load_csv_file <- function(csv_file_path) {
-    csv_data <- tryCatch({ read.csv(csv_file_path) },
+    csv_data <- tryCatch({
+        # Only switch encoding when a BOM is present: forcing UTF-8 on a non-UTF-8 file
+        # (e.g. Windows-1252 with accented names) silently truncates it.
+        has_bom <- identical(readBin(csv_file_path, "raw", n = 3), as.raw(c(0xef, 0xbb, 0xbf)))
+        file_encoding <- if (has_bom) "UTF-8-BOM" else ""
+        header <- readLines(csv_file_path, n = 1, warn = FALSE)
+        n_semicolon <- lengths(regmatches(header, gregexpr(";", header, fixed = TRUE)))
+        n_comma <- lengths(regmatches(header, gregexpr(",", header, fixed = TRUE)))
+        if (n_semicolon > n_comma) {
+            log_msg("Semicolon-separated file detected, reading with decimal comma.")
+            read.csv(csv_file_path, sep = ";", dec = ",", fileEncoding = file_encoding)
+        } else {
+            read.csv(csv_file_path, sep = ",", dec = ".", fileEncoding = file_encoding)
+        }
+    },
         error = function(e) {
             stop(glue::glue("[ERROR] Error while loading the file: {csv_file_path}\nDetails: {conditionMessage(e)}"))
         }

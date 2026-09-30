@@ -4,7 +4,7 @@ Read-only. This pipeline writes its own report and nothing else - it never delet
 overwrites, deploys or archives. `snt_workspace_manager` is the only component that changes
 workspace state (docs/wip/PRODUCT_SPEC.md section 5.4).
 
-Phase 3 of the build plan (PRODUCT_SPEC.md section 6). Two modes (decision D11):
+Phase 4 of the build plan (PRODUCT_SPEC.md section 6). Two modes (decision D11):
 
     verification  a target release is given: every file gets a verdict relative to it, judged
                   in the light of EVERY release's manifest, with the full status taxonomy
@@ -47,8 +47,8 @@ from pathlib import Path, PurePosixPath
 import requests
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 
-# Bumped only when the report shape changes in a way a consumer must notice. Frozen at
-# phase 4; until then the shape is provisional (PRODUCT_SPEC.md section 5.5).
+# Bumped only when the report shape changes in a way a consumer must notice. v1 was frozen at
+# phase 4; the contract is docs/wip/docs/status_report.schema.json.
 SCHEMA_VERSION = 1
 
 REPORT_DIR_NAME = "snt_status"
@@ -1391,7 +1391,7 @@ def build_report(
     Returns
     -------
     dict
-        The full report, in the PRODUCT_SPEC.md section 5.5 shape.
+        The full report, in the shape frozen by docs/wip/docs/status_report.schema.json.
     """
     by_status: dict[str, int] = {}
     for entry in entries:
@@ -1406,9 +1406,10 @@ def build_report(
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        # Frozen at phase 4. A run cannot read the name of the pipeline version executing it,
-        # so this stays null until the checker is deployed from a release tag by the manager.
-        "checker_version": None,
+        # The version of THIS pipeline that produced the report. A run cannot read the name of
+        # the pipeline version executing it, so this is null until a source for it is found.
+        # The key is part of the frozen v1 schema and stays, nullable.
+        "snt_workspace_check_version": None,
         "workspace": workspace.slug,
         "repo": github_repo,
         "mode": "verification" if release else "attribution",

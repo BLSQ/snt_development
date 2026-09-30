@@ -8,6 +8,15 @@
 >
 > Nothing specified here is live in a country workspace. Sections marked **BUILT** describe code
 > that exists and has been verified in a sandbox; everything else is a requirement, not a report.
+>
+> **This folder (`docs/wip/`) is destined to become its own repository** (decision D18). It sits
+> inside `snt_development` for now only so that agents working on the pipelines have the context
+> at hand. Write everything here as if the parent repo were not there: no links that only make
+> sense from the parent's layout unless they are marked as such, and machine-readable contracts
+> (such as [`docs/status_report.schema.json`](docs/status_report.schema.json)) live *inside* this
+> folder, never beside the pipelines. Links that point out of the folder today (to
+> `../../snt_workspace_check/`, `../PIPELINE_README_STANDARD.md`, `../../.github/`) are the ones to
+> revisit at the move.
 
 ## 1. The product
 
@@ -28,7 +37,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 | Component | Role | State |
 |---|---|---|
 | `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
-| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 3 — both modes verified in the sandbox (§6.3, §6.5). Phase 4 (schema freeze, readme) next |
+| `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 4 — both modes verified in the sandbox (§6.3, §6.5); report schema frozen at `schema_version: 1` (§5.5, D18). No deployment workflow, by decision (D19) |
 | Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
 
@@ -296,65 +305,96 @@ Excluded from the scan entirely, so the bucket stays readable: `archive/`, `pape
 
 ### 5.5 The report contract
 
+**Frozen at `schema_version: 1` (phase 4, decision D18).** The authority is the JSON Schema
+[`docs/status_report.schema.json`](docs/status_report.schema.json), not this section. This section
+says what the contract is *for* and shows the shape; if the two ever disagree, the schema wins and
+this section is the bug.
+
 A JSON file, written to the workspace filesystem, timestamped **and** latest (decision D3):
 
 ```
-<workspace root>/snt_status/status_<UTC ISO timestamp>.json
-<workspace root>/snt_status/status_latest.json      ← the stable path the web app reads
+<workspace root>/snt_status/status_<UTC timestamp>.json    ← colons in the time replaced by '-'
+<workspace root>/snt_status/status_latest.json             ← byte-identical; the stable path the web app reads
 ```
 
-Shape (v1 — to be frozen at the end of phase 4, §6):
+Top-level keys, all always present: `schema_version`, `generated_at`, `snt_workspace_check_version`,
+`workspace`, `repo`, `mode`, `target_release`, `declared_release`, `releases_considered`,
+`incomplete`, `summary` (`by_status`, `attribution`), `pipelines`, `entries`,
+`inert_filesystem_copies`, `scan_exclusions`, `errors`, `blind_spots`. An abridged example:
 
 ```json
 {
   "schema_version": 1,
-  "generated_at": "2026-09-18T10:00:00Z",
-  "checker_version": "<pipeline version tag>",
+  "generated_at": "2026-09-29T13:39:32Z",
+  "snt_workspace_check_version": null,
   "workspace": "<slug>",
   "repo": "BLSQ/snt_development_sandbox",
-  "mode": "attribution | verification",
-  "target_release": {"tag": "v0.2.1-test | null", "resolved_from": "parameter | marker | nothing_given", "published_at": "... | null"},
-  "declared_release": {"tag": "v0.1.0-test", "source": ".snt_release"},
-  "releases_considered": [{"tag": "...", "published_at": "...", "manifest_available": true}],
-  "incomplete": false,
+  "mode": "attribution",
+  "target_release": {"tag": null, "resolved_from": "parameter", "published_at": null},
+  "declared_release": {"tag": "v0.3.0-test", "source": ".snt_release"},
+  "releases_considered": [{"tag": "v0.1.0-test", "published_at": "2026-09-21T15:20:03Z", "manifest_available": true}],
+  "incomplete": true,
   "summary": {
-    "by_status": {"match": 101, "mismatch_known": 3, "untracked": 2},
+    "by_status": {"attributed": 164, "untracked": 1},
     "attribution": {
       "files_scored": 164,
-      "rule": "<human-readable statement of how every number below was computed>",
+      "rule": "<display text: how every number below was computed>",
       "by_release": [
-        {"tag": "v0.1.0-test", "published_at": "...", "manifest_available": true,
-         "shipped": 163, "present": 163, "agreeing": 162, "extra": 1, "agreement": 0.9939, "completeness": 1.0},
-        {"tag": "v0.3.0-test", "published_at": "...", "manifest_available": true,
-         "shipped": 163, "present": 160, "agreeing": 160, "extra": 4, "agreement": 1.0, "completeness": 0.9816},
-        {"tag": "v0.4.0-test", "published_at": "...", "manifest_available": false,
-         "shipped": null, "present": null, "agreeing": null, "extra": null, "agreement": null, "completeness": null}
+        {"tag": "v0.3.0-test", "published_at": "2026-09-21T16:04:03Z", "manifest_available": true,
+         "shipped": 163, "present": 160, "agreeing": 160, "extra": 4, "agreement": 1.0, "completeness": 0.9816}
       ],
       "best_fit": {"tag": "v0.3.0-test", "agreement": 1.0, "completeness": 0.9816},
       "matches_no_release": {"count": 0, "share": 0.0},
       "unreadable": {"count": 0, "share": 0.0}
     }
   },
+  "pipelines": [
+    {"pipeline": "snt_dhis2_extract", "code": "snt-dhis2-extract", "in_target": null, "in_any_release": true,
+     "current_version_name": "v0.1.0-test [v2]", "current_version_claims_tag": "v0.1.0-test",
+     "version_name_matches_content": true, "remediation": null}
+  ],
   "entries": [
     {
-      "path": "pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb",
-      "source": "filesystem | pipeline_version",
-      "pipeline": "snt_dhis2_incidence",
-      "status": "mismatch_known",
-      "observed_sha256": "...",
-      "target_sha256": "...",
-      "matching_releases": [{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}],
-      "position": "older",
-      "remediation": "Run snt_workspace_manager at v0.2.1-test to update; the current copy is archived first."
+      "path": "code/fixture_stable.r",
+      "source": "filesystem",
+      "pipeline": null,
+      "status": "attributed",
+      "observed_sha256": "<64 hex>",
+      "target_sha256": null,
+      "matching_releases": [{"from": "v0.1.0-test", "to": "v0.3.0-test", "count": 4}],
+      "position": null,
+      "remediation": null
     }
   ],
-  "errors": [{"scope": "...", "message": "..."}]
+  "inert_filesystem_copies": [],
+  "scan_exclusions": {"top_level_directories": ["archive", "configuration", "data", "snt_status"],
+                      "directories_at_any_depth": ["papermill_outputs"], "subpaths": ["reporting/outputs"],
+                      "root_files": [".snt_release"]},
+  "errors": [{"scope": "manifest:v0.4.0-test", "message": "<display text>"}],
+  "blind_spots": ["<display text>"]
 }
 ```
 
-Rules: `status` and `position` are **stable enums** — the web app switches on them, so a value is
-added, never renamed. `remediation` is human-readable text for display, never parsed. Every field
-that could be absent is present with `null` rather than omitted.
+**Compatibility rules** (what "frozen" means):
+
+* **Not breaking, stays `schema_version: 1`:** a new key; a new `status`, `position`,
+  `resolved_from`, `source` or `errors[].scope` value; a new `blind_spots` line. The schema is
+  updated in the same change.
+* **Breaking, needs `schema_version: 2`:** renaming or removing a key or an enum value, changing a
+  type, or changing what a value *means* (for instance redefining `agreement`).
+* The schema is deliberately **strict** (`additionalProperties: false`, closed enums) so the
+  *producer* cannot drift silently. A *consumer* must do the opposite: ignore unknown keys and
+  tolerate unknown enum values, or the first additive change breaks it.
+* **Display-only strings.** `remediation`, `errors[].message`, `blind_spots[]` and
+  `summary.attribution.rule` are text for a human, marked `x-display-only` in the schema. Never
+  parse or compare them; their wording may change at any time without a version bump.
+* Every key that could be absent is present with `null`, never omitted.
+
+**`snt_workspace_check_version`** records which version of the `snt_workspace_check` pipeline
+generated the report, so a report can be tied to the code that wrote it. **It is `null` today.** A
+run has no way to read the name of the pipeline version executing it, and no source for the value
+has been found; the key is frozen and nullable so that filling it later is not a breaking change.
+It replaces the earlier name `checker_version`, renamed for clarity before the freeze.
 
 ## 6. Build phases
 
@@ -367,7 +407,7 @@ still open.
 | **1** | ✅ **DONE** 2026-09-22 — checker skeleton in [`snt_workspace_check/`](../../snt_workspace_check/): verification mode against a single target release, both sources hashed, four statuses, report written (§6.2). | Met: `snt-development-sandbox` at `v0.1.0-test` reported **163/163 `match`**. | — |
 | **2** | ✅ **DONE** 2026-09-29 — taxonomy verified in the sandbox, D9 decided (§6.3). Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | ✅ **DONE** 2026-09-29 — attribution mode, per-release agreement and completeness in both modes, D15–D17 (§6.4, §6.5). | Met: the mixed sandbox workspace scores `v0.3.0-test` as best fit, agreement 1.0, completeness 0.9816. | — |
-| **4** | Freeze `schema_version: 1`. Pipeline `readme.md` per [`docs/PIPELINE_README_STANDARD.md`](../PIPELINE_README_STANDARD.md); commit to the repo. | Report schema documented; readme verified against the code, not memory. | 3 |
+| **4** | ✅ **DONE** 2026-09-30 — `schema_version: 1` frozen as [`docs/status_report.schema.json`](docs/status_report.schema.json); `snt_workspace_check/readme.md` re-verified against the code (§6.6, D18). | Met: schema documented and validated against reports the code builds; readme verified by reading, discrepancies listed in §6.6. | — |
 | **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
 | **6** | Web app. | Out of scope for this spec. | 5 |
 
@@ -629,6 +669,45 @@ The three files absent for `v0.3.0-test` are the never-deployed `snt_fixture_pip
 exit criterion is met: the mixed workspace gets a correct per-release breakdown, and the best fit is
 the release it was actually upgraded to.
 
+### 6.6 Phase 4, as verified
+
+Done 2026-09-30. Three changes, one new file.
+
+* **The schema** is [`docs/status_report.schema.json`](docs/status_report.schema.json) (JSON Schema
+  2020-12), the authority for `schema_version: 1`. §5.5 now points to it and states the
+  compatibility rules.
+* **`checker_version` became `snt_workspace_check_version`** (D18). It was hardcoded to `null` and
+  still is: a run cannot read the name of the pipeline version executing it. The key is frozen and
+  nullable, so filling it later is not a breaking change.
+* **`snt_workspace_check/readme.md`** was checked against `pipeline.py`. Discrepancies found and
+  fixed, so the record shows what the previous readme got wrong:
+  * it said the run stops only when the target has no usable manifest; it also stops when the target
+    is not among the published releases (`require_target`);
+  * it said `files_scored` excludes only `untracked`; it also excludes `missing`;
+  * it did not say that a `not_covered` file counts in `files_scored` and in `matches_no_release`
+    (no release holds its path). Left as it is, and now documented;
+  * it did not list the report's top-level keys, the `errors[].scope` values, or which strings are
+    display-only.
+
+**What was verified, and how.** `ruff check snt_workspace_check/` is clean. The local stub test
+(`ignore/SNT25-670/test_workspace_check_stub.py`, not committed) now builds a report with
+`build_report()` in **each mode** (the verification one with an unreadable pipeline, so `unreadable`
+and `errors` appear) and validates it against the schema, in memory and after a JSON round trip. It
+also asserts the report's keys equal the schema's, in both directions, so a key added to the code
+without the schema, or the reverse, fails. The saved sandbox report
+`status_2026-09-29T13-39-32Z.json` (attribution, real workspace) validates once
+`checker_version` is renamed. Deliberately corrupted copies (renamed status, old key, omitted key,
+`schema_version: 2`, unknown `by_status` key) are rejected.
+
+**Sandbox run, 2026-09-30.** The pipeline was pushed and run after the rename. Its report
+(`status_2026-09-30T08-33-01Z.json`, attribution mode, 164 `attributed` + 1 `untracked`) validates
+against the schema with no errors, and its top-level keys equal the schema's exactly, including
+`snt_workspace_check_version: null`.
+
+**Not verified.** No real *verification-mode* report has been
+validated, only one built by the stub. Older saved reports predate the current shape and do not
+validate, as expected.
+
 ## 7. Open decisions
 
 Blocking ones name the phase they block. None may be resolved by guessing.
@@ -702,12 +781,14 @@ A daily unattended check was the original motivation for splitting check from fi
 pipelines can be scheduled in OpenHEXA in practice — and whether a daily run is wanted per
 workspace — is unconfirmed. The repo's pipelines are all launched by hand today.
 
-### 7.7 R5
+### 7.7 ~~R5~~ and the Template mechanism — **closed 2026-09-30 (D19, D20)**
 
 `CLAUDE.md` **R5** ("always publish from `snt-development`") was written about *template*
-publication. Pushing a pipeline version into the workspace that runs it creates no template and is
-a different operation. R5 needs rewording, with the team's agreement, before production use —
-see `pipeline_deployment_mechanism.md`.
+publication. This work, `snt_workspace_manager` above all, exists to **get rid of pipeline
+templates altogether** (D20). The mechanism is still in place and must be understood, but nothing
+new is built around it, and R5 is **not** being reworded for this work: it stays as it is for as
+long as the templates it protects exist. Pushing a pipeline version into the workspace that runs it
+creates no template and is a different operation; see `pipeline_deployment_mechanism.md`.
 
 ### 7.8 ~~How to represent attribution without flooding the report~~ — **closed 2026-09-29 (D14)**
 
@@ -802,7 +883,7 @@ value **`release_tag=none`** (D17), both as recommended below.
 ## 8. Decisions taken
 
 Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1–D9, D11, D12) and
-2026-09-21 (D10), and 2026-09-29 (D9 resolved, D13–D17).
+2026-09-21 (D10), 2026-09-29 (D9 resolved, D13–D17) and 2026-09-30 (D18–D20).
 
 | # | Decision |
 |---|---|
@@ -823,3 +904,6 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D15 | Attribution scores (2026-09-29, §7.10), **revised the same day after sandbox run 1** (§6.5). Each release is judged **only on the paths it ships**. **Agreement** = files here with exactly its bytes ÷ its files found here. **Completeness** = its files found here ÷ its files shipped. Files at paths it does not ship are **extra**, neither for nor against it. A file counts towards every release it matches, so nothing sums to 100%. Best fit = highest agreement, then completeness, then newest. The pool is every entry for a present file except `untracked`, both sources together, and the rule is stated in the report. Files matching no release and unreadable files are also shown on their own. *Superseded form:* one share per release over the whole pool, which counted leftovers of removed files against the release that removed them. |
 | D16 | New status **`attributed`** (2026-09-29, §7.11): attribution mode's "known path, bytes match ≥1 release", with spans over all matching releases and `position: null`. |
 | D17 | The reserved `release_tag` value **`none`** (any case) forces attribution mode even when `.snt_release` exists (2026-09-29, §7.11), so a scheduled attribution check never requires deleting the marker. |
+| D18 | Phase 4 (2026-09-30): `schema_version: 1` is **frozen** as a JSON Schema in `docs/wip/docs/status_report.schema.json`, and **`docs/wip/` is treated as a future standalone repository**, so contracts live inside it. Free-text fields (`remediation`, `errors[].message`, `blind_spots[]`, `summary.attribution.rule`) are frozen as keys and types but **display-only**. `checker_version` is renamed **`snt_workspace_check_version`**: the version of the `snt_workspace_check` pipeline that generated the report; documenting it is enough, and it is `null` today (§5.5, §6.6). |
+| D19 | **No deployment workflow** (`push_snt_*.yaml`) for `snt_workspace_check` or `snt_workspace_manager` (2026-09-30). They are deployed by hand or by `snt_workspace_manager` itself; nobody adds a workflow. Supersedes the open item in `pipeline_deployment_mechanism.md`. |
+| D20 | **The pipeline Template mechanism is being retired** (2026-09-30). This work, especially `snt_workspace_manager`, aims to remove templates altogether. It stays documented because it is still in place and affects `pipeline.py` delivery, but new work is not designed around it, and `CLAUDE.md` R5 is not reworded for it (§7.7). |

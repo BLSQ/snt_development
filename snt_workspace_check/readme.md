@@ -16,9 +16,10 @@ It runs in one of two modes (decision D11):
 
 Both modes report the per-release scores.
 
-> **Phase 3 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** The report shape is
-> provisional until `schema_version: 1` is frozen at phase 4, and this readme is re-verified against
-> the code then.
+> **Phase 4 of [`docs/wip/PRODUCT_SPEC.md`](../docs/wip/PRODUCT_SPEC.md) §6.** The report shape is
+> **frozen at `schema_version: 1`**. The contract is the JSON Schema
+> [`docs/wip/docs/status_report.schema.json`](../docs/wip/docs/status_report.schema.json); this
+> readme explains it, and the schema wins if the two disagree.
 
 ## Parameters
 
@@ -53,7 +54,8 @@ unattended in a country workspace that holds no connection at all.
    download each one's **`release_manifest.json`** asset. A release whose manifest is absent, cannot
    be downloaded, or has no `pipelines` block cannot be used for comparison. It is listed with
    `manifest_available: false`, added to `errors`, and the report is marked `incomplete`. The run
-   stops only if the **target** has no usable manifest.
+   stops (raises) only if the **target** is not among the published releases or has no usable
+   manifest.
 4. **Filesystem source.** Walk `workspace.files_path`, minus the exclusions below. A file at a path
    no release has ever shipped is `untracked` and is **not read**. A file at a known path is hashed
    and classified. A file inside a pipeline directory is listed in `inert_filesystem_copies` and
@@ -129,19 +131,33 @@ code, not data, so nothing about it is country-specific.
 
 Written to the **workspace filesystem** (no dataset, no database table):
 
-* **`snt_status/status_<UTC timestamp>.json`**: the run's report, kept as history.
+* **`snt_status/status_<UTC timestamp>.json`**: the run's report, kept as history. The colons of the
+  time are written as `-` in the filename (`status_2026-09-29T13-39-32Z.json`); `generated_at`
+  inside keeps the ISO form.
 * **`snt_status/status_latest.json`**: a byte-identical copy at a stable path. This is the one the
   future status web app reads.
 
 Nothing is published to an OpenHEXA dataset.
 
+**The report's top-level keys** (all always present; types, enums and nullability are in the
+[schema](../docs/wip/docs/status_report.schema.json)): `schema_version`,
+`snt_workspace_check_version`, `generated_at`, `workspace`, `repo`, `mode`, `target_release`,
+`declared_release`, `releases_considered`, `incomplete`, `summary` (`by_status`, `attribution`),
+`pipelines`, `entries`, `inert_filesystem_copies`, `scan_exclusions`, `errors`, `blind_spots`.
+
 > **Notes for the Data Analyst:**
 >
-> - **`status`** and **`position`** are stable enums. A value may be added but is never renamed, so a
->   consumer can switch on them.
-> - **`remediation`** is display text for a human. Never parse it. Its wording depends on the
->   source as well as the status: an `untracked` file in a zip is deployed code, one on the
->   filesystem is a stray.
+> - **`status`**, **`position`**, **`source`** and **`target_release.resolved_from`** are stable
+>   enums. A value may be added but is never renamed, so a consumer can switch on them. A consumer
+>   should also tolerate a value it does not know yet.
+> - **Display-only text.** `remediation`, `errors[].message`, `blind_spots[]` and
+>   `summary.attribution.rule` are for a human. Never parse or compare them; their wording can
+>   change without a version bump. `remediation`'s wording depends on the source as well as the
+>   status: an `untracked` file in a zip is deployed code, one on the filesystem is a stray.
+> - **`snt_workspace_check_version`** is meant to record which version of this pipeline generated
+>   the report. It is **`null` today**: a run cannot read the name of the pipeline version executing
+>   it, and no source for the value has been found. The key is frozen and nullable.
+> - **`errors[].scope`** is `manifest:<tag>`, `pipeline_version:<code>` or `pipeline_list`.
 > - **`matching_releases`**: the releases whose manifest holds exactly the observed bytes at that
 >   path, collapsed into spans in `published_at` order, e.g.
 >   `[{"from": "v0.1.0-test", "to": "v0.2.0-test", "count": 2}]`. In verification mode the target
@@ -162,8 +178,9 @@ Nothing is published to an OpenHEXA dataset.
 >
 >   A file unchanged across releases agrees with each of them, so no column adds up to 1. `best_fit`
 >   is the highest agreement, then the highest completeness, then the newest release. `files_scored`
->   counts everything present in the workspace except `untracked`, both sources together, and `rule`
->   restates all of this. Files matching no release (`matches_no_release`) and files that could not
+>   counts every entry for a file present in the workspace, both sources together, except
+>   `untracked` (no release has an opinion about the path) and `missing` (no bytes). A `not_covered`
+>   file therefore counts, and counts as matching no release. `rule` restates all of this. Files matching no release (`matches_no_release`) and files that could not
 >   be read (`unreadable`) are also reported on their own. An unreadable file is present but never
 >   agrees. A release with no usable manifest has `null` in every count.
 > - **`incomplete`**: `true` means at least one source or release manifest could not be read. The

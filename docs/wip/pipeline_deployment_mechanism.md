@@ -204,15 +204,17 @@ into `snt-development-sandbox`, with correct pipeline codes, parameters round-tr
    there is a working checker and manager to demonstrate. `PRODUCT_SPEC.md` §7.3b.
 3. ~~**Establish whether *reading* a pipeline version needs the `oh` token too.**~~ **Closed
    2026-09-22: it does not.** See Authentication above and [`HISTORY.md`](HISTORY.md) §2.4.
-4. **Add a `push_snt_workspace_manager.yaml` workflow**, once the R5 question below is settled.
+4. ~~**Add a `push_snt_workspace_manager.yaml` workflow.**~~ **Closed 2026-09-30 (D19): no deployment
+   workflow for the manager or the checker.**
 
-### R5 needs rewording, not violating
+### R5 and the Template mechanism
 
 This approach pushes pipeline **versions directly into each country workspace**, bypassing
-OpenHEXA's Template system — which is the stated intent of the release strategy.
+OpenHEXA's Template system. Retiring templates altogether is the aim of this work (D20,
+`PRODUCT_SPEC.md` §7.7), so the mechanism is documented here because it is still in place, not
+because anything new should be built around it.
 
-That sits oddly beside CLAUDE.md **R5** ("Always publish from `snt-development`"). R5 exists
-because pushing *a template* from the wrong workspace creates a competing duplicate template.
-Pushing a *pipeline version into the workspace that will run it* is a different operation and
-creates no template at all. R5 should be reworded rather than treated as violated — a real edit to
-CLAUDE.md, needing the team's agreement, not a drive-by change.
+CLAUDE.md **R5** ("Always publish from `snt-development`") exists because pushing *a template* from
+the wrong workspace creates a competing duplicate template. Pushing a *pipeline version into the
+workspace that will run it* is a different operation and creates no template. R5 is **left as it
+is** and is not being reworded for this work: it stays true for as long as templates exist.

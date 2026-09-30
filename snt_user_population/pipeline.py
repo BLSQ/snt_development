@@ -33,7 +33,7 @@ EXPECTED_COLS = [*REQUIRED_COLS, *DISAGGREGATION_COLS]
     "user_file",
     name="Upload user population file (.csv)",
     type=File,
-    required=False,
+    required=True,
     default=None,
     help="Select user-uploaded file based on population template in CSV format.",
 )
@@ -86,80 +86,81 @@ def snt_user_population(user_file: File, run_report_only: bool):
         )
         raise
 
-    if run_report_only:
+    if not run_report_only:
+        # Load pyramid data from the dataset
+        pyramid_data = get_file_from_dataset(
+            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
+            filename=f"{country_code}_pyramid.parquet",
+        )
+
+        if pyramid_data is None or pyramid_data.empty:
+            current_run.log_error(
+                f"{country_code}_pyramid.parquet not found in DHIS2_DATASET_FORMATTED, "
+                "perhaps DHIS2 formatting pipeline has not yet been executed."
+            )
+            raise FileNotFoundError(f"{country_code}_pyramid.parquet not found.")
+
+        if user_file is None:
+            current_run.log_error(
+                "No user population file selected. Please select a file based on the template."
+            )
+            raise ValueError("Missing user population file.")
+
+        if not Path(user_file.path).exists():
+            current_run.log_error(f"User population file not found: {user_file.path}")
+            raise FileNotFoundError(user_file.path)
+
+        pyramid_adm = get_pyramid_adm_units(pyramid_data, snt_config_dict, country_code)
+
+        # Load and validate the file from the user
+        user_population = read_user_csv(Path(user_file.path))
+        user_population = validate_user_population_file(user_population, pyramid_adm, country_code)
+
+        # save the user-provided population file to the designated path
+        user_population_path = snt_user_population_data_path / f"{country_code}_population_user.parquet"
+        user_population_csv_path = snt_user_population_data_path / f"{country_code}_population_user.csv"
+        user_population.to_parquet(user_population_path, index=False)
+        user_population.to_csv(user_population_csv_path, index=False)
+        current_run.log_info(f"User population data saved under: {user_population_path}")
+
         try:
-            run_report_notebook(
-                nb_file=snt_pipeline_path / "reporting" / "snt_user_population_report.ipynb",
-                nb_output_path=snt_pipeline_path / "reporting" / "outputs",
-                error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_user_population",
+                parameters={
+                    "user_file": user_file.path,
+                },
+                output_path=snt_user_population_data_path,
                 country_code=country_code,
             )
         except Exception as e:
-            current_run.log_error(f"Error in running report notebook: {e}")
+            current_run.log_error(f"Failed to save pipeline parameters: {e}")
             raise
-        current_run.log_info("Pipeline finished: only run completed.")
-        return
 
-    # Load pyramid data from the dataset
-    pyramid_data = get_file_from_dataset(
-        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED", None),
-        filename=f"{country_code}_pyramid.parquet",
-    )
-
-    if pyramid_data is None or pyramid_data.empty:
-        current_run.log_error(
-            f"{country_code}_pyramid.parquet not found in DHIS2_DATASET_FORMATTED, "
-            "perhaps DHIS2 formatting pipeline has not yet been executed."
-        )
-        raise FileNotFoundError(f"{country_code}_pyramid.parquet not found.")
-
-    if user_file is None:
-        current_run.log_error("No user population file selected. Please select a file based on the template.")
-        raise ValueError("Missing user population file.")
-
-    if not Path(user_file.path).exists():
-        current_run.log_error(f"User population file not found: {user_file.path}")
-        raise FileNotFoundError(user_file.path)
-
-    pyramid_adm = get_pyramid_adm_units(pyramid_data, snt_config_dict, country_code)
-
-    # Load and validate the file from the user
-    user_population = read_user_csv(Path(user_file.path))
-    user_population = validate_user_population_file(user_population, pyramid_adm, country_code)
-
-    # save the user-provided population file to the designated path
-    user_population_path = snt_user_population_data_path / f"{country_code}_population_user.parquet"
-    user_population_csv_path = snt_user_population_data_path / f"{country_code}_population_user.csv"
-    user_population.to_parquet(user_population_path, index=False)
-    user_population.to_csv(user_population_csv_path, index=False)
-    current_run.log_info(f"User population data saved under: {user_population_path}")
+        try:
+            add_files_to_dataset(
+                dataset_id=dataset_pop_user_id,
+                country_code=country_code,
+                file_paths=[
+                    user_population_path,
+                    user_population_csv_path,
+                    parameters_file,
+                ],
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to add files to dataset: {e}")
+            raise
 
     try:
-        parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_user_population",
-            parameters={
-                "user_file": user_file.path,
-            },
-            output_path=snt_user_population_data_path,
+        run_report_notebook(
+            nb_file=snt_pipeline_path / "reporting" / "snt_user_population_report.ipynb",
+            nb_output_path=snt_pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
     except Exception as e:
-        current_run.log_error(f"Failed to save pipeline parameters: {e}")
+        current_run.log_error(f"Error in running report notebook: {e}")
         raise
 
-    try:
-        add_files_to_dataset(
-            dataset_id=dataset_pop_user_id,
-            country_code=country_code,
-            file_paths=[
-                user_population_path,
-                user_population_csv_path,
-                parameters_file,
-            ],
-        )
-    except Exception as e:
-        current_run.log_error(f"Failed to add files to dataset: {e}")
-        raise
     current_run.log_info("User population pipeline completed successfully.")
 
 

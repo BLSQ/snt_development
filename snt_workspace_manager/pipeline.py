@@ -81,7 +81,7 @@ class DuplicateVersionNameError(RuntimeError):
     ),
     type=str,
     default="oh",
-    required=False,
+    required=True,
 )
 @parameter(
     "backup_existing",
@@ -162,12 +162,20 @@ def get_api_token(connection_slug: str) -> str:
     """
     try:
         token = workspace.custom_connection(connection_slug).token
+        reason = None if token else "the 'token' field is empty"
     except Exception as exception:
-        raise ValueError(
-            f"Could not read a token from the custom connection '{connection_slug}': {exception}. "
-            "Create a CUSTOM connection with that slug and a secret field named 'token' holding a "
-            "workspace API token, or turn off 'Deploy pipelines'."
-        ) from exception
+        token = None
+        reason = f"{type(exception).__name__}: {exception}"
+
+    if not token:
+        message = (
+            f"[ERROR] Cannot deploy: the OpenHEXA API connection '{connection_slug}' is missing or "
+            f"unusable ({reason}). Create a CUSTOM connection with the slug '{connection_slug}' and a "
+            "secret field named 'token' holding a workspace API token (Settings > Connections), "
+            "or set the 'OpenHEXA API connection' parameter to an existing connection slug."
+        )
+        current_run.log_error(message)
+        raise ValueError(message)
 
     current_run.log_info(f"Using the API token from connection '{connection_slug}' to deploy.")
     return token

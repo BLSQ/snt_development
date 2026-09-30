@@ -57,10 +57,10 @@ def snt_user_population(user_file: File, run_report_only: bool):
     snt_user_population_data_path.mkdir(parents=True, exist_ok=True)
 
     current_run.log_info("Pulling pipeline scripts from repository.")
-    # pull_scripts_from_repository(
-    #     pipeline_name="snt_user_population",
-    #     report_scripts=["snt_user_population_report.ipynb"],
-    # )
+    pull_scripts_from_repository(
+        pipeline_name="snt_user_population",
+        report_scripts=["snt_user_population_report.ipynb"],
+    )
 
     try:
         # Load configuration (needed for report and for main run)

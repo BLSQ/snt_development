@@ -21,13 +21,16 @@ CUSTOM connection instead - see the `api_connection` parameter.
 """
 
 import base64
+import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import tarfile
 import tempfile
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -40,6 +43,16 @@ from openhexa.sdk.pipelines.runtime import get_pipeline
 ZIPPED_SUFFIXES = (".py", ".ipynb", ".txt", ".md", ".r", ".sql")
 
 GITHUB_HEADERS = {"User-Agent": "snt-workspace-manager"}
+
+# OpenHEXA appends " [v<number>]" to a version name when it is read back.
+VERSION_NUMBER_SUFFIX = re.compile(r"\s*\[v\d+\]\s*$")
+
+# The error code OpenHEXA returns when a pipeline already has a version with that name.
+DUPLICATE_VERSION_NAME_ERROR = "DUPLICATE_PIPELINE_VERSION_NAME"
+
+
+class DuplicateVersionNameError(RuntimeError):
+    """The pipeline already has a version with the requested name."""
 
 
 @pipeline("snt_workspace_manager")
@@ -438,21 +451,15 @@ def deploy_one(
     parsed = get_pipeline(pipeline_dir)
     existing = get_pipeline_by_code(token, code)
 
-    if dry_run:
-        action = "update" if existing else ("create" if create_missing else "SKIP (does not exist)")
-        current_run.log_info(
-            f"DRY RUN would {action}: {code} with {len(parsed.parameters)} parameter(s)."
-        )
-        return
-
     version_input = build_version_input(pipeline_dir, parsed, release)
 
     if existing:
-        registered = upload_version(token, code, version_input)
-        current_run.log_info(
-            f"{code}: updated from version {existing['currentVersion']['versionNumber']} "
-            f"to {registered['versionNumber']} ('{registered['versionName']}')."
-        )
+        deploy_new_version(token, code, existing["currentVersion"], version_input, dry_run)
+        return
+
+    if dry_run:
+        action = "create" if create_missing else "SKIP (does not exist)"
+        current_run.log_info(f"DRY RUN would {action}: {code} with {len(parsed.parameters)} parameter(s).")
         return
 
     if not create_missing:
@@ -469,6 +476,108 @@ def deploy_one(
             "just made and create it by hand in the UI with the right code."
         )
     current_run.log_info(f"{code}: created and seeded with version {version_input['name']}.")
+
+
+def deploy_new_version(
+    token: str, code: str, current_version: dict | None, version_input: dict, dry_run: bool
+) -> None:
+    """Register the release as a new version of an existing pipeline, unless it is already there.
+
+    Re-running the manager on the same tag must converge, so the pipeline's current version is
+    read first and compared with the release by content, not by name (a name is free text):
+
+    * same bytes as the release: nothing to do, logged as a skip and counted as a success;
+    * different bytes, and the current version carries this very tag: the tag is taken by
+      something that is not the release, so the release is registered under
+      `<tag>+redeploy-<date>` and a warning says why;
+    * otherwise: registered under the plain tag.
+
+    A plain tag can also be taken by an older, non-current version, which cannot be seen from
+    the current one. OpenHEXA then refuses the name, and the next candidate name is tried.
+    """
+    tag = version_input["name"]
+
+    if current_version is None:
+        current_run.log_info(f"{code}: has no registered version yet.")
+        tag_is_current = False
+    else:
+        current_name = current_version["versionName"]
+        current_members = hash_zip_members(current_version["zipfile"])
+        if current_members == hash_zip_members(version_input["zipfile"]):
+            current_run.log_info(
+                f"{code}: already up to date, skipped. Version {current_version['versionNumber']} "
+                f"('{current_name}') holds exactly the files of release {tag}."
+            )
+            return
+        tag_is_current = VERSION_NUMBER_SUFFIX.sub("", current_name).strip() == tag
+
+    candidates = redeploy_name_candidates(tag, tag_is_current)
+    if dry_run:
+        current_run.log_info(f"DRY RUN would register {code} as '{candidates[0]}'.")
+        return
+
+    for candidate in candidates:
+        try:
+            registered = upload_version(token, code, {**version_input, "name": candidate})
+        except DuplicateVersionNameError:
+            current_run.log_info(f"{code}: the name '{candidate}' is already taken, trying another.")
+            continue
+
+        if candidate != tag:
+            current_run.log_warning(
+                f"{code}: a version named '{tag}' already exists but does not hold the files of "
+                f"release {tag} (edited by hand, or built from another source), or is not the "
+                f"current one. Registered the release's files as '{registered['versionName']}' instead."
+            )
+        previous = current_version["versionNumber"] if current_version else None
+        current_run.log_info(
+            f"{code}: updated from version {previous} to {registered['versionNumber']} "
+            f"('{registered['versionName']}')."
+        )
+        return
+
+    raise RuntimeError(f"Every candidate version name for '{code}' is already taken: {candidates}.")
+
+
+def redeploy_name_candidates(tag: str, tag_is_current: bool) -> list[str]:
+    """List the version names to try, in order, for a release tag.
+
+    The plain tag comes first unless the current version is known to hold it. The redeploy
+    names follow: by day, then by second for a second redeploy on the same day.
+
+    Returns
+    -------
+    list[str]
+        The candidate version names, most preferred first.
+    """
+    now = datetime.now(UTC)
+    redeploys = [f"{tag}+redeploy-{now:%Y%m%d}", f"{tag}+redeploy-{now:%Y%m%dT%H%M%SZ}"]
+    return redeploys if tag_is_current else [tag, *redeploys]
+
+
+def hash_zip_members(encoded_zipfile: str | None) -> dict:
+    """Hash every file inside a base64-encoded zip.
+
+    Contents are compared rather than the zip itself, because two zips of the same files
+    differ in their timestamps. An empty field is an error and never read as an empty zip: a
+    field-level permission denial returns null inside a successful response.
+
+    Returns
+    -------
+    dict
+        {path inside the zip: sha256 of its contents}.
+    """
+    if not encoded_zipfile:
+        raise ValueError(
+            "The API returned an empty zipfile field for the pipeline's current version. That is how "
+            "field-level permission denial presents itself; check the token."
+        )
+    archive = zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded_zipfile)))
+    return {
+        info.filename: hashlib.sha256(archive.read(info.filename)).hexdigest()
+        for info in archive.infolist()
+        if not info.is_dir()
+    }
 
 
 def build_version_input(pipeline_dir: Path, parsed: Pipeline, release: dict) -> dict:
@@ -509,13 +618,13 @@ def get_pipeline_by_code(token: str, code: str) -> dict | None:
     Returns
     -------
     dict | None
-        The pipeline with its current version number, or None if the workspace has no
-        pipeline with that code.
+        The pipeline with its current version (number, name, zipfile; null if it has none),
+        or None if the workspace has no pipeline with that code.
     """
     return call_graphql(
         token,
         "query ($slug: String!, $code: String!) { pipelineByCode(workspaceSlug: $slug, code: $code)"
-        " { id code currentVersion { versionNumber } } }",
+        " { id code currentVersion { versionNumber versionName zipfile } } }",
         {"slug": workspace.slug, "code": code},
     )["pipelineByCode"]
 
@@ -527,6 +636,11 @@ def upload_version(token: str, code: str, version_input: dict) -> dict:
     -------
     dict
         The registered pipeline version (versionNumber, versionName).
+
+    Raises
+    ------
+    DuplicateVersionNameError
+        If the pipeline already has a version with that name.
     """
     data = call_graphql(
         token,
@@ -536,7 +650,10 @@ def upload_version(token: str, code: str, version_input: dict) -> dict:
     )["uploadPipeline"]
 
     if not data["success"]:
-        raise RuntimeError(f"uploadPipeline refused for '{code}': {data['errors']}")
+        message = f"uploadPipeline refused for '{code}': {data['errors']}"
+        if DUPLICATE_VERSION_NAME_ERROR in data["errors"]:
+            raise DuplicateVersionNameError(message)
+        raise RuntimeError(message)
     return data["pipelineVersion"]
 
 

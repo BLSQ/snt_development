@@ -193,20 +193,15 @@ exercises that fallback any more** — whether to keep it against a legacy fixtu
 Still unverified: **`backup_existing`** — every verified run so far was against an empty workspace,
 so there was nothing to archive. Past verification runs: [`HISTORY.md`](HISTORY.md) §4.2.
 
-**Known defect — re-deploying a tag always fails: `DUPLICATE_PIPELINE_VERSION_NAME`.** The manager
-names each new pipeline version after the release tag (`build_version_input`), and OpenHEXA requires
-version names to be unique *within* a pipeline. So deploying a tag a pipeline has already been
-deployed at is refused by the API — which is exactly what re-running to converge after a partial run
-does. Observed 2026-09-22 on `snt-dhis2-population-transformation` during the phase-1 setup run: the
-other 21 pipelines deployed, that one stayed at the version it already had, and the run ended in the
-`RuntimeError` the manager raises for partial deployments.
-
-The behaviour wanted is **idempotence**: if the pipeline's current version already carries that tag
-*and* its contents hash to the release manifest, the deploy is a no-op and should be logged as one;
-if the name is taken but the contents differ, that is the misleading-label case
-([`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) §3.1) and needs a disambiguated name plus a loud warning. Not
-fixed yet — it belongs to the manager, not to the checker. The non-destructive workaround meanwhile
-is to **rename** the colliding version in the OpenHEXA UI and re-run with `only_pipelines`.
+**Re-deploying a tag — fixed in code, not yet verified in a workspace.** OpenHEXA refuses two
+versions of one pipeline with the same name (`DUPLICATE_PIPELINE_VERSION_NAME`), and the manager names
+each version after the release tag, so re-running a tag used to fail for every pipeline already
+deployed (observed 2026-09-22). `deploy_new_version()` now reads the pipeline's current version and
+compares contents with the release: identical files are skipped and counted as a success; different
+files under the same tag are registered as `<tag>+redeploy-<YYYYMMDD>` with a warning; a name held by
+an older, non-current version falls back to the redeploy names after OpenHEXA refuses it. An identical
+version is never re-registered (decision of 2026-09-30). The checker strips only the `[vN]` suffix, so
+it reads a `+redeploy-` name as claiming no release (`version_name_matches_content: null`).
 
 ### Python deployment — done
 

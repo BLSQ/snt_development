@@ -30,7 +30,8 @@ particular is the mechanism this pipeline replaces.
 * **`release_tag`** (str, Required):
   * **Name:** Release tag
   * **Description:** The GitHub release tag to deploy. It also becomes the **version name** of every
-    pipeline version registered by the run, and the name of the backup subdirectory.
+    pipeline version registered by the run, and the name of the backup subdirectory. When a pipeline
+    already has a version with that name and different files, the name gets a suffix (see step 6).
   * **Default:** `None` — the operator must supply it.
 * **`api_connection`** (str, Optional):
   * **Name:** OpenHEXA API connection
@@ -92,9 +93,21 @@ particular is the mechanism this pipeline replaces.
    dependencies need not be installed), zip the whole directory (`.py`, `.ipynb`, `.txt`, `.md`,
    `.r`, `.sql`), and call `uploadPipeline` — or `createPipeline` with a nested version when the
    pipeline does not exist and `create_missing` is on. The OpenHEXA pipeline code is the directory
-   name with `_` → `-`.
+   name with `_` → `-`. For a pipeline that already exists, its current version is read first and
+   compared **by file contents** (not by name) with the release:
+   * **same files as the release:** nothing is registered. Logged as "already up to date, skipped"
+     and counted as a success, whatever the current version is called;
+   * **different files, and the current version is named with this very tag:** the tag is held by
+     something that is not the release (edited by hand, or built from elsewhere). The release is
+     registered as `<tag>+redeploy-<YYYYMMDD>` (`<tag>+redeploy-<YYYYMMDDTHHMMSSZ>` for a second one
+     the same day) and a warning says so;
+   * **otherwise:** registered under the plain tag. If OpenHEXA refuses the name because an older,
+     non-current version holds it, the redeploy names above are tried in turn.
+
+   An identical version is never registered again. There is no option to force it.
 7. **Continue on failure:** one pipeline's failure is logged with an `[ERROR]` prefix and does not
-   stop the others; the run raises at the end listing every failure, so re-running converges.
+   stop the others; the run raises at the end listing every failure. Re-running the same tag
+   converges: pipelines already deployed are skipped (step 6).
 8. **Write the release marker:** record `{"snt_release": "<tag>"}` in `.snt_release` at the
    workspace root. Skipped on a dry run.
 
@@ -125,7 +138,8 @@ particular is the mechanism this pipeline replaces.
 
 **OpenHEXA object store**
 
-* **A new version of each deployed pipeline**, named after the release tag, described as
+* **A new version of each deployed pipeline that differs from the release**, named after the release
+  tag (or `<tag>+redeploy-<date>`, see step 6), described as
   `Deployed by snt_workspace_manager from release <tag>`, with `externalLink` set to the release's
   GitHub page.
 
@@ -141,6 +155,9 @@ particular is the mechanism this pipeline replaces.
 >   `release_strategy.md`: verification currently covers less than what is actually deployed.
 > - **Partial runs are expected to be re-run.** A failure leaves the workspace partially updated, by
 >   design — every failure is named in the final error and re-running converges on the release.
+>   Pipelines already at the release are skipped, not refused.
+> - **Version names can carry a `+redeploy-` suffix.** It means the plain tag was already taken by a
+>   version that was not the release. Not yet verified that OpenHEXA accepts `+` in a version name.
 > - **`default=""` breaks a deploy, not a run.** A `str` parameter with an empty-string default is
 >   rejected by the SDK's AST parse, so it fails here rather than in the target pipeline. Use
 >   `default=None`.

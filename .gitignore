@@ -41,6 +41,9 @@ __pycache__/
 # Negated after BOTH *.yaml (above) and *.yml — in .gitignore the last matching
 # pattern wins, so this must come last or the file never reaches a clone.
 !dev/environment.yml
+# ...and the CI deployment workflows: without this, a new push_snt_*.yaml is ignored
+# (the existing ones are only tracked because they were committed before *.yaml).
+!.github/workflows/*.yaml
 
 # # Claude Code -----------------
 # CLAUDE.md

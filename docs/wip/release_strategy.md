@@ -197,10 +197,12 @@ so there was nothing to archive. Past verification runs: [`HISTORY.md`](HISTORY.
 versions of one pipeline with the same name (`DUPLICATE_PIPELINE_VERSION_NAME`), and the manager names
 each version after the release tag, so re-running a tag used to fail for every pipeline already
 deployed (observed 2026-09-22). `deploy_new_version()` now reads the pipeline's current version and
-compares contents with the release: identical files are skipped and counted as a success; different
-files under the same tag are registered as `<tag>+redeploy-<YYYYMMDD>` with a warning; a name held by
-an older, non-current version falls back to the redeploy names after OpenHEXA refuses it. An identical
-version is never re-registered (decision of 2026-09-30). The checker strips only the `[vN]` suffix, so
+compares contents with the release: identical files already named with the tag are skipped and
+counted as a success; identical files under another name are registered again under the tag, so the
+workspace reads as being at the release; different files under the same tag are registered as `<tag>+redeploy-<YYYYMMDD>` with a warning; a name held by
+an older, non-current version falls back to the redeploy names after OpenHEXA refuses it. The manager
+always deploys the whole release (2026-09-30): `sync_analytics`, `deploy_pipelines`,
+`only_pipelines` and `create_missing` were removed. The checker strips only the `[vN]` suffix, so
 it reads a `+redeploy-` name as claiming no release (`version_name_matches_content: null`).
 
 ### Python deployment — done

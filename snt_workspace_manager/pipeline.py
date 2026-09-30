@@ -77,48 +77,10 @@ class DuplicateVersionNameError(RuntimeError):
     name="OpenHEXA API connection",
     help=(
         "CUSTOM connection holding a workspace API token in a secret field named 'token'. "
-        "A run's own credentials cannot deploy pipelines. Only needed if 'Deploy pipelines' is on."
+        "A run's own credentials cannot deploy pipelines."
     ),
     type=str,
     default="oh",
-    required=False,
-)
-@parameter(
-    "sync_analytics",
-    name="Sync R analytics to the filesystem",
-    help="Copy the release's notebooks and .r helpers into the workspace filesystem",
-    type=bool,
-    default=True,
-    required=False,
-)
-@parameter(
-    "deploy_pipelines",
-    name="Deploy pipelines",
-    help="Register each release pipeline.py as a new version of the matching OpenHEXA pipeline",
-    type=bool,
-    default=True,
-    required=False,
-)
-@parameter(
-    "only_pipelines",
-    name="Only these pipelines",
-    help=(
-        "Comma-separated pipeline names to deploy, e.g. 'snt_dhis2_extract, snt_map_extracts'. "
-        "Leave empty to deploy every pipeline in the release. Does not affect the analytics sync."
-    ),
-    type=str,
-    default=None,
-    required=False,
-)
-@parameter(
-    "create_missing",
-    name="Create pipelines that do not exist yet",
-    help=(
-        "Bootstrap an empty workspace by creating any pipeline the release defines but the "
-        "workspace lacks. Off by default so a typo cannot silently create a duplicate."
-    ),
-    type=bool,
-    default=False,
     required=False,
 )
 @parameter(
@@ -141,10 +103,6 @@ def snt_workspace_manager(
     github_repo: str,
     release_tag: str,
     api_connection: str,
-    sync_analytics: bool,
-    deploy_pipelines: bool,
-    only_pipelines: str | None,
-    create_missing: bool,
     backup_existing: bool,
     dry_run: bool,
 ) -> None:
@@ -157,7 +115,7 @@ def snt_workspace_manager(
     if dry_run:
         current_run.log_info("DRY RUN - nothing will be written or registered.")
 
-    token = get_api_token(api_connection) if deploy_pipelines else None
+    token = get_api_token(api_connection)
 
     release = get_release(github_repo, release_tag)
     manifest = download_manifest(release)
@@ -167,34 +125,19 @@ def snt_workspace_manager(
         f"{len(analytics_files)} analytics file(s) and {len(pipeline_dirs)} pipeline(s)."
     )
 
-    failures = []
-
     with tempfile.TemporaryDirectory() as tmp_dir:
         tarball_root = download_and_extract_tarball(release["tarball_url"], Path(tmp_dir))
 
-        if sync_analytics:
-            archive_dir = snt_root_path / "archive" / release_tag if backup_existing else None
-            copied, missing = sync_files(analytics_files, tarball_root, snt_root_path, archive_dir, dry_run)
-            verb = "would be synced" if dry_run else "synced"
-            current_run.log_info(f"Analytics: {len(copied)}/{len(analytics_files)} file(s) {verb}.")
-            if missing:
-                current_run.log_warning(
-                    f"{len(missing)} manifest entries were not found in the release tarball: {missing}"
-                )
-        else:
-            current_run.log_info("Analytics sync skipped by parameter.")
-
-        if deploy_pipelines:
-            failures = deploy_all(
-                tarball_root,
-                filter_pipelines(pipeline_dirs, only_pipelines),
-                release,
-                token,
-                create_missing,
-                dry_run,
+        archive_dir = snt_root_path / "archive" / release_tag if backup_existing else None
+        copied, missing = sync_files(analytics_files, tarball_root, snt_root_path, archive_dir, dry_run)
+        verb = "would be synced" if dry_run else "synced"
+        current_run.log_info(f"Analytics: {len(copied)}/{len(analytics_files)} file(s) {verb}.")
+        if missing:
+            current_run.log_warning(
+                f"{len(missing)} manifest entries were not found in the release tarball: {missing}"
             )
-        else:
-            current_run.log_info("Pipeline deployment skipped by parameter.")
+
+        failures = deploy_all(tarball_root, pipeline_dirs, release, token, dry_run)
 
     if not dry_run:
         write_release_marker(snt_root_path, release_tag)
@@ -307,33 +250,6 @@ def split_manifest(tracked_files: dict, pipelines: dict | None = None) -> tuple[
     return analytics, sorted(pipeline_dirs)
 
 
-def filter_pipelines(pipeline_dirs: list[str], only_pipelines: str | None) -> list[str]:
-    """Restrict deployment to an explicitly named subset of the release's pipelines.
-
-    An unknown name is an error rather than a silent no-op: a typo would otherwise look
-    like a successful run that deployed nothing.
-
-    Returns
-    -------
-    list[str]
-        The selected pipeline directory names, or all of them if no subset was given.
-    """
-    if not only_pipelines or not only_pipelines.strip():
-        return pipeline_dirs
-
-    wanted = {name.strip().replace("-", "_") for name in only_pipelines.split(",") if name.strip()}
-    unknown = sorted(wanted - set(pipeline_dirs))
-    if unknown:
-        raise ValueError(
-            f"'Only these pipelines' names {unknown}, which the release does not define. "
-            f"Available: {pipeline_dirs}"
-        )
-
-    selected = [dir_name for dir_name in pipeline_dirs if dir_name in wanted]
-    current_run.log_info(f"Restricted to {len(selected)} of {len(pipeline_dirs)} pipeline(s): {selected}")
-    return selected
-
-
 def download_and_extract_tarball(tarball_url: str, extract_to: Path) -> Path:
     """Download a GitHub source tarball and extract it.
 
@@ -406,10 +322,9 @@ def deploy_all(
     pipeline_dirs: list[str],
     release: dict,
     token: str,
-    create_missing: bool,
     dry_run: bool,
 ) -> list[str]:
-    """Register every release pipeline as a new version of the matching OpenHEXA pipeline.
+    """Register every release pipeline as a version of the matching OpenHEXA pipeline.
 
     One pipeline's failure does not stop the others: a partial deployment is reported in
     full and re-running converges, whereas aborting halfway hides which ones still need it.
@@ -422,7 +337,7 @@ def deploy_all(
     failures = []
     for dir_name in pipeline_dirs:
         try:
-            deploy_one(tarball_root / dir_name, dir_name, release, token, create_missing, dry_run)
+            deploy_one(tarball_root / dir_name, dir_name, release, token, dry_run)
         except Exception as exception:  # one bad pipeline must not stop the other nineteen
             current_run.log_error(f"[ERROR] {dir_name}: deployment failed: {exception}")
             failures.append(dir_name)
@@ -436,10 +351,8 @@ def deploy_all(
     return failures
 
 
-def deploy_one(
-    pipeline_dir: Path, dir_name: str, release: dict, token: str, create_missing: bool, dry_run: bool
-) -> None:
-    """Deploy a single pipeline directory as a new version, creating the pipeline if allowed.
+def deploy_one(pipeline_dir: Path, dir_name: str, release: dict, token: str, dry_run: bool) -> None:
+    """Deploy a single pipeline directory as a new version, creating the pipeline if it is missing.
 
     The OpenHEXA pipeline code is the directory name with underscores replaced by hyphens -
     the same slug this repo's CI passes to `openhexa pipelines push --code`.
@@ -458,15 +371,8 @@ def deploy_one(
         return
 
     if dry_run:
-        action = "create" if create_missing else "SKIP (does not exist)"
-        current_run.log_info(f"DRY RUN would {action}: {code} with {len(parsed.parameters)} parameter(s).")
+        current_run.log_info(f"DRY RUN would create: {code} with {len(parsed.parameters)} parameter(s).")
         return
-
-    if not create_missing:
-        raise ValueError(
-            f"Pipeline '{code}' does not exist in workspace '{workspace.slug}'. Re-run with "
-            "'Create pipelines that do not exist yet' enabled to bootstrap it."
-        )
 
     created = create_pipeline_with_version(token, parsed.name, version_input)
     if created["code"] != code:
@@ -481,39 +387,45 @@ def deploy_one(
 def deploy_new_version(
     token: str, code: str, current_version: dict | None, version_input: dict, dry_run: bool
 ) -> None:
-    """Register the release as a new version of an existing pipeline, unless it is already there.
+    """Make the pipeline's current version carry the release tag, registering a version if needed.
 
     Re-running the manager on the same tag must converge, so the pipeline's current version is
     read first and compared with the release by content, not by name (a name is free text):
 
-    * same bytes as the release: nothing to do, logged as a skip and counted as a success;
-    * different bytes, and the current version carries this very tag: the tag is taken by
-      something that is not the release, so the release is registered under
-      `<tag>+redeploy-<date>` and a warning says why;
-    * otherwise: registered under the plain tag.
+    * same files and already named with this tag: nothing to do, logged as a skip and counted
+      as a success;
+    * same files under another name: registered again under the tag, so the workspace reads as
+      being at this release (most pipelines do not change between releases);
+    * different files: registered under the tag, or under `<tag>+redeploy-<date>` when the
+      current version already carries the tag, since it then holds something that is not the
+      release.
 
     A plain tag can also be taken by an older, non-current version, which cannot be seen from
     the current one. OpenHEXA then refuses the name, and the next candidate name is tried.
     """
     tag = version_input["name"]
+    same_files = False
+    tag_is_current = False
 
     if current_version is None:
         current_run.log_info(f"{code}: has no registered version yet.")
-        tag_is_current = False
     else:
         current_name = current_version["versionName"]
-        current_members = hash_zip_members(current_version["zipfile"])
-        if current_members == hash_zip_members(version_input["zipfile"]):
+        same_files = hash_zip_members(current_version["zipfile"]) == hash_zip_members(
+            version_input["zipfile"]
+        )
+        tag_is_current = VERSION_NUMBER_SUFFIX.sub("", current_name).strip() == tag
+        if same_files and tag_is_current:
             current_run.log_info(
                 f"{code}: already up to date, skipped. Version {current_version['versionNumber']} "
                 f"('{current_name}') holds exactly the files of release {tag}."
             )
             return
-        tag_is_current = VERSION_NUMBER_SUFFIX.sub("", current_name).strip() == tag
 
     candidates = redeploy_name_candidates(tag, tag_is_current)
     if dry_run:
-        current_run.log_info(f"DRY RUN would register {code} as '{candidates[0]}'.")
+        what = "relabel (same files)" if same_files else "register"
+        current_run.log_info(f"DRY RUN would {what} {code} as '{candidates[0]}'.")
         return
 
     for candidate in candidates:
@@ -525,14 +437,15 @@ def deploy_new_version(
 
         if candidate != tag:
             current_run.log_warning(
-                f"{code}: a version named '{tag}' already exists but does not hold the files of "
-                f"release {tag} (edited by hand, or built from another source), or is not the "
-                f"current one. Registered the release's files as '{registered['versionName']}' instead."
+                f"{code}: the name '{tag}' is already held by another version of this pipeline "
+                f"(edited by hand, or an older deployment of this tag). Registered the release's "
+                f"files as '{registered['versionName']}' instead."
             )
         previous = current_version["versionNumber"] if current_version else None
+        relabel = " (same files, relabelled)" if same_files else ""
         current_run.log_info(
             f"{code}: updated from version {previous} to {registered['versionNumber']} "
-            f"('{registered['versionName']}')."
+            f"('{registered['versionName']}'){relabel}."
         )
         return
 

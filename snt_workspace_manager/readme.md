@@ -32,34 +32,14 @@ particular is the mechanism this pipeline replaces.
   * **Description:** The GitHub release tag to deploy. It also becomes the **version name** of every
     pipeline version registered by the run, and the name of the backup subdirectory. When a pipeline
     already has a version with that name and different files, the name gets a suffix (see step 6).
+    The whole release is always deployed: there is no option to deploy only part of it.
   * **Default:** `None` — the operator must supply it.
 * **`api_connection`** (str, Optional):
   * **Name:** OpenHEXA API connection
   * **Description:** Slug of a **CUSTOM** connection holding a workspace API token in a secret field
     named `token`. A run's own `HEXA_TOKEN` is refused with `PERMISSION_DENIED` on `uploadPipeline`,
-    so deployment cannot use the run's own credentials. Read only when `deploy_pipelines` is on.
+    so deployment cannot use the run's own credentials. Always required.
   * **Default:** `oh`.
-* **`sync_analytics`** (bool, Optional):
-  * **Name:** Sync R analytics to the filesystem
-  * **Description:** Copy the release's notebooks and `.r` helpers into the workspace filesystem.
-  * **Default:** `True`.
-* **`deploy_pipelines`** (bool, Optional):
-  * **Name:** Deploy pipelines
-  * **Description:** Register each release `pipeline.py` as a new version of the matching OpenHEXA
-    pipeline.
-  * **Default:** `True`.
-* **`only_pipelines`** (str, Optional):
-  * **Name:** Only these pipelines
-  * **Description:** Comma-separated pipeline directory names to deploy, e.g.
-    `snt_dhis2_extract, snt_map_extracts`. Hyphens are accepted and normalised to underscores. A
-    name the release does not define **raises** rather than being skipped. Empty means every
-    pipeline in the release. Does not affect the analytics sync.
-  * **Default:** `None`.
-* **`create_missing`** (bool, Optional):
-  * **Name:** Create pipelines that do not exist yet
-  * **Description:** Bootstrap an empty workspace by creating any pipeline the release defines but
-    the workspace lacks. Off by default so a typo cannot silently create a duplicate pipeline.
-  * **Default:** `False`.
 * **`backup_existing`** (bool, Optional):
   * **Name:** Backup existing files
   * **Description:** Move any existing tracked file to `archive/[RELEASE_TAG]/` before overwriting
@@ -74,9 +54,8 @@ particular is the mechanism this pipeline replaces.
 
 ## Functionality Overview
 
-1. **Credentials:** When `deploy_pipelines` is on, read the bearer token from the custom connection
-   named by `api_connection`; a missing or malformed connection aborts the run before anything is
-   fetched.
+1. **Credentials:** Read the bearer token from the custom connection named by `api_connection`; a
+   missing or malformed connection aborts the run before anything is fetched.
 2. **Resolve the release:** Fetch the GitHub release by tag, then download its
    `release_manifest.json` asset. A release without that asset aborts the run.
 3. **Split the manifest:** Any entry of the form `<name>/pipeline.py` identifies a **pipeline to
@@ -85,26 +64,28 @@ particular is the mechanism this pipeline replaces.
    version's zip and never from the workspace bucket.
 4. **Download the source tarball** once for the whole repository and extract it to a temporary
    directory (a per-file Contents API fetch would exhaust the unauthenticated rate limit).
-5. **Sync analytics** (when `sync_analytics` is on): copy each tracked analytics file into
+5. **Sync analytics:** copy each tracked analytics file into
    `workspace.files_path`, archiving any existing copy first when `backup_existing` is on. A
    manifest entry missing from the tarball is logged as a **warning** and skipped, not raised.
-6. **Deploy pipelines** (when `deploy_pipelines` is on): for each selected pipeline directory, parse
+6. **Deploy pipelines:** for each pipeline directory in the release, parse
    its parameters with the SDK's AST-based `get_pipeline()` (no import, so the pipeline's own
    dependencies need not be installed), zip the whole directory (`.py`, `.ipynb`, `.txt`, `.md`,
    `.r`, `.sql`), and call `uploadPipeline` — or `createPipeline` with a nested version when the
-   pipeline does not exist and `create_missing` is on. The OpenHEXA pipeline code is the directory
+   pipeline does not exist. The OpenHEXA pipeline code is the directory
    name with `_` → `-`. For a pipeline that already exists, its current version is read first and
    compared **by file contents** (not by name) with the release:
-   * **same files as the release:** nothing is registered. Logged as "already up to date, skipped"
-     and counted as a success, whatever the current version is called;
-   * **different files, and the current version is named with this very tag:** the tag is held by
-     something that is not the release (edited by hand, or built from elsewhere). The release is
-     registered as `<tag>+redeploy-<YYYYMMDD>` (`<tag>+redeploy-<YYYYMMDDTHHMMSSZ>` for a second one
-     the same day) and a warning says so;
-   * **otherwise:** registered under the plain tag. If OpenHEXA refuses the name because an older,
-     non-current version holds it, the redeploy names above are tried in turn.
+   * **same files as the release, and already named with this tag:** nothing is registered. Logged
+     as "already up to date, skipped" and counted as a success;
+   * **same files, another name:** registered again under the tag. Most pipelines do not change
+     between releases, and without this the workspace would still read as being at the release
+     they last changed in;
+   * **different files:** registered under the tag. If the current version already carries the tag,
+     it holds something that is not the release (edited by hand, or built from elsewhere), so the
+     release is registered as `<tag>+redeploy-<YYYYMMDD>` (`<tag>+redeploy-<YYYYMMDDTHHMMSSZ>` for a
+     second one the same day) and a warning says so;
+   * **the tag is refused because an older, non-current version holds it** (for example after a
+     rollback): the redeploy names above are tried in turn.
 
-   An identical version is never registered again. There is no option to force it.
 7. **Continue on failure:** one pipeline's failure is logged with an `[ERROR]` prefix and does not
    stop the others; the run raises at the end listing every failure. Re-running the same tag
    converges: pipelines already deployed are skipped (step 6).
@@ -117,8 +98,7 @@ particular is the mechanism this pipeline replaces.
   repository must be public or the run fails.
   * **`release_manifest.json`** release asset — required; the list of tracked files.
   * **The release source tarball** — required; the actual file contents.
-* **CUSTOM connection `[API_CONNECTION]`** with a secret field `token` — required when
-  `deploy_pipelines` is on.
+* **CUSTOM connection `[API_CONNECTION]`** with a secret field `token` — always required.
 * **`HEXA_SERVER_URL`** from the run environment — the GraphQL endpoint.
 * **No `SNT_config.json`, no OpenHEXA dataset, no country code.**
 
@@ -138,8 +118,8 @@ particular is the mechanism this pipeline replaces.
 
 **OpenHEXA object store**
 
-* **A new version of each deployed pipeline that differs from the release**, named after the release
-  tag (or `<tag>+redeploy-<date>`, see step 6), described as
+* **A new version of each pipeline** that is not already current at the release, named after the
+  release tag (or `<tag>+redeploy-<date>`, see step 6), described as
   `Deployed by snt_workspace_manager from release <tag>`, with `externalLink` set to the release's
   GitHub page.
 
@@ -155,13 +135,13 @@ particular is the mechanism this pipeline replaces.
 >   `release_strategy.md`: verification currently covers less than what is actually deployed.
 > - **Partial runs are expected to be re-run.** A failure leaves the workspace partially updated, by
 >   design — every failure is named in the final error and re-running converges on the release.
->   Pipelines already at the release are skipped, not refused.
+>   Pipelines already at the release (same files, same name) are skipped, not refused.
 > - **Version names can carry a `+redeploy-` suffix.** It means the plain tag was already taken by a
 >   version that was not the release. Not yet verified that OpenHEXA accepts `+` in a version name.
 > - **`default=""` breaks a deploy, not a run.** A `str` parameter with an empty-string default is
 >   rejected by the SDK's AST parse, so it fails here rather than in the target pipeline. Use
 >   `default=None`.
-> - **`create_missing` derives the code from the pipeline name.** The run verifies the created code
+> - **Missing pipelines are always created.** The code is derived from the pipeline name. The run verifies the created code
 >   matches the expected slug and raises if it does not; recovery is manual (delete and recreate in
 >   the UI).
 > - **R5 interaction.** This pipeline pushes versions **directly into the workspace that runs them**,

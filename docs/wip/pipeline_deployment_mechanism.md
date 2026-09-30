@@ -175,6 +175,15 @@ The checker therefore needs no credential at all. Method and raw result:
    manifest — that is how byte-identity was confirmed, and it is the basis for the verification
    pipeline.
 
+9. **Version names must be unique within a pipeline.** `uploadPipeline` refuses a name that any
+   version of that pipeline already holds, current or not, with `DUPLICATE_PIPELINE_VERSION_NAME`. The
+   manager therefore reads the current version first and chooses skip / relabel / `+redeploy-` name
+   (`release_strategy.md` § Workspace Manager). The `+` is accepted by OpenHEXA.
+10. **Nothing can be deleted through a pipeline.** There is no way for a pipeline to delete another
+    pipeline or a version, so a release that drops a pipeline leaves a stray behind
+    (`PRODUCT_SPEC.md` §7.5). Whether a rename or delete API exists for versions was not established;
+    the SDK schema was not inspected.
+
 ---
 
 ## What has been proven, and what has not
@@ -187,6 +196,8 @@ into `snt-development-sandbox`, with correct pipeline codes, parameters round-tr
 
 **Not verified:**
 
+* **The 2026-09-30 version-naming logic** (skip / relabel / `+redeploy-`), in a real workspace.
+  `PRODUCT_SPEC.md` §6.7 has the test plan.
 * **The remaining 18 pipelines.** Only 2 of 20 have been through the deployer.
 * **Whether `externalLink` is stored.** It is sent in the payload, but the MCP `get_pipeline` query
   does not select that field, so its absence from the response proves nothing either way. Check the

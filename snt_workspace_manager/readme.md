@@ -11,8 +11,10 @@ It is the Phase 3/4 prototype of [`docs/wip/release_strategy.md`](../docs/wip/re
 the deployment mechanism is documented in
 [`docs/wip/pipeline_deployment_mechanism.md`](../docs/wip/pipeline_deployment_mechanism.md).
 
-> **Status: prototype.** Verified end to end on 2026-09-16 in `snt-development-sandbox` for
-> `snt_dhis2_extract` and `snt_map_extracts` only — 2 of 20 pipelines. It replaces the per-pipeline
+> **Status: prototype. Reworked on 2026-09-30 (whole-release-only, version relabelling) and not yet
+> tested in a workspace; test plan in `docs/wip/PRODUCT_SPEC.md` §6.7.** The
+> first version was verified end to end on 2026-09-16 in `snt-development-sandbox` for
+> `snt_dhis2_extract` and `snt_map_extracts` only. It replaces the per-pipeline
 > `Pull scripts` toggle and the Template auto-update subscription, so do not run it against a
 > country workspace until the open items in the two documents above are settled.
 
@@ -141,6 +143,11 @@ particular is the mechanism this pipeline replaces.
 > - **`default=""` breaks a deploy, not a run.** A `str` parameter with an empty-string default is
 >   rejected by the SDK's AST parse, so it fails here rather than in the target pipeline. Use
 >   `default=None`.
+> - **Nothing is ever deleted, so a release cannot be "installed clean".** A pipeline can not delete
+>   another pipeline in OpenHEXA. A pipeline that a newer release no longer contains **stays in the
+>   workspace** at the code of the release that last deployed it, and the manager does not mention it.
+>   The same holds for analytics files. Only `snt_workspace_check` reports such strays. A person deletes
+>   them by hand in the OpenHEXA UI.
 > - **Missing pipelines are always created.** The code is derived from the pipeline name. The run verifies the created code
 >   matches the expected slug and raises if it does not; recovery is manual (delete and recreate in
 >   the UI).

@@ -172,16 +172,19 @@ Two consequences worth knowing:
 Country-specific notebook variants appear in the manifest undistinguished from generic files. That
 is intended — telling them apart is the verification pipeline's job, not the generator's.
 
-### Workspace Manager — done (prototype)
+### Workspace Manager — built, **changed 2026-09-30 and not yet fully tested**
 
 [`snt_workspace_manager/`](../../snt_workspace_manager/), an OpenHEXA pipeline running in
-`snt-development-sandbox`. Parameters: `github_repo`, `release_tag`, `backup_existing`. It:
+`snt-development-sandbox`. Parameters: `github_repo`, `release_tag`, `api_connection`,
+`backup_existing`, `dry_run`. It always deploys the **whole** release, both halves together
+(decision D21): there is no option to sync only the analytics, deploy only the pipelines, restrict to
+some pipelines, or skip creating missing ones. It:
 
 1. resolves the release via the GitHub API and downloads `release_manifest.json` from its assets;
 2. downloads the release **source tarball** and extracts it;
 3. copies every manifest-tracked R/notebook file into `workspace.files_path`, archiving any
    existing copy under `archive/<release_tag>/` first;
-4. deploys each pipeline through the OpenHEXA API (see below);
+4. deploys each pipeline through the OpenHEXA API (see below), creating any that is missing;
 5. writes `.snt_release`.
 
 `split_manifest()` decides which manifest entries are filesystem analytics and which are deployed
@@ -190,20 +193,45 @@ falling back to a `<name>/pipeline.py` derivation for pre-phase-0 manifests. **N
 exercises that fallback any more** — whether to keep it against a legacy fixture or drop it is open
 (`PRODUCT_SPEC.md` §2.1).
 
-Still unverified: **`backup_existing`** — every verified run so far was against an empty workspace,
-so there was nothing to archive. Past verification runs: [`HISTORY.md`](HISTORY.md) §4.2.
+**Version naming on deploy (2026-09-30, D22).** OpenHEXA refuses two versions of one pipeline with
+the same name (`DUPLICATE_PIPELINE_VERSION_NAME`), and the manager names each version after the
+release tag. Re-running a tag used to fail for every pipeline already deployed (observed 2026-09-22).
+Most pipelines are also byte-identical across many releases, so a workspace deployed at
+`v0.1.0-test` and then `v0.2.1-test` used to *look* mostly like `v0.1.0-test`. `deploy_new_version()`
+now reads the pipeline's current version and compares its **contents** with the release:
 
-**Re-deploying a tag — fixed in code, not yet verified in a workspace.** OpenHEXA refuses two
-versions of one pipeline with the same name (`DUPLICATE_PIPELINE_VERSION_NAME`), and the manager names
-each version after the release tag, so re-running a tag used to fail for every pipeline already
-deployed (observed 2026-09-22). `deploy_new_version()` now reads the pipeline's current version and
-compares contents with the release: identical files already named with the tag are skipped and
-counted as a success; identical files under another name are registered again under the tag, so the
-workspace reads as being at the release; different files under the same tag are registered as `<tag>+redeploy-<YYYYMMDD>` with a warning; a name held by
-an older, non-current version falls back to the redeploy names after OpenHEXA refuses it. The manager
-always deploys the whole release (2026-09-30): `sync_analytics`, `deploy_pipelines`,
-`only_pipelines` and `create_missing` were removed. The checker strips only the `[vN]` suffix, so
-it reads a `+redeploy-` name as claiming no release (`version_name_matches_content: null`).
+| Current version | Action |
+|---|---|
+| Same files, already named with this tag | Skip; counts as a success (the re-run case) |
+| Same files, another name | Register again under the tag, so the workspace reads as being at the release |
+| Different files | Register under the tag |
+| Different files, current version already carries the tag | Register as `<tag>+redeploy-<YYYYMMDD>` (`…T<HHMMSS>Z` for a second one that day), with a warning |
+| Plain tag refused because an older, non-current version holds it (e.g. a rollback) | Same `+redeploy-` fallback |
+
+So a full run leaves every pipeline's current version named after the tag, at the price of one extra
+version per unchanged pipeline per release. `+` in a version name is accepted by OpenHEXA (Giulia,
+2026-09-30). The checker strips only the `[vN]` suffix, so it reads a `+redeploy-` name as claiming no
+release (`version_name_matches_content: null`); teaching `claimed_release_tag` to strip it is a
+one-line change, **not yet made**.
+
+**What the manager cannot do — keep in mind, discuss with the OpenHEXA devs.**
+
+* **A pipeline cannot delete a pipeline in OpenHEXA**, so a "factory reset" (make the workspace hold
+  exactly the release and nothing else) cannot be implemented. The same goes for the filesystem: the
+  manager moves superseded files to `archive/`, it never deletes them (`PRODUCT_SPEC.md` §5.4).
+* **A pipeline that a later release drops stays in the workspace**, as a stray left over from an
+  earlier release, and it keeps its old code. The manager does not touch it, does not warn about it,
+  and nothing marks it as no longer part of the release. It is confusing for an operator, who sees a
+  pipeline in the list that the release no longer ships. Only the checker notices, as
+  `pipelines[].in_target: false` (report-and-leave, `PRODUCT_SPEC.md` §7.5). Deleting it is a manual
+  UI action. Not being fixed; the open question is whether OpenHEXA could offer a way (an API
+  mutation callable from a pipeline, or a way to archive/hide a pipeline).
+* The same applies to analytics files a release removes: they remain on the filesystem.
+
+**Testing state.** The 2026-09-30 changes (D21, D22) pass `ruff` and an offline stub test of
+`deploy_new_version()` (seven cases). **They have not been run in a workspace.** The full test plan
+is `PRODUCT_SPEC.md` §6.7. Still unverified from before: **`backup_existing`**, since every verified
+run so far was against an empty workspace. Past verification runs: [`HISTORY.md`](HISTORY.md) §4.2.
 
 ### Python deployment — done
 
@@ -222,8 +250,8 @@ gotchas — is in **[`pipeline_deployment_mechanism.md`](pipeline_deployment_mec
 * `createPipeline` accepts the nested form that creates a pipeline and its first version atomically,
   so **bootstrapping an empty workspace needs no manual UI step.**
 
-Proven for **2 of 20** pipelines, byte-identical to the manifest hash. The other 18 have never been
-through the deployer.
+Proven for **2 of 20** pipelines in the original 2026-09-16 run, byte-identical to the manifest hash;
+the phase 1–4 sandbox runs since deployed the whole fixture release (21 pipelines) through it.
 
 ### Verification pipeline — phase 1 done
 

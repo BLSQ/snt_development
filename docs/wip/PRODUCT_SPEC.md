@@ -36,7 +36,7 @@ the pipelines. The web app is out of scope beyond the report contract it will co
 
 | Component | Role | State |
 |---|---|---|
-| `snt_workspace_manager` | **Fix / install.** Deploys one pinned release into the workspace: R analytics to the filesystem, `pipeline.py` via the API. | **BUILT**, prototype — verified for 2 of 20 pipelines |
+| `snt_workspace_manager` | **Fix / install.** Deploys one pinned release, always whole, into the workspace: R analytics to the filesystem, `pipeline.py` via the API. Cannot delete anything (§7.5). | **BUILT**, prototype — changed 2026-09-30 (D21, D22), **not yet tested in a workspace** (§6.7) |
 | `snt_workspace_check` | **Check.** Read-only. Hashes what is actually in the workspace, attributes each file to a release, and writes a status report. | **BUILT**, phase 4 — both modes verified in the sandbox (§6.3, §6.5); report schema frozen at `schema_version: 1` (§5.5, D18). No deployment workflow, by decision (D19) |
 | Release manifest generation | GitHub Action producing `release_manifest.json` per release | **BUILT** — covers everything the deploy zip ships |
 | Status web app | Reads the checker's report; offers "fix" or "leave as is" | Deferred |
@@ -408,7 +408,7 @@ still open.
 | **2** | ✅ **DONE** 2026-09-29 — taxonomy verified in the sandbox, D9 decided (§6.3). Full taxonomy: `removed_in_target`, `untracked`, `not_covered`, the pipeline-directory case. Plus **measure notebook drift** on a real workspace and decide D9. | A workspace at T-1 with one hand-edited file reports exactly the expected mix. | 1 |
 | **3** | ✅ **DONE** 2026-09-29 — attribution mode, per-release agreement and completeness in both modes, D15–D17 (§6.4, §6.5). | Met: the mixed sandbox workspace scores `v0.3.0-test` as best fit, agreement 1.0, completeness 0.9816. | — |
 | **4** | ✅ **DONE** 2026-09-30 — `schema_version: 1` frozen as [`docs/status_report.schema.json`](docs/status_report.schema.json); `snt_workspace_check/readme.md` re-verified against the code (§6.6, D18). | Met: schema documented and validated against reports the code builds; readme verified by reading, discrepancies listed in §6.6. | — |
-| **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). | A fix run links to the before/after reports it produced. | 4 |
+| **5** | `snt_workspace_manager` integration: report before and after a fix; enrich `.snt_release` (§7.4). **In progress**: step 1, making the manager solid on its own (re-deploy defect, whole-release-only), is written and untested (§6.7). Integration with the checker comes after. | A fix run links to the before/after reports it produced. | 4 |
 | **6** | Web app. | Out of scope for this spec. | 5 |
 
 ### 6.1 Test fixtures in the sandbox
@@ -623,6 +623,9 @@ release its name claims. Phase 3 therefore adds a **mode**, not new machinery.
   `.snt_release`**, which no longer matters with `release_tag=none` (D17).
 * Add the attribution cases to the stub test first, and let it define the expected numbers before
   the sandbox run.
+* **Historical.** This recipe used the manager's `deploy_pipelines` and `only_pipelines` options.
+  Both were removed on 2026-09-30 (D21). A mixed workspace is now made by deploying an older tag
+  first, then a newer one, which also relabels unchanged pipelines (D22).
 
 **Unchanged constraints to keep in mind:** the checker is read-only (§5.4); `status` values are
 added, never renamed (§5.5); `schema_version` stays 1 until phase 4.
@@ -708,6 +711,51 @@ against the schema with no errors, and its top-level keys equal the schema's exa
 validated, only one built by the stub. Older saved reports predate the current shape and do not
 validate, as expected.
 
+### 6.7 Phase 5, step 1 — the manager on its own (written 2026-09-30, **not yet tested**)
+
+The manager is treated as a standalone pipeline first; integration with the checker (before/after
+reports, enriched `.snt_release`) is the next step and has not been started. Changes made, all in
+`snt_workspace_manager/pipeline.py` and its readme:
+
+* **D21:** `sync_analytics`, `deploy_pipelines`, `only_pipelines` and `create_missing` removed. The
+  release is always deployed whole. `api_connection` is therefore always required, dry run included.
+* **D22:** `deploy_new_version()` compares the current version's contents with the release and
+  either skips, relabels or registers, as tabulated in `release_strategy.md` (§ Workspace Manager).
+  An identical version *is* registered again when its name is not the tag; it is never registered
+  when it already carries the tag.
+
+**Verified so far:** `ruff check` and `ruff format --check` clean; `get_pipeline` parses the manager
+and yields exactly `github_repo, release_tag, api_connection, backup_existing, dry_run`; an offline
+stub of `deploy_new_version()` (fake `upload_version`, fake `current_run`) passes seven cases: skip,
+relabel, plain register, `+redeploy-` for a taken current name, fallback when an older version holds
+the tag, dry run, no current version. That stub was thrown away; recreate it before extending. **Not
+verified: anything in a real workspace.**
+
+**Test plan for `snt-development-sandbox`** (use tags never before deployed to these pipelines; run
+by a human):
+
+1. Fresh tag `A`. Everything deploys, missing pipelines are created.
+2. Same tag `A` again. Every pipeline logs "already up to date, skipped"; the run ends without error.
+   This is the case that failed on 2026-09-22.
+3. Newer tag `B`. Unchanged pipelines are relabelled `B`, changed ones get a new version `B`. Then run
+   the checker with `release_tag=none`: the best fit should be `B`, and pipeline version names should
+   read `B` throughout.
+4. Roll back to `A`. Pipelines where an older version holds `A` get `A+redeploy-<date>` and a warning.
+5. Hand-edit one pipeline's code under the current tag and re-run that tag: expect a `+redeploy-` name
+   and a warning.
+6. Dry run of steps 3 and 5: log lines only, nothing registered.
+7. Also untested from before: `backup_existing` against a workspace that already holds files.
+
+**Known consequences to check or decide:**
+
+* The checker reads `+redeploy-` names as claiming no release (`null`). Decide whether to strip the
+  suffix in `claimed_release_tag` (recommended, one line); if so, extend the stub test and
+  `snt_workspace_check/readme.md`, and re-validate a report against the schema.
+* Version count grows by about one per unchanged pipeline per release. Watch for an OpenHEXA limit or
+  a slow run (21 uploads instead of a few).
+* `+` in a version name is accepted by OpenHEXA, on Giulia's word; confirm in the first test.
+* Strays: see §7.5.
+
 ## 7. Open decisions
 
 Blocking ones name the phase they block. None may be resolved by guessing.
@@ -775,6 +823,21 @@ changing `snt_workspace_manager` and handling markers written by older versions.
 and agents are forbidden destructive actions anyway. The report says plainly that the pipeline is
 not part of the target (`pipelines[].in_target: false`), and deleting it is a manual UI action.
 
+Two consequences to keep in mind, **not to fix here** and worth raising with the OpenHEXA devs
+(Giulia, 2026-09-30):
+
+* **No "factory reset".** Because no pipeline can delete any other, the manager cannot make a
+  workspace hold exactly one release. It can only add and update.
+* **Pipelines dropped by a release stay as strays.** When a new release no longer contains a pipeline,
+  the workspace keeps it, at the code of whichever release last deployed it. Nothing in the manager
+  says so, and in the OpenHEXA pipeline list it looks like part of the current release. This is
+  confusing for operators. Today only the checker surfaces it (`in_target: false`, or
+  `in_any_release` for one no release describes). Files on the filesystem that a release drops behave
+  the same way (§6.5, the `fixture_removed.r` leftovers).
+
+The question for the OpenHEXA devs: could a pipeline, or a documented API call, delete or archive a
+pipeline? Until then this is a permanent limit of the design, not a bug.
+
 ### 7.6 Scheduling
 
 A daily unattended check was the original motivation for splitting check from fix. Whether SNT
@@ -814,8 +877,8 @@ retention/pruning. Also parked until one of them blocks something (Giulia, 2026-
 
 * **A manifest cache**, keyed by tag. Safe, because tags never move. It is no longer needed for the
   rate limit (§7.2); it would matter only for GitHub outages, bandwidth, or runs with no internet.
-* **The manager's `DUPLICATE_PIPELINE_VERSION_NAME` defect** on re-deploy
-  ([`release_strategy.md`](release_strategy.md)). Its fix is deferred, and it blocks phase 5.
+* ~~**The manager's `DUPLICATE_PIPELINE_VERSION_NAME` defect** on re-deploy.~~ **Written 2026-09-30
+  (D22), untested** — §6.7. No longer blocks phase 5 once the test plan passes.
 * **The manager's legacy-manifest fallback** (§2.1): keep a fixture, or delete the code.
 * **The 15 `not_in_repo` notebooks** from the D9 run, one real country workspace, 2026-09-29. Their
   names would show whether they are country variants, renamed notebooks or scratch work, which is
@@ -883,7 +946,7 @@ value **`release_tag=none`** (D17), both as recommended below.
 ## 8. Decisions taken
 
 Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1–D9, D11, D12) and
-2026-09-21 (D10), 2026-09-29 (D9 resolved, D13–D17) and 2026-09-30 (D18–D20).
+2026-09-21 (D10), 2026-09-29 (D9 resolved, D13–D17) and 2026-09-30 (D18–D22).
 
 | # | Decision |
 |---|---|
@@ -907,3 +970,5 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D18 | Phase 4 (2026-09-30): `schema_version: 1` is **frozen** as a JSON Schema in `docs/wip/docs/status_report.schema.json`, and **`docs/wip/` is treated as a future standalone repository**, so contracts live inside it. Free-text fields (`remediation`, `errors[].message`, `blind_spots[]`, `summary.attribution.rule`) are frozen as keys and types but **display-only**. `checker_version` is renamed **`snt_workspace_check_version`**: the version of the `snt_workspace_check` pipeline that generated the report; documenting it is enough, and it is `null` today (§5.5, §6.6). |
 | D19 | **No deployment workflow** (`push_snt_*.yaml`) for `snt_workspace_check` or `snt_workspace_manager` (2026-09-30). They are deployed by hand or by `snt_workspace_manager` itself; nobody adds a workflow. Supersedes the open item in `pipeline_deployment_mechanism.md`. |
 | D20 | **The pipeline Template mechanism is being retired** (2026-09-30). This work, especially `snt_workspace_manager`, aims to remove templates altogether. It stays documented because it is still in place and affects `pipeline.py` delivery, but new work is not designed around it, and `CLAUDE.md` R5 is not reworded for it (§7.7). |
+| D21 | **The manager always deploys the whole release** (2026-09-30). The parameters `sync_analytics`, `deploy_pipelines`, `only_pipelines` and `create_missing` are removed: the point is that R and Python code move together on one tag, and a partial deploy invites the mixed workspaces this product exists to prevent. Recovery from a partial run is a plain re-run, which now skips what is done. `dry_run` and `backup_existing` stay. |
+| D22 | **Version naming on deploy** (2026-09-30, §6.7). A pipeline whose current version has the release's exact files *and* the tag as its name is skipped (success). Identical files under another name are **registered again under the tag**, so the workspace reads as being at the release, at the cost of one extra version per unchanged pipeline per release (reverses an earlier decision not to redeploy identical versions). A taken tag gets `<tag>+redeploy-<YYYYMMDD>`. `+` in a version name is accepted by OpenHEXA. |

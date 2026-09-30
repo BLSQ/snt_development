@@ -13,6 +13,9 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
 )
 
+# Ticket:
+# https://bluesquare.atlassian.net/browse/SNT25-684
+
 # Columns of the population user template ({COUNTRY_CODE}_population_user_template.csv)
 ADM_COLS = ["ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID"]
 REQUIRED_COLS = ["YEAR", *ADM_COLS, "POPULATION"]

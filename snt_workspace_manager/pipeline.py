@@ -32,6 +32,7 @@ import tempfile
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NoReturn
 
 import requests
 from openhexa.sdk import current_run, parameter, pipeline, workspace
@@ -53,6 +54,10 @@ DUPLICATE_VERSION_NAME_ERROR = "DUPLICATE_PIPELINE_VERSION_NAME"
 
 class DuplicateVersionNameError(RuntimeError):
     """The pipeline already has a version with the requested name."""
+
+
+class DeploymentAbortedError(RuntimeError):
+    """The run was stopped on purpose, and the reason is already in the run's Messages."""
 
 
 @pipeline("snt_workspace_manager")
@@ -113,7 +118,29 @@ def snt_workspace_manager(
 
     Orchestration only: resolves the release, downloads its manifest and source tarball,
     then delegates the file sync and the pipeline deployment to plain helper functions.
+
+    A raised exception reaches only the run's logs, not its Messages, so any failure that was
+    not already reported through `abort_run()` is logged here before the run is stopped.
     """
+    try:
+        deploy_release(github_repo, release_tag, api_connection, backup_existing, dry_run)
+    except DeploymentAbortedError:
+        raise
+    except Exception as exception:
+        current_run.log_error(
+            f"[ERROR] Deployment stopped by an unexpected error - {type(exception).__name__}: {exception}"
+        )
+        raise
+
+
+def deploy_release(
+    github_repo: str,
+    release_tag: str | None,
+    api_connection: str,
+    backup_existing: bool,
+    dry_run: bool,
+) -> None:
+    """Run the deployment steps for `snt_workspace_manager`, in order."""
     snt_root_path = Path(workspace.files_path)
     if dry_run:
         current_run.log_info("DRY RUN - nothing will be written or registered.")
@@ -147,7 +174,7 @@ def snt_workspace_manager(
         write_release_marker(snt_root_path, release_tag)
 
     if failures:
-        raise RuntimeError(
+        abort_run(
             f"{len(failures)} pipeline(s) failed to deploy: {failures}. The workspace is now "
             "partially updated - fix the cause and re-run to converge on the release."
         )
@@ -179,7 +206,7 @@ def get_api_token(connection_slug: str) -> str:
             "or set the 'OpenHEXA API connection' parameter to an existing connection slug."
         )
         current_run.log_error(message)
-        raise ValueError(message)
+        raise DeploymentAbortedError(message)
 
     current_run.log_info(f"Using the API token from connection '{connection_slug}' to deploy.")
     return token
@@ -200,15 +227,92 @@ def get_release(github_repo: str, release_tag: str | None) -> dict:
     release_tag = (release_tag or "").strip()
     base_url = f"https://api.github.com/repos/{github_repo}/releases"
     url = f"{base_url}/tags/{release_tag}" if release_tag else f"{base_url}/latest"
-    response = requests.get(url, headers=GITHUB_HEADERS, timeout=30)
+    response = github_get(url)
     if response.status_code == 404:
-        what = f"Release '{release_tag}'" if release_tag else "A latest release (non-draft, non-pre-release)"
-        raise ValueError(f"{what} not found in {github_repo}.")
-    response.raise_for_status()
+        abort_run(explain_missing_release(github_repo, release_tag))
+    if not response.ok:
+        abort_run(f"GitHub answered {response.status_code} on {url}: {response.text[:200]}")
     release = response.json()
     if not release_tag:
         current_run.log_info(f"No release tag given: deploying the latest release, {release['tag_name']}.")
     return release
+
+
+def github_get(url: str) -> requests.Response:
+    """GET a GitHub API URL, turning a network failure into a readable run error.
+
+    Returns
+    -------
+    requests.Response
+        The response, whatever its status code.
+    """
+    try:
+        return requests.get(url, headers=GITHUB_HEADERS, timeout=30)
+    except requests.RequestException as exception:
+        abort_run(f"Could not reach GitHub ({type(exception).__name__}: {exception}).")
+
+
+def explain_missing_release(github_repo: str, release_tag: str) -> str:
+    """Work out why GitHub returned 404 for a release, for the operator to act on.
+
+    A 404 covers several causes - the repository is missing or private, the tag does not exist,
+    the repository has no release at all, or it only has pre-releases (which GitHub never
+    treats as "latest") - so the repository and its release list are queried to tell them apart.
+
+    Returns
+    -------
+    str
+        A message naming the cause and what to do about it.
+    """
+    repo_response = github_get(f"https://api.github.com/repos/{github_repo}")
+    if repo_response.status_code == 404:
+        return (
+            f"The GitHub repository '{github_repo}' does not exist or is private (it is read without "
+            "credentials, so it must be public). Check the 'GitHub repository' parameter."
+        )
+
+    releases_response = github_get(f"https://api.github.com/repos/{github_repo}/releases?per_page=10")
+    if not releases_response.ok:
+        what = f"a release tagged '{release_tag}'" if release_tag else "a latest release"
+        return (
+            f"GitHub found no {what} in '{github_repo}', and listing its releases failed "
+            f"({releases_response.status_code}: {releases_response.text[:200]})."
+        )
+    releases = releases_response.json()
+    available = ", ".join(r["tag_name"] + (" (pre-release)" if r["prerelease"] else "") for r in releases)
+
+    if not releases:
+        return (
+            f"The repository '{github_repo}' has no published GitHub release, so there is nothing to "
+            "deploy. Publish a release (with its release_manifest.json asset) on GitHub, or point the "
+            "'GitHub repository' parameter at a repository that has one."
+        )
+    if release_tag:
+        return (
+            f"The repository '{github_repo}' has no release tagged '{release_tag}'. Check the spelling "
+            f"of the 'Release tag' parameter. Most recent releases: {available}."
+        )
+    return (
+        f"The repository '{github_repo}' has no release GitHub counts as 'latest': only pre-releases "
+        f"are published, and GitHub never treats a pre-release as latest. Type the tag to deploy in "
+        f"the 'Release tag' parameter, or mark a release as a full release on GitHub. Most recent "
+        f"releases: {available}."
+    )
+
+
+def abort_run(reason: str) -> NoReturn:
+    """Log a failure to the run's Messages and stop the run.
+
+    A raised exception alone shows only in the run's logs, so the reason is logged first.
+
+    Raises
+    ------
+    DeploymentAbortedError
+        Always, carrying the same message that was logged.
+    """
+    message = f"[ERROR] Cannot deploy: {reason}"
+    current_run.log_error(message)
+    raise DeploymentAbortedError(message)
 
 
 def download_manifest(release: dict) -> dict:
@@ -221,13 +325,21 @@ def download_manifest(release: dict) -> dict:
     """
     asset = next((a for a in release["assets"] if a["name"] == "release_manifest.json"), None)
     if asset is None:
-        raise ValueError(
-            f"No release_manifest.json asset found on release {release['tag_name']}. "
-            "Was the 'Generate Release Manifest' workflow run for this release?"
+        abort_run(
+            f"release {release['tag_name']} has no release_manifest.json asset, so the files to deploy "
+            "are unknown. Run the 'Generate Release Manifest' workflow for this release on GitHub (or "
+            f"wait for it to finish), then re-run. Release page: {release['html_url']}"
         )
-    response = requests.get(asset["browser_download_url"], headers=GITHUB_HEADERS, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    response = github_get(asset["browser_download_url"])
+    if not response.ok:
+        abort_run(
+            f"downloading release_manifest.json of release {release['tag_name']} failed "
+            f"({response.status_code}: {response.text[:200]})."
+        )
+    try:
+        return response.json()
+    except ValueError:
+        abort_run(f"release_manifest.json of release {release['tag_name']} is not valid JSON.")
 
 
 def split_manifest(tracked_files: dict, pipelines: dict | None = None) -> tuple[dict, list[str]]:
@@ -284,8 +396,12 @@ def download_and_extract_tarball(tarball_url: str, extract_to: Path) -> Path:
         The path to the extracted repository root (GitHub tarballs contain one top-level
         directory named "<owner>-<repo>-<short_sha>").
     """
-    response = requests.get(tarball_url, headers=GITHUB_HEADERS, timeout=120, stream=True)
-    response.raise_for_status()
+    try:
+        response = requests.get(tarball_url, headers=GITHUB_HEADERS, timeout=120, stream=True)
+    except requests.RequestException as exception:
+        abort_run(f"could not download the release source tarball ({type(exception).__name__}: {exception}).")
+    if not response.ok:
+        abort_run(f"downloading the release source tarball failed ({response.status_code}): {tarball_url}")
 
     tarball_path = extract_to / "release.tar.gz"
     with tarball_path.open("wb") as f:
@@ -297,7 +413,7 @@ def download_and_extract_tarball(tarball_url: str, extract_to: Path) -> Path:
 
     subdirs = [p for p in extract_to.iterdir() if p.is_dir()]
     if len(subdirs) != 1:
-        raise ValueError(f"Expected exactly one extracted directory, found: {subdirs}")
+        abort_run(f"the release source tarball should hold exactly one directory, found: {subdirs}")
     return subdirs[0]
 
 

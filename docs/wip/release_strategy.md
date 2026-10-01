@@ -176,11 +176,13 @@ is intended — telling them apart is the verification pipeline's job, not the g
 
 [`snt_workspace_manager/`](../../snt_workspace_manager/), an OpenHEXA pipeline running in
 `snt-development-sandbox`. Parameters: `github_repo`, `release_tag`, `api_connection`,
-`backup_existing`, `dry_run`. It always deploys the **whole** release, both halves together
+`backup_existing`, `dry_run`. `release_tag` is optional: empty deploys the repository's latest
+release (D23), and the resolved tag is what names everything downstream. It always deploys the **whole** release, both halves together
 (decision D21): there is no option to sync only the analytics, deploy only the pipelines, restrict to
 some pipelines, or skip creating missing ones. It:
 
-1. resolves the release via the GitHub API and downloads `release_manifest.json` from its assets;
+1. resolves the release via the GitHub API — by tag, or `/releases/latest` when no tag is given —
+   and downloads `release_manifest.json` from its assets;
 2. downloads the release **source tarball** and extracts it;
 3. copies every manifest-tracked R/notebook file into `workspace.files_path`, archiving any
    existing copy under `archive/<release_tag>/` first;
@@ -213,6 +215,14 @@ version per unchanged pipeline per release. `+` in a version name is accepted by
 2026-09-30). The checker strips only the `[vN]` suffix, so it reads a `+redeploy-` name as claiming no
 release (`version_name_matches_content: null`); teaching `claimed_release_tag` to strip it is a
 one-line change, **not yet made**.
+
+**Failures reach the run's Messages (2026-10-01, D24).** OpenHEXA shows a raised exception only in
+the run's logs, so a run could stop with an `INFO` line as the last message and no reason given
+(observed with an empty tag resolving to `v0.4.0-test`, which has no manifest). Every anticipated
+failure now goes through `abort_run()`, which logs `[ERROR] Cannot deploy: <reason and fix>` before
+raising, and the pipeline function catches anything else and logs it as an unexpected error. A
+GitHub 404 on the release is diagnosed into its actual cause: repository missing or private, no
+published release, only pre-releases, or unknown tag.
 
 **What the manager cannot do — keep in mind, discuss with the OpenHEXA devs.**
 

@@ -1,7 +1,7 @@
 # SNT Workspace Manager Pipeline
 
-The **SNT Workspace Manager** deploys one pinned GitHub release of this repository into the
-workspace it runs in. It moves both halves of the codebase on a single release tag: the R analytics
+The **SNT Workspace Manager** deploys one GitHub release of this repository — the one named by
+`release_tag`, or the latest release when that is left empty — into the workspace it runs in. It moves both halves of the codebase on a single release tag: the R analytics
 (notebooks and `.r` helpers) are copied into the workspace filesystem, and each `<name>/pipeline.py`
 is registered as a new **version** of the matching OpenHEXA pipeline through the GraphQL API. It
 publishes nothing to an OpenHEXA dataset — its output is the state of the workspace itself, plus a
@@ -61,8 +61,13 @@ particular is the mechanism this pipeline replaces.
 
 1. **Credentials:** Read the bearer token from the custom connection named by `api_connection`; a
    missing or malformed connection aborts the run before anything is fetched.
-2. **Resolve the release:** Fetch the GitHub release by tag, then download its
-   `release_manifest.json` asset. A release without that asset aborts the run.
+2. **Resolve the release:** Fetch the GitHub release by tag or, when `release_tag` is empty, the
+   repository's latest release (`/releases/latest`). From here on the resolved tag is used
+   everywhere — version names, `archive/<tag>/`, `.snt_release` — never the word "latest". When
+   GitHub finds nothing, the run works out why and says so: repository missing or private, no
+   published release at all, only pre-releases (never "latest" on GitHub), or a misspelled tag (the
+   most recent tags are listed). Then download the release's `release_manifest.json` asset; a release
+   without it aborts the run, naming the 'Generate Release Manifest' workflow to run.
 3. **Split the manifest:** Any entry of the form `<name>/pipeline.py` identifies a **pipeline to
    deploy**; everything else is an **analytics file to copy**. `pipeline.py` is deliberately
    excluded from the filesystem sync, because OpenHEXA runs each pipeline from its registered
@@ -92,15 +97,15 @@ particular is the mechanism this pipeline replaces.
      rollback): the redeploy names above are tried in turn.
 
 7. **Continue on failure:** one pipeline's failure is logged with an `[ERROR]` prefix and does not
-   stop the others; the run raises at the end listing every failure. Re-running the same tag
+   stop the others; the run stops at the end with an `[ERROR]` message listing every failure. Re-running the same tag
    converges: pipelines already deployed are skipped (step 6).
 8. **Write the release marker:** record `{"snt_release": "<tag>"}` in `.snt_release` at the
    workspace root. Skipped on a dry run.
 
 ## Inputs
 
-* **GitHub release `[RELEASE_TAG]` (or the latest one, if empty) of `[GITHUB_REPO]`** — required. Read unauthenticated, so the
-  repository must be public or the run fails.
+* **GitHub release `[RELEASE_TAG]` of `[GITHUB_REPO]`**, or its latest release when `release_tag` is
+  empty — required. Read unauthenticated, so the repository must be public or the run fails.
   * **`release_manifest.json`** release asset — required; the list of tracked files.
   * **The release source tarball** — required; the actual file contents.
 * **CUSTOM connection `[API_CONNECTION]`** with a secret field `token` — always required.
@@ -138,6 +143,15 @@ particular is the mechanism this pipeline replaces.
 > - **The zip carries the whole directory,** so `requirements.txt` and `readme.md` are deployed even
 >   though the manifest tracks only `pipeline.py`. This is the manifest gap described in
 >   `release_strategy.md`: verification currently covers less than what is actually deployed.
+> - **Every failure is spelled out in the run's Messages.** A raised exception alone reaches only the
+>   run's logs, so each failure the pipeline anticipates (connection, release lookup, manifest,
+>   tarball, failed pipelines) is logged as `[ERROR] Cannot deploy: <reason and what to do>` before
+>   the run stops. Anything unanticipated is caught at the top and logged as
+>   `[ERROR] Deployment stopped by an unexpected error - <type>: <message>`. If Messages ends on an
+>   `INFO` line with no `[ERROR]` after it, that is a gap in this coverage — report it.
+> - **An empty `release_tag` follows GitHub's "latest", not the newest tag.** A pre-release is never
+>   "latest", and the latest release may lack a manifest (in `BLSQ/snt_development_sandbox` it is
+>   `v0.4.0-test`, which has none by design, so an empty tag aborts there). Type the tag when in doubt.
 > - **Partial runs are expected to be re-run.** A failure leaves the workspace partially updated, by
 >   design — every failure is named in the final error and re-running converges on the release.
 >   Pipelines already at the release (same files, same name) are skipped, not refused.

@@ -424,7 +424,7 @@ the newest non-prerelease release automatically.
 | `v0.2.0-test` | manifest, 163 files | **dud**, byte-identical to `v0.1.0-test`; kept because tags are never deleted |
 | **`v0.2.1-test`** | manifest, 163 files | **the verification target** |
 | `v0.3.0-test` | manifest, 163 files | ahead of the target; deploy target for check run 2 |
-| `v0.4.0-test` | **none** | `manifest_available: false`, `incomplete: true` |
+| `v0.4.0-test` | **none** | `manifest_available: false`, `incomplete: true`. Also the repo's GitHub "latest", so an empty-tag manager run resolves to it and aborts on the missing manifest |
 
 The dud is harmless: its `published_at` puts it on the older side of the target, where duplicate
 content changes no expected status, and it incidentally covers the case of **two releases with
@@ -723,13 +723,21 @@ reports, enriched `.snt_release`) is the next step and has not been started. Cha
   either skips, relabels or registers, as tabulated in `release_strategy.md` (§ Workspace Manager).
   An identical version *is* registered again when its name is not the tag; it is never registered
   when it already carries the tag.
+* **D23 (2026-10-01):** `release_tag` is optional; empty deploys GitHub's latest release, and the
+  resolved tag names the versions, the archive folder and `.snt_release`.
+* **D24 (2026-10-01):** every failure is logged as an `[ERROR]` message to the run's Messages before
+  the run stops (`abort_run()`, plus a catch-all in the pipeline function), and a GitHub 404 on the
+  release is diagnosed into its cause.
 
 **Verified so far:** `ruff check` and `ruff format --check` clean; `get_pipeline` parses the manager
 and yields exactly `github_repo, release_tag, api_connection, backup_existing, dry_run`; an offline
 stub of `deploy_new_version()` (fake `upload_version`, fake `current_run`) passes seven cases: skip,
 relabel, plain register, `+redeploy-` for a taken current name, fallback when an older version holds
-the tag, dry run, no current version. That stub was thrown away; recreate it before extending. **Not
-verified: anything in a real workspace.**
+the tag, dry run, no current version. That stub was thrown away; recreate it before extending.
+**Verified in `snt-development-sandbox` on 2026-10-01 (D23, D24 only):** an empty tag resolves to the
+latest release (`v0.4.0-test`), and its missing manifest now stops the run with an `[ERROR]` message in
+Messages. **Not verified: the D21/D22 test plan below**, nor the other D24 diagnoses (no release, only
+pre-releases, unknown tag, private repo).
 
 **Test plan for `snt-development-sandbox`** (use tags never before deployed to these pipelines; run
 by a human):
@@ -745,6 +753,8 @@ by a human):
    and a warning.
 6. Dry run of steps 3 and 5: log lines only, nothing registered.
 7. Also untested from before: `backup_existing` against a workspace that already holds files.
+8. D24 messages: a misspelled tag, and a public repository with no release. Each should end on an
+   `[ERROR] Cannot deploy:` line in Messages naming the cause.
 
 **Known consequences to check or decide:**
 
@@ -972,3 +982,5 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D20 | **The pipeline Template mechanism is being retired** (2026-09-30). This work, especially `snt_workspace_manager`, aims to remove templates altogether. It stays documented because it is still in place and affects `pipeline.py` delivery, but new work is not designed around it, and `CLAUDE.md` R5 is not reworded for it (§7.7). |
 | D21 | **The manager always deploys the whole release** (2026-09-30). The parameters `sync_analytics`, `deploy_pipelines`, `only_pipelines` and `create_missing` are removed: the point is that R and Python code move together on one tag, and a partial deploy invites the mixed workspaces this product exists to prevent. Recovery from a partial run is a plain re-run, which now skips what is done. `dry_run` and `backup_existing` stay. |
 | D22 | **Version naming on deploy** (2026-09-30, §6.7). A pipeline whose current version has the release's exact files *and* the tag as its name is skipped (success). Identical files under another name are **registered again under the tag**, so the workspace reads as being at the release, at the cost of one extra version per unchanged pipeline per release (reverses an earlier decision not to redeploy identical versions). A taken tag gets `<tag>+redeploy-<YYYYMMDD>`. `+` in a version name is accepted by OpenHEXA. |
+| D23 | **An empty `release_tag` deploys the latest release** (2026-10-01, §6.7). The manager resolves it through GitHub's `/releases/latest`, i.e. the newest published release that is neither a draft nor a pre-release, so a pre-release must be typed. The resolved tag, never "latest", names the pipeline versions, `archive/<tag>/` and `.snt_release`, so a workspace always records which release it actually got. |
+| D24 | **Every manager failure reaches the run's Messages** (2026-10-01, §6.7). A raised exception alone appears only in the logs, so each anticipated failure is logged as `[ERROR] Cannot deploy: <reason and fix>` before raising, and anything else is logged by a catch-all in the pipeline function. |

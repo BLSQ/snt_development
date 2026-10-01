@@ -194,8 +194,8 @@ some pipelines, or skip creating missing ones. It:
 `split_manifest()` decides which manifest entries are filesystem analytics and which are deployed
 inside a zip. It splits by *directory*, reading the manifest's `pipelines` block where present and
 falling back to a `<name>/pipeline.py` derivation for pre-phase-0 manifests. **No live release
-exercises that fallback any more** — whether to keep it against a legacy fixture or drop it is open
-(`PRODUCT_SPEC.md` §2.1).
+exercises that fallback any more**, and legacy manifests are not supported, so it is to be deleted
+in a PR of its own (`PRODUCT_SPEC.md` §2.1, D26).
 
 **Version naming on deploy (2026-09-30, D22).** OpenHEXA refuses two versions of one pipeline with
 the same name (`DUPLICATE_PIPELINE_VERSION_NAME`), and the manager names each version after the

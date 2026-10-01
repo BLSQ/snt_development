@@ -62,6 +62,8 @@ __pycache__/
 !.claude/settings.json
 # ...or the frozen status-report schema (docs/wip/ is destined to become its own repository).
 !docs/wip/docs/status_report.schema.json
+# ...or the release-manifest contract (PRODUCT_SPEC.md D26).
+!docs/wip/docs/release_manifest.schema.json
 
 # R ----------------------------------------
 *.rds

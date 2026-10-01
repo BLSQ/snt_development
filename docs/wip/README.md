@@ -6,10 +6,11 @@ is live in a country workspace yet.
 > **This folder is destined to become its own repository** (`PRODUCT_SPEC.md` D18). It lives inside
 > `snt_development` for now so that agents working on the pipelines have the context at hand. Keep it
 > self-contained: machine-readable contracts go in [`docs/`](docs/) (today,
-> [`status_report.schema.json`](docs/status_report.schema.json), the frozen report schema), and a
+> [`status_report.schema.json`](docs/status_report.schema.json), the frozen report schema, and
+> [`release_manifest.schema.json`](docs/release_manifest.schema.json), the manifest contract), and a
 > link that leaves this folder is a link to revisit at the move.
 
-**Five files, and they do not overlap.** Each states only what is *currently* true; anything that
+**Six files, and they do not overlap.** Each states only what is *currently* true; anything that
 stopped being true moved to `HISTORY.md`.
 
 | File | Answers | Read it when |
@@ -18,6 +19,7 @@ stopped being true moved to `HISTORY.md`.
 | [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) | **What** the workspace checker must do — statuses, report contract, build phases, open decisions. | You are building or reviewing the checker. |
 | [`pipeline_deployment_mechanism.md`](pipeline_deployment_mechanism.md) | **How** a pipeline is deployed into a workspace through the OpenHEXA API. | You are touching deployment, tokens or the GraphQL calls. |
 | [`docs/status_report.schema.json`](docs/status_report.schema.json) | **The contract**: the frozen JSON Schema of the checker's report (`schema_version: 1`). Machine-readable, not prose. | You are writing or validating a consumer of the report, or changing the report's shape. |
+| [`docs/release_manifest.schema.json`](docs/release_manifest.schema.json) | **The contract** between a release's producer and its consumers: the JSON Schema of `release_manifest.json` (D26). Machine-readable, not prose. | You are changing how the manifest is generated or read, or publishing releases from another repository. |
 | [`HISTORY.md`](HISTORY.md) | **What is no longer true** — superseded designs, closed issues, dead ends, deleted fixtures, the original spec draft. | **Before** investigating anything that smells already-solved, or before reopening a decision. |
 
 ## Rules for keeping these useful

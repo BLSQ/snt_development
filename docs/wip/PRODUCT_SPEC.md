@@ -116,19 +116,20 @@ are deployed and correct — a false alarm in the one component whose job is to 
   `snt_workspace_manager`'s own derivation.
 
 `files` keeps its exact previous shape, so the block is additive: a reader that ignores `pipelines`
-behaves as before. Legacy manifests have no such block, and a consumer meeting one must fall back to
-deriving pipeline directories from `<name>/pipeline.py` entries — `split_manifest()` in
-`snt_workspace_manager` is the reference for that fallback.
+behaves as before. Legacy (pre-phase-0) manifests have no such block and are not supported: a
+consumer refuses one. `split_manifest()` in `snt_workspace_manager` still carries a fallback that
+derives pipeline directories from `<name>/pipeline.py` entries; it is to be deleted (below).
 
-**Open:** no live release lacks the block, so the fallback is unreachable in testing. Either keep a
-legacy manifest as a local test fixture or delete the fallback in a PR of its own — untested
-back-compat code for a case that can no longer occur is worse than either.
+**Decided 2026-10-01 (D26): delete the fallback.** Legacy manifests only ever existed during
+development, no live release lacks the block, and the fallback is unreachable in testing — untested
+back-compat code for a case that can no longer occur. Delete it in a PR of its own; until then it is
+dead code. The contract is [`docs/release_manifest.schema.json`](docs/release_manifest.schema.json),
+which requires the block.
 
 `snt_workspace_check` deliberately does **not** carry the fallback: it refuses a manifest with no
 `pipelines` block, naming the phase-0 cutover in the error. That makes the two components disagree on
 purpose, and the disagreement is the argument — one of them has untested code for an impossible case
-and the other does not. Resolve §2.1 in the manager's favour or the checker's, but do not copy the
-fallback across to make them match.
+and the other does not. Resolved in the checker's favour (D26).
 
 ## 3. What the checker observes
 
@@ -905,7 +906,7 @@ retention/pruning. Also parked until one of them blocks something (Giulia, 2026-
   rate limit (§7.2); it would matter only for GitHub outages, bandwidth, or runs with no internet.
 * ~~**The manager's `DUPLICATE_PIPELINE_VERSION_NAME` defect** on re-deploy.~~ **Written 2026-09-30
   (D22), untested** — §6.7. No longer blocks phase 5 once the test plan passes.
-* **The manager's legacy-manifest fallback** (§2.1): keep a fixture, or delete the code.
+* **Delete the manager's legacy-manifest fallback** (§2.1, D26: decided 2026-10-01), in a PR of its own.
 * **The 15 `not_in_repo` notebooks** from the D9 run, one real country workspace, 2026-09-29. Their
   names would show whether they are country variants, renamed notebooks or scratch work, which is
   input for D5. Not collected.
@@ -1001,3 +1002,4 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D23 | **An empty `release_tag` deploys the latest release** (2026-10-01, §6.7). The manager resolves it through GitHub's `/releases/latest`, i.e. the newest published release that is neither a draft nor a pre-release, so a pre-release must be typed. The resolved tag, never "latest", names the pipeline versions, `archive/<tag>/` and `.snt_release`, so a workspace always records which release it actually got. |
 | D24 | **Every manager failure reaches the run's Messages** (2026-10-01, §6.7). A raised exception alone appears only in the logs, so each anticipated failure is logged as `[ERROR] Cannot deploy: <reason and fix>` before raising, and anything else is logged by a catch-all in the pipeline function. |
 | D25 | **One workspace per release is the expected usage** (2026-10-01, §1.3). A country keeps a main workspace on the latest release, updated forward, and uses a dedicated workspace to run an older release. Rolling one workspace back and forth only has to be safe, not clean; do not polish it before there is feedback from real users. |
+| D26 | **The release manifest is a cross-repo contract, frozen as a JSON Schema** (2026-10-01, §2.1) in `docs/wip/docs/release_manifest.schema.json`. It is derived from the generator, `split_manifest()`/`download_manifest()` in the manager and `load_manifests()`/`build_index()` in the checker, not from prose. It is repository-agnostic (no `pipelines/` or `code/` paths), because the bootstrap's other release sources will publish the same shape. Strict for the producer (`additionalProperties: false`), tolerant for consumers, which ignore unknown keys. `pipelines` is required, so pre-phase-0 manifests do not validate. **They are not supported** (decided 2026-10-01): they only ever existed during development, so the manager's fallback for them in `split_manifest()` is to be deleted in a PR of its own (§2.1). Two invariants JSON Schema cannot express (every `<dir>/<zip_file>` is a key of `files`; every `zip_files` holds `pipeline.py`) are stated in the schema's description and must be checked by a validator separately. |

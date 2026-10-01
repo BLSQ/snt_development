@@ -61,6 +61,21 @@ Out of scope, and to be stated as blind spots in the report:
   ordinary untracked files. Recognising them as deliberate overrides is deferred, and until it is
   done the report will look alarming in any workspace that has one.
 
+### 1.3 Expected usage: one workspace per release (D25)
+
+The working assumption, until real users say otherwise: **a country keeps one workspace on one
+release.** Typically that is a main workspace that tracks the latest release and is updated forward
+as releases come out. To run data through an old release (say, last year's), a country is expected
+to use a **dedicated workspace** deployed at that release, not to roll its main workspace back and
+then forward again.
+
+Consequence for this work: **moving forwards is the path that has to be solid; going back and
+forth between releases in one workspace is not a priority.** Downgrades and back-and-forth must stay
+*safe* — nothing deleted, superseded files archived, every failure reported — but they do not have
+to be *clean*: `+redeploy-` version names, extra versions, strays and checker statuses that read
+oddly after a rollback are acceptable. Do not spend effort polishing that path until there is
+feedback from actual use. Revisit this assumption once countries are running the release process.
+
 ## 2. Vocabulary
 
 | Term | Meaning |
@@ -749,6 +764,7 @@ by a human):
    the checker with `release_tag=none`: the best fit should be `B`, and pipeline version names should
    read `B` throughout.
 4. Roll back to `A`. Pipelines where an older version holds `A` get `A+redeploy-<date>` and a warning.
+   Low priority (§1.3): check it is safe — no error, nothing lost — not that the result is tidy.
 5. Hand-edit one pipeline's code under the current tag and re-run that tag: expect a `+redeploy-` name
    and a warning.
 6. Dry run of steps 3 and 5: log lines only, nothing registered.
@@ -984,3 +1000,4 @@ Recorded so they are not re-litigated. Taken by Giulia in review, 2026-09-18 (D1
 | D22 | **Version naming on deploy** (2026-09-30, §6.7). A pipeline whose current version has the release's exact files *and* the tag as its name is skipped (success). Identical files under another name are **registered again under the tag**, so the workspace reads as being at the release, at the cost of one extra version per unchanged pipeline per release (reverses an earlier decision not to redeploy identical versions). A taken tag gets `<tag>+redeploy-<YYYYMMDD>`. `+` in a version name is accepted by OpenHEXA. |
 | D23 | **An empty `release_tag` deploys the latest release** (2026-10-01, §6.7). The manager resolves it through GitHub's `/releases/latest`, i.e. the newest published release that is neither a draft nor a pre-release, so a pre-release must be typed. The resolved tag, never "latest", names the pipeline versions, `archive/<tag>/` and `.snt_release`, so a workspace always records which release it actually got. |
 | D24 | **Every manager failure reaches the run's Messages** (2026-10-01, §6.7). A raised exception alone appears only in the logs, so each anticipated failure is logged as `[ERROR] Cannot deploy: <reason and fix>` before raising, and anything else is logged by a catch-all in the pipeline function. |
+| D25 | **One workspace per release is the expected usage** (2026-10-01, §1.3). A country keeps a main workspace on the latest release, updated forward, and uses a dedicated workspace to run an older release. Rolling one workspace back and forth only has to be safe, not clean; do not polish it before there is feedback from real users. |

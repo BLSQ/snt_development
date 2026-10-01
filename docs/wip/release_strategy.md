@@ -96,7 +96,9 @@ Explicitly out of scope:
   manifest, flagging edited files. Country-specific notebook variants (`<generic>_<CC>.ipynb`) are
   flagged as deliberate overrides, not as drift — deferred past v1, see `PRODUCT_SPEC.md` §1.2.
 * **Update / downgrade** — back up modified files into `archive/<release_tag>/`, then overwrite
-  with the target release.
+  with the target release. Updating forward is the path that matters: countries are expected to run
+  an older release in a dedicated workspace rather than downgrade their main one, so a downgrade
+  only has to be safe, not clean (`PRODUCT_SPEC.md` §1.3, D25).
 
 The manager writes `{"snt_release": "<tag>"}` into a hidden `.snt_release` file at the workspace
 root, so anything downstream can tell which manifest to compare against.

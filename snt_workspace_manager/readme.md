@@ -152,6 +152,10 @@ particular is the mechanism this pipeline replaces.
 > - **An empty `release_tag` follows GitHub's "latest", not the newest tag.** A pre-release is never
 >   "latest", and the latest release may lack a manifest (in `BLSQ/snt_development_sandbox` it is
 >   `v0.4.0-test`, which has none by design, so an empty tag aborts there). Type the tag when in doubt.
+> - **One workspace, one release.** The expected use is to keep a workspace on the latest release
+>   and deploy forward. To run an older release, use a dedicated workspace rather than rolling this
+>   one back. Rolling back works and loses nothing, but leaves `+redeploy-` names and extra versions
+>   behind (`docs/wip/PRODUCT_SPEC.md` §1.3).
 > - **Partial runs are expected to be re-run.** A failure leaves the workspace partially updated, by
 >   design — every failure is named in the final error and re-running converges on the release.
 >   Pipelines already at the release (same files, same name) are skipped, not refused.

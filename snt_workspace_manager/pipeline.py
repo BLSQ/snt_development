@@ -67,10 +67,13 @@ class DuplicateVersionNameError(RuntimeError):
 @parameter(
     "release_tag",
     name="Release tag",
-    help="GitHub release tag to deploy (e.g. v0.0.1-test). Becomes the pipeline version name.",
+    help=(
+        "GitHub release tag to deploy (e.g. v0.3.0-test). Leave empty to deploy the repository's "
+        "latest release. The resolved tag becomes the pipeline version name."
+    ),
     type=str,
     default=None,
-    required=True,
+    required=False,
 )
 @parameter(
     "api_connection",
@@ -101,7 +104,7 @@ class DuplicateVersionNameError(RuntimeError):
 )
 def snt_workspace_manager(
     github_repo: str,
-    release_tag: str,
+    release_tag: str | None,
     api_connection: str,
     backup_existing: bool,
     dry_run: bool,
@@ -118,6 +121,7 @@ def snt_workspace_manager(
     token = get_api_token(api_connection)
 
     release = get_release(github_repo, release_tag)
+    release_tag = release["tag_name"]
     manifest = download_manifest(release)
     analytics_files, pipeline_dirs = split_manifest(manifest["files"], manifest.get("pipelines"))
     current_run.log_info(
@@ -181,20 +185,30 @@ def get_api_token(connection_slug: str) -> str:
     return token
 
 
-def get_release(github_repo: str, release_tag: str) -> dict:
-    """Fetch a GitHub release's metadata by tag.
+def get_release(github_repo: str, release_tag: str | None) -> dict:
+    """Fetch a GitHub release's metadata, by tag or the repository's latest.
+
+    A blank `release_tag` resolves to GitHub's "latest" release, which is the most recent
+    published one that is neither a draft nor flagged as a pre-release. A pre-release must
+    therefore be requested by its tag.
 
     Returns
     -------
     dict
         The GitHub API release object (tag_name, tarball_url, html_url, assets, ...).
     """
-    url = f"https://api.github.com/repos/{github_repo}/releases/tags/{release_tag}"
+    release_tag = (release_tag or "").strip()
+    base_url = f"https://api.github.com/repos/{github_repo}/releases"
+    url = f"{base_url}/tags/{release_tag}" if release_tag else f"{base_url}/latest"
     response = requests.get(url, headers=GITHUB_HEADERS, timeout=30)
     if response.status_code == 404:
-        raise ValueError(f"Release '{release_tag}' not found in {github_repo}.")
+        what = f"Release '{release_tag}'" if release_tag else "A latest release (non-draft, non-pre-release)"
+        raise ValueError(f"{what} not found in {github_repo}.")
     response.raise_for_status()
-    return response.json()
+    release = response.json()
+    if not release_tag:
+        current_run.log_info(f"No release tag given: deploying the latest release, {release['tag_name']}.")
+    return release
 
 
 def download_manifest(release: dict) -> dict:

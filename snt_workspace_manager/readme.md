@@ -29,13 +29,16 @@ particular is the mechanism this pipeline replaces.
   * **Description:** `owner/repo` to pull the release from. The release must carry a
     `release_manifest.json` asset listing the tracked files and their sha256 hashes.
   * **Default:** `BLSQ/snt_development_sandbox`.
-* **`release_tag`** (str, Required):
+* **`release_tag`** (str, Optional):
   * **Name:** Release tag
-  * **Description:** The GitHub release tag to deploy. It also becomes the **version name** of every
+  * **Description:** The GitHub release tag to deploy (e.g. `v0.3.0-test`). Leave it empty to deploy
+    the repository's **latest release** — GitHub's "latest", i.e. the most recent published release
+    that is neither a draft nor a pre-release, so a pre-release must be requested by its tag. The
+    resolved tag (typed or latest) also becomes the **version name** of every
     pipeline version registered by the run, and the name of the backup subdirectory. When a pipeline
     already has a version with that name and different files, the name gets a suffix (see step 6).
     The whole release is always deployed: there is no option to deploy only part of it.
-  * **Default:** `None` — the operator must supply it.
+  * **Default:** `None` — deploy the latest release.
 * **`api_connection`** (str, Optional):
   * **Name:** OpenHEXA API connection
   * **Description:** Slug of a **CUSTOM** connection holding a workspace API token in a secret field
@@ -96,7 +99,7 @@ particular is the mechanism this pipeline replaces.
 
 ## Inputs
 
-* **GitHub release `[RELEASE_TAG]` of `[GITHUB_REPO]`** — required. Read unauthenticated, so the
+* **GitHub release `[RELEASE_TAG]` (or the latest one, if empty) of `[GITHUB_REPO]`** — required. Read unauthenticated, so the
   repository must be public or the run fails.
   * **`release_manifest.json`** release asset — required; the list of tracked files.
   * **The release source tarball** — required; the actual file contents.

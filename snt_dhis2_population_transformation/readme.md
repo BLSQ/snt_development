@@ -13,7 +13,7 @@ All columns of the source table are kept. **`POPULATION`** is the basis for the 
   * **Description:** Source of the population data to transform.
   * **Choices:**
     * `DHIS2` — **`{COUNTRY_CODE}_population.parquet`** from **`DHIS2_DATASET_FORMATTED`**.
-    * `User-provided` — **`{COUNTRY_CODE}_population_user.parquet`** from **`SNT_POPULATION_USER_PROVIDED`**.
+    * `User-provided` — **`{COUNTRY_CODE}_population.parquet`** from **`SNT_POPULATION_USER_PROVIDED`**.
   * **Default:** `DHIS2`.
 
 ### Part 1 — Population adjustment
@@ -63,9 +63,9 @@ Each proportion is applied to **`POPULATION`** (after scaling) and written to th
 3. Load the population table of the selected **`pop_source`** from its dataset; abort with an error if the dataset, its latest version or the file cannot be found or downloaded, or if the table is empty.
 4. If a **`disaggregation_file`** is supplied: abort if the file does not exist on disk, and validate its header — abort if **`ADM2_ID`** is missing or **`YEAR`** / **`POPULATION`** are present.
 5. Read the years available in the **`YEAR`** column of the population table (abort if the column is missing), then resolve **`tot_pop_reference_year`** (only if **`tot_pop_reference`** is set) and **`growth_reference_year`** (only if **`growth_factor`** is set) against them.
-6. Save all parameters to **`{COUNTRY_CODE}_parameters.json`** via **`save_pipeline_parameters`** in `data/dhis2/population_transformed/`.
+6. Save the notebook parameters to **`{COUNTRY_CODE}_parameters.json`** via **`save_pipeline_parameters`** in `data/dhis2/population_transformed/`. The source is recorded as **`POPULATION_DATASET_SOURCE`**, the dataset id resolved from **`pop_source`**; the reference years are the resolved values from step 5.
 7. Run `code/snt_dhis2_population_transformation.ipynb` with **`SNT_ROOT_PATH`** and the parameters above:
-   1. Load the population table of the selected **`pop_source`**, keeping all columns.
+   1. Load **`{COUNTRY_CODE}_population.parquet`** from **`POPULATION_DATASET_SOURCE`**, keeping all columns.
    2. **Part 1 — Adjustment:** if **`tot_pop_reference`** is set, multiply **`POPULATION`** and every existing non-empty numeric population column by **`tot_pop_reference` / total `POPULATION` of the reference year**, for all years.
    3. **Part 2 — Disaggregation (parameters):** for each proportion parameter provided, compute its column as **`POPULATION`** × proportion.
    4. **Part 2 — Disaggregation (file):** if **`disaggregation_file`** is set, join the proportions on **`ADM2_ID`** and compute each valid column as **`POPULATION`** × proportion (see Notes for the validation rules).
@@ -73,13 +73,13 @@ Each proportion is applied to **`POPULATION`** (after scaling) and written to th
    6. Convert all population columns to integer and write **`{COUNTRY_CODE}_population.parquet`** and **`{COUNTRY_CODE}_population.csv`** to `data/dhis2/population_transformed/`.
 8. Check that the Parquet and the CSV were written during this run; abort with an error if either is missing or older than the run (guards against publishing stale files).
 9. Publish the Parquet, the CSV and the parameters JSON to **`DHIS2_POPULATION_TRANSFORMATION`**.
-10. Run `reporting/snt_dhis2_population_transformation_report.ipynb` (also in report-only mode).
+10. Run `reporting/snt_dhis2_population_transformation_report.ipynb` (also in report-only mode). It draws one choropleth per population column, faceted by **`YEAR`**, with a subtitle naming the source read from **`POPULATION_DATASET_SOURCE`** in the published parameters JSON (`DHIS2` or `population fournie par l'utilisateur`).
 
 ## Inputs
 
 * **`configuration/SNT_config.json`**: **`SNT_CONFIG.COUNTRY_CODE`** and the dataset identifiers **`DHIS2_DATASET_FORMATTED`**, **`SNT_POPULATION_USER_PROVIDED`** and **`DHIS2_POPULATION_TRANSFORMATION`** under **`SNT_DATASET_IDENTIFIERS`**.
 * **`pop_source` = `DHIS2`:** **`{COUNTRY_CODE}_population.parquet`** from **`DHIS2_DATASET_FORMATTED`**, produced by **`snt_dhis2_formatting`** (required).
-* **`pop_source` = `User-provided`:** **`{COUNTRY_CODE}_population_user.parquet`** from **`SNT_POPULATION_USER_PROVIDED`**, produced by **`snt_user_population`** (required).
+* **`pop_source` = `User-provided`:** **`{COUNTRY_CODE}_population.parquet`** from **`SNT_POPULATION_USER_PROVIDED`**, produced by **`snt_user_population`** (required).
 * **Optional `disaggregation_file`**: operator-uploaded CSV with ADM2-level proportion columns. Start from **`uploads/{COUNTRY_CODE}_population_disaggregation_template.csv`**, written by **`snt_dhis2_formatting`**.
 
 ## Outputs
@@ -92,7 +92,7 @@ Written to the workspace filesystem, in `data/dhis2/population_transformed/`:
 
 Published to **`DHIS2_POPULATION_TRANSFORMATION`**: the same three files.
 
-Executed notebooks are also written to `pipelines/snt_dhis2_population_transformation/papermill_outputs/` and `reporting/outputs/` (not published).
+Executed notebooks are also written to `pipelines/snt_dhis2_population_transformation/papermill_outputs/` and `reporting/outputs/`, and the report maps to `reporting/outputs/figures/{COUNTRY_CODE}_choropleth_poptransformed_<INDICATOR>.png` (not published).
 
 > **Notes for the Data Analyst:**
 >

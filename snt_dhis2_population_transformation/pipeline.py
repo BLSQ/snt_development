@@ -1,6 +1,5 @@
 import time
 from pathlib import Path
-import pandas as pd
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace, File
 from snt_lib.snt_pipeline_utils import (
@@ -233,7 +232,11 @@ def snt_dhis2_population_transformation(
 
     if not run_report_only:
         try:
-            population_data = get_population_from_source(snt_config_dict, pop_source)
+            dataset_id = resolve_population_dataset(snt_config_dict, pop_source)
+            population_data = get_file_from_dataset(
+                dataset_id=dataset_id,
+                filename=f"{country_code}_population.parquet",
+            )
         except Exception as e:
             msg = f"Population not available in {pop_source}: {e}."
             current_run.log_error(msg)
@@ -273,7 +276,7 @@ def snt_dhis2_population_transformation(
             )
 
         parameters = {
-            "DATA_SOURCE": pop_source,
+            "POPULATION_DATASET_SOURCE": dataset_id,
             "TOT_POP_REFERENCE": tot_pop_reference,
             "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
             "GROWTH_FACTOR": growth_factor,
@@ -374,36 +377,25 @@ def dhis2_population_transformation(
         raise Exception(f"Error in executing population transformation notebook: {e}") from e
 
 
-def get_population_from_source(snt_config_dict: dict, pop_source: str) -> pd.DataFrame:
-    """Load the population table of the selected source from its dataset.
+def resolve_population_dataset(snt_config: dict, population_selection: str) -> str:
+    """Resolve the population dataset ID based on the population selection.
 
     Args:
-        snt_config_dict: Dictionary containing SNT configuration and dataset identifiers.
-        pop_source: The source of the population data ("DHIS2" or "User-provided").
+        snt_config (dict): The SNT configuration dictionary.
+        population_selection (str): The population source option. One of "DHIS2" or "User-provided".
 
     Returns:
-        A pandas DataFrame containing the population data.
+        str: The dataset ID corresponding to the population selection.
 
     Raises:
-        ValueError: If the population file cannot be loaded from the dataset, or is empty.
+        ValueError: If the population selection is unknown.
+        KeyError: If the matching dataset identifier is missing from SNT_DATASET_IDENTIFIERS.
     """
-    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-    if pop_source == "DHIS2":
-        dataset_source = "DHIS2_DATASET_FORMATTED"
-        filename = f"{country_code}_population.parquet"
-    else:
-        dataset_source = "SNT_POPULATION_USER_PROVIDED"
-        filename = f"{country_code}_population_user.parquet"
-
-    population_data = get_file_from_dataset(
-        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"][dataset_source],
-        filename=filename,
-    )
-
-    if population_data.empty:
-        raise ValueError("Population data is empty.")
-
-    return population_data
+    if population_selection == "DHIS2":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+    if population_selection == "User-provided":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_POPULATION_USER_PROVIDED"]
+    raise ValueError(f"Unknown population selection: {population_selection}")
 
 
 def resolve_reference_year(

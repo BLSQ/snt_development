@@ -120,7 +120,8 @@ def snt_dhis2_incidence(
     if not run_report_only:
         # check if it exists otherwise fail
         try:
-            check_population_file_exists(snt_config, population_selection)
+            dataset_id = resolve_population_dataset(snt_config, population_selection)
+            check_population_file_exists(country_code, dataset_id)
         except Exception as e:
             msg = f"Population not available in {population_selection}: {e}."
             current_run.log_error(msg)
@@ -135,7 +136,7 @@ def snt_dhis2_incidence(
         notebook_params = {
             "N1_METHOD": n1_method,
             "ROUTINE_DATA_CHOICE": routine_data_choice,
-            "POPULATION_SELECTION": population_selection,
+            "POPULATION_DATASET_ID": dataset_id,
             "DISAGGREGATION_SELECTION": (
                 mapping_dictionary.get(disaggregation_selection) if disaggregation_selection else None
             ),
@@ -157,8 +158,8 @@ def snt_dhis2_incidence(
         current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
         expected_outputs = [
-            *[p for p in (data_path.glob(f"{country_code}_incidence.parquet"))],
-            *[p for p in (data_path.glob(f"{country_code}_incidence.csv"))],
+            data_path / f"{country_code}_incidence.parquet",
+            data_path / f"{country_code}_incidence.csv",
         ]
 
         run_start_ts = time.time()
@@ -202,35 +203,46 @@ def snt_dhis2_incidence(
     current_run.log_info("Pipeline finished!")
 
 
-def check_population_file_exists(snt_config: dict, population_selection: str) -> None:
-    """Check if the population file exists for the given country code and population selection.
+def check_population_file_exists(country_code: str, population_dataset_id: str) -> None:
+    """Check that {country_code}_population.parquet exists in the latest version of the given dataset.
+
+    Args:
+        country_code (str): The country code used as the filename prefix.
+        population_dataset_id (str): The dataset ID resolved by `resolve_population_dataset()`.
+
+    Raises:
+        FileNotFoundError: If the population file does not exist.
+    """
+    if not dataset_file_exists(population_dataset_id, f"{country_code}_population.parquet"):
+        msg = (
+            f"Population file {country_code}_population.parquet not found in dataset {population_dataset_id}."
+        )
+        current_run.log_error(msg)
+        raise FileNotFoundError(msg)
+
+
+def resolve_population_dataset(snt_config: dict, population_selection: str) -> str:
+    """Resolve the population dataset ID based on the population selection.
 
     Args:
         snt_config (dict): The SNT configuration dictionary.
         population_selection (str): The population selection option. One of "DHIS2", "Population-transformed"
-         or "USER_PROVIDED".
+         or "User-provided".
+
+    Returns:
+        str: The dataset ID corresponding to the population selection.
 
     Raises:
-        FileNotFoundError: If the population file does not exist.
         ValueError: If the population selection is unknown.
+        KeyError: If the matching dataset identifier is missing from SNT_DATASET_IDENTIFIERS.
     """
-    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
     if population_selection == "DHIS2":
-        dataset_source = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-        filename = f"{country_code}_population.parquet"
-    elif population_selection == "Population-transformed":
-        dataset_source = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_POPULATION_TRANSFORMATION"]
-        filename = f"{country_code}_population.parquet"
-    elif population_selection == "User-provided":
-        dataset_source = snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_POPULATION_USER_PROVIDED"]
-        filename = f"{country_code}_population_user.parquet"
-    else:
-        raise ValueError(f"Unknown population selection: {population_selection}")
-
-    if not dataset_file_exists(dataset_source, filename):
-        msg = f"Population file for selection '{population_selection}' cannot be found."
-        current_run.log_error(msg)
-        raise FileNotFoundError(msg)
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+    if population_selection == "Population-transformed":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_POPULATION_TRANSFORMATION"]
+    if population_selection == "User-provided":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_POPULATION_USER_PROVIDED"]
+    raise ValueError(f"Unknown population selection: {population_selection}")
 
 
 if __name__ == "__main__":

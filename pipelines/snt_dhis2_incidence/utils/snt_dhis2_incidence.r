@@ -222,6 +222,16 @@ validate_and_format_careseeking_data <- function(data, from_file) {
 }
 
 
+#' Join careseeking data to the monthly cases table
+#'
+#' Joins on ADM2_ID if present in the careseeking data, otherwise on ADM1_ID. If the careseeking
+#' data also has a YEAR column, the join is done per year as well, so each year uses its own value.
+#'
+#' @param main_df Monthly cases table, with ADM1_ID, ADM2_ID and YEAR columns.
+#' @param careseeking_data Validated careseeking data, with CARESEEKING_PCT and ADM1_ID or ADM2_ID
+#'   (optionally YEAR).
+#' @return main_df with a CARESEEKING_PCT column added.
+#' @export
 join_careseeking_data <- function(main_df, careseeking_data) {
   # --- 1. Determine the join key based on available columns ---
   if ("ADM2_ID" %in% colnames(careseeking_data)) {
@@ -231,12 +241,28 @@ join_careseeking_data <- function(main_df, careseeking_data) {
   } else {
     stop("[ERROR] Input data must contain 'ADM1_ID' or 'ADM2_ID'.")
   }
+  # If YEAR is provided, join per year (YEAR is numeric in routine data, see load step)
+  if ("YEAR" %in% colnames(careseeking_data)) {
+    join_key <- c(join_key, "YEAR")
+    careseeking_data <- careseeking_data |> mutate(YEAR = as.numeric(YEAR))
+    log_msg(glue::glue("Careseeking data contains a YEAR column: joining by {paste(join_key, collapse = ', ')}."))
+  }
   # --- 2. Robust Safeguard: Collapse the user data to the join_key level ---
-  # This handles 'broadcasted' duplicates by ensuring only 1 row exists per ID   
+  # This handles 'broadcasted' duplicates by ensuring only 1 row exists per ID (and YEAR)
   careseeking_data_clean <- careseeking_data |>
     select(all_of(join_key), CARESEEKING_PCT) |>
-    # Ensure there's only one value per ID to prevent row duplication
-    distinct(!!sym(join_key), .keep_all = TRUE)
+    # Ensure there's only one value per ID (and YEAR) to prevent row duplication
+    distinct(across(all_of(join_key)), .keep_all = TRUE)
+  # Warn about years in the routine data with no careseeking value: N3 will be missing for them
+  if ("YEAR" %in% join_key) {
+    missing_years <- setdiff(unique(main_df$YEAR), unique(careseeking_data_clean$YEAR))
+    if (length(missing_years) > 0) {
+      log_msg(glue::glue(
+        "[WARNING] Careseeking data has no values for YEAR(s): {paste(sort(missing_years), collapse = ', ')}. ",
+        "No careseeking adjustment (N3) is available for these years."
+      ), "warning")
+    }
+  }
   # --- 3. Ensure CARESEEKING_PCT is numeric and handles any non-numeric issues ---
   careseeking_data_clean <- careseeking_data_clean |>
     mutate(CARESEEKING_PCT = as.numeric(CARESEEKING_PCT)) 
@@ -253,7 +279,7 @@ join_careseeking_data <- function(main_df, careseeking_data) {
   return(result)
 }
 
-
+ 
 load_reporting_rate_data <- function() {
     rr_dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_REPORTING_RATE
     file_name_de <<- paste0(COUNTRY_CODE, "_reporting_rate_dataelement.parquet")

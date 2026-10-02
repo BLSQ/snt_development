@@ -2,7 +2,7 @@
 
 Guardrails for anyone (human or agent) changing code in this repository.
 
-- **[Conventions → Register](#register)** — every hard rule (R1–R19) in one table, with its
+- **[Conventions → Register](#register)** — every hard rule (R1–R22) in one table, with its
   enforcement status and known exceptions. Start there if you want the rules without the prose.
 - New here? Orientation and the documentation map: [`README.md`](README.md).
 - Architecture, lineage and dataset contracts: [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
@@ -89,6 +89,7 @@ configuration/SNT_config_<CC>.json     ← reference copies only (see below).
 dev/environment.yml                    ← local Python dev tools. Never runs on OpenHEXA.
 pyproject.toml                         ← ruff's rulebook + PEP 621 metadata. Never runs on OpenHEXA.
 .claude/                               ← agent guardrails (R19). Active on clone.
+.github/workflows/generate_manifest.yaml ← release manifest; its shape is a cross-repo contract (R22).
 ```
 
 ### Note — no dbt, no Airflow, no DAG engine, no tests
@@ -306,7 +307,9 @@ Not implemented — recorded here so they can be assessed:
 - **`nbstripout --install` as a repo git filter** plus a committed `.gitattributes`, so output
   stripping stops depending on each developer remembering.
 - **Add a `ruff check` CI job on pull requests.** Today the only GitHub Actions workflows are the
-  20 `push_snt_*.yaml` deployment files, and each is narrowly triggered:
+  20 `push_snt_*.yaml` deployment files, plus `generate_manifest.yaml`, which runs only when a
+  release is published ([Release management](#release-management)). Each deployment file is
+  narrowly triggered:
 
   ```yaml
   on:
@@ -459,6 +462,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R19** | Agents never run destructive / history-rewriting `git` or `gh` commands | `enforced` — hook + `permissions.deny` in `.claude/` ([how](#how-this-is-enforced-r19)) |
 | **R20** | R: roxygen2 docstrings above every function (`#' Title`, blank, description, `@param`, `@return`, `@export`) | `convention` — see `code/snt_utils.r` |
 | **R21** | Every published output **table** carries a `YEAR` column | `convention` — new, existing outputs not audited ([why](#schema)) |
+| **R22** | The shape of `release_manifest.json` changes only together with its schema in `snt_workspace_bootstrap` | `convention` — cross-repo, nothing checks it ([why](#release-management)) |
 
 Adding a rule: add a row here *and* the rationale to the matching section below. A rule that is
 only in the prose will be missed; a rule that is only in the table will be misapplied.
@@ -495,6 +499,29 @@ an SNT pipeline from a country or personal workspace. `--description` and `--lin
 workflows stamp each published version with the commit message and a link to the commit, which is
 what makes the OpenHEXA version list a usable deployment history — write commit messages that
 will read well there.
+
+### Release management
+
+A GitHub release of this repo is the unit that the tools in
+[`BLSQ/snt_workspace_bootstrap`](https://github.com/BLSQ/snt_workspace_bootstrap) deploy into a
+workspace and check it against. This repo holds only the producer side:
+[`.github/workflows/generate_manifest.yaml`](.github/workflows/generate_manifest.yaml) runs when a
+release is published, hashes every file the release ships, and attaches `release_manifest.json` to
+the release.
+
+**The manifest's shape is a cross-repo contract (R22).** `snt_workspace_deployer` and
+`snt_workspace_checker` read it, and its schema lives in that repo:
+[`docs/contracts/release_manifest.schema.json`](https://github.com/BLSQ/snt_workspace_bootstrap/blob/main/docs/contracts/release_manifest.schema.json),
+with the prose in
+[`release_manifest.md`](https://github.com/BLSQ/snt_workspace_bootstrap/blob/main/docs/contracts/release_manifest.md).
+Do not change the shape (a key, a type, or what a value means) without updating that schema in the
+same change. In practice that means a paired PR in `snt_workspace_bootstrap`, merged together with
+this one. The schema's description says which changes break compatibility.
+
+*Which* paths a release ships is this repo's choice, not part of the schema: the four R glob
+patterns, plus every top-level directory holding a `pipeline.py`. Changing that does not break the
+contract, but it changes what the deployer installs and the checker compares, so say so in the PR.
+For example, a new top-level directory with a `pipeline.py` ships in the next release.
 
 ### Standard pipeline parameters
 
@@ -732,6 +759,8 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
       as `snt-development`. *(R5)*
 - [ ] `readme.md` re-verified against the code, not patched by memory —
       [`docs/PIPELINE_README_STANDARD.md` §3](docs/PIPELINE_README_STANDARD.md). *(R16)*
+- [ ] Manifest shape changed in `generate_manifest.yaml`: paired schema PR open in
+      `snt_workspace_bootstrap`. *(R22)*
 - [ ] Handover states: which country/workspace it was tested in (or that it was not), and that
       operators must run with **`Pull scripts` = ON** to pick up notebook changes.
 

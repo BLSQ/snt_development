@@ -159,7 +159,7 @@ person *or* an agent.
 - **[`CLAUDE.md`](CLAUDE.md) is the rulebook, and it is not Claude-specific.** [Claude
   Code](https://claude.com/claude-code) loads it automatically; with any other assistant (Cursor,
   Copilot, Gemini, …) paste it in or point the tool at it. The
-  [Register](CLAUDE.md#register) is all 19 rules in one table — the cheapest thing to give a model
+  [Register](CLAUDE.md#register) is all 22 rules in one table — the cheapest thing to give a model
   that is about to touch this repo.
 - **[`.claude/`](.claude/) ships live guardrails.** They are active the moment you clone: a hook
   that blocks destructive and history-rewriting `git` commands, plus a matching deny list. If an
@@ -190,6 +190,21 @@ Four things that are never OK:
 
 Before opening a PR, walk the
 [handover checklist](CLAUDE.md#handover-checklist) — it is short and it maps to the rules.
+
+---
+
+## 📦 Release management
+
+Each GitHub release of this repo gets a `release_manifest.json`, built by
+[`.github/workflows/generate_manifest.yaml`](.github/workflows/generate_manifest.yaml): every file
+the release ships, with its hash. The tools that deploy a release into a workspace and check it
+against one live in their own repo,
+[`BLSQ/snt_workspace_bootstrap`](https://github.com/BLSQ/snt_workspace_bootstrap).
+
+The manifest's shape is a **contract** between the two repos, defined by
+[`release_manifest.schema.json`](https://github.com/BLSQ/snt_workspace_bootstrap/blob/main/docs/contracts/release_manifest.schema.json)
+there. Do not change the shape without updating that schema in the same change.
+→ [`CLAUDE.md` R22](CLAUDE.md#release-management)
 
 ---
 

@@ -768,7 +768,7 @@ readme was last verified against, which is well-defined today and needs no OpenH
 
 ### 7.3 CI coverage
 
-The only workflows are the 20 `push_snt_*.yaml` deployment files. Each triggers on `push` to
+The deployment workflows are the 20 `push_snt_*.yaml` files. Each triggers on `push` to
 `main`, filtered to `<pipeline>/pipeline.py`, `<pipeline>/requirements.txt` and its own workflow
 file. Therefore:
 
@@ -776,6 +776,12 @@ file. Therefore:
   appear on the PR. Expected, not a fault.
 - The workflows that do fire run **after** merge and only perform `openhexa pipelines push`.
 - `ruff` is configured in `pyproject.toml` but is never executed by CI, before or after merge.
+
+One more workflow, `generate_manifest.yaml`, is not a deployment. It runs when a GitHub release is
+published (or by hand) and attaches `release_manifest.json` to the release. That manifest is read by
+the deployer and checker in
+[`BLSQ/snt_workspace_bootstrap`](https://github.com/BLSQ/snt_workspace_bootstrap), whose schema
+fixes its shape — see [`CLAUDE.md` → Release management](../CLAUDE.md#release-management) (R22).
 
 ### 7.4 The workspace runtime image
 

@@ -10,8 +10,8 @@ source(file.path("~/workspace/code", "snt_utils.r"))
 #' Validate and Resolve Reference Year
 #'
 #' Checks if a provided reference year exists among the available years.
-#' If the year is NULL or missing from the data, it defaults to the maximum
-#' available year and logs a warning.
+#' If the year is NULL, it defaults to the maximum available year (logged as info);
+#' if it is missing from the data, it falls back to the maximum year with a warning.
 #'
 #' @param available_years Numeric or character vector of years present in the population data.
 #' @param reference_year The year to validate (numeric or string). Can be NULL.
@@ -51,8 +51,8 @@ resolve_reference_year <- function(available_years, reference_year = NULL) {
 #' @param growth_factor Numeric growth rate.
 #' @param target_columns Character vector of column names to project.
 #'
-#' @return Data frame with one row per input year (stacked via rbind), with target_columns
-#'   scaled down for each year, or NULL if years is empty.
+#' @return Data frame with one copy of ref_data per input year (stacked via rbind), with YEAR set
+#'   and target_columns scaled down for each year, or NULL if years is empty.
 #'
 #' @export
 project_backward <- function(ref_data, years, growth_factor, target_columns) {
@@ -89,10 +89,10 @@ project_backward <- function(ref_data, years, growth_factor, target_columns) {
 #' @param ref_data Dataframe of the base year.
 #' @param years Vector of years to project.
 #' @param growth_factor Numeric growth rate.
-#' @param target_columns Character vector of column names to project (e.g., c("TOTAL_POP", "FEMALE_POP")).
+#' @param target_columns Character vector of column names to project (e.g., c("POPULATION", "POP_UNDER_5")).
 #'
-#' @return Data frame with one row per input year (stacked via rbind), with target_columns
-#'   scaled up for each year, or NULL if years is empty.
+#' @return Data frame with one copy of ref_data per input year (stacked via rbind), with YEAR set
+#'   and target_columns scaled up for each year, or NULL if years is empty.
 #'
 #' @export
 project_forward <- function(ref_data, years, growth_factor, target_columns) {

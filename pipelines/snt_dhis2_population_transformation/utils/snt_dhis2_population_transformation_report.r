@@ -5,17 +5,19 @@
 #' @param df Data frame-like object.
 #' @param name Optional display name (defaults to variable name).
 #' @return Invisibly prints dimensions to console.
+#' @export
 printdim <- function(df, name = deparse(substitute(df))) {
     cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
 }
 
 #' Build dynamic legend labels from numeric breakpoints.
 #'
-#' Labels are formatted in thousands with apostrophe separators, producing
+#' Labels are formatted in thousands (suffix "k", no digit separators), producing
 #' lower-than, interval, and upper-than categories.
 #'
 #' @param breaks Numeric vector of threshold values.
 #' @return Character vector of category labels.
+#' @export
 create_dynamic_labels <- function(breaks) {
     fmt <- function(x) {
         format(x/1000, big.mark = "", scientific = FALSE, trim = TRUE)
@@ -36,6 +38,7 @@ create_dynamic_labels <- function(breaks) {
 #'
 #' @param scale_value Raw metadata scale field.
 #' @return Numeric vector of break values.
+#' @export
 parse_metadata_scale <- function(scale_value) {
     if (is.character(scale_value) && length(scale_value) == 1) {
         return(jsonlite::fromJSON(scale_value))
@@ -53,10 +56,35 @@ parse_metadata_scale <- function(scale_value) {
 #' @param n_breaks Number of break intervals to generate.
 #' @param style classInt classification style (default: \code{"jenks"}).
 #' @return Numeric vector of \code{n_breaks} rounded upper bounds.
+#' @export
 compute_value_intervals <- function(pop_values, n_breaks, style = "jenks") {
     breaks <- classInt::classIntervals(pop_values, n = n_breaks, style = style)$brks
     magnitude <- 10^(floor(log10(max(pop_values))) - 1)
     return(round(breaks[-1] / magnitude) * magnitude)
+}
+
+
+#' Build the plot subtitle naming the population source.
+#'
+#' Compares the source dataset recorded by the pipeline (POPULATION_DATASET_SOURCE in
+#' {CC}_parameters.json) with the dataset identifiers of the config.
+#'
+#' @param source_dataset_id Dataset ID of the source population, or NULL if unknown.
+#' @param config_json SNT configuration list.
+#' @return Character subtitle, e.g. "Source : DHIS2 (transformée)".
+#' @export
+get_population_source_subtitle <- function(source_dataset_id, config_json) {
+    dataset_ids <- config_json$SNT_DATASET_IDENTIFIERS
+    source_label <- if (is.null(source_dataset_id)) {
+        "inconnue"
+    } else if (identical(source_dataset_id, dataset_ids$DHIS2_DATASET_FORMATTED)) {
+        "DHIS2"
+    } else if (identical(source_dataset_id, dataset_ids$SNT_POPULATION_USER_PROVIDED)) {
+        "population fournie par l'utilisateur"
+    } else {
+        source_dataset_id
+    }
+    return(glue::glue("Source : {source_label} (transformée)"))
 }
 
 
@@ -73,7 +101,9 @@ compute_value_intervals <- function(pop_values, n_breaks, style = "jenks") {
 #' @param legend_title Legend title text.
 #' @param plot_title Main title text.
 #' @param palette_values Color vector for categories.
+#' @param subtitle Subtitle text naming the population source (see `get_population_source_subtitle()`).
 #' @return `ggplot` object ready to print/save.
+#' @export
 build_population_choropleth <- function(
     population_data_filtered,
     shapes_data,
@@ -82,7 +112,8 @@ build_population_choropleth <- function(
     labels,
     legend_title,
     plot_title,
-    palette_values
+    palette_values,
+    subtitle = "Source : population transformée"
 ) {
     names(palette_values) <- labels
 
@@ -106,7 +137,7 @@ build_population_choropleth <- function(
         ) +
         ggplot2::labs(
             title = plot_title,
-            subtitle = "Source: DHIS2",
+            subtitle = subtitle,
             fill = legend_title
         ) +
         ggplot2::scale_fill_manual(values = palette_values, limits = labels, drop = FALSE) +

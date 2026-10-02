@@ -1,26 +1,39 @@
+import time
 from pathlib import Path
 
 from openhexa.sdk import current_run, parameter, pipeline, workspace, File
 from snt_lib.snt_pipeline_utils import (
     pull_scripts_from_repository,
     add_files_to_dataset,
-    dataset_file_exists,
     load_configuration_snt,
     run_notebook,
     run_report_notebook,
     validate_config,
     save_pipeline_parameters,
     get_file_from_dataset,
+    check_outputs_generated,
 )
 
 
 @pipeline("snt_dhis2_population_transformation")
 @parameter(
+    "pop_source",
+    name="Population source",
+    help=(
+        "Choose the source of the population data. DHIS2 (DHIS2_DATASET_FORMATTED dataset) "
+        "or User-provided (SNT_POPULATION_USER_PROVIDED dataset)."
+    ),
+    type=str,
+    default="DHIS2",
+    required=True,
+    choices=["DHIS2", "User-provided"],
+)
+@parameter(
     "tot_pop_reference",
     name="Part 1: Population reference",
     help=(
-        "Total population used to scale DHIS2 population data. When provided, "
-        "population values are adjusted proportionally to match this total."
+        "Total population used to scale population data. When provided, "
+        "population values are adjusted proportionally to match this total. "
         "(e.g. 1000000 for a total population of 1 million people)."
     ),
     type=int,
@@ -32,8 +45,8 @@ from snt_lib.snt_pipeline_utils import (
     name="Part 1: Population year reference",
     help=(
         "Year corresponding to the total population reference. "
-        "This year must be available in the population data."
-        "Defaults to the latest year available in the population data."
+        "This year must be available in the population data. "
+        "Defaults to the latest year available in the population data. "
         "(e.g. 2025)."
     ),
     type=int,
@@ -107,6 +120,17 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 @parameter(
+    "pop_50_plus",
+    name="Part 2: Proportion population 50 plus years",
+    help=(
+        "Proportion of the total population aged 50 years and above (e.g. 0.06 for 6%). "
+        "Used to disaggregate population figures into the 50 plus years age group."
+    ),
+    type=float,
+    default=None,
+    required=False,
+)
+@parameter(
     "disaggregation_file",
     name="Part 2: Use disaggregation proportions (.csv)",
     type=File,
@@ -118,8 +142,7 @@ from snt_lib.snt_pipeline_utils import (
     "growth_factor",
     name="Part 3: Projection growth rate",
     help=(
-        "Annual growth rate (e.g. 0.03 for 3%) used to project "
-        "DHIS2 population figures into past and future years."
+        "Annual growth rate (e.g. 0.03 for 3%) used to project population figures into past and future years."
     ),
     type=float,
     default=None,
@@ -129,9 +152,9 @@ from snt_lib.snt_pipeline_utils import (
     "growth_reference_year",
     name="Part 3: Projection reference year",
     help=(
-        "Base year from which DHIS2 population figures are projected. "
+        "Base year from which population figures are projected. "
         "This year must be available in the population data. "
-        "Defaults to the latest year available"
+        "Defaults to the latest year available."
     ),
     type=int,
     default=None,
@@ -154,6 +177,7 @@ from snt_lib.snt_pipeline_utils import (
     required=False,
 )
 def snt_dhis2_population_transformation(
+    pop_source: str,
     tot_pop_reference: int,
     tot_pop_reference_year: int,
     pop_under_5: float,
@@ -162,16 +186,19 @@ def snt_dhis2_population_transformation(
     pop_1_2_y: float,
     pop_5_10_y: float,
     pop_5_36_m: float,
+    pop_50_plus: float,
     disaggregation_file: File,
     growth_factor: float,
     growth_reference_year: int,
     run_report_only: bool,
     pull_scripts: bool,
 ):
-    """Write your pipeline orchestration here.
+    """Transform the selected population data and publish it to the population transformation dataset.
 
-    Pipeline functions should only call tasks and should never perform IO operations or
-    expensive computations.
+    Loads the population of the selected source (DHIS2 or user-provided), validates the inputs and
+    runs the transformation notebook: optional scaling to a reference total, disaggregations from
+    proportion parameters and/or a CSV file, and growth projections. The outputs are published to
+    DHIS2_POPULATION_TRANSFORMATION and the reporting notebook is executed.
     """
     # set paths
     snt_root_path = Path(workspace.files_path)
@@ -198,21 +225,42 @@ def snt_dhis2_population_transformation(
             config_path=snt_root_path / "configuration" / "SNT_config.json"
         )
         validate_config(snt_config_dict)
-        country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
+        country_code = snt_config_dict["SNT_CONFIG"]["COUNTRY_CODE"]
     except Exception as e:
         current_run.log_error(f"Failed to load configuration: {e}")
         raise
 
     if not run_report_only:
+        try:
+            dataset_id = resolve_population_dataset(snt_config_dict, pop_source)
+            population_data = get_file_from_dataset(
+                dataset_id=dataset_id,
+                filename=f"{country_code}_population.parquet",
+            )
+        except Exception as e:
+            msg = f"Population not available in {pop_source}: {e}."
+            current_run.log_error(msg)
+            raise FileNotFoundError(msg) from e
+
         if disaggregation_file and not Path(disaggregation_file.path).exists():
             current_run.log_error(f"Disaggregation file not found: {disaggregation_file.path}")
-            raise FileNotFoundError
-        if disaggregation_file:
-            validate_disaggregation_file(Path(disaggregation_file.path), country_code)
+            raise FileNotFoundError(f"Disaggregation file not found: {disaggregation_file.path}")
 
-        years_available = get_available_years_from_dhis2_population_data(snt_config_dict)
+        if disaggregation_file:
+            try:
+                validate_disaggregation_file(Path(disaggregation_file.path), country_code)
+            except Exception as e:
+                msg = f"Disaggregation file validation failed: {e}"
+                current_run.log_error(msg)
+                raise ValueError(msg) from e
+
+        try:
+            years_available = sorted(population_data["YEAR"].unique())
+        except Exception as e:
+            current_run.log_error(f"Failed to determine years available in population data: {e}")
+            raise ValueError(f"Failed to determine years available in population data: {e}") from e
         if not years_available:
-            current_run.log_error("No DHIS2 population data available.")
+            current_run.log_error("Years available in population data are empty.")
             raise ValueError
 
         tot_pop_reference_year_res = None
@@ -228,6 +276,7 @@ def snt_dhis2_population_transformation(
             )
 
         parameters = {
+            "POPULATION_DATASET_SOURCE": dataset_id,
             "TOT_POP_REFERENCE": tot_pop_reference,
             "TOT_POP_REFERENCE_YEAR": tot_pop_reference_year_res,
             "GROWTH_FACTOR": growth_factor,
@@ -238,6 +287,7 @@ def snt_dhis2_population_transformation(
             "POP_1_2_Y": pop_1_2_y,
             "POP_5_10_Y": pop_5_10_y,
             "POP_5_36_M": pop_5_36_m,
+            "POP_50_PLUS": pop_50_plus,
             "DISAGGREGATION_FILE": disaggregation_file.path if disaggregation_file else None,
         }
 
@@ -249,6 +299,12 @@ def snt_dhis2_population_transformation(
         )
         current_run.log_info(f"Saved pipeline parameters to {params_file}")
 
+        expected_outputs = [
+            snt_dhis2_pop_transform_path / f"{country_code}_population.parquet",
+            snt_dhis2_pop_transform_path / f"{country_code}_population.csv",
+        ]
+
+        run_start_ts = time.time()
         try:
             # Apply transformation to population data
             dhis2_population_transformation(
@@ -261,17 +317,19 @@ def snt_dhis2_population_transformation(
             current_run.log_error(f"Failed to apply population transformation: {e}")
             raise
 
-        add_files_to_dataset(
-            dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
-                "DHIS2_POPULATION_TRANSFORMATION", None
-            ),
-            country_code=country_code,
-            file_paths=[
-                snt_dhis2_pop_transform_path / f"{country_code}_population.parquet",
-                snt_dhis2_pop_transform_path / f"{country_code}_population.csv",
-                params_file,
-            ],
-        )
+        check_outputs_generated(file_paths=expected_outputs, run_start_ts=run_start_ts)
+
+        try:
+            add_files_to_dataset(
+                dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get(
+                    "DHIS2_POPULATION_TRANSFORMATION", None
+                ),
+                country_code=country_code,
+                file_paths=[*expected_outputs, params_file],
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to add files to dataset: {e}")
+            raise
 
     try:
         run_report_notebook(
@@ -291,21 +349,21 @@ def dhis2_population_transformation(
     snt_config: dict,
     nb_parameter: dict,
 ) -> None:
-    """Format DHIS2 analytics data for SNT."""
-    current_run.log_info("Running DHIS2 population data transformations.")
+    """Run the population transformation notebook on the selected population source.
+
+    Args:
+        snt_root_path: Root path of the SNT workspace files.
+        pipeline_root_path: Path of the pipeline folder containing the code notebook.
+        snt_config: Dictionary containing SNT configuration and dataset identifiers.
+        nb_parameter: Parameters injected into the notebook (updated with SNT_ROOT_PATH).
+
+    Raises:
+        Exception: If the notebook execution fails.
+    """
+    current_run.log_info("Running population data transformations.")
 
     # set parameters for notebook
     nb_parameter.update({"SNT_ROOT_PATH": str(snt_root_path)})
-
-    # Check if the reporting rates data file exists
-    country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-    ds_id = snt_config["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED")
-    if not dataset_file_exists(ds_id=ds_id, filename=f"{country_code}_population.parquet"):
-        current_run.log_warning(
-            f"File {country_code} DHIS2 population formatted not found, "
-            "perhaps DHIS2 formatting pipeline has not yet been executed. Skipping process."
-        )
-        return
 
     try:
         run_notebook(
@@ -313,27 +371,31 @@ def dhis2_population_transformation(
             out_nb_path=pipeline_root_path / "papermill_outputs",
             parameters=nb_parameter,
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
-            country_code=country_code,
+            country_code=snt_config["SNT_CONFIG"]["COUNTRY_CODE"],
         )
     except Exception as e:
         raise Exception(f"Error in executing population transformation notebook: {e}") from e
 
 
-def get_available_years_from_dhis2_population_data(snt_config_dict: dict) -> list[int]:
-    """Get the years available in the DHIS2 population data.
+def resolve_population_dataset(snt_config: dict, population_selection: str) -> str:
+    """Resolve the population dataset ID based on the population selection.
+
+    Args:
+        snt_config (dict): The SNT configuration dictionary.
+        population_selection (str): The population source option. One of "DHIS2" or "User-provided".
 
     Returns:
-        A sorted list of years available in the population data, or an empty list.
-    """
-    country_code = snt_config_dict["SNT_CONFIG"].get("COUNTRY_CODE", None)
-    pop_data = get_file_from_dataset(
-        dataset_id=snt_config_dict["SNT_DATASET_IDENTIFIERS"].get("DHIS2_DATASET_FORMATTED"),
-        filename=f"{country_code}_population.parquet",
-    )
+        str: The dataset ID corresponding to the population selection.
 
-    if pop_data is not None and not pop_data.empty:
-        return sorted(pop_data.YEAR.unique())
-    return []
+    Raises:
+        ValueError: If the population selection is unknown.
+        KeyError: If the matching dataset identifier is missing from SNT_DATASET_IDENTIFIERS.
+    """
+    if population_selection == "DHIS2":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
+    if population_selection == "User-provided":
+        return snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_POPULATION_USER_PROVIDED"]
+    raise ValueError(f"Unknown population selection: {population_selection}")
 
 
 def resolve_reference_year(

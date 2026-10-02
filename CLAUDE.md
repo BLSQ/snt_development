@@ -74,8 +74,8 @@ Orchestration is OpenHEXA's `@pipeline` / `@task` SDK. The analytics themselves 
 notebooks executed by papermill**. Each pipeline is launched by hand from the OpenHEXA UI, and
 pipelines pass data to each other through **OpenHEXA datasets** — never by calling each other.
 
-An inventory of all 20 pipelines is in
-[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-20-pipelines-at-a-glance).
+An inventory of all 21 pipelines is in
+[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-21-pipelines-at-a-glance).
 
 ```
 <pipeline_name>/pipeline.py            ← deployed by CI. Orchestration only.

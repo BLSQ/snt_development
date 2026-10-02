@@ -79,7 +79,7 @@ Ask this person before changing the pipeline's analytics; ask them to review the
 | A′ | `snt_dhs_indicators` | `_TBD_` | `_TBD_` |
 | E | `snt_assemble_results` ⚠️ *being deprecated* | `_TBD_` | `_TBD_` |
 
-Stages are those of [`DATA_ARCHITECTURE.md` §1.1](DATA_ARCHITECTURE.md#11-the-20-pipelines-at-a-glance).
+Stages are those of [`DATA_ARCHITECTURE.md` §1.1](DATA_ARCHITECTURE.md#11-the-21-pipelines-at-a-glance).
 
 ---
 

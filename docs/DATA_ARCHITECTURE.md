@@ -69,7 +69,7 @@ does not know which upstream pipeline produced its input — it only knows a dat
 filename. This is what makes the "user can supply their own input" and "alternative pipelines
 override each other" behaviours possible.
 
-### 1.1 The 20 pipelines at a glance
+### 1.1 The 21 pipelines at a glance
 
 Orientation table — one row per pipeline, for answering "which one do I even open?". Dataset ids
 are the logical names in `SNT_CONFIG.SNT_DATASET_IDENTIFIERS`; the detail is in
@@ -85,10 +85,11 @@ notebooks — see [Rule 2 in `CLAUDE.md`](../CLAUDE.md)).
 | `snt_dhis2_outliers_imputation_median` | C | Same, median method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
 | `snt_dhis2_outliers_imputation_path` | C | Same, PATH method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
 | `snt_dhis2_outliers_imputation_magic_glasses` | C | Same, Magic Glasses method | `DHIS2_DATASET_FORMATTED` | `DHIS2_OUTLIERS_IMPUTATION` | `nb` |
-| `snt_dhis2_population_transformation` | C | Rescales/projects population; optional disaggregation upload | `DHIS2_DATASET_FORMATTED` | `DHIS2_POPULATION_TRANSFORMATION` | `nb` |
+| `snt_user_population` | C | Imports and validates an operator-supplied population CSV (ADM2 × yearly) | `DHIS2_DATASET_FORMATTED` (pyramid), operator population upload | `SNT_POPULATION_USER_PROVIDED` | `py` (+R report) |
+| `snt_dhis2_population_transformation` | C | Rescales/projects population; optional disaggregation upload | `DHIS2_DATASET_FORMATTED` or `SNT_POPULATION_USER_PROVIDED` (per `pop_source`) | `DHIS2_POPULATION_TRANSFORMATION` | `nb` |
 | `snt_dhis2_reporting_rate_dataelement` | D | Reporting rates computed from data elements | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
 | `snt_dhis2_reporting_rate_dataset` | D | Reporting rates taken from DHIS2 dataset metrics | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
-| `snt_dhis2_incidence` | D | Malaria incidence, optionally adjusted for reporting and care-seeking | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION`, `DHIS2_POPULATION_TRANSFORMATION`, `DHS_INDICATORS` | `DHIS2_INCIDENCE` | `nb` |
+| `snt_dhis2_incidence` | D | Malaria incidence, optionally adjusted for reporting and care-seeking | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION`, `DHIS2_REPORTING_RATE`, population per `population_selection` (`DHIS2_DATASET_FORMATTED`, `SNT_POPULATION_USER_PROVIDED` or `DHIS2_POPULATION_TRANSFORMATION`), `DHS_INDICATORS` | `DHIS2_INCIDENCE` | `nb` |
 | `snt_dhis2_quality_of_care` | D | Care-quality indicators | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_QUALITY_OF_CARE` | `nb` |
 | `snt_seasonality_cases` | D | Seasonality of malaria cases | `DHIS2_DATASET_FORMATTED` | `SNT_SEASONALITY_CASES` | `nb` |
 | `snt_seasonality_rainfall` | D | Seasonality of rainfall | `DHIS2_DATASET_FORMATTED`, `ERA5_DATASET_CLIMATE` | `SNT_SEASONALITY_RAINFALL` | `nb` |
@@ -107,6 +108,11 @@ Notes that the table cannot carry:
   filenames and the last run wins, by design — see [§3.2](#32-stages).
 - **The two Stage D reporting-rate pipelines are likewise alternatives**, both writing to
   `DHIS2_REPORTING_RATE`.
+- **Population has three interchangeable sources**, all publishing the same filename
+  `{CC}_population.parquet` to different datasets: DHIS2 (`DHIS2_DATASET_FORMATTED`), operator-supplied
+  (`snt_user_population` → `SNT_POPULATION_USER_PROVIDED`) and transformed
+  (`snt_dhis2_population_transformation` → `DHIS2_POPULATION_TRANSFORMATION`, itself built from
+  either of the first two). Consumers choose by dataset, not by filename — see [§3.2](#32-stages).
 - **Run order within a stage is not enforced** and the authoritative operator-facing order is
   still [`[TODO: Giulia]` (§4.2)](#42-todo-giulia--authoritative-order--dependency-map).
 
@@ -254,7 +260,7 @@ Python pipelines are the only ones with a workable local development story today
 | **WorldPop** | `https://data.worldpop.org/GIS/Population` (`Global_2015_2030/R2025A`) | `snt_worldpop_extract`, `snt_map_extracts`, `snt_healthcare_access` | population rasters (`worldpopclient.py`, duplicated in 3 pipelines) |
 | **Malaria Atlas Project** | `https://data.malariaatlas.org/geoserver` (WCS) | `snt_map_extracts` | `malariaAtlasProject/map.py` |
 | **DHS** | recode files staged in the workspace | `snt_dhs_indicators` | `extract_latest_dhs_recode_filename()` in `code/snt_utils.r` |
-| **Operator uploads** | OpenHEXA `File` parameter | `snt_dhis2_incidence` (care-seeking CSV), `snt_dhis2_population_transformation` (disaggregation CSV), `snt_healthcare_access` (FOSA locations CSV), `snt_assemble_results` (`add_layers_file`) | user-supplied override paths |
+| **Operator uploads** | OpenHEXA `File` parameter | `snt_user_population` (population CSV), `snt_dhis2_incidence` (care-seeking CSV), `snt_dhis2_population_transformation` (disaggregation CSV), `snt_healthcare_access` (FOSA locations CSV), `snt_assemble_results` (`add_layers_file`) | user-supplied override paths |
 
 > **The external-source pipelines are not lineage roots.** `snt_era5_climate_data`,
 > `snt_map_extracts`, `snt_worldpop_extract` and `snt_healthcare_access` each fetch
@@ -343,10 +349,11 @@ only relational sink in the system, and likewise overwritten by whichever varian
 
 | Pipeline | Reads | Writes → dataset |
 |---|---|---|
-| `snt_dhis2_population_transformation` | `DHIS2_DATASET_FORMATTED` | `{CC}_population.parquet/.csv` → `DHIS2_POPULATION_TRANSFORMATION` |
+| `snt_user_population` | operator population CSV + `{CC}_pyramid.parquet` from `DHIS2_DATASET_FORMATTED` (validation only) | `{CC}_population.parquet/.csv` → `SNT_POPULATION_USER_PROVIDED` |
+| `snt_dhis2_population_transformation` | `{CC}_population.parquet` from `DHIS2_DATASET_FORMATTED` or `SNT_POPULATION_USER_PROVIDED` (per `pop_source`) | `{CC}_population.parquet/.csv` → `DHIS2_POPULATION_TRANSFORMATION` |
 | `snt_dhis2_reporting_rate_dataelement` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_reporting_rate_dataelement.*` → `DHIS2_REPORTING_RATE` |
 | `snt_dhis2_reporting_rate_dataset` | idem | `{CC}_reporting_rate_dataset.*` → `DHIS2_REPORTING_RATE` |
-| `snt_dhis2_incidence` | routine per `routine_data_choice`; population per `use_transformed_population`; DHS or uploaded care-seeking | `{CC}_incidence.parquet/.csv` → `DHIS2_INCIDENCE` |
+| `snt_dhis2_incidence` | routine per `routine_data_choice`; population per `population_selection`; reporting rate from `DHIS2_REPORTING_RATE`; DHS or uploaded care-seeking | `{CC}_incidence.parquet/.csv` → `DHIS2_INCIDENCE` |
 | `snt_dhis2_quality_of_care` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_quality_of_care_district_year_{action}.*` → `DHIS2_QUALITY_OF_CARE` |
 | `snt_seasonality_cases` | `DHIS2_DATASET_FORMATTED` | `{CC}_cases_seasonality.*` → `SNT_SEASONALITY_CASES` |
 | `snt_seasonality_rainfall` | `DHIS2_DATASET_FORMATTED`, `ERA5_DATASET_CLIMATE` | `{CC}_rainfall_seasonality.*` → `SNT_SEASONALITY_RAINFALL` |
@@ -383,9 +390,22 @@ against the code:
 | `imputed` (default) | `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_routine_outliers_imputed.parquet` |
 
 Verified in `pipelines/snt_dhis2_incidence/utils/snt_dhis2_incidence.r`: `resolve_routine_filename()`
-early-returns `"_routine.parquet"` for `raw` (line 83) before the `is_removed` logic runs, and
+early-returns `"_routine.parquet"` for `raw` (line 14) before the `removed_status` logic runs, and
 `select_routine_dataset_and_filename()` picks the dataset on the same condition. All three choices
 resolve correctly.
+
+Population selection is resolved in `snt_dhis2_incidence/pipeline.py` (`resolve_population_dataset()`),
+which checks the file exists before the notebook runs and injects the dataset id as
+`POPULATION_DATASET_ID`. The filename is the same for every source:
+
+| `population_selection` | dataset | filename |
+|---|---|---|
+| `DHIS2` (default) | `DHIS2_DATASET_FORMATTED` | `{CC}_population.parquet` |
+| `User-provided` | `SNT_POPULATION_USER_PROVIDED` | `{CC}_population.parquet` |
+| `Population-transformed` | `DHIS2_POPULATION_TRANSFORMATION` | `{CC}_population.parquet` |
+
+The parameters JSON records the dataset id, not the selection label; the report maps it back to a
+label for its captions.
 
 **But the same concept is spelled three different ways across pipelines**, which defeats the
 operator muscle-memory the shared parameter names are supposed to buy:
@@ -476,6 +496,12 @@ ERA5_DATASET_CLIMATE   SNT_MAP_EXTRACTS              WORLDPOP_DATASET_EXTRACT   
                           E. snt_assemble_results  ──▶  SNT_RESULTS  (1 row per ADM2)
                              ⚠️ being deprecated — SNT Explorer will read datasets directly
 ```
+
+Not drawn above: **`snt_user_population`** reads an operator CSV (validated against the pyramid
+from `DHIS2_DATASET_FORMATTED`) and publishes `SNT_POPULATION_USER_PROVIDED`, which
+`population_transformation` (`pop_source = User-provided`) and `incidence`
+(`population_selection = User-provided`) can read in place of the DHIS2 population. `incidence`
+can likewise read the population straight from `DHIS2_DATASET_FORMATTED`.
 
 Note the shapes fan-out: the three external-source pipelines are **downstream of
 `snt_dhis2_formatting`**, not independent roots, because they aggregate into its ADM2 geometries.
@@ -636,7 +662,7 @@ Selecting **"Pregnant Women"** in `snt_dhis2_incidence` fails, every time, in ev
 
 The chain, all verified:
 
-1. `snt_dhis2_incidence/pipeline.py:117` maps the UI label to the singular
+1. `snt_dhis2_incidence/pipeline.py:133` maps the UI label to the singular
    `"Pregnant Women" → "PREGNANT_WOMAN"`.
 2. That single value is then used for **two different naming domains**:
    - *indicator suffix* — `target_colnames <- glue("{prefix_all}_{DISAGGREGATION_SELECTION}")` →
@@ -646,7 +672,8 @@ The chain, all verified:
      `POP_PREGNANT_WOMAN`. ❌
 3. Every producer of that column uses the **plural**: `snt_dhis2_formatting_population.ipynb`
    (`disaggregation_cols <- c("POP_UNDER_5", "POP_PREGNANT_WOMEN", …)`),
-   `snt_dhis2_population_transformation.ipynb`, `snt_assemble_results/pipeline.py:351`, and the
+   `snt_dhis2_population_transformation.ipynb`, `snt_user_population/pipeline.py`
+   (`DISAGGREGATION_COLS`), `snt_assemble_results/pipeline.py:351`, and the
    `POPULATION_INDICATOR_DEFINITIONS` key in all five country configs.
 4. `select_population_column()` therefore takes its else-branch and calls `stop()`.
 

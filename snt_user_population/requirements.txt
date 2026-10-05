@@ -1,1 +1,1 @@
-snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git@release-v1

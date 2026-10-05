@@ -1,6 +1,6 @@
 pygadm
 psycopg2
 geoalchemy2
-snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
+snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git@release-v1
 owslib==0.34.1
 exactextract==0.3.0

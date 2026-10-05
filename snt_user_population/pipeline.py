@@ -48,7 +48,16 @@ EXPECTED_COLS = [*REQUIRED_COLS, *DISAGGREGATION_COLS]
     default=False,
     required=False,
 )
-def snt_user_population(user_file: File, run_report_only: bool):
+@parameter(
+    "pull_scripts",
+    name="Pull notebooks from repository",
+    help="Pull the latest notebooks from the GitHub repository."
+    " Note: this will overwrite any local changes to the notebooks!",
+    type=bool,
+    default=True,
+    required=False,
+)
+def snt_user_population(user_file: File, run_report_only: bool, pull_scripts: bool):
     """Orchestrate the SNT user population pipeline."""
     # set paths
     snt_root_path = Path(workspace.files_path)
@@ -59,11 +68,12 @@ def snt_user_population(user_file: File, run_report_only: bool):
     snt_pipeline_path.mkdir(parents=True, exist_ok=True)
     snt_user_population_data_path.mkdir(parents=True, exist_ok=True)
 
-    current_run.log_info("Pulling pipeline scripts from repository.")
-    pull_scripts_from_repository(
-        pipeline_name="snt_user_population",
-        report_scripts=["snt_user_population_report.ipynb"],
-    )
+    if pull_scripts:
+        current_run.log_info("Pulling pipeline scripts from repository.")
+        pull_scripts_from_repository(
+            pipeline_name="snt_user_population",
+            report_scripts=["snt_user_population_report.ipynb"],
+        )
 
     try:
         # Load configuration (needed for report and for main run)
@@ -120,8 +130,8 @@ def snt_user_population(user_file: File, run_report_only: bool):
         user_population = validate_user_population_file(user_population, pyramid_adm, country_code)
 
         # save the user-provided population file to the designated path
-        user_population_path = snt_user_population_data_path / f"{country_code}_population_user.parquet"
-        user_population_csv_path = snt_user_population_data_path / f"{country_code}_population_user.csv"
+        user_population_path = snt_user_population_data_path / f"{country_code}_population.parquet"
+        user_population_csv_path = snt_user_population_data_path / f"{country_code}_population.csv"
         user_population.to_parquet(user_population_path, index=False)
         user_population.to_csv(user_population_csv_path, index=False)
         current_run.log_info(f"User population data saved under: {user_population_path}")
@@ -212,7 +222,11 @@ def read_user_csv(file_path: Path) -> pd.DataFrame:
         file_path: Path to the user-uploaded CSV file.
 
     Returns:
-        The file contents as a DataFrame, with all values read as strings.
+        The file contents as a DataFrame, with all values read as strings, column names stripped and
+        uppercased, and the detected decimal mark stored in `attrs["decimal"]`.
+
+    Raises:
+        ValueError: If the file is empty, cannot be parsed, or cannot be decoded with any encoding.
     """
     for encoding in ("utf-8-sig", "latin-1"):
         try:

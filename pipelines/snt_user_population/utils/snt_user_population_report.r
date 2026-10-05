@@ -58,7 +58,7 @@ check_population_matches_shapes <- function(
             dplyr::pull(detail)
         stop(
             glue::glue(
-                "[ERROR] {nrow(unmatched)} admin unit(s) in {country_code}_population_user.parquet ",
+                "[ERROR] {nrow(unmatched)} admin unit(s) in {country_code}_population.parquet ",
                 "do not match {country_code}_shapes.geojson on {paste(adm_cols, collapse = ', ')}. ",
                 "Correct the uploaded file so the names and IDs match the shapes, then re-run the pipeline.\n",
                 "{paste(utils::head(details, 10), collapse = '\n')}",

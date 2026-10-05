@@ -66,15 +66,21 @@ check_pres_col <- function(dhis2_routine) {
     }
 }
 
-load_population_data <- function(config_json) {
-    dhis2_pop_dataset <- if (USE_TRANSFORMED_POPULATION) {
-        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_POPULATION_TRANSFORMATION
-    } else {
-        config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED        
-    }
-        
-    dhis2_population_adm2 <- load_dataset_file(dataset_id=dhis2_pop_dataset, filename= paste0(COUNTRY_CODE, "_population.parquet"))
-    log_msg(glue::glue("DHIS2 population data loaded from {dhis2_pop_dataset}."))
+#' Load population data from the selected dataset
+#'
+#' Loads {country_code}_population.parquet from the latest version of the dataset resolved
+#' by pipeline.py from the population selection (DHIS2, User-provided or Population-transformed).
+#'
+#' @param country_code Character. Country code used as the filename prefix.
+#' @param population_dataset_id Character. Dataset ID of the selected population source.
+#' @return Data frame of ADM2 x yearly population.
+#' @export
+load_population_data <- function(country_code, population_dataset_id) {
+    dhis2_population_adm2 <- load_dataset_file(
+        dataset_id=population_dataset_id, 
+        filename=paste0(country_code, "_population.parquet")
+    )
+    log_msg(glue::glue("Population data loaded from {population_dataset_id}."))
     return(dhis2_population_adm2)
 }
 

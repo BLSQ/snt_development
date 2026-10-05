@@ -52,7 +52,7 @@ population templates with one row per ADM2. These files are not published to any
 that pipeline's `readme.md`.
 
 The full pipeline-by-pipeline inventory is in
-[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-20-pipelines-at-a-glance), where
+[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-21-pipelines-at-a-glance), where
 the stage letters above are used throughout (stage `A2` here is written `A′` there).
 
 ---

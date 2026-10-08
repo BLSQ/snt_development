@@ -1,70 +1,22 @@
-# Load shared SNT helpers.
-source(file.path("~/workspace", "code", "snt_utils.r"))
+# ================================================
+# Title: Main helpers for the Quality of Care pipeline
+# Description: Routine data typing, district-year aggregation, output saving and yearly maps,
+#   sourced by the pipeline notebook and the reporting notebook.
+# Dependencies: data.table, sf, dplyr, ggplot2, arrow, glue
+# Requires: code/snt_utils.r, loaded by the notebooks before this file.
+# ================================================
 
 
-#' Load packages, OpenHEXA, and return base workspace paths (one list, four names).
-#' @param SNT_ROOT_PATH Workspace root. Default `~/workspace`.
-#' @param packages R packages to install/load.
-#' @return Named list: `CONFIG_PATH`, `UPLOADS_PATH`, `DATA_PATH`, `PIPELINES_PATH`.
-get_setup_variables <- function(
-    SNT_ROOT_PATH = "~/workspace",
-    packages = c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue", "reticulate")
-) {
-    base_paths <- list(
-        CONFIG_PATH    = file.path(SNT_ROOT_PATH, "configuration"),
-        UPLOADS_PATH   = file.path(SNT_ROOT_PATH, "uploads"),
-        DATA_PATH      = file.path(SNT_ROOT_PATH, "data"),
-        PIPELINES_PATH = file.path(SNT_ROOT_PATH, "pipelines")
-    )
-
-    for (p in base_paths) {
-        if (!dir.exists(p)) {
-            dir.create(p, recursive = TRUE, showWarnings = FALSE)
-        }
-    }
-
-    install_and_load(packages)
-
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    reticulate::py_config()$python
-    assign("openhexa", reticulate::import("openhexa.sdk"), envir = .GlobalEnv)
-
-    return(base_paths)
-}
-
-#' Load dataset file from OpenHEXA.
+#' Validate the Quality of Care Data Action Parameter
 #'
-#' @param dataset_id Character. OpenHEXA dataset identifier.
-#' @param filename Character. Name of file to load.
-#' @param verbose Logical. If TRUE, log dataframe dimensions after a successful load.
-#' @return Dataframe containing the loaded data.
-load_dataset_file <- function(dataset_id, filename, verbose = TRUE) {
-    if (!exists("openhexa", inherits = TRUE) || is.null(get("openhexa", inherits = TRUE))) {
-        stop("[ERROR] OpenHEXA SDK is not available. Run `get_setup_variables()` before loading dataset files.")
-    }
-
-    data <- tryCatch(
-        {
-            get_latest_dataset_file_in_memory(dataset_id, filename)
-        },
-        error = function(e) {
-            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
-        }
-    )
-
-    if (verbose) {
-        log_msg(glue::glue(
-            "{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse = ', ')}]"
-        ))
-    }
-
-    return(data)
-}
-
-#' Validate quality-of-care action parameter.
+#' Checks that the routine data choice is one of the outliers pipelines' outputs
+#' (`imputed` or `removed`). A NULL or empty value falls back to `imputed`; any
+#' other value stops execution with an `[ERROR]` message.
 #'
-#' @param data_action Action string expected to be `imputed` or `removed`.
-#' @return Validated action string.
+#' @param data_action Character. Routine data choice, `imputed` or `removed`.
+#' @return Character. The validated data action.
+#'
+#' @export
 validate_quality_of_care_action <- function(data_action) {
     if (is.null(data_action) || !nzchar(data_action)) {
         return("imputed")
@@ -76,12 +28,19 @@ validate_quality_of_care_action <- function(data_action) {
     data_action
 }
 
-#' Compute district-year Quality of Care indicators.
+
+#' Normalize Column Types of the Quality of Care Routine Data
 #'
-#' @param routine Routine dataframe loaded from outliers dataset.
-#' @param indicator_cols Character vector of routine indicator column names to coerce to numeric
-#'   (define in the notebook or config, not hardcoded here).
-#' @return Data table with district-year indicators.
+#' Converts the routine data to a data.table (by reference) and casts the
+#' available indicator columns to numeric, treating empty strings and `-` as NA.
+#' Also casts `YEAR` to integer and `ADM2_ID` to character.
+#'
+#' @param routine Data frame. Routine data loaded from the outliers dataset.
+#' @param indicator_cols Character vector. Indicator columns to cast to numeric;
+#'   columns absent from `routine` are skipped.
+#' @return data.table. The routine data with normalized column types.
+#'
+#' @export
 normalize_qoc_routine_types <- function(routine, indicator_cols) {
     data.table::setDT(routine)
     available_cols <- intersect(indicator_cols, names(routine))
@@ -97,12 +56,20 @@ normalize_qoc_routine_types <- function(routine, indicator_cols) {
     routine
 }
 
-#' Aggregate QoC routine indicators by district and year.
+
+#' Aggregate Quality of Care Indicators by District and Year
 #'
-#' @param routine Routine data table with normalized types.
-#' @param indicator_cols Character vector of column names to sum (must match the vector used
-#'   in [normalize_qoc_routine_types()]).
-#' @return Aggregated district-year data table.
+#' Sums the available indicator columns by `ADM2_ID` and `YEAR`, ignoring NA
+#' values. When none of the indicator columns are present, returns the unique
+#' district-year pairs only.
+#'
+#' @param routine data.table. Routine data with normalized types (see
+#'   `normalize_qoc_routine_types()`).
+#' @param indicator_cols Character vector. Indicator columns to sum; must match
+#'   the vector used in `normalize_qoc_routine_types()`.
+#' @return data.table. One row per `ADM2_ID` and `YEAR` with summed indicators.
+#'
+#' @export
 aggregate_qoc_district_year <- function(routine, indicator_cols) {
     available_cols <- intersect(indicator_cols, names(routine))
 
@@ -113,11 +80,17 @@ aggregate_qoc_district_year <- function(routine, indicator_cols) {
     }
 }
 
-#' Merge ADM2 labels into Quality of Care outputs.
+
+#' Attach District Names to the Quality of Care Table
 #'
-#' @param qoc_dt Quality-of-care data table.
-#' @param shapes_sf Shapes sf table.
-#' @return Data table with optional ADM2_NAME.
+#' Left-joins `ADM2_NAME` from the shapes onto the quality-of-care table by
+#' `ADM2_ID`. The table is returned unchanged if the shapes lack either column.
+#'
+#' @param qoc_dt data.table. District-year quality-of-care indicators.
+#' @param shapes_sf sf. District shapes with `ADM2_ID` and `ADM2_NAME` columns.
+#' @return data.table. The quality-of-care table, with `ADM2_NAME` when available.
+#'
+#' @export
 attach_quality_of_care_shapes <- function(qoc_dt, shapes_sf) {
     shapes_dt <- data.table::as.data.table(sf::st_drop_geometry(shapes_sf))
     if ("ADM2_ID" %in% names(shapes_dt) && "ADM2_NAME" %in% names(shapes_dt)) {
@@ -127,13 +100,20 @@ attach_quality_of_care_shapes <- function(qoc_dt, shapes_sf) {
     qoc_dt
 }
 
-#' Save district-year Quality of Care outputs.
+
+#' Save the District-Year Quality of Care Outputs
 #'
-#' @param qoc_dt Computed quality-of-care data table.
-#' @param output_data_path Output directory path.
-#' @param country_code Country code.
-#' @param data_action Action suffix for output naming.
-#' @return Named list with `parquet` and `csv` output file paths.
+#' Writes the quality-of-care table as parquet and as its csv twin, named
+#' `{country_code}_quality_of_care_district_year_{data_action}`, and logs the
+#' saved paths.
+#'
+#' @param qoc_dt data.table. District-year quality-of-care indicators.
+#' @param output_data_path Character. Directory where the files are written.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @param data_action Character. Routine data choice used as the filename suffix.
+#' @return Named list with the `parquet` and `csv` output file paths.
+#'
+#' @export
 save_quality_of_care_outputs <- function(qoc_dt, output_data_path, country_code, data_action) {
     out_district_parquet <- file.path(output_data_path, glue::glue("{country_code}_quality_of_care_district_year_{data_action}.parquet"))
     out_district_csv <- file.path(output_data_path, glue::glue("{country_code}_quality_of_care_district_year_{data_action}.csv"))
@@ -145,12 +125,21 @@ save_quality_of_care_outputs <- function(qoc_dt, output_data_path, country_code,
     list(parquet = out_district_parquet, csv = out_district_csv)
 }
 
-#' Generate and save yearly district maps for QoC indicators.
+
+#' Generate and Save Yearly District Maps of Quality of Care Indicators
 #'
-#' @param qoc_dt Quality-of-care data table.
-#' @param shapes_sf District shapes sf.
-#' @param figures_path Folder where PNG maps are written.
-#' @return Invisibly returns `TRUE`.
+#' For each indicator present in the table and each year, joins the values to
+#' the district shapes and saves a PNG map named `{indicator}_{year}.png`
+#' (`allout_{year}.png` for non-malaria outpatients). Rates are binned into
+#' fixed classes; absolute values into quantile classes. A map that fails is
+#' logged as a `[WARNING]` and skipped.
+#'
+#' @param qoc_dt data.table. District-year quality-of-care indicators.
+#' @param shapes_sf sf. District shapes with an `ADM2_ID` column.
+#' @param figures_path Character. Directory where the PNG maps are written.
+#' @return Invisibly, TRUE. Called for its side effects.
+#'
+#' @export
 save_quality_of_care_maps <- function(qoc_dt, shapes_sf, figures_path) {
     shapes_sf$ADM2_ID <- as.character(shapes_sf$ADM2_ID)
     qoc_dt$ADM2_ID <- as.character(qoc_dt$ADM2_ID)

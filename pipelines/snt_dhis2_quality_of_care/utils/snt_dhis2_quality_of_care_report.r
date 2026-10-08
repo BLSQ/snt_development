@@ -1,12 +1,24 @@
-# Load pipeline helpers (common + code-specific functions).
-source(file.path("~/workspace", "pipelines", "snt_dhis2_quality_of_care", "utils", "snt_dhis2_quality_of_care.r"))
+# ================================================
+# Title: Report helpers for the Quality of Care pipeline
+# Description: Summary table, summary outputs and year-level chart helpers sourced by the
+#   reporting notebook.
+# Dependencies: data.table, arrow, ggplot2, gridExtra, scales, glue
+# Requires: code/snt_utils.r, loaded by the reporting notebook before this file.
+# ================================================
 
 
-#' Load latest Quality of Care district-year output.
+#' Load the Latest Quality of Care District-Year Output
 #'
-#' @param output_data_path Path to quality-of-care data outputs.
-#' @param country_code Country code.
-#' @return Named list with `qoc` (data table) and `latest_file` (path).
+#' Finds the `{country_code}_quality_of_care_district_year_{imputed|removed}.parquet`
+#' files in the output folder and reads the most recently modified one. Stops
+#' with an `[ERROR]` message if none is found.
+#'
+#' @param output_data_path Character. Folder holding the quality-of-care data outputs.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Named list with `qoc` (data.table, the loaded output) and `latest_file`
+#'   (character, the path of the file read).
+#'
+#' @export
 load_latest_quality_of_care_output <- function(output_data_path, country_code) {
     files <- list.files(
         output_data_path,
@@ -22,10 +34,16 @@ load_latest_quality_of_care_output <- function(output_data_path, country_code) {
 }
 
 
-#' Build year-level Quality of Care summary table.
+#' Build the Year-Level Quality of Care Summary Table
 #'
-#' @param qoc_dt Quality-of-care district-year data table.
-#' @return Year-level summary table ordered by YEAR.
+#' Aggregates the district-year table to one row per year: rate indicators are
+#' averaged across districts and absolute indicators are summed, ignoring NA
+#' values. Indicators absent from the input are skipped.
+#'
+#' @param qoc_dt data.table. District-year quality-of-care indicators.
+#' @return data.table. One row per `YEAR`, ordered by `YEAR`.
+#'
+#' @export
 build_quality_of_care_summary <- function(qoc_dt) {
     mean_cols <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths")
     sum_cols  <- c("non_malaria_all_cause_outpatients", "presumed_cases")
@@ -46,12 +64,18 @@ build_quality_of_care_summary <- function(qoc_dt) {
 }
 
 
-#' Save year-level summary outputs (parquet and csv only; no Excel — avoids extra deps).
+#' Save the Year-Level Quality of Care Summary Outputs
 #'
-#' @param summary_tbl Summary table.
-#' @param report_outputs_path Reporting outputs folder.
-#' @param country_code Country code.
-#' @return Named list with `summary_parquet` and `summary_csv` paths.
+#' Writes the summary table as `{country_code}_quality_of_care_summary` in
+#' parquet and csv format (no Excel, to avoid extra dependencies) and logs the
+#' saved paths.
+#'
+#' @param summary_tbl data.table. Year-level summary table.
+#' @param report_outputs_path Character. Reporting outputs folder.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Named list with the `summary_parquet` and `summary_csv` file paths.
+#'
+#' @export
 save_quality_of_care_summary_outputs <- function(summary_tbl, report_outputs_path, country_code) {
     summary_parquet <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.parquet"))
     summary_csv     <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.csv"))
@@ -64,12 +88,19 @@ save_quality_of_care_summary_outputs <- function(summary_tbl, report_outputs_pat
 }
 
 
-#' Build and save year-level bar chart panel for QoC indicators.
+#' Build and Save the Year-Level Quality of Care Chart Panel
 #'
-#' @param summary_tbl Year-level summary table.
-#' @param figures_path Folder where the combined chart is saved.
-#' @param country_code Country code used in output file name.
-#' @return Path to saved chart, or NULL if no indicator columns are available.
+#' Draws one bar chart per available indicator (rates as percentages, absolute
+#' indicators as counts), arranges them in a two-column panel and saves it as
+#' `{country_code}_quality_of_care_by_year.png`.
+#'
+#' @param summary_tbl data.table. Year-level summary table.
+#' @param figures_path Character. Folder where the chart panel is saved.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Character. Path of the saved chart, or NULL if the summary is empty or
+#'   no indicator column is available.
+#'
+#' @export
 save_quality_of_care_summary_charts <- function(summary_tbl, figures_path, country_code) {
     plot_data <- data.table::copy(summary_tbl)
     if (nrow(plot_data) == 0) return(NULL)

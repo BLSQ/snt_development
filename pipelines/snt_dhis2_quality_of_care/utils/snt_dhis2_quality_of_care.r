@@ -198,13 +198,13 @@ save_quality_of_care_maps <- function(qoc_dt, shapes_sf, figures_path) {
         }
     }
 
-    plot_yearly_map(qoc_dt, shapes_sf, "testing_rate","Testing rate (TEST / SUSP)","testing_rate",TRUE)
-    plot_yearly_map(qoc_dt, shapes_sf, "treatment_rate","Treatment rate (MALTREAT / CONF)","treatment_rate",TRUE)
-    plot_yearly_map(qoc_dt, shapes_sf, "case_fatality_rate","In-hospital case fatality rate (MALDTH / MALADM)","case_fatality_rate",TRUE)
-    plot_yearly_map(qoc_dt, shapes_sf, "prop_adm_malaria","Proportion admitted for malaria (MALADM / ALLADM)","prop_adm_malaria",TRUE)
-    plot_yearly_map(qoc_dt, shapes_sf, "prop_malaria_deaths","Proportion of malaria deaths (MALDTH / ALLDTH)","prop_malaria_deaths",TRUE)
-    plot_yearly_map(qoc_dt, shapes_sf, "non_malaria_all_cause_outpatients","Non-malaria all-cause outpatients (ALLOUT)","allout",FALSE)
-    plot_yearly_map(qoc_dt, shapes_sf, "presumed_cases","Presumed cases (PRES)","presumed_cases",FALSE)
+    plot_yearly_map(qoc_dt, shapes_sf, "TESTING_RATE","Testing rate (TEST / SUSP)","testing_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "TREATMENT_RATE","Treatment rate (MALTREAT / CONF)","treatment_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "CASE_FATALITY_RATE","In-hospital case fatality rate (MALDTH / MALADM)","case_fatality_rate",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "PROP_ADM_MALARIA","Proportion admitted for malaria (MALADM / ALLADM)","prop_adm_malaria",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "PROP_MALARIA_DEATHS","Proportion of malaria deaths (MALDTH / ALLDTH)","prop_malaria_deaths",TRUE)
+    plot_yearly_map(qoc_dt, shapes_sf, "NON_MALARIA_ALL_CAUSE_OUTPATIENTS","Non-malaria all-cause outpatients (ALLOUT)","allout",FALSE)
+    plot_yearly_map(qoc_dt, shapes_sf, "PRESUMED_CASES","Presumed cases (PRES)","presumed_cases",FALSE)
 
     log_msg(glue::glue("Saved yearly maps in: {figures_path}"))
     invisible(TRUE)

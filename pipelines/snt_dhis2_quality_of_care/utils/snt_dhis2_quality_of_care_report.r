@@ -45,8 +45,8 @@ load_latest_quality_of_care_output <- function(output_data_path, country_code) {
 #'
 #' @export
 build_quality_of_care_summary <- function(qoc_dt) {
-    mean_cols <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths")
-    sum_cols  <- c("non_malaria_all_cause_outpatients", "presumed_cases")
+    mean_cols <- c("TESTING_RATE", "TREATMENT_RATE", "CASE_FATALITY_RATE", "PROP_ADM_MALARIA", "PROP_MALARIA_DEATHS")
+    sum_cols  <- c("NON_MALARIA_ALL_CAUSE_OUTPATIENTS", "PRESUMED_CASES")
 
     summary_tbl <- unique(qoc_dt[, .(YEAR)])
 
@@ -147,17 +147,17 @@ save_quality_of_care_summary_charts <- function(summary_tbl, figures_path, count
     }
 
     plots_list <- list()
-    if ("testing_rate" %in% names(plot_data)) plots_list[["testing_rate"]] <- make_pct_plot("testing_rate", "Testing rate (TEST / SUSP)")
-    if ("treatment_rate" %in% names(plot_data)) plots_list[["treatment_rate"]] <- make_pct_plot("treatment_rate", "Treatment rate (MALTREAT / CONF)")
-    if ("case_fatality_rate" %in% names(plot_data)) plots_list[["case_fatality_rate"]] <- make_pct_plot("case_fatality_rate", "Case fatality rate (MALDTH / MALADM)")
-    if ("prop_adm_malaria" %in% names(plot_data)) plots_list[["prop_adm_malaria"]] <- make_pct_plot("prop_adm_malaria", "Prop. admissions paludisme (MALADM / ALLADM)")
-    if ("prop_malaria_deaths" %in% names(plot_data)) plots_list[["prop_malaria_deaths"]] <- make_pct_plot("prop_malaria_deaths", "Prop. deces paludisme (MALDTH / ALLDTH)")
-    if ("presumed_cases" %in% names(plot_data)) plots_list[["presumed_cases"]] <- make_abs_plot("presumed_cases", "Cas presumes (PRES)")
-    if ("non_malaria_all_cause_outpatients" %in% names(plot_data)) plots_list[["non_malaria_all_cause_outpatients"]] <- make_abs_plot("non_malaria_all_cause_outpatients", "Consultations externes non-paludisme (ALLOUT)")
+    if ("TESTING_RATE" %in% names(plot_data)) plots_list[["TESTING_RATE"]] <- make_pct_plot("TESTING_RATE", "Testing rate (TEST / SUSP)")
+    if ("TREATMENT_RATE" %in% names(plot_data)) plots_list[["TREATMENT_RATE"]] <- make_pct_plot("TREATMENT_RATE", "Treatment rate (MALTREAT / CONF)")
+    if ("CASE_FATALITY_RATE" %in% names(plot_data)) plots_list[["CASE_FATALITY_RATE"]] <- make_pct_plot("CASE_FATALITY_RATE", "Case fatality rate (MALDTH / MALADM)")
+    if ("PROP_ADM_MALARIA" %in% names(plot_data)) plots_list[["PROP_ADM_MALARIA"]] <- make_pct_plot("PROP_ADM_MALARIA", "Prop. admissions paludisme (MALADM / ALLADM)")
+    if ("PROP_MALARIA_DEATHS" %in% names(plot_data)) plots_list[["PROP_MALARIA_DEATHS"]] <- make_pct_plot("PROP_MALARIA_DEATHS", "Prop. deces paludisme (MALDTH / ALLDTH)")
+    if ("PRESUMED_CASES" %in% names(plot_data)) plots_list[["PRESUMED_CASES"]] <- make_abs_plot("PRESUMED_CASES", "Cas presumes (PRES)")
+    if ("NON_MALARIA_ALL_CAUSE_OUTPATIENTS" %in% names(plot_data)) plots_list[["NON_MALARIA_ALL_CAUSE_OUTPATIENTS"]] <- make_abs_plot("NON_MALARIA_ALL_CAUSE_OUTPATIENTS", "Consultations externes non-paludisme (ALLOUT)")
 
     if (length(plots_list) == 0) return(NULL)
 
-    plot_order <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths", "presumed_cases", "non_malaria_all_cause_outpatients")
+    plot_order <- c("TESTING_RATE", "TREATMENT_RATE", "CASE_FATALITY_RATE", "PROP_ADM_MALARIA", "PROP_MALARIA_DEATHS", "PRESUMED_CASES", "NON_MALARIA_ALL_CAUSE_OUTPATIENTS")
     available_plots <- plots_list[intersect(plot_order, names(plots_list))]
     n_plots <- length(available_plots)
     ncol_layout <- 2

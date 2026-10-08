@@ -1,12 +1,24 @@
-# Load pipeline helpers (common + code-specific functions).
-source(file.path("~/workspace", "pipelines", "snt_dhis2_quality_of_care", "utils", "snt_dhis2_quality_of_care.r"))
+# ================================================
+# Title: Report helpers for the Quality of Care pipeline
+# Description: Summary table, summary outputs and year-level chart helpers sourced by the
+#   reporting notebook.
+# Dependencies: data.table, arrow, ggplot2, gridExtra, scales, glue
+# Requires: code/snt_utils.r, loaded by the reporting notebook before this file.
+# ================================================
 
 
-#' Load latest Quality of Care district-year output.
+#' Load the Latest Quality of Care District-Year Output
 #'
-#' @param output_data_path Path to quality-of-care data outputs.
-#' @param country_code Country code.
-#' @return Named list with `qoc` (data table) and `latest_file` (path).
+#' Finds the `{country_code}_quality_of_care_district_year_{imputed|removed}.parquet`
+#' files in the output folder and reads the most recently modified one. Stops
+#' with an `[ERROR]` message if none is found.
+#'
+#' @param output_data_path Character. Folder holding the quality-of-care data outputs.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Named list with `qoc` (data.table, the loaded output) and `latest_file`
+#'   (character, the path of the file read).
+#'
+#' @export
 load_latest_quality_of_care_output <- function(output_data_path, country_code) {
     files <- list.files(
         output_data_path,
@@ -22,13 +34,19 @@ load_latest_quality_of_care_output <- function(output_data_path, country_code) {
 }
 
 
-#' Build year-level Quality of Care summary table.
+#' Build the Year-Level Quality of Care Summary Table
 #'
-#' @param qoc_dt Quality-of-care district-year data table.
-#' @return Year-level summary table ordered by YEAR.
+#' Aggregates the district-year table to one row per year: rate indicators are
+#' averaged across districts and absolute indicators are summed, ignoring NA
+#' values. Indicators absent from the input are skipped.
+#'
+#' @param qoc_dt data.table. District-year quality-of-care indicators.
+#' @return data.table. One row per `YEAR`, ordered by `YEAR`.
+#'
+#' @export
 build_quality_of_care_summary <- function(qoc_dt) {
-    mean_cols <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths")
-    sum_cols  <- c("non_malaria_all_cause_outpatients", "presumed_cases")
+    mean_cols <- c("TESTING_RATE", "TREATMENT_RATE", "CASE_FATALITY_RATE", "PROP_ADM_MALARIA", "PROP_MALARIA_DEATHS")
+    sum_cols  <- c("NON_MALARIA_ALL_CAUSE_OUTPATIENTS", "PRESUMED_CASES")
 
     summary_tbl <- unique(qoc_dt[, .(YEAR)])
 
@@ -46,12 +64,18 @@ build_quality_of_care_summary <- function(qoc_dt) {
 }
 
 
-#' Save year-level summary outputs (parquet and csv only; no Excel — avoids extra deps).
+#' Save the Year-Level Quality of Care Summary Outputs
 #'
-#' @param summary_tbl Summary table.
-#' @param report_outputs_path Reporting outputs folder.
-#' @param country_code Country code.
-#' @return Named list with `summary_parquet` and `summary_csv` paths.
+#' Writes the summary table as `{country_code}_quality_of_care_summary` in
+#' parquet and csv format (no Excel, to avoid extra dependencies) and logs the
+#' saved paths.
+#'
+#' @param summary_tbl data.table. Year-level summary table.
+#' @param report_outputs_path Character. Reporting outputs folder.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Named list with the `summary_parquet` and `summary_csv` file paths.
+#'
+#' @export
 save_quality_of_care_summary_outputs <- function(summary_tbl, report_outputs_path, country_code) {
     summary_parquet <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.parquet"))
     summary_csv     <- file.path(report_outputs_path, glue::glue("{country_code}_quality_of_care_summary.csv"))
@@ -64,12 +88,19 @@ save_quality_of_care_summary_outputs <- function(summary_tbl, report_outputs_pat
 }
 
 
-#' Build and save year-level bar chart panel for QoC indicators.
+#' Build and Save the Year-Level Quality of Care Chart Panel
 #'
-#' @param summary_tbl Year-level summary table.
-#' @param figures_path Folder where the combined chart is saved.
-#' @param country_code Country code used in output file name.
-#' @return Path to saved chart, or NULL if no indicator columns are available.
+#' Draws one bar chart per available indicator (rates as percentages, absolute
+#' indicators as counts), arranges them in a two-column panel and saves it as
+#' `{country_code}_quality_of_care_by_year.png`.
+#'
+#' @param summary_tbl data.table. Year-level summary table.
+#' @param figures_path Character. Folder where the chart panel is saved.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Character. Path of the saved chart, or NULL if the summary is empty or
+#'   no indicator column is available.
+#'
+#' @export
 save_quality_of_care_summary_charts <- function(summary_tbl, figures_path, country_code) {
     plot_data <- data.table::copy(summary_tbl)
     if (nrow(plot_data) == 0) return(NULL)
@@ -116,17 +147,17 @@ save_quality_of_care_summary_charts <- function(summary_tbl, figures_path, count
     }
 
     plots_list <- list()
-    if ("testing_rate" %in% names(plot_data)) plots_list[["testing_rate"]] <- make_pct_plot("testing_rate", "Testing rate (TEST / SUSP)")
-    if ("treatment_rate" %in% names(plot_data)) plots_list[["treatment_rate"]] <- make_pct_plot("treatment_rate", "Treatment rate (MALTREAT / CONF)")
-    if ("case_fatality_rate" %in% names(plot_data)) plots_list[["case_fatality_rate"]] <- make_pct_plot("case_fatality_rate", "Case fatality rate (MALDTH / MALADM)")
-    if ("prop_adm_malaria" %in% names(plot_data)) plots_list[["prop_adm_malaria"]] <- make_pct_plot("prop_adm_malaria", "Prop. admissions paludisme (MALADM / ALLADM)")
-    if ("prop_malaria_deaths" %in% names(plot_data)) plots_list[["prop_malaria_deaths"]] <- make_pct_plot("prop_malaria_deaths", "Prop. deces paludisme (MALDTH / ALLDTH)")
-    if ("presumed_cases" %in% names(plot_data)) plots_list[["presumed_cases"]] <- make_abs_plot("presumed_cases", "Cas presumes (PRES)")
-    if ("non_malaria_all_cause_outpatients" %in% names(plot_data)) plots_list[["non_malaria_all_cause_outpatients"]] <- make_abs_plot("non_malaria_all_cause_outpatients", "Consultations externes non-paludisme (ALLOUT)")
+    if ("TESTING_RATE" %in% names(plot_data)) plots_list[["TESTING_RATE"]] <- make_pct_plot("TESTING_RATE", "Testing rate (TEST / SUSP)")
+    if ("TREATMENT_RATE" %in% names(plot_data)) plots_list[["TREATMENT_RATE"]] <- make_pct_plot("TREATMENT_RATE", "Treatment rate (MALTREAT / CONF)")
+    if ("CASE_FATALITY_RATE" %in% names(plot_data)) plots_list[["CASE_FATALITY_RATE"]] <- make_pct_plot("CASE_FATALITY_RATE", "Case fatality rate (MALDTH / MALADM)")
+    if ("PROP_ADM_MALARIA" %in% names(plot_data)) plots_list[["PROP_ADM_MALARIA"]] <- make_pct_plot("PROP_ADM_MALARIA", "Prop. admissions paludisme (MALADM / ALLADM)")
+    if ("PROP_MALARIA_DEATHS" %in% names(plot_data)) plots_list[["PROP_MALARIA_DEATHS"]] <- make_pct_plot("PROP_MALARIA_DEATHS", "Prop. deces paludisme (MALDTH / ALLDTH)")
+    if ("PRESUMED_CASES" %in% names(plot_data)) plots_list[["PRESUMED_CASES"]] <- make_abs_plot("PRESUMED_CASES", "Cas presumes (PRES)")
+    if ("NON_MALARIA_ALL_CAUSE_OUTPATIENTS" %in% names(plot_data)) plots_list[["NON_MALARIA_ALL_CAUSE_OUTPATIENTS"]] <- make_abs_plot("NON_MALARIA_ALL_CAUSE_OUTPATIENTS", "Consultations externes non-paludisme (ALLOUT)")
 
     if (length(plots_list) == 0) return(NULL)
 
-    plot_order <- c("testing_rate", "treatment_rate", "case_fatality_rate", "prop_adm_malaria", "prop_malaria_deaths", "presumed_cases", "non_malaria_all_cause_outpatients")
+    plot_order <- c("TESTING_RATE", "TREATMENT_RATE", "CASE_FATALITY_RATE", "PROP_ADM_MALARIA", "PROP_MALARIA_DEATHS", "PRESUMED_CASES", "NON_MALARIA_ALL_CAUSE_OUTPATIENTS")
     available_plots <- plots_list[intersect(plot_order, names(plots_list))]
     n_plots <- length(available_plots)
     ncol_layout <- 2

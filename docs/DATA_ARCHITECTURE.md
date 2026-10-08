@@ -544,9 +544,8 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
 - Parameters are injected as globals into the R notebook, and every notebook has a fallback cell
   `if (!exists("PARAM")) PARAM <- <default>` so it stays runnable interactively. Injected globals
   are **UPPERCASE** (`ROOT_PATH`, `N1_METHOD`, `DEVIATION_IQR`, `SNT_ROOT_PATH`…) — rule **R11** in
-  [`CLAUDE.md`](../CLAUDE.md). Three pipelines predate the rule and use lowercase on both sides:
-  `snt_dhis2_quality_of_care` (`data_action`), `snt_seasonality_cases` and
-  `snt_seasonality_rainfall` (`minimum_month_block_size`, …). Each is internally consistent, so
+  [`CLAUDE.md`](../CLAUDE.md). Two pipelines predate the rule and use lowercase on both sides:
+  `snt_seasonality_cases` and `snt_seasonality_rainfall` (`minimum_month_block_size`, …). Each is internally consistent, so
   nothing is broken today, and they are logged for migration. Until then, do not assume the case
   of a parameter — read `pipeline.py`'s injected dict, and keep it and the fallback cell in exact
   agreement, case included.

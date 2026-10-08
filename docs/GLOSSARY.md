@@ -140,8 +140,8 @@ data. Rates return `NA` rather than zero when the denominator is zero.
 | **Testing rate** | *Taux de dépistage* | `TEST / SUSP` — of the suspected cases, how many were actually tested. | ✅ |
 | **Treatment rate** | *Taux de traitement* | `MALTREAT / CONF` — of the confirmed cases, how many were treated. | ✅ |
 | **Case fatality rate** | *Létalité* | `MALDTH / MALADM` — of malaria patients **admitted** to hospital, how many died. Note the denominator is admissions, not all cases: this is in-facility severe-case lethality, not population mortality. | ✅ |
-| **`prop_adm_malaria`** | — | `MALADM / ALLADM` — malaria's share of all hospital admissions. A burden-of-disease proxy. | ✅ |
-| **`prop_malaria_deaths`** | — | `MALDTH / ALLDTH` — malaria's share of all in-facility deaths. (The notebook also emits `prop_deaths_malaria` as an alias.) | ✅ |
+| **`PROP_ADM_MALARIA`** | — | `MALADM / ALLADM` — malaria's share of all hospital admissions. A burden-of-disease proxy. | ✅ |
+| **`PROP_MALARIA_DEATHS`** | — | `MALDTH / ALLDTH` — malaria's share of all in-facility deaths. | ✅ |
 
 ---
 
@@ -184,12 +184,12 @@ Used by `snt_dhis2_quality_of_care` to express malaria as a share of total facil
 
 | Code | FR | Definition | Status |
 |---|---|---|---|
-| `ALLOUT` | — | **All-cause outpatient** consultations. In the quality-of-care output it is carried as `non_malaria_all_cause_outpatients`. | ✅ |
-| `ALLADM` | — | **All-cause admissions**. Denominator of `prop_adm_malaria`. | ✅ |
-| `ALLDTH` | — | **All-cause deaths** in facility. Denominator of `prop_malaria_deaths`. | ✅ |
+| `ALLOUT` | — | **All-cause outpatient** consultations. In the quality-of-care output it is carried as `NON_MALARIA_ALL_CAUSE_OUTPATIENTS`. | ✅ |
+| `ALLADM` | — | **All-cause admissions**. Denominator of `PROP_ADM_MALARIA`. | ✅ |
+| `ALLDTH` | — | **All-cause deaths** in facility. Denominator of `PROP_MALARIA_DEATHS`. | ✅ |
 
 > ⚠️ **Naming mismatch, worth confirming.** The quality-of-care column is named
-> `non_malaria_all_cause_outpatients` but is a direct district-year sum of `ALLOUT`, with no malaria
+> `NON_MALARIA_ALL_CAUSE_OUTPATIENTS` but is a direct district-year sum of `ALLOUT`, with no malaria
 > subtraction anywhere in the notebook. Either the column name or the computation is wrong. Flagged
 > in [§7](#7-open-questions).
 
@@ -479,7 +479,7 @@ domain knowledge — not another pass over the code.
 
 **Naming problems found during the sweep** (each is a code question, not just a glossary one):
 
-13. `non_malaria_all_cause_outpatients` in `snt_dhis2_quality_of_care` is a plain sum of `ALLOUT`
+13. `NON_MALARIA_ALL_CAUSE_OUTPATIENTS` in `snt_dhis2_quality_of_care` is a plain sum of `ALLOUT`
     with no malaria subtraction. Is the name wrong, or the computation?
 14. `ITN_USE_RATE_RATE` — doubled suffix in `SNT_metadata.json`. Renaming it is operator-visible,
     so it needs a migration rather than an edit.

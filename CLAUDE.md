@@ -390,17 +390,16 @@ Not implemented — recorded here so they can be assessed:
 - **Unify the routine-data-choice vocabulary** across `snt_dhis2_incidence`, both
   `reporting_rate_*` pipelines and `snt_dhis2_quality_of_care` — operator-visible, so it needs a
   migration rather than a rename. (Rule **R15**.)
-- **Migrate the three lowercase-parameter pipelines to UPPERCASE** (rule **R11**):
-  `snt_dhis2_quality_of_care` (`data_action`), `snt_seasonality_cases` and
-  `snt_seasonality_rainfall` (`minimum_month_block_size`, `maximum_month_block_size`,
+- **Migrate the two lowercase-parameter pipelines to UPPERCASE** (rule **R11**):
+  `snt_seasonality_cases` and `snt_seasonality_rainfall` (`minimum_month_block_size`, `maximum_month_block_size`,
   `threshold_for_seasonality`, `threshold_proportion_seasonal_years`,
   `use_calendar_year_denominator`). Purely internal — these are notebook globals, not `@parameter`
   codes, so **no operator-visible name changes and no OpenHEXA UI churn**, unlike R15. Each is a
   contained three-part edit: the injected dict in `pipeline.py`, the `if (!exists("X"))` fallback
   cell, and every use inside the notebook and its `utils/*.r`. It must be atomic per pipeline —
   a missed use site fails only at runtime, in a workspace, with an "object not found" error.
-  Cheapest sequencing: do it in the same PR as the R15 vocabulary migration for
-  `snt_dhis2_quality_of_care`, since that notebook is being touched anyway.
+  `snt_dhis2_quality_of_care` has been migrated (`data_action` → `DATA_ACTION`); its operator-facing
+  `@parameter` code is still `data_action`, which is R15's concern, not R11's.
 - **Write a domain glossary** (`docs/GLOSSARY.md`) — **the largest documentation gap left, and the
   one nobody but the SNT team can fill.** The code is full of domain terms that cannot be inferred
   from it: `N1_METHOD` with choices `PRES` / `SUSP-TEST`, `CSB` (care-seeking behaviour), `FOSA`,
@@ -451,7 +450,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R8** | Parquet is the machine contract; write the `.csv` twin beside it | `convention` |
 | **R9** | `{CC}_parameters.json` published beside the data, via `save_pipeline_parameters(...)` | `⚠ exceptions` — ERA5 stamps `pipeline_name="snt_era5_aggregate"`; healthcare_access stores the `File` object, not `.path` |
 | **R10** | All **column** names UPPERCASE in every published artefact | `convention` |
-| **R11** | All **notebook parameter** globals UPPERCASE, injected side and `exists()` side alike | `⚠ exceptions` — [TODO: migrate 3 pipelines](#suggestions-logged-for-later-evaluation-giulia) |
+| **R11** | All **notebook parameter** globals UPPERCASE, injected side and `exists()` side alike | `⚠ exceptions` — [TODO: migrate 2 pipelines](#suggestions-logged-for-later-evaluation-giulia) |
 | **R12** | Every injected parameter has a matching `if (!exists("X")) X <- …` fallback, spelled identically | `convention` |
 | **R13** | Admin levels read from config, never hardcoded | `convention` — [Schema](#schema) |
 | **R14** | Standard flags named `run_report_only` / `pull_scripts` / `overwrite` | `⚠ exceptions` — `run_reports_only` in `snt_dhs_indicators` |
@@ -612,9 +611,9 @@ Keep these names and behaviours identical across pipelines — operators rely on
   cell, so the notebook stays interactively runnable. Change both sides together.
 - **Notebook parameter globals are UPPERCASE** (**R11**) — `ROUTINE_DATA_CHOICE`, `SNT_ROOT_PATH`,
   `DEVIATION_IQR`. This distinguishes an injected pipeline parameter from an ordinary R local at a
-  glance, and matches the UPPERCASE column convention. Three pipelines predate the rule and use
+  glance, and matches the UPPERCASE column convention. Two pipelines predate the rule and use
   lowercase — see [Traps](#traps). New parameters are UPPERCASE even when added to one of those
-  three, *unless* that would leave a single notebook mixing both: converting a violator is an
+  two, *unless* that would leave a single notebook mixing both: converting a violator is an
   all-at-once change, not a drive-by.
 - **A notebook change needs a domain reviewer**, not just any reviewer. Every change to `main` goes
   via PR, and a change to `pipelines/*/code/`, `pipelines/*/utils/` or `code/` should be reviewed by
@@ -721,12 +720,13 @@ file as a backup, not as the running code.
   removed" is `raw_without_outliers` in `snt_dhis2_incidence`, `outliers_removed` in the two
   `reporting_rate_*` pipelines, and `removed` under a differently-named parameter (`data_action`)
   in `snt_dhis2_quality_of_care`. Check the target pipeline's `choices=[...]` before assuming.
-- **Three pipelines break the UPPERCASE parameter rule (R11).** `snt_dhis2_quality_of_care`
-  (`data_action`), `snt_seasonality_cases` and `snt_seasonality_rainfall` inject lowercase globals.
+- **Two pipelines break the UPPERCASE parameter rule (R11).** `snt_seasonality_cases` and
+  `snt_seasonality_rainfall` inject lowercase globals.
   Each is internally self-consistent, so it works — but it means you cannot assume the case of a
   parameter without checking. Read the pipeline's injected dict before writing the notebook's
   `exists()` cell. **Not a permitted variant**: logged for migration below. Do not half-convert
-  one — a notebook mixing `data_action` and `DATA_ACTION` is worse than either.
+  one — a notebook mixing `threshold_for_seasonality` and `THRESHOLD_FOR_SEASONALITY` is worse
+  than either.
   - Beware the near-miss in `snt_healthcare_access`: it injects UPPERCASE
     (`INPUT_FOSA_FILE`, `WORLDPOP_YEAR`) into the notebook but records lowercase keys in its
     parameters JSON. Both are intentional; only the notebook side is governed by R11.

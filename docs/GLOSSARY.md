@@ -350,7 +350,7 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 > differently in three places. Check the target pipeline's `choices=[...]` before assuming. This is a
 > known violation of rule **R15**, logged for migration in `CLAUDE.md`.
 
-| Concept | `snt_dhis2_incidence` | `snt_dhis2_reporting_rate_*` | `snt_dhis2_quality_of_care` |
+| Concept | `snt_dhis2_incidence` | `snt_dhis2_reporting_rate_dataelement` | `snt_dhis2_quality_of_care` |
 |---|---|---|---|
 | Parameter name | `routine_data_choice` | `routine_data_choice` | **`data_action`** |
 | Formatted, untreated | `raw` | `raw` | *(not offered)* |
@@ -361,7 +361,7 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 
 | Term | Definition | Status |
 |---|---|---|
-| **Dataset method** | `snt_dhis2_reporting_rate_dataset` — uses DHIS2's **own** reporting-rate metrics (`ACTUAL_REPORTS` / `EXPECTED_REPORTS`, identified by `REPORTING_RATE_PRODUCT_UID`). Takes DHIS2's definition of "expected" as given. Can have incomplete coverage, which propagates `NA` into `N2`. | ✅ |
+| **Dataset method** | `snt_dhis2_reporting_rate_dataset` — uses DHIS2's **own** reporting-rate metrics (`ACTUAL_REPORTS` / `EXPECTED_REPORTS`, identified by `REPORTING_RATE_PRODUCT_UID`, which is required). Reads only the formatted reporting extract, no routine data: facility-level when extracted from DHIS2 datasets, already ADM2 when extracted from DHIS2 indicators. Takes DHIS2's definition of "expected" as given. Can have incomplete coverage, which propagates `NA` into `N2`. | ✅ |
 | **Data element method** | `snt_dhis2_reporting_rate_dataelement` — **reconstructs** the rate: builds a full `PERIOD × OU_ID` grid from the pyramid and counts a facility as having reported if it has a positive value on the chosen `activity_indicators`. Independent of how DHIS2 configures datasets. | ✅ |
 | `ROUTINE_ACTIVE_FACILITIES` | `dataelement_method_denominator` choice. Denominator = facilities seen to be clinically active in the routine data. | ✅ |
 | `PYRAMID_OPEN_FACILITIES` | `dataelement_method_denominator` choice. Denominator = facilities the pyramid says were open, whether or not they reported anything. Stricter, and usually gives a lower rate. | ✅ |

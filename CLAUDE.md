@@ -387,9 +387,9 @@ Not implemented — recorded here so they can be assessed:
   *which* version number counts (source / template / workspace — see
   [`docs/DATA_ARCHITECTURE.md` §7.1.1](docs/DATA_ARCHITECTURE.md)). A commit SHA of the
   `pipeline.py` last verified against is well-defined today and needs no OpenHEXA change.
-- **Unify the routine-data-choice vocabulary** across `snt_dhis2_incidence`, both
-  `reporting_rate_*` pipelines and `snt_dhis2_quality_of_care` — operator-visible, so it needs a
-  migration rather than a rename. (Rule **R15**.)
+- **Unify the routine-data-choice vocabulary** across `snt_dhis2_incidence`,
+  `snt_dhis2_reporting_rate_dataelement` and `snt_dhis2_quality_of_care` — operator-visible, so it
+  needs a migration rather than a rename. (Rule **R15**.)
 - **Migrate the two lowercase-parameter pipelines to UPPERCASE** (rule **R11**):
   `snt_seasonality_cases` and `snt_seasonality_rainfall` (`minimum_month_block_size`, `maximum_month_block_size`,
   `threshold_for_seasonality`, `threshold_proportion_seasonal_years`,
@@ -717,9 +717,10 @@ file as a backup, not as the running code.
   data file in the system. This is the one place pipelines couple through the filesystem instead
   of a dataset. Don't rename those files.
 - **The same concept has three different parameter vocabularies.** "Routine data with outliers
-  removed" is `raw_without_outliers` in `snt_dhis2_incidence`, `outliers_removed` in the two
-  `reporting_rate_*` pipelines, and `removed` under a differently-named parameter (`data_action`)
-  in `snt_dhis2_quality_of_care`. Check the target pipeline's `choices=[...]` before assuming.
+  removed" is `raw_without_outliers` in `snt_dhis2_incidence`, `outliers_removed` in
+  `snt_dhis2_reporting_rate_dataelement`, and `removed` under a differently-named parameter
+  (`data_action`) in `snt_dhis2_quality_of_care`. Check the target pipeline's `choices=[...]` before
+  assuming. (`snt_dhis2_reporting_rate_dataset` takes no routine data and has no such parameter.)
 - **Two pipelines break the UPPERCASE parameter rule (R11).** `snt_seasonality_cases` and
   `snt_seasonality_rainfall` inject lowercase globals.
   Each is internally self-consistent, so it works — but it means you cannot assume the case of a
@@ -736,9 +737,11 @@ file as a backup, not as the running code.
   so no bad data — but the pipeline's own help text makes the bug read as expected behaviour. Fix
   belongs in `select_population_column()`, not in the mapping. See
   [`docs/DATA_ARCHITECTURE.md` §6.1](docs/DATA_ARCHITECTURE.md).
-- **`snt_dhis2_reporting_rate_*` is the reference implementation for routine-file selection** —
-  its `resolve_routine_filename()` is explicit and total, and it verifies the file exists with
-  `dataset_file_exists()` before running anything. Copy that shape rather than inventing another.
+- **`snt_dhis2_reporting_rate_dataelement` is the reference implementation for routine-file
+  selection** — its `resolve_routine_filename()` is explicit and total, and it verifies the file
+  exists with `dataset_file_exists()` before running anything. Copy that shape rather than inventing
+  another. (Its `_dataset` sibling no longer reads routine data: it uses only the formatted
+  reporting extract.)
 - **`snt_assemble_results` is being deprecated** — the SNT Explorer will read the OpenHEXA datasets
   directly instead. Don't extend it, and treat `configuration/SNT_metadata.json` as mid-change.
 

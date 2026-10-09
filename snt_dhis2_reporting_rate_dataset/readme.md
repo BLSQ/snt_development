@@ -1,38 +1,56 @@
 # SNT DHIS2 Reporting Rate (Dataset) Pipeline
 
-This pipeline computes **monthly** DHIS2 **dataset-level** reporting rates at **ADM2** resolution by combining routine metadata with pre-computed **actual** and **expected** report counts from DHIS2, then aggregating and deduplicating at facility and district level. Results are written to **`data/dhis2/reporting_rate/`**, registered in the **`DHIS2_REPORTING_RATE`** dataset, and summarized again in the reporting notebook.
+The **SNT DHIS2 Reporting Rate (Dataset)** pipeline computes **monthly** DHIS2 reporting rates at **ADM2** resolution as **`ACTUAL_REPORTS / EXPECTED_REPORTS`**, from the reporting extract formatted by the DHIS2 formatting pipeline. It publishes the district-month table to **`DHIS2_REPORTING_RATE`** and runs the reporting notebook.
 
 ## Parameters
 
-* **`routine_data_choice`** (String, Required):
-  * **Name:** Routine data source
-  * **Description:** Selects which routine Parquet the notebook loads: formatted raw routine, outlier-imputed routine, or outlier-removed routine.
-  * **Choices/Default:** `raw` (**`{COUNTRY_CODE}_routine.parquet`** on **`DHIS2_DATASET_FORMATTED`**), `imputed` (**`{COUNTRY_CODE}_routine_outliers_imputed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**), `outliers_removed` (**`{COUNTRY_CODE}_routine_outliers_removed.parquet`** on **`DHIS2_OUTLIERS_IMPUTATION`**). Default: `imputed`.
+This pipeline takes no domain parameters; it only has the standard `run_report_only` and `pull_scripts` flags.
 
 ## Functionality Overview
 
-1. Load **`configuration/SNT_config.json`** and resolve the routine filename implied by **`routine_data_choice`**.
-2. Verify the chosen routine file exists in the appropriate source dataset; exit early with a warning if it is missing (for example before outliers imputation has been run).
-3. Run **`pipelines/snt_dhis2_reporting_rate_dataset/code/snt_dhis2_reporting_rate_dataset.ipynb`** with **`SNT_ROOT_PATH`** and **`ROUTINE_FILE`**.
-4. Save the Papermill parameter record alongside outputs.
-5. Upload **`{COUNTRY_CODE}_reporting_rate_dataset`** tables and the parameter file to **`DHIS2_REPORTING_RATE`**.
-6. Run the dataset reporting notebook to refresh charts and tables in **`reporting/outputs/`**.
+1. **Configuration:** Load and validate **`SNT_config.json`**, read **`COUNTRY_CODE`** and the dataset identifiers.
+2. **Input check:** Verify that **`[COUNTRY_CODE]_reporting.parquet`** exists on **`DHIS2_DATASET_FORMATTED`**. If it is missing, log a warning and **stop without failing**: nothing is computed, published or reported.
+3. **Product UID check:** Fail the run with an error if **`SNT_CONFIG.REPORTING_RATE_PRODUCT_UID`** is missing, empty or holds only blank values.
+4. **Parameters:** Save the pipeline parameters JSON (records **`ROOT_PATH`**) to **`data/dhis2/reporting_rate/`**.
+5. **Computation notebook:** Run **`pipelines/snt_dhis2_reporting_rate_dataset/code/snt_dhis2_reporting_rate_dataset.ipynb`**:
+   1. **Load** **`[COUNTRY_CODE]_reporting.parquet`** from **`DHIS2_DATASET_FORMATTED`** and detect its grain: **facility level** when an **`OU_ID`** column is present (dataset-based extract), **already ADM2** when it is absent (indicator-based extract).
+   2. **Filter by product:** Keep only the rows whose **`PRODUCT_UID`** is listed in **`REPORTING_RATE_PRODUCT_UID`**, when all the listed UIDs are present in the data; otherwise log a warning and keep all products.
+   3. **Pivot** **`PRODUCT_METRIC`** into **`ACTUAL_REPORTS`** and **`EXPECTED_REPORTS`** columns.
+   4. **Deduplicate (facility level only):** When a facility appears in several datasets for the same period, keep the row with the highest **`ACTUAL_REPORTS`**, provided all duplicated values are 0 or 1; otherwise log a warning and keep the duplicates. Skipped for ADM2-level data.
+   5. **NER only, facility level only:** Convert **`ACTUAL_REPORTS`** and **`EXPECTED_REPORTS`** values above 1 to 1 (pre-aggregated HOP hospital datasets). Skipped, with a warning, for ADM2-level data.
+   6. **Aggregate:** Sum **`ACTUAL_REPORTS`** and **`EXPECTED_REPORTS`** **by `ADM2_ID` and `PERIOD`**, then compute **`REPORTING_RATE`**.
+   7. **Export** **`[COUNTRY_CODE]_reporting_rate_dataset.parquet`** and **`.csv`** to **`data/dhis2/reporting_rate/`**.
+6. **Output check:** Fail the run if the parquet or CSV is missing or was not written during this run, so files left over from a previous run are never published.
+7. **Publish:** Upload the parquet, CSV and parameters JSON to **`DHIS2_REPORTING_RATE`**.
+8. **Reporting:** Run **`pipelines/snt_dhis2_reporting_rate_dataset/reporting/snt_dhis2_reporting_rate_dataset_report.ipynb`**, which reads the published table back from **`DHIS2_REPORTING_RATE`**.
 
 ## Inputs
 
-* **`configuration/SNT_config.json`**: Dataset identifiers (formatted routine versus outliers imputation) and **`COUNTRY_CODE`**.
-* **`{COUNTRY_CODE}_routine.parquet`** or **`{COUNTRY_CODE}_routine_outliers_imputed.parquet`** or **`{COUNTRY_CODE}_routine_outliers_removed.parquet`**: Monthly facility-level routine table (columns include **`PERIOD`** in **`YYYYMM`** form, **`ADM2_ID`**, and indicators as configured).
-* **`{COUNTRY_CODE}_reporting.parquet`**: DHIS2 reporting extract with actual and expected report counts by **`OU_ID`** and **`PERIOD`**, restricted in the notebook to datasets declared in the configuration.
+* **`[COUNTRY_CODE]_reporting.parquet`** on **`DHIS2_DATASET_FORMATTED`** — required; produced by the DHIS2 formatting pipeline from the extract's reporting data. Its grain depends on how reporting rates are configured for extraction (**`DHIS2_DATA_DEFINITIONS.DHIS2_REPORTING_RATES`**):
+  * **`REPORTING_DATASETS`**: one row per facility (**`OU_ID`**) × period × dataset metric.
+  * **`REPORTING_INDICATORS`**: one row per district (**`ADM2_ID`**) × period × indicator, already aggregated by DHIS2; no **`OU_ID`** / **`OU_NAME`** columns.
+* **`configuration/SNT_config.json`** for **`SNT_CONFIG.COUNTRY_CODE`**, **`SNT_CONFIG.REPORTING_RATE_PRODUCT_UID`** (required) and the dataset identifiers **`DHIS2_DATASET_FORMATTED`** and **`DHIS2_REPORTING_RATE`**.
+* Reporting notebook only: **`[COUNTRY_CODE]_shapes.geojson`** on **`DHIS2_DATASET_FORMATTED`** (maps) and the **`REPORTING_RATE.SCALE`** breaks in **`configuration/SNT_metadata.json`** (colour categories).
 
 ## Outputs
 
-* **`{COUNTRY_CODE}_reporting_rate_dataset.parquet`** and **`.csv`**: District-month reporting rates (**`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`**, plus supporting admin labels as produced by the notebook).
-* **Pipeline parameters JSON** under **`data/dhis2/reporting_rate/`**.
-* **Papermill output** under **`papermill_outputs/`** and **report outputs** under **`reporting/outputs/`**.
+**Workspace filesystem**
+
+* **`data/dhis2/reporting_rate/[COUNTRY_CODE]_reporting_rate_dataset.parquet`** and **`.csv`**.
+* **Pipeline parameters JSON** in the same directory.
+* **Report figures** in **`pipelines/snt_dhis2_reporting_rate_dataset/reporting/outputs/figures/`**: line-point plot, heatmap, monthly map and yearly-mean map, named **`[COUNTRY_CODE]_reporting_rate_dataset_adm2_{linepoint|heatmap|map|map_year}_[PRODUCT_UIDs].png`**. Written, not published.
+
+**Published to `DHIS2_REPORTING_RATE`**
+
+* **`[COUNTRY_CODE]_reporting_rate_dataset.parquet`** and **`.csv`**.
+* The pipeline parameters JSON.
 
 > **Notes for the Data Analyst:**
 >
-> - **`Temporal and spatial resolution`**: Reporting rates are computed per **calendar month** (**`PERIOD`** / **`YEAR`**–**`MONTH`**) and summarized to **ADM2**, per the main notebook.
-> - **`routine_data_choice`**: **`imputed`** and **`outliers_removed`** require successful runs of the outliers pipeline; **`raw`** reads only from the formatted routine dataset.
-> - **`Dataset selection`**: When several DHIS2 products exist, the notebook keeps only datasets listed in **`SNT_config.json`** and deduplicates **`OU_ID`** by **`PERIOD`** using the highest **`ACTUAL_REPORTS`** when safe to do so.
-> - **`Period alignment`**: Mismatched years or months between routine and reporting extracts can bias downstream metrics; review overlap checks in the executed notebook.
+> - **Grain:** one row per **`ADM2_ID`** × **`YEAR`** × **`MONTH`**, for the district-months present in the reporting extract. Columns: **`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`** (no **`PERIOD`**, no names).
+> - **`REPORTING_RATE`**: district-month **`sum(ACTUAL_REPORTS) / sum(EXPECTED_REPORTS)`**, a proportion — a ratio of sums, not an average of facility rates.
+>   - There is no guard on the denominator: a district-month with **`EXPECTED_REPORTS` = 0** gets **`NaN`** (or **`Inf`** if actual reports are positive).
+>   - Values above 1 are kept; the notebook logs a warning when any value falls outside [0, 1].
+> - **`REPORTING_RATE_PRODUCT_UID`** must list UIDs from the extraction mode actually used: dataset UIDs for **`REPORTING_DATASETS`** (it may be a subset of the extracted datasets), or both indicator UIDs (actual and expected reports) for **`REPORTING_INDICATORS`**. If a listed UID is absent from the data, no filtering is applied and all products are kept.
+> - **Guarded execution:** a missing **`[COUNTRY_CODE]_reporting.parquet`** ends the run early as a success, with only a warning in the log. Facility-level steps (deduplication, NER HOP conversion) are skipped when the data has no **`OU_ID`**.
+> - **Downstream use:** **`snt_dhis2_incidence`** left-joins this table onto its own routine district-months by **`ADM2_ID`**, **`YEAR`**, **`MONTH`**, so district-months missing here get a missing reporting rate there.

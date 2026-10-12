@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from pathlib import Path
+from typing import NoReturn
 from urllib.parse import quote
 
 import pandas as pd
@@ -28,6 +29,11 @@ REPOSITORY = "BLSQ/snt_development"
 MASTER_REPO_PATH = "metadata/SNT_metadata_master.json"
 LATEST_RELEASE = "latest"
 HTTP_TIMEOUT_SECONDS = 30
+
+
+class MasterNotFoundError(Exception):
+    """The requested ref has no master list: no release yet, unknown ref, or ref older than the file."""
+
 
 # Drop reasons, in the order the checks run. Anything other than COLUMN_NOT_FOUND means the column
 # could not even be looked for.
@@ -83,8 +89,9 @@ class SourceCheck:
 def snt_metadata_json_trim(repository_ref: str, metadata_file: File | None = None) -> None:
     """Trim the SNT metadata master list to the layers whose source column exists in this workspace.
 
-    Never fails the run: every problem is logged, and the run ends early (with nothing published)
-    only when no output can be produced at all.
+    Fails the run whenever no usable output is published: configuration or master list unavailable,
+    no layer kept, or the outputs could not be written or published. Layers that cannot be checked
+    are dropped and logged without failing the run.
     """
     root_path = Path(workspace.files_path)
     output_path = root_path / "pipelines" / "snt_metadata_json_trim" / "output"
@@ -94,23 +101,21 @@ def snt_metadata_json_trim(repository_ref: str, metadata_file: File | None = Non
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
         dataset_identifiers = snt_config.get("SNT_DATASET_IDENTIFIERS", {})
     except Exception as e:
-        current_run.log_error(
+        fail(
             f"Could not load configuration/SNT_config.json or read COUNTRY_CODE from it: {e}. "
-            "Nothing was produced."
+            "Nothing was produced.",
+            e,
         )
-        return
 
     try:
         content, master = load_master(repository_ref, metadata_file)
     except Exception as e:
-        current_run.log_error(f"Could not get the master list: {e}. Nothing was produced.")
-        return
+        fail(f"Could not get the master list: {e}. Nothing was produced.", e)
 
     try:
         metadata = parse_metadata(content)
     except Exception as e:
-        current_run.log_error(f"Could not parse the master list {master['PATH']}: {e}. Nothing was produced.")
-        return
+        fail(f"Could not parse the master list {master['PATH']}: {e}. Nothing was produced.", e)
 
     current_run.log_info(
         f"Checking {len(metadata)} layers from {master['PATH']} (sha256 {master['SHA256'][:12]}) "
@@ -130,18 +135,47 @@ def snt_metadata_json_trim(repository_ref: str, metadata_file: File | None = Non
         )
         current_run.log_info(f"Trimmed metadata written to {trimmed_path}.")
     except Exception as e:
-        current_run.log_error(
-            f"Could not write the output files to {output_path}: {e}. Nothing was published."
+        fail(f"Could not write the output files to {output_path}: {e}. Nothing was published.", e)
+
+    if not trimmed:
+        fail(
+            "No layer was kept. Either no upstream pipeline has published its outputs yet in this "
+            "workspace, or the master list does not match it (dataset keys, filenames, column names). "
+            f"Nothing was published to {OUTPUT_DATASET_NAME}, so its previous version stays the latest. "
+            f"The reason for every dropped layer is logged above and in {report_path}."
         )
-        return
 
     try:
         publish_to_dataset([trimmed_path, report_path], country_code)
     except Exception as e:
-        current_run.log_error(
+        fail(
             f"Could not publish to the {OUTPUT_DATASET_NAME} dataset: {e}. "
-            f"The output files are still available in {output_path}."
+            f"The output files are still available in {output_path}.",
+            e,
         )
+
+
+class PipelineFailedError(Exception):
+    """Ends the run as failed; its message has already been logged at error level."""
+
+
+def fail(message: str, cause: Exception | None = None) -> NoReturn:
+    """Log an error and fail the run.
+
+    Parameters
+    ----------
+    message : str
+        What went wrong and what was (not) produced.
+    cause : Exception | None
+        The underlying exception, chained for the traceback.
+
+    Raises
+    ------
+    PipelineFailedError
+        Always.
+    """
+    current_run.log_error(message)
+    raise PipelineFailedError(message) from cause
 
 
 def load_master(repository_ref: str, metadata_file: File | None) -> tuple[bytes, dict]:
@@ -212,7 +246,7 @@ def resolve_ref(ref: str) -> str:
 
     Raises
     ------
-    ValueError
+    MasterNotFoundError
         If ref is "latest" and the repository has no published release.
     """
     if ref != LATEST_RELEASE:
@@ -221,8 +255,8 @@ def resolve_ref(ref: str) -> str:
         release = json.loads(http_get(f"https://api.github.com/repos/{REPOSITORY}/releases/latest"))
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise ValueError(
-                f"no release has been published yet in {REPOSITORY}; set repository_ref to a branch "
+            raise MasterNotFoundError(
+                f"no release has been published yet in {REPOSITORY}. Set repository_ref to a branch "
                 "such as 'main'"
             ) from e
         raise
@@ -244,7 +278,7 @@ def fetch_master(ref: str) -> tuple[bytes, str]:
 
     Raises
     ------
-    ValueError
+    MasterNotFoundError
         If the ref does not exist, or exists but does not contain the master list.
     """
     url = f"https://raw.githubusercontent.com/{REPOSITORY}/{quote(ref, safe='/')}/{MASTER_REPO_PATH}"
@@ -258,10 +292,14 @@ def fetch_master(ref: str) -> tuple[bytes, str]:
         http_get(f"https://api.github.com/repos/{REPOSITORY}/commits/{quote(ref, safe='/')}")
     except urllib.error.HTTPError as e:
         if e.code in (404, 422):
-            raise ValueError(f"'{ref}' is not a release tag or branch of {REPOSITORY}") from e
+            raise MasterNotFoundError(
+                f"'{ref}' is not a release tag or branch of {REPOSITORY}. Check the spelling, or use "
+                "'latest', a release tag or a branch such as 'main'"
+            ) from e
         raise
-    raise ValueError(
-        f"'{ref}' exists in {REPOSITORY} but has no {MASTER_REPO_PATH} (it may predate the master list)"
+    raise MasterNotFoundError(
+        f"'{ref}' exists in {REPOSITORY} but has no {MASTER_REPO_PATH} (it predates the master list). "
+        "Use a newer release tag, or a branch that contains the file"
     )
 
 
@@ -606,12 +644,6 @@ def log_summary(metadata: dict, trimmed: dict, dropped: list[dict]) -> None:
 
     current_run.log_info(f"Kept {len(trimmed)} of {len(metadata)} layers, dropped {len(dropped)}.")
 
-    if metadata and not trimmed:
-        current_run.log_error(
-            "No layer was kept. Either no upstream pipeline has published its outputs yet in this "
-            "workspace, or the metadata file does not match this workspace (dataset keys, filenames, "
-            "column names). See the reasons above and SNT_metadata_trimmed_report.json."
-        )
     if by_reason.get(CHECK_FAILED):
         current_run.log_error(
             f"{len(by_reason[CHECK_FAILED])} layer(s) were dropped because a check failed, not because "

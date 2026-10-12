@@ -31,11 +31,11 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
 ## Functionality Overview
 
 1. **Configuration:** Load **`configuration/SNT_config.json`** for **`COUNTRY_CODE`** and
-   **`SNT_DATASET_IDENTIFIERS`**. If it cannot be loaded, log an error and stop (nothing written).
+   **`SNT_DATASET_IDENTIFIERS`**. If it cannot be loaded, the run fails (nothing written).
 2. **Get the master list:** If `metadata_file` is given, read it. Otherwise resolve `repository_ref`
    (`latest` → the latest release's tag) and download `metadata/SNT_metadata_master.json` at that
    ref, unauthenticated (the repository is public). Its SHA256 is recorded in the report. If the
-   download fails, or the content is not a JSON object, log an error naming the cause and stop. The
+   download fails, or the content is not a JSON object, the run fails with an error naming the cause. The
    possible causes are: no release published yet, unknown ref, or a ref that predates the master
    list. The run never falls back to another ref.
 3. **Check each distinct source once:** Group layers by (`DATASET.NAME`, `DATASET.VERSION`,
@@ -52,10 +52,20 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
 6. **Publish:** Create a new version of **`SNT_METADATA`**, named `SNT_[COUNTRY_CODE]_YYYYMMDD_HHMM`
    (UTC), holding both files. The dataset is created if it does not exist yet.
 
-**The run never fails.** Every problem is logged and the run still finishes as a success. Nothing is
-written when step 1 or 2 fails. When publishing fails, the files are still in the output folder.
-When no layer at all is kept, an error-level message says so and an empty catalogue is still
-published.
+**The run fails whenever it does not publish a usable trimmed list.** An error-level message names
+the cause, and the run status is *failed*:
+
+| Cause | Written to the output folder | Published |
+|---|---|---|
+| `SNT_config.json` cannot be loaded (step 1) | nothing | nothing |
+| Master list cannot be fetched or parsed (step 2): no release yet, unknown ref, ref predates the master list, network or GitHub error, invalid JSON | nothing | nothing |
+| The output files cannot be written (step 5) | — | nothing |
+| **No layer is kept** | both files (read the report for every drop reason) | nothing — the previous `SNT_METADATA` version stays the latest |
+| Publishing fails (step 6) | both files | nothing |
+
+**A partial result still succeeds.** When at least one layer is kept, the run publishes and finishes
+as a success, even if other layers were dropped. That includes layers dropped as `CHECK_FAILED`,
+which is logged at error level.
 
 ## Inputs
 

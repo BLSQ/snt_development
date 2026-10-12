@@ -10,8 +10,7 @@
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
 | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from the old-format `SNT_metadata_20260226.json` on 2026-09-08. Nine layers, schema-valid. Read [§7](#7-the-ner-conversion-2026-09-08) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
-| [`SNT_metadata_all_layers.json`](SNT_metadata_all_layers.json) | **Interoperability test file** (2026-09-28): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. **All text is placeholder** and scales are defaults. Read [§8](#8-the-all-layers-test-file-2026-09-28) for what it leaves out and why. |
-| [`build_snt_metadata_all_layers.py`](build_snt_metadata_all_layers.py) | The generator for `SNT_metadata_all_layers.json`. Edit the layer list or scales here, not in the JSON, then regenerate. |
+| [`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. **All text is still placeholder** and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
 
 > **Format change, 2026-09-08:** `TYPE` now also accepts `"Ordinal"`, and `SCALE` is read differently
 > under it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
@@ -479,22 +478,24 @@ reference copy either way.
 > subfolder like this one stays tracked. Do not narrow it when adding a schema for another
 > configuration file — see [`docs/schemas/README.md`](../README.md).
 
-## 8. The all-layers test file (2026-09-28)
+## 8. The master list (2026-09-28)
 
-[`SNT_metadata_all_layers.json`](SNT_metadata_all_layers.json) exists to test interoperability with
-the SNT Explorer: it declares **every column the current pipelines can publish** that fits this
-format, so the Explorer's ingestion can be exercised end to end. It is **not a catalogue to deploy**.
+[`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) declares **every
+column the current pipelines can publish** that fits this format. It started as an interoperability
+test file for the SNT Explorer and is now the **master list**: `snt_metadata_json_trim` fetches it
+from this repository and keeps, per workspace, the layers whose data exists. It was created as
+`SNT_metadata_all_layers.json` in this folder and moved and renamed on 2026-10-12.
 `snt_assemble_results` is out of scope (being deprecated).
 
-**The JSON is generated — do not edit it by hand.** It is written by
-[`build_snt_metadata_all_layers.py`](build_snt_metadata_all_layers.py) (standard library only), which
-holds the layer list and the scale defaults below. Change the script, then regenerate and validate:
+**The JSON is the source of truth — edit it by hand, reviewed in a PR.** It was bootstrapped by a
+one-off generator, `build_snt_metadata_all_layers.py`, deleted on 2026-10-12 so it can never
+overwrite curated text. It is in git history at commit `062cf0c`. After editing, validate with
+[§5](#5-validating) with `METADATA` pointed at the JSON. How to maintain it:
+[`metadata/README.md`](../../../metadata/README.md).
 
-```bash
-python3 docs/schemas/snt_metadata_json/build_snt_metadata_all_layers.py   # overwrites the JSON
-```
-
-followed by the validator in [§5](#5-validating) with `METADATA` pointed at the JSON.
+The rest of this section records how the 2026-09-28 content was produced. The placeholder and
+default-scale tables below describe the file as bootstrapped; they stop being accurate entry by
+entry as real text and scales are written.
 
 Every `SOURCE_DATA` pointer was traced to the code that writes the column (`pipeline.py`
 `add_files_to_dataset(...)` calls, and the notebook cells that build the final table). Nothing was

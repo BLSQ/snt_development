@@ -1,8 +1,8 @@
 # SNT Metadata JSON Trim Pipeline
 
-The **SNT Metadata JSON Trim** pipeline takes the full SNT Explorer layer catalogue
-(**`SNT_metadata_all_layers.json`**) and keeps only the layers whose data actually exists in this
-workspace. It publishes the trimmed catalogue, **`SNT_metadata_trimmed.json`**, and a run report to
+The **SNT Metadata JSON Trim** pipeline takes the master list of SNT Explorer data layers
+(**`SNT_metadata_master.json`**, fetched from the `snt_development` repository) and keeps only the
+layers whose data actually exists in this workspace. It publishes the trimmed catalogue, **`SNT_metadata_trimmed.json`**, and a run report to
 the **`SNT_METADATA`** dataset, creating that dataset on first run.
 
 > **Status:** a tool for NER only (`ner-snt-process`) for now. It is **not** published through
@@ -11,17 +11,33 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
 
 ## Parameters
 
-* **`metadata_file`** (File, Required):
-  * **Name:** SNT metadata JSON (all layers)
-  * **Description:** The catalogue to trim: a JSON object keyed by layer id, in the format described
-    in `docs/schemas/snt_metadata_json/`. Chosen from the workspace file browser; where this file
-    should live permanently is still undecided.
+* **`repository_ref`** (String, Required, Default: `latest`):
+  * **Name:** Master list version (release tag or branch)
+  * **Description:** Which version of
+    [`metadata/SNT_metadata_master.json`](../metadata/SNT_metadata_master.json) to fetch from
+    `github.com/BLSQ/snt_development`:
+    * `latest` — the latest published GitHub release (drafts and pre-releases excluded).
+    * a release tag (e.g. `v2026.10.0`) — pins that release.
+    * a branch (e.g. `main`) — the current state of that branch. GitHub may serve a copy up to a few
+      minutes old after a push.
+
+    Ignored when `metadata_file` is given.
+* **`metadata_file`** (File, Optional):
+  * **Name:** Master list file (optional override)
+  * **Description:** A local master list to use instead of the repository one, e.g. to test an edited
+    copy. A JSON object keyed by layer id, in the format described in
+    `docs/schemas/snt_metadata_json/`. Leave empty for normal runs.
 
 ## Functionality Overview
 
 1. **Configuration:** Load **`configuration/SNT_config.json`** for **`COUNTRY_CODE`** and
    **`SNT_DATASET_IDENTIFIERS`**. If it cannot be loaded, log an error and stop (nothing written).
-2. **Read the catalogue:** Parse `metadata_file`. If it is not a JSON object, log an error and stop.
+2. **Get the master list:** If `metadata_file` is given, read it. Otherwise resolve `repository_ref`
+   (`latest` → the latest release's tag) and download `metadata/SNT_metadata_master.json` at that
+   ref, unauthenticated (the repository is public). Its SHA256 is recorded in the report. If the
+   download fails, or the content is not a JSON object, log an error naming the cause and stop. The
+   possible causes are: no release published yet, unknown ref, or a ref that predates the master
+   list. The run never falls back to another ref.
 3. **Check each distinct source once:** Group layers by (`DATASET.NAME`, `DATASET.VERSION`,
    `FILENAME` with `{COUNTRY_CODE}` substituted). Checks for each group, in order:
    1. `DATASET.NAME` is a key of `SNT_DATASET_IDENTIFIERS`.
@@ -43,7 +59,8 @@ published.
 
 ## Inputs
 
-* **`metadata_file`** — required (see Parameters).
+* **The master list** — from the repository at `repository_ref`, or `metadata_file` (see
+  Parameters). Needs outbound HTTPS to `api.github.com` and `raw.githubusercontent.com`.
 * **`configuration/SNT_config.json`** for **`SNT_CONFIG.COUNTRY_CODE`** and
   **`SNT_DATASET_IDENTIFIERS`** (every key named by a layer's `DATASET.NAME`).
 * **Every dataset file referenced by the catalogue.** Each one is optional: a missing one drops its
@@ -53,7 +70,7 @@ published.
 
 **Workspace filesystem** — `pipelines/snt_metadata_json_trim/output/`
 
-* **`SNT_metadata_trimmed.json`** — the kept layers, formatted like the generator's output
+* **`SNT_metadata_trimmed.json`** — the kept layers, formatted like the master list
   (4-space indent, UTF-8, non-ASCII kept as-is).
 * **`SNT_metadata_trimmed_report.json`** — the run report (below).
 
@@ -77,10 +94,14 @@ Both are overwritten on each run.
 >   - `MALFORMED_LAYER`: `SOURCE_DATA` is missing a required field.
 >   - `CHECK_FAILED`: an API error, or a file that could not be read. **This does not mean the data is
 >     absent.** It is logged at error level; re-run once the cause is fixed.
-> - **Report fields:** `RUN_AT`, `COUNTRY_CODE`, `INPUT_FILE`, `N_LAYERS_INPUT` / `_KEPT` /
+> - **Report fields:** `RUN_AT`, `COUNTRY_CODE`, `MASTER` (`SOURCE` = `repository` or `file`,
+>   `REF_REQUESTED`, `REF_RESOLVED`, `PATH`, `SHA256`), `N_LAYERS_INPUT` / `_KEPT` /
 >   `_DROPPED`, `KEPT` (layer ids), `DROPPED` (`LAYER_ID`, `REASON`, `DETAIL`, `DATASET_NAME`,
 >   `FILENAME`, `COLUMN`), and `SOURCES`: one entry per file checked, including the **resolved
 >   dataset version**, which records which vintage each kept layer was validated against.
+> - **`MASTER.SHA256` ties the run to a release.** It is the SHA256 of the master list's bytes, the
+>   same hash `release_manifest.json` records for `metadata/SNT_metadata_master.json`, so a run can
+>   be matched to the release it trimmed.
 > - **A kept layer is only as fresh as its dataset version.** The check is made against whatever
 >   version is latest *at run time*. Re-run this pipeline after upstream pipelines publish.
 > - **"Last run wins" is visible here.** Alternative pipelines that publish to the same dataset

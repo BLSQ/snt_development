@@ -1,9 +1,13 @@
+import hashlib
 import io
 import json
+import urllib.error
+import urllib.request
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -18,6 +22,12 @@ OUTPUT_DATASET_DESCRIPTION = (
 )
 TRIMMED_FILENAME = "SNT_metadata_trimmed.json"
 REPORT_FILENAME = "SNT_metadata_trimmed_report.json"
+
+# Where the master list is fetched from. "latest" resolves to the latest published GitHub release.
+REPOSITORY = "BLSQ/snt_development"
+MASTER_REPO_PATH = "metadata/SNT_metadata_master.json"
+LATEST_RELEASE = "latest"
+HTTP_TIMEOUT_SECONDS = 30
 
 # Drop reasons, in the order the checks run. Anything other than COLUMN_NOT_FOUND means the column
 # could not even be looked for.
@@ -48,17 +58,30 @@ class SourceCheck:
 
 @pipeline("snt_metadata_json_trim")
 @parameter(
-    "metadata_file",
-    name="SNT metadata JSON (all layers)",
-    type=File,
+    "repository_ref",
+    name="Master list version (release tag or branch)",
+    type=str,
+    default=LATEST_RELEASE,
     required=True,
     help=(
-        "The SNT_metadata_all_layers.json catalogue to trim. Each layer is kept only if the column "
-        "named in its SOURCE_DATA exists in the referenced dataset file of this workspace."
+        "Which version of SNT_metadata_master.json to fetch from the snt_development repository: "
+        "'latest' (the latest release), a release tag, or a branch such as 'main'. "
+        "Ignored when a file is given below."
     ),
 )
-def snt_metadata_json_trim(metadata_file: File) -> None:
-    """Trim the SNT metadata catalogue to the layers whose source column exists in this workspace.
+@parameter(
+    "metadata_file",
+    name="Master list file (optional override)",
+    type=File,
+    required=False,
+    default=None,
+    help=(
+        "Use this file instead of fetching the master list from the repository, e.g. to test an edited "
+        "copy. Leave empty for normal runs."
+    ),
+)
+def snt_metadata_json_trim(repository_ref: str, metadata_file: File | None = None) -> None:
+    """Trim the SNT metadata master list to the layers whose source column exists in this workspace.
 
     Never fails the run: every problem is logged, and the run ends early (with nothing published)
     only when no output can be produced at all.
@@ -78,15 +101,20 @@ def snt_metadata_json_trim(metadata_file: File) -> None:
         return
 
     try:
-        metadata = read_metadata(Path(metadata_file.path))
+        content, master = load_master(repository_ref, metadata_file)
     except Exception as e:
-        current_run.log_error(
-            f"Could not read the metadata file {metadata_file.path}: {e}. Nothing was produced."
-        )
+        current_run.log_error(f"Could not get the master list: {e}. Nothing was produced.")
+        return
+
+    try:
+        metadata = parse_metadata(content)
+    except Exception as e:
+        current_run.log_error(f"Could not parse the master list {master['PATH']}: {e}. Nothing was produced.")
         return
 
     current_run.log_info(
-        f"Checking {len(metadata)} layers from {metadata_file.name} for country {country_code}."
+        f"Checking {len(metadata)} layers from {master['PATH']} (sha256 {master['SHA256'][:12]}) "
+        f"for country {country_code}."
     )
 
     sources = check_sources(metadata, country_code, dataset_identifiers)
@@ -97,7 +125,7 @@ def snt_metadata_json_trim(metadata_file: File) -> None:
         output_path.mkdir(parents=True, exist_ok=True)
         trimmed_path = write_json(trimmed, output_path / TRIMMED_FILENAME)
         report_path = write_json(
-            build_report(metadata_file.path, country_code, metadata, trimmed, dropped, sources),
+            build_report(master, country_code, metadata, trimmed, dropped, sources),
             output_path / REPORT_FILENAME,
         )
         current_run.log_info(f"Trimmed metadata written to {trimmed_path}.")
@@ -116,26 +144,146 @@ def snt_metadata_json_trim(metadata_file: File) -> None:
         )
 
 
-def read_metadata(path: Path) -> dict:
-    """Read the metadata catalogue and check it is a JSON object of layers.
+def load_master(repository_ref: str, metadata_file: File | None) -> tuple[bytes, dict]:
+    """Get the master list content, from the override file if given, else from the repository.
 
     Parameters
     ----------
-    path : Path
-        Path to the metadata JSON file.
+    repository_ref : str
+        "latest", a release tag, or a branch name.
+    metadata_file : File | None
+        Optional override file.
 
     Returns
     -------
-    dict
-        The catalogue, keyed by layer id, in file order.
+    tuple[bytes, dict]
+        The raw content, and the MASTER provenance block for the report.
+    """
+    if metadata_file is not None:
+        current_run.log_info(f"Using the master list file {metadata_file.path}; repository_ref is ignored.")
+        content = Path(metadata_file.path).read_bytes()
+        source, ref_requested, ref_resolved, path = "file", None, None, metadata_file.path
+    else:
+        ref_requested = (repository_ref or LATEST_RELEASE).strip()
+        ref_resolved = resolve_ref(ref_requested)
+        content, path = fetch_master(ref_resolved)
+        source = "repository"
+        current_run.log_info(f"Fetched the master list from {REPOSITORY} at '{ref_resolved}'.")
+
+    return content, {
+        "SOURCE": source,
+        "REF_REQUESTED": ref_requested,
+        "REF_RESOLVED": ref_resolved,
+        "PATH": path,
+        "SHA256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def http_get(url: str) -> bytes:
+    """Fetch a URL from GitHub, unauthenticated (the repository is public).
+
+    Parameters
+    ----------
+    url : str
+        The URL.
+
+    Returns
+    -------
+    bytes
+        The response body.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": "openhexa-snt-metadata-json-trim"})
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+        return response.read()
+
+
+def resolve_ref(ref: str) -> str:
+    """Turn "latest" into the tag of the latest published release; return any other ref unchanged.
+
+    Parameters
+    ----------
+    ref : str
+        "latest", a release tag, or a branch name.
+
+    Returns
+    -------
+    str
+        The ref to fetch from.
 
     Raises
     ------
     ValueError
-        If the file is not a JSON object.
+        If ref is "latest" and the repository has no published release.
     """
-    with path.open(encoding="utf-8-sig") as f:
-        metadata = json.load(f)
+    if ref != LATEST_RELEASE:
+        return ref
+    try:
+        release = json.loads(http_get(f"https://api.github.com/repos/{REPOSITORY}/releases/latest"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise ValueError(
+                f"no release has been published yet in {REPOSITORY}; set repository_ref to a branch "
+                "such as 'main'"
+            ) from e
+        raise
+    return release["tag_name"]
+
+
+def fetch_master(ref: str) -> tuple[bytes, str]:
+    """Download the master list at a given ref.
+
+    Parameters
+    ----------
+    ref : str
+        A release tag or branch name.
+
+    Returns
+    -------
+    tuple[bytes, str]
+        The file content, and the URL it was fetched from.
+
+    Raises
+    ------
+    ValueError
+        If the ref does not exist, or exists but does not contain the master list.
+    """
+    url = f"https://raw.githubusercontent.com/{REPOSITORY}/{quote(ref, safe='/')}/{MASTER_REPO_PATH}"
+    try:
+        return http_get(url), url
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    # A 404 means either the ref or the file is missing: ask the API which one.
+    try:
+        http_get(f"https://api.github.com/repos/{REPOSITORY}/commits/{quote(ref, safe='/')}")
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 422):
+            raise ValueError(f"'{ref}' is not a release tag or branch of {REPOSITORY}") from e
+        raise
+    raise ValueError(
+        f"'{ref}' exists in {REPOSITORY} but has no {MASTER_REPO_PATH} (it may predate the master list)"
+    )
+
+
+def parse_metadata(content: bytes) -> dict:
+    """Parse the master list and check it is a JSON object of layers.
+
+    Parameters
+    ----------
+    content : bytes
+        The raw file content.
+
+    Returns
+    -------
+    dict
+        The master list, keyed by layer id, in file order.
+
+    Raises
+    ------
+    ValueError
+        If the content is not a JSON object.
+    """
+    metadata = json.loads(content.decode("utf-8-sig"))
     if not isinstance(metadata, dict):
         raise ValueError("expected a JSON object keyed by layer id")
     return metadata
@@ -472,7 +620,7 @@ def log_summary(metadata: dict, trimmed: dict, dropped: list[dict]) -> None:
 
 
 def build_report(
-    input_path: str,
+    master: dict,
     country_code: str,
     metadata: dict,
     trimmed: dict,
@@ -483,8 +631,8 @@ def build_report(
 
     Parameters
     ----------
-    input_path : str
-        Path of the input metadata file.
+    master : dict
+        Provenance of the master list, from `load_master`.
     country_code : str
         The country code.
     metadata : dict
@@ -504,7 +652,7 @@ def build_report(
     return {
         "RUN_AT": datetime.now(UTC).isoformat(timespec="seconds"),
         "COUNTRY_CODE": country_code,
-        "INPUT_FILE": input_path,
+        "MASTER": master,
         "N_LAYERS_INPUT": len(metadata),
         "N_LAYERS_KEPT": len(trimmed),
         "N_LAYERS_DROPPED": len(dropped),
@@ -526,7 +674,7 @@ def build_report(
 
 
 def write_json(content: dict, path: Path) -> Path:
-    """Write JSON in the same format as build_snt_metadata_all_layers.py.
+    """Write JSON in the same format as metadata/SNT_metadata_master.json (4-space indent, UTF-8).
 
     Parameters
     ----------

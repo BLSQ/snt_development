@@ -60,6 +60,10 @@ __pycache__/
 # ...), and a single-* negation would not reach inside them — the files would be
 # silently untracked, with git status never mentioning them.
 !docs/schemas/**/*.json
+# ...or the SNT Explorer master list, fetched from this repo by snt_metadata_json_trim and
+# shipped with each release. Layer definitions only, no country data (see metadata/README.md).
+# Named exactly, so a stray data .json dropped into metadata/ is still ignored.
+!metadata/SNT_metadata_master.json
 
 # R ----------------------------------------
 *.rds

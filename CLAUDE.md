@@ -86,6 +86,7 @@ pipelines/<pipeline_name>/utils/*.r    ← R helpers sourced by the notebooks.
 pipelines/<pipeline_name>/reporting/   ← R reporting notebooks.
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
 configuration/SNT_config_<CC>.json     ← reference copies only (see below).
+metadata/SNT_metadata_master.json      ← SNT Explorer master list; fetched by snt_metadata_json_trim.
 dev/environment.yml                    ← local Python dev tools. Never runs on OpenHEXA.
 pyproject.toml                         ← ruff's rulebook + PEP 621 metadata. Never runs on OpenHEXA.
 .claude/                               ← agent guardrails (R19). Active on clone.
@@ -380,6 +381,24 @@ Not implemented — recorded here so they can be assessed:
   `DHIS2_OUTLIERS_REMOVAL_IMPUTATION` and `SNT_SEASONALITY`; the other four do not), which is
   worth resolving at the same time.
 - **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
+- **Scripted checks for the SNT Explorer master list** (`metadata/SNT_metadata_master.json`,
+  maintained by hand today — see [`metadata/README.md`](metadata/README.md)). Estimated at about
+  1.5–2 days in all; deferred because the trim pipeline works without them.
+
+  | Piece | What it does | Effort |
+  |---|---|---|
+  | Schema + config check | Turn the §5 validator in `docs/schemas/snt_metadata_json/README.md` into a script. Also check that every `DATASET.NAME` is a key in all `configuration/SNT_config_*.json`. | ~2 h |
+  | Filename cross-check | Read the `add_files_to_dataset(...)` calls in every `*/pipeline.py` (AST or regex). Flag layers that point at a file no pipeline publishes, and published csv/parquet files that no layer uses. | ~0.5–1 day |
+  | Column inventory | Have the trim report also list each source's columns, and which ones no layer uses. Combining several workspaces' reports gives a list of candidate new layers. | ~0.5 day |
+  | Release CI | Run the checks in the release workflow, and block a release on schema errors. | ~2 h |
+  | Column audit | Per release, an agent reviews only the diff of `pipelines/**` since the last tag. | small, recurring |
+
+  **Not worth building:** static extraction of *columns* from the R code. Columns come from
+  `mutate`/`select`, from config-driven names (`POP_*`), from parameter-dependent branches and from
+  NA fallback columns. A parser would be costly and still wrong.
+
+  **Separate open point:** per-country tuning of `SCALE` and labels has no home yet. Re-running the
+  trim pipeline overwrites any hand edits to a workspace's trimmed file.
 - **Stamp readmes with the version they describe**, to make drift detectable. Blocked on deciding
   *which* version number counts (source / template / workspace — see
   [`docs/DATA_ARCHITECTURE.md` §7.1.1](docs/DATA_ARCHITECTURE.md)). A commit SHA of the
@@ -554,10 +573,11 @@ Keep these names and behaviours identical across pipelines — operators rely on
 - `configuration/SNT_config_<CC>.json` are **reference copies, not loadable**. In a workspace the
   file is renamed manually to drop the `_<CC>` suffix. Keep the versioned copies in sync when a
   schema key changes, and do not add logic that reads the `_<CC>` names.
-- `.gitignore` blocks `*.json` except `configuration/SNT_config_*.json` and
-  `.claude/settings.json` — a new config file needs a deliberate negation, not a force-add. The
-  second negation is load-bearing: without it the destructive-git guardrail (**R19**) is ignored by
-  git and never reaches a colleague's clone.
+- `.gitignore` blocks `*.json` except `configuration/SNT_config_*.json`,
+  `.claude/settings.json`, `docs/schemas/**/*.json` and `metadata/SNT_metadata_master.json` — a new
+  JSON file needs a deliberate negation, not a force-add. The `.claude/settings.json` negation is
+  load-bearing: without it the destructive-git guardrail (**R19**) is ignored by git and never
+  reaches a colleague's clone.
 
 ### Logging & error labels
 
@@ -727,6 +747,8 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
       case**; new globals are UPPERCASE. *(R11, R12)*
 - [ ] New outputs are in `add_files_to_dataset(...)`, in the pipeline `readme.md`, and in
       `docs/DATA_ARCHITECTURE.md`. *(R4, R16)*
+- [ ] A published column added or renamed → its entry in
+      [`metadata/SNT_metadata_master.json`](metadata/README.md) added or updated, in the same PR.
 - [ ] New notebook/`.r` filenames registered in `pull_scripts_from_repository(...)`. *(R6)*
 - [ ] New pipeline: workflow file added with the name updated in *all* places, `workspace:` left
       as `snt-development`. *(R5)*

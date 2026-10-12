@@ -61,7 +61,7 @@ class SourceCheck:
     "repository_ref",
     name="Master list version (release tag or branch)",
     type=str,
-    default=LATEST_RELEASE,
+    default="latest",  # must be a literal: the OpenHEXA CLI parses defaults via AST (= LATEST_RELEASE)
     required=True,
     help=(
         "Which version of SNT_metadata_master.json to fetch from the snt_development repository: "

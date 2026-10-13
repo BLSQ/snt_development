@@ -67,6 +67,12 @@ jobs:
               "code/**/*.r",
           )
 
+          # Files a pipeline fetches from this repository at run time, at the release tag
+          # (e.g. snt_metadata_json_trim reads the SNT Explorer master list). Hashed into the
+          # separate `repository_files` block for provenance only: they are never synced into
+          # the workspace filesystem and ship in no zip, so they must stay out of `files`.
+          REPOSITORY_PATTERNS = ("metadata/*.json",)
+
 
           def hash_file(filepath: Path) -> str:
               """Compute the sha256 of a file, read in chunks.
@@ -176,8 +182,10 @@ jobs:
               Returns
               -------
               dict
-                  The manifest: `version`, a flat `files` map of `{path: sha256}`, and a
-                  `pipelines` map describing what each deployment zip contains.
+                  The manifest: `version`, a flat `files` map of `{path: sha256}`, a
+                  `pipelines` map describing what each deployment zip contains, and a
+                  `repository_files` map of `{path: sha256}` for files fetched from the
+                  repository at run time.
               """
               tracked = set()
 
@@ -196,10 +204,15 @@ jobs:
                       "zip_files": [p.relative_to(pipeline_dir).as_posix() for p in in_zip],
                   }
 
+              fetched = set()
+              for pattern in REPOSITORY_PATTERNS:
+                  fetched.update(p.relative_to(root) for p in root.glob(pattern) if p.is_file())
+
               return {
                   "version": version,
                   "files": {p.as_posix(): hash_file(root / p) for p in sorted(tracked)},
                   "pipelines": pipelines,
+                  "repository_files": {p.as_posix(): hash_file(root / p) for p in sorted(fetched)},
               }
 
 
@@ -215,6 +228,7 @@ jobs:
               for name, entry in manifest["pipelines"].items():
                   print(f"  {name} -> {entry['code']} ({len(entry['zip_files'])} files in zip)")
               print(f"Generated manifest with {len(manifest['files'])} files.")
+              print(f"Repository files (fetched at run time): {len(manifest['repository_files'])}")
 
 
           if __name__ == "__main__":
@@ -232,6 +246,7 @@ jobs:
           print(f"version:   {manifest['version']}")
           print(f"files:     {len(manifest['files'])}")
           print(f"pipelines: {len(manifest['pipelines'])}")
+          print(f"repository_files: {len(manifest['repository_files'])}")
           EOF
 
       - name: Upload Manifest to Release (If published release)

@@ -756,9 +756,11 @@ file as a backup, not as the running code.
   so no bad data — but the pipeline's own help text makes the bug read as expected behaviour. Fix
   belongs in `select_population_column()`, not in the mapping. See
   [`docs/DATA_ARCHITECTURE.md` §6.1](docs/DATA_ARCHITECTURE.md).
-- **`snt_dhis2_reporting_rate_*` is the reference implementation for routine-file selection** —
-  its `resolve_routine_filename()` is explicit and total, and it verifies the file exists with
-  `dataset_file_exists()` before running anything. Copy that shape rather than inventing another.
+- **`snt_dhis2_reporting_rate_dataelement` is the reference implementation for routine-file
+  selection** — its `resolve_routine_source()` maps each choice to both the dataset and the filename
+  in one table, raises on an unknown choice, and the pipeline verifies the file exists with
+  `dataset_file_exists()` before running anything. The notebook receives both as `DATASET_ID` /
+  `ROUTINE_FILE` and makes no choice of its own. Copy that shape rather than inventing another.
 - **`snt_assemble_results` is being deprecated** — the SNT Explorer will read the OpenHEXA datasets
   directly instead. Don't extend it, and treat `configuration/SNT_metadata.json` as mid-change.
 

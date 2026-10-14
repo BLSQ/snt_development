@@ -436,8 +436,8 @@ Not implemented — recorded here so they can be assessed:
   rest. Mark anything unconfirmed rather than shipping a plausible guess.
 - **Documentation open items are tracked separately** in
   [`docs/OWNERSHIP.md` §4](docs/OWNERSHIP.md#4-open-items): filling in the per-pipeline responsible
-  persons, confirming the (provisional MIT) licence, linking an external published reference for the
-  SNT method, and removing the unadopted `.github/CODEOWNERS`.
+  persons, confirming the (provisional MIT) licence, and linking an external published reference for
+  the SNT method.
 - **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
   append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
   are fine as they are — overwriting is the intended override mechanism and their companion
@@ -640,9 +640,8 @@ Keep these names and behaviours identical across pipelines — operators rely on
   via PR, and a change to `pipelines/*/code/`, `pipelines/*/utils/` or `code/` should be reviewed by
   the person responsible for that pipeline — listed in
   [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md#2-pipeline-responsibilities). This is a convention only:
-  nothing blocks an unreviewed merge. `.github/CODEOWNERS` exists but was **not adopted** by the
-  team — do not treat it as the rule, and see
-  [`docs/OWNERSHIP.md` §4](docs/OWNERSHIP.md#4-open-items) for its pending removal.
+  nothing blocks an unreviewed merge. There is no `CODEOWNERS` file: one was drafted and the team
+  decided against it.
 ### Country-specific notebook variants
 
 **The mechanism.** A notebook whose filename is the generic name plus an underscore and a country

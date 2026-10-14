@@ -21,7 +21,7 @@ running it, and the coverage is uneven on purpose.
   call. Published-output claims in §3 come from those calls, not from the pipelines' `readme.md`.
 - The `utils/*.r` helpers behind filename resolution and column selection, and the notebook cells
   that resolve dataset ids (`config_json$SNT_DATASET_IDENTIFIERS$…`).
-- All 20 `.github/workflows/push_snt_*.yaml`, `pyproject.toml`, `.gitignore`, `CODEOWNERS`, and
+- All 20 `.github/workflows/push_snt_*.yaml`, `pyproject.toml`, `.gitignore`, and
   the five `configuration/SNT_config_<CC>.json` reference copies.
 - The OpenHEXA workspace image `blsq/openhexa-blsq-r-environment:latest`, read from its registry
   manifest (see [§7.4](#74-the-workspace-runtime-image)).

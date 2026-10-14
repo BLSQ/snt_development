@@ -131,8 +131,3 @@ variants](../CLAUDE.md#country-specific-notebook-variants)
       protocol document, or a paper. External readers (epidemiologists reading the R code without
       workspace access) currently have this repository as their only context. Add the link to
       [`../README.md`](../README.md) §*Start here* and to [`GLOSSARY.md`](GLOSSARY.md) §1.1.
-- [ ] **Delete `.github/CODEOWNERS`.** It names @sPuntinG as required approver for two notebooks,
-      but the team decided not to adopt it — so it is either misleading (if GitHub is not
-      enforcing it) or an unintended gate. Removing it makes [§1](#1-the-review-convention) the
-      single statement of how review works. *Deliberately left in place for now: deleting it is a
-      one-line PR that should be a conscious decision, not a side effect of writing this file.*

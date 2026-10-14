@@ -88,7 +88,7 @@ notebooks — see [Rule 2 in `CLAUDE.md`](../CLAUDE.md)).
 | `snt_user_population` | C | Imports and validates an operator-supplied population CSV (ADM2 × yearly) | `DHIS2_DATASET_FORMATTED` (pyramid), operator population upload | `SNT_POPULATION_USER_PROVIDED` | `py` (+R report) |
 | `snt_dhis2_population_transformation` | C | Rescales/projects population; optional disaggregation upload | `DHIS2_DATASET_FORMATTED` or `SNT_POPULATION_USER_PROVIDED` (per `pop_source`) | `DHIS2_POPULATION_TRANSFORMATION` | `nb` |
 | `snt_dhis2_reporting_rate_dataelement` | D | Reporting rates computed from data elements | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
-| `snt_dhis2_reporting_rate_dataset` | D | Reporting rates taken from DHIS2 dataset metrics | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_REPORTING_RATE` | `nb` |
+| `snt_dhis2_reporting_rate_dataset` | D | Reporting rates taken from DHIS2 dataset metrics (or reporting indicators) | `DHIS2_DATASET_FORMATTED` | `DHIS2_REPORTING_RATE` | `nb` |
 | `snt_dhis2_incidence` | D | Malaria incidence, optionally adjusted for reporting and care-seeking | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION`, `DHIS2_REPORTING_RATE`, population per `population_selection` (`DHIS2_DATASET_FORMATTED`, `SNT_POPULATION_USER_PROVIDED` or `DHIS2_POPULATION_TRANSFORMATION`), `DHS_INDICATORS` | `DHIS2_INCIDENCE` | `nb` |
 | `snt_dhis2_quality_of_care` | D | Care-quality indicators | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `DHIS2_QUALITY_OF_CARE` | `nb` |
 | `snt_seasonality_cases` | D | Seasonality of malaria cases | `DHIS2_DATASET_FORMATTED` | `SNT_SEASONALITY_CASES` | `nb` |
@@ -352,7 +352,7 @@ only relational sink in the system, and likewise overwritten by whichever varian
 | `snt_user_population` | operator population CSV + `{CC}_pyramid.parquet` from `DHIS2_DATASET_FORMATTED` (validation only) | `{CC}_population.parquet/.csv` → `SNT_POPULATION_USER_PROVIDED` |
 | `snt_dhis2_population_transformation` | `{CC}_population.parquet` from `DHIS2_DATASET_FORMATTED` or `SNT_POPULATION_USER_PROVIDED` (per `pop_source`) | `{CC}_population.parquet/.csv` → `DHIS2_POPULATION_TRANSFORMATION` |
 | `snt_dhis2_reporting_rate_dataelement` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_reporting_rate_dataelement.*` → `DHIS2_REPORTING_RATE` |
-| `snt_dhis2_reporting_rate_dataset` | idem | `{CC}_reporting_rate_dataset.*` → `DHIS2_REPORTING_RATE` |
+| `snt_dhis2_reporting_rate_dataset` | `{CC}_reporting.parquet` from `DHIS2_DATASET_FORMATTED` (no routine data) | `{CC}_reporting_rate_dataset.*` → `DHIS2_REPORTING_RATE` |
 | `snt_dhis2_incidence` | routine per `routine_data_choice`; population per `population_selection`; reporting rate from `DHIS2_REPORTING_RATE`; DHS or uploaded care-seeking | `{CC}_incidence.parquet/.csv` → `DHIS2_INCIDENCE` |
 | `snt_dhis2_quality_of_care` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_quality_of_care_district_year_{action}.*` → `DHIS2_QUALITY_OF_CARE` |
 | `snt_seasonality_cases` | `DHIS2_DATASET_FORMATTED` | `{CC}_cases_seasonality.*` → `SNT_SEASONALITY_CASES` |
@@ -413,7 +413,7 @@ operator muscle-memory the shared parameter names are supposed to buy:
 | Pipeline | Parameter | Choices |
 |---|---|---|
 | `snt_dhis2_incidence` | `routine_data_choice` | `raw`, **`raw_without_outliers`**, `imputed` |
-| `snt_dhis2_reporting_rate_dataelement` / `_dataset` | `routine_data_choice` | `raw`, `imputed`, **`outliers_removed`** |
+| `snt_dhis2_reporting_rate_dataelement` | `routine_data_choice` | `raw`, `imputed`, **`outliers_removed`** |
 | `snt_dhis2_quality_of_care` | **`data_action`** | `imputed`, **`removed`** (no `raw` option) |
 
 Three names for "routine data with outliers removed", and a fourth parameter name for the same
@@ -502,6 +502,11 @@ from `DHIS2_DATASET_FORMATTED`) and publishes `SNT_POPULATION_USER_PROVIDED`, wh
 `population_transformation` (`pop_source = User-provided`) and `incidence`
 (`population_selection = User-provided`) can read in place of the DHIS2 population. `incidence`
 can likewise read the population straight from `DHIS2_DATASET_FORMATTED`.
+
+Also simplified above: of the two `reporting_rate` variants, only `_dataelement` reads routine data
+(from `DHIS2_OUTLIERS_IMPUTATION` or `DHIS2_DATASET_FORMATTED`). **`snt_dhis2_reporting_rate_dataset`**
+reads only `{CC}_reporting.parquet` from `DHIS2_DATASET_FORMATTED`, and publishes to the same
+`DHIS2_REPORTING_RATE`.
 
 Note the shapes fan-out: the three external-source pipelines are **downstream of
 `snt_dhis2_formatting`**, not independent roots, because they aggregate into its ADM2 geometries.

@@ -78,7 +78,7 @@ All 20 existing readmes already follow this. Keep the section order exactly.
 Optional additions, when they earn their place:
 
 - `## Key aggregations (reference)` — a table of the actual arithmetic, when the pipeline
-  aggregates (see `snt_assemble_results`).
+  aggregates (see the retired `deprecated/DEPRECATED_snt_assemble_results/readme.md`).
 - `### Part 1 / Part 2 / …` subsections under `## Parameters`, when a pipeline has many
   parameters in distinct groups (see `snt_dhis2_population_transformation`).
 

@@ -66,7 +66,7 @@ parameter values, and they do not localise.
 | Term | FR | Definition | Status |
 |---|---|---|---|
 | **SNT** | *Stratification nationale du paludisme / ciblage infranational* | **Subnational Tailoring.** The WHO-promoted exercise of stratifying a country by district and choosing the malaria intervention mix per stratum, rather than applying one national package. Everything in this repository exists to produce the one-row-per-ADM2 evidence table that exercise consumes. | 🟡 |
-| **SNT Explorer** | — | The downstream web application that reads the results. Its column vocabulary is `configuration/SNT_metadata.json` — a results column absent from that file is silently dropped. Being migrated to read the OpenHEXA datasets directly instead of `snt_assemble_results`. | ✅ |
+| **SNT Explorer** | — | The downstream web application that reads the results. It imports data layers directly from the OpenHEXA datasets; the layers it can show are listed in `metadata/SNT_metadata_master.json`. It formerly read one flattened table built by `snt_assemble_results`, now retired. | ✅ |
 | **Routine data** | *Données de routine* | Monthly aggregate counts reported by health facilities into DHIS2 (cases, tests, treatments, deaths). The primary input. Distinct from *survey* data (DHS) and *modelled* data (MAP). | ✅ |
 
 ### 1.2. The incidence cascade — `N1`, `N2`, `N3`
@@ -247,7 +247,7 @@ Keys of `DHIS2_DATA_DEFINITIONS.POPULATION_INDICATOR_DEFINITIONS`. Denominators 
 | **Pyramid** | *Pyramide sanitaire* | The DHIS2 organisation-unit **hierarchy** — the country's nested administrative and health-facility tree, with each unit's level, parent, name, coordinates and opening/closing dates. Extracted as `{CC}_pyramid.parquet` and used to know which facilities *should* have reported. | ✅ |
 | **FOSA** | *FOrmation SAnitaire* | **Health facility** (French). The term is used interchangeably with "facility" in `snt_healthcare_access`, whose `input_fosa_file` supplies facility coordinates when the pyramid's are unusable. | ✅ |
 | **ADM1** | *Niveau administratif 1* | First subnational administrative level — region/province. The grain of DHS-derived indicators (survey samples are not powered below it). | ✅ |
-| **ADM2** | *District sanitaire* | Second subnational administrative level — **health district**. **The grain of the whole SNT exercise**: the final results table is one row per `ADM2_ID`, and it is the unit at which interventions are tailored. | ✅ |
+| **ADM2** | *District sanitaire* | Second subnational administrative level — **health district**. **The grain of the whole SNT exercise**: the data layers are one row per `ADM2_ID` (per year), and it is the unit at which interventions are tailored. | ✅ |
 | **Shapes** | *Contours / limites administratives* | ADM2 polygon geometries, published as `{CC}_shapes.geojson` by `snt_dhis2_formatting`. Every external-source pipeline (ERA5, MAP, WorldPop, healthcare access) starts by fetching this file — they look like independent roots but are not. | ✅ |
 
 > **The two admin-level config keys are not interchangeable.** `ANALYTICS_ORG_UNITS_LEVEL` (an
@@ -387,10 +387,11 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 
 ## 5. Results-table columns
 
-The 29 columns of the final ADM2 results table, declared in `configuration/SNT_metadata.json`.
-That file is authoritative: a column absent from it is **silently dropped** by
-`snt_assemble_results`. French labels below are quoted verbatim from it and are what an SNT
-Explorer user sees.
+The 29 columns of the former ADM2 results table, declared in `configuration/SNT_metadata.json`.
+That file was read by `snt_assemble_results`, now retired, which **silently dropped** any column
+absent from it; the SNT Explorer's layer list is now `metadata/SNT_metadata_master.json`. French
+labels below are quoted verbatim from `configuration/SNT_metadata.json` and are what an SNT
+Explorer user saw.
 
 | Column | Source | FR label | Units | Status |
 |---|---|---|---|---|

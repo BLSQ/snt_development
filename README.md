@@ -37,14 +37,13 @@ flowchart TD
     C --> D["D. compute indicators<br/>incidence, reporting rate x2<br/>quality of care, seasonality x2"]
     AP --> D
     D --> OUT["data layers, one or more tables per pipeline<br/>SNT Explorer, exported tables, plots, reports"]
-    D --> E["E. snt_assemble_results<br/>flattens the layers into one table per ADM2<br/>being deprecated"]
-    E --> OUT
 ```
 
 Each box is one or more standalone pipelines, **launched by hand** from the OpenHEXA UI. They pass
 data to each other through OpenHEXA **datasets** — never by calling each other directly. Stages
-`C` and `A2` publish usable layers of their own, not just intermediates, and the Explorer will
-increasingly read those datasets directly rather than the assembled table.
+`C` and `A2` publish usable layers of their own, not just intermediates, and the Explorer reads
+those datasets directly. (A former stage `E`, `snt_assemble_results`, flattened everything into one
+table per ADM2; it is retired and kept under [`deprecated/`](deprecated/).)
 
 Some pipelines also create **blank CSV templates** in the workspace `uploads/` folder, for an
 operator to fill in and upload to a later pipeline. `snt_dhis2_formatting`, for example, writes
@@ -52,7 +51,7 @@ population templates with one row per ADM2. These files are not published to any
 that pipeline's `readme.md`.
 
 The full pipeline-by-pipeline inventory is in
-[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-21-pipelines-at-a-glance), where
+[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-pipelines-at-a-glance), where
 the stage letters above are used throughout (stage `A2` here is written `A′` there).
 
 ---
@@ -217,7 +216,6 @@ Stated plainly, so nobody spends a day rediscovering them:
 | **No automated tests** | `ruff` is the only check, and no CI job runs it. |
 | **Dependencies are unpinned** | Both entries in every `requirements.txt` install from a Git branch, so two deploys of identical code can produce different runtimes. → [detail](CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) |
 | **No full offline development** | R notebooks are edited locally but execute on the workspace kernel. → [the loop](CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop) |
-| **`snt_assemble_results` is being deprecated** | The SNT Explorer will read the OpenHEXA datasets directly. Don't extend it. |
 | **Run order is not written down yet** | Tracked in [`docs/DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md). |
 
 ---

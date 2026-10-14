@@ -35,8 +35,8 @@ the methods are correct — only what they consume and produce.
 
 | Excluded | Why |
 |---|---|
-| `configuration/SNT_metadata.json` | mid-change; excluded on Giulia's instruction (see §3.2 Stage E) |
-| Deep audit of `snt_assemble_results` | being deprecated; read for lineage only, not reviewed |
+| `configuration/SNT_metadata.json` | old format, no reader left; excluded on Giulia's instruction (see §3.2 Stage E) |
+| `snt_assemble_results` | retired, moved to `deprecated/` (see §3.2 Stage E) |
 | `snt_dhis2_outliers_detection/` | discontinued; local-only leftover, not on the remote |
 | `deprecated/` | history, never a template |
 | `snt_lib` (`BLSQ/snt_utils`) internals | external repo, not in this checkout |
@@ -56,8 +56,9 @@ anything in a pipeline whose `pipeline.py` has changed since the commit above.
 ## 1. What this system is
 
 A collection of ~20 independent [OpenHEXA](https://openhexa.org) pipelines that turn routine
-health-system data (DHIS2) plus external geospatial/survey sources into a single
-**one-row-per-ADM2 results table** used for subnational tailoring of malaria interventions.
+health-system data (DHIS2) plus external geospatial/survey sources into **ADM2-level data
+layers**, published as OpenHEXA datasets and read directly by the SNT Explorer, for subnational
+tailoring of malaria interventions.
 
 There is **no central scheduler and no DAG engine**. Each pipeline is a standalone OpenHEXA
 pipeline, launched **manually from the OpenHEXA UI**. Ordering is a convention, not an
@@ -69,7 +70,7 @@ does not know which upstream pipeline produced its input — it only knows a dat
 filename. This is what makes the "user can supply their own input" and "alternative pipelines
 override each other" behaviours possible.
 
-### 1.1 The 21 pipelines at a glance
+### 1.1 The pipelines at a glance
 
 Orientation table — one row per pipeline, for answering "which one do I even open?". Dataset ids
 are the logical names in `SNT_CONFIG.SNT_DATASET_IDENTIFIERS`; the detail is in
@@ -98,7 +99,6 @@ notebooks — see [Rule 2 in `CLAUDE.md`](../CLAUDE.md)).
 | `snt_map_extracts` | A′ | Malaria Atlas Project layers (PfPR, ITN, IRS, …) | `DHIS2_DATASET_FORMATTED` (shapes), MAP WCS | `SNT_MAP_EXTRACTS` | `py` |
 | `snt_healthcare_access` | A′ | Travel-time / access to health facilities | `DHIS2_DATASET_FORMATTED` (shapes), WorldPop raster cache, operator FOSA upload | `SNT_HEALTHCARE_ACCESS` | `nb` |
 | `snt_dhs_indicators` | A′ | DHS survey indicators at **ADM1** | `DHIS2_DATASET_FORMATTED`, DHS recode files | `DHS_INDICATORS` | `nb` |
-| `snt_assemble_results` | E | Flattens everything into the one-row-per-ADM2 results table — **⚠️ being deprecated** | most of the above | `SNT_RESULTS` | `py` |
 
 Notes that the table cannot carry:
 
@@ -241,7 +241,6 @@ workspace and copying it back to git by hand. The working loop, and that gap, ar
 |---|---|---|
 | `snt_dhis2_extract` | core extraction | reporting only |
 | `snt_map_extracts`, `snt_worldpop_extract`, `snt_era5_climate_data` | core extraction | reporting only |
-| `snt_assemble_results` | **fully Python, no notebooks at all** | — |
 | everything else (13 pipelines) | thin orchestration shell | **yes — analytics live in `.ipynb` (kernel `ir`)** |
 
 Python pipelines are the only ones with a workable local development story today
@@ -420,43 +419,28 @@ Three names for "routine data with outliers removed", and a fourth parameter nam
 choice. Worth unifying; changing published parameter names is operator-visible, so it needs a
 deliberate migration rather than a quiet rename.
 
-**Stage E — Assemble (egress) — ⚠️ BEING DEPRECATED**
+**Stage E — Assemble (egress) — RETIRED**
 
-> **This stage is on its way out. Do not build on it, and do not invest in extending it.**
->
-> `snt_assemble_results` exists for exactly one consumer: it flattens everything into a single
-> ADM2 table for the **SNT Explorer** (an IASO-based application). The approach is changing —
-> the SNT Explorer will instead **import data layers directly from the OpenHEXA datasets**,
-> driven by a modified version of `SNT_metadata.json`. Once that lands, the single assembled
-> results table stops being the system's egress point, and this pipeline is expected to be
-> deprecated and removed.
->
-> Two practical consequences right now:
-> - **`configuration/SNT_metadata.json` is mid-change** and is deliberately *not* audited in this
->   document. Treat its current structure as unstable; do not encode assumptions about it. The
->   *target* shape it is moving to is specified in
->   [`docs/schemas/snt_metadata_json/`](schemas/snt_metadata_json/README.md) — a JSON
->   Schema plus the reasoning behind it, including what is still undecided. That is the format the
->   Explorer will import layers from; the file in `configuration/` is the old one.
-> - The description below documents the pipeline **as it stands today**, for operators still
->   running it — not as a design to extend or replicate.
->
-> The architectural direction is worth stating plainly: the per-stage datasets already *are* the
-> contract (§1), so having the Explorer read them directly removes a lossy flattening step —
-> along with the metadata gate that silently drops undeclared columns (point 1 below).
+`snt_assemble_results` flattened every stage's output into a single one-row-per-ADM2 table for the
+**SNT Explorer** and published it to `SNT_RESULTS`. It is **retired**: the code is archived in
+`deprecated/DEPRECATED_snt_assemble_results/`, CI no longer deploys it, and it ships in no
+release. The Explorer now imports data layers **directly from the per-stage OpenHEXA datasets**,
+listed in [`metadata/SNT_metadata_master.json`](../metadata/README.md) and trimmed per workspace by
+`snt_metadata_json_trim`. The per-stage datasets already *were* the contract (§1); reading them
+directly removes a lossy flattening step — it aggregated over time and dropped `YEAR` — along with
+the metadata gate that silently dropped any column not declared in
+`configuration/SNT_metadata.json`.
 
-`snt_assemble_results` (pure Python, 1 643 lines) builds the deliverable:
+Leftovers to know about:
 
-1. Column skeleton from `configuration/SNT_metadata.json` — **a column not declared there is
-   silently dropped**, including columns from the operator's `add_layers_file`.
-2. ADM1/ADM2 identity from `{CC}_pyramid.parquet`.
-3. Joins population, reporting rate, incidence, MAP, seasonality, DHS, healthcare access —
-   each guarded by "is this column in the metadata schema *and* in the source file".
-4. Aggregations: reporting rate → `mean|median` over all periods × 100, 1 dp; incidence →
-   `mean|median` over the year window, 2 dp; MAP → latest year, `STATISTIC == "MEAN"`, then
-   per-indicator scalars (parasite rate ×100, mortality ×100 000).
-5. Emits `{CC}_results_dataset.parquet/.csv` + `{CC}_metadata.parquet/.csv` under `results/`
-   and publishes to `SNT_RESULTS`.
+- **`configuration/SNT_metadata.json`** — the old-format column list it read. Nothing reads it
+  now; it is deliberately *not* audited in this document. The target format it was replaced by is
+  specified in [`docs/schemas/snt_metadata_json/`](schemas/snt_metadata_json/README.md).
+- **`SNT_RESULTS`** — removed from `SNT_config.skeleton.json`, but still a key in the older
+  `SNT_config_<CC>.json` reference copies and in live workspace configs, where it is harmless:
+  nothing reads it. The dataset still exists in workspaces that ran the pipeline, frozen at its
+  last run.
+- The OpenHEXA template is deleted, so no new copies can be created from it.
 
 ### 3.3 Lineage summary
 
@@ -493,8 +477,8 @@ ERA5_DATASET_CLIMATE   SNT_MAP_EXTRACTS              WORLDPOP_DATASET_EXTRACT   
    │                          │                                                      │
    └──────────────────────────┴──────────────────┬───────────────────────────────────┘
                                                  ▼
-                          E. snt_assemble_results  ──▶  SNT_RESULTS  (1 row per ADM2)
-                             ⚠️ being deprecated — SNT Explorer will read datasets directly
+                     SNT Explorer — imports each layer directly from its dataset
+                     (layers listed in metadata/SNT_metadata_master.json)
 ```
 
 Not drawn above: **`snt_user_population`** reads an operator CSV (validated against the pyramid
@@ -579,7 +563,7 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
 ```
 ~/workspace/
   configuration/SNT_config.json          # the ONLY config the pipelines read
-  configuration/SNT_metadata.json        # results-table column schema
+  configuration/SNT_metadata.json        # old-format column list; no reader left
   code/snt_utils.r snt_report.r snt_palettes.r
   pipelines/<pipeline>/
       code/*.ipynb          reporting/*.ipynb    utils/*.r
@@ -590,7 +574,7 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
       era5/{raw,cache,aggregate}/   worldpop/{raw,rasters}/
       map/   dhs/indicators/   seasonality_rainfall/   seasonality_cases/
       healthcare_access/
-  results/                               # snt_assemble_results output
+  results/                               # retired snt_assemble_results output, if it ever ran
 ```
 
 `data/` is scratch; **OpenHEXA datasets are the contract.** A file that exists on disk but was
@@ -605,7 +589,6 @@ never added to its dataset is invisible to every downstream pipeline.
 | Formatted | `{CC}_{routine,population,pyramid,reporting}.parquet` + `.csv`; `{CC}_shapes.geojson` |
 | Outliers | `{CC}_routine_outliers_{detected,removed,imputed}.parquet` |
 | Run parameters | `{CC}_parameters.json` (written by `save_pipeline_parameters`) |
-| Results | `{CC}_results_dataset.parquet/.csv`, `{CC}_metadata.parquet/.csv` |
 | Dataset version | `{CC}_dhis2_level{N}_…` / `{CC}_…` prefix via `get_new_dataset_version()` |
 
 `{CC}` = `SNT_CONFIG.COUNTRY_CODE`, uppercase (`COD`, `BFA`, `NER`, `BDI`, `CMR`).
@@ -616,7 +599,7 @@ Parquet is the machine contract; the `.csv` twin is for human inspection.
 - **All column names UPPERCASE.** Enforced at the merge boundary in Python
   (`df.columns.str.upper()`) and by `clean_column_names()` in R (non-alphanumeric → `_`, upper).
 - **Join keys:** `ADM1_ID` / `ADM2_ID` (+ `_NAME` twins), `YEAR`, `MONTH`, `PERIOD`.
-  `ADM2_ID` is the grain of the final results table.
+  `ADM2_ID` is the grain of the SNT data layers.
 - **Admin-level indirection:** `DHIS2_ADMINISTRATION_1` / `DHIS2_ADMINISTRATION_2` hold *strings*
   like `"level_3_name"`, parsed with `re.search(r"level_(\d+)_", …)`. `ANALYTICS_ORG_UNITS_LEVEL`
   is a separate *integer* (facility level for routine data). These differ per country
@@ -658,7 +641,6 @@ Validation is **in-line and advisory**, not a framework. What exists today:
 | Admin-key matching | `check_perfect_match()`, `compare_values()`, `compare_combinations()` | logs |
 | Time×space completeness | `make_cartesian_admin_period()`, `make_full_time_space_data()`, `fill_missing_cases_ts()` | fills gaps |
 | DHS recode consistency | `check_dhs_same_version()` | logs |
-| Metadata-schema gate | `snt_assemble_results` | column absent from `SNT_metadata.json` is dropped + warned |
 
 ### 6.1 Confirmed defect — `POP_PREGNANT_WOMAN` vs `POP_PREGNANT_WOMEN`
 
@@ -677,7 +659,7 @@ The chain, all verified:
 3. Every producer of that column uses the **plural**: `snt_dhis2_formatting_population.ipynb`
    (`disaggregation_cols <- c("POP_UNDER_5", "POP_PREGNANT_WOMEN", …)`),
    `snt_dhis2_population_transformation.ipynb`, `snt_user_population/pipeline.py`
-   (`DISAGGREGATION_COLS`), `snt_assemble_results/pipeline.py:351`, and the
+   (`DISAGGREGATION_COLS`), and the
    `POPULATION_INDICATOR_DEFINITIONS` key in all five country configs.
 4. `select_population_column()` therefore takes its else-branch and calls `stop()`.
 
@@ -858,7 +840,8 @@ environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
 - `snt_dhis2_outliers_detection/` — **discontinued**; present in some local clones, absent from
   the remote. Do not document, extend, or deploy it.
 - `pipelines/snt_dhis2_outliers_removal_imputation/` — stub only (Zone.Identifier file).
-- `deprecated/` — retired pipelines kept for reference. Never a template for new work.
+- `deprecated/` — retired pipelines kept for reference, including `snt_assemble_results`
+  (retired 2026-10, §3.2 Stage E). Never a template for new work.
 
 ---
 
@@ -873,8 +856,8 @@ environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
    pregnant-women disaggregation unusable in `snt_dhis2_incidence` (§6.1).
 5. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
    (paused Shiny app, or its replacement) is resumed (§3.2 Stage C).
-6. **In progress** — SNT Explorer reading OpenHEXA datasets directly; `snt_assemble_results` and
-   `SNT_metadata.json` change as a result (§3.2 Stage E).
+6. With `snt_assemble_results` retired, should `configuration/SNT_metadata.json` be removed too?
+   (The `SNT_RESULTS` key is already gone from `SNT_config.skeleton.json`; §3.2 Stage E.)
 7. Should the routine-data-choice vocabulary be unified across the four pipelines that use it?
    (§3.2 Stage D)
 8. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)

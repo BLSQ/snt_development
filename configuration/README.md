@@ -8,7 +8,7 @@ workspace. That file is placed there by hand (or, in future, by the config webap
 |---|---|---|
 | `SNT_config.skeleton.json` | The **fixed part** of `SNT_config.json`, which is the same in every country and workspace. The country-specific values are left empty. | **Yes.** This is the reference for the current structure. |
 | `SNT_config_<CC>.json` | Past per-country copies (BDI, BFA, CMR, COD, NER). | **No.** Not checked against the running workspaces, so they may be out of date. Use them as examples only. |
-| `SNT_metadata.json` | Column metadata used by `snt_assemble_results` (which is being deprecated). | See the root `CLAUDE.md`, *Traps*. |
+| `SNT_metadata.json` | Old-format column metadata, read only by `snt_assemble_results`, which is now retired. Nothing reads it today. | See the root `CLAUDE.md`, *Traps*. |
 
 ---
 

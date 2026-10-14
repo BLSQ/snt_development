@@ -21,8 +21,8 @@ document, never in the data file. (They would not survive the future editing web
 that reads, edits and rewrites JSON drops comments silently.)
 
 **These two files describe the target format. They do not describe what is deployed today.**
-`configuration/SNT_metadata.json` in this repo is still the older shape, and
-`snt_assemble_results` still reads that older shape. Nothing has been migrated. See
+`configuration/SNT_metadata.json` in this repo is still the older shape, and nothing reads it:
+its only reader, `snt_assemble_results`, is retired. It has not been migrated. See
 [Relationship to what exists today](#6-relationship-to-what-exists-today).
 
 ---
@@ -339,9 +339,9 @@ must:
 
 | | Status |
 |---|---|
-| `configuration/SNT_metadata.json` | **Old format**, still what is deployed. Single-language strings, stringified `SCALE`, no `SOURCE_DATA`, plus `ORDER` and `PERIOD`. Not migrated. |
+| `configuration/SNT_metadata.json` | **Old format**, no reader since `snt_assemble_results` was retired. Single-language strings, stringified `SCALE`, no `SOURCE_DATA`, plus `ORDER` and `PERIOD`. Not migrated. |
 | `configuration/SNT_metadata_20260908.json` | The working file this schema was derived from. It carries `//` comments; the committed example does not, because the Explorer cannot read JSONC (see the note at the top of this document). |
-| `snt_assemble_results` | Reads the **old** format, and writes `PERIOD` back into it at runtime via `update_metadata(...)`. Being deprecated — the Explorer will read the OpenHEXA datasets directly. |
+| `snt_assemble_results` | **Retired** (archived in `deprecated/`). Read the **old** format, and wrote `PERIOD` back into it at runtime via `update_metadata(...)`. The Explorer reads the OpenHEXA datasets directly instead. |
 
 **Two fields were dropped:**
 
@@ -406,7 +406,7 @@ carries no information.
 The one wide source is `{CC}_results_dataset.csv` on `SNT_RESULTS`, where `snt_assemble_results`
 pivots `METRIC_NAME` into real `PF_*` columns — but it **filters each metric to a single year and
 drops `YEAR`**, so the layer could not be stepped through time ([§2.4](#24-time-is-carried-by-the-data-via-the-year-column)),
-and that pipeline is being deprecated precisely so the Explorer can read source datasets directly.
+and that pipeline was retired precisely so the Explorer can read source datasets directly.
 Pointing at it would encode the dependency the format exists to remove.
 
 **To restore these three layers, one of the following has to happen** (a decision for the SNT and
@@ -485,7 +485,7 @@ column the current pipelines can publish** that fits this format. It started as 
 test file for the SNT Explorer and is now the **master list**: `snt_metadata_json_trim` fetches it
 from this repository and keeps, per workspace, the layers whose data exists. It was created as
 `SNT_metadata_all_layers.json` in this folder and moved and renamed on 2026-10-12.
-`snt_assemble_results` is out of scope (being deprecated).
+`snt_assemble_results` is out of scope (retired).
 
 **The JSON is the source of truth — edit it by hand, reviewed in a PR.** It was bootstrapped by a
 one-off generator, `build_snt_metadata_all_layers.py`, deleted on 2026-10-12 so it can never
@@ -596,7 +596,7 @@ Included, but likely to exercise open questions:
 | All raw extracts (`{CC}_dhis2_raw_*.parquet`) | `snt_dhis2_extract` | Long format, raw DHIS2 ids, no `YEAR`. |
 | Extra columns from an uploaded disaggregation file | `snt_dhis2_population_transformation` | Arbitrary operator-chosen names, not uppercased. Only the template's `POP_*` columns are included. |
 | Seasonality admin columns `ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME` | `snt_seasonality_*`, `snt_healthcare_access` | Admin columns. |
-| `SNT_RESULTS` | `snt_assemble_results` | Out of scope (being deprecated). |
+| `SNT_RESULTS` | `snt_assemble_results` | Out of scope (retired; no longer written). |
 
 `snt_workspace_check` publishes nothing to a dataset.
 

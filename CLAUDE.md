@@ -67,15 +67,15 @@ change it in a PR of its own.
 ## What this repo is
 
 ~20 standalone [OpenHEXA](https://openhexa.org) pipelines that turn DHIS2 routine health data
-plus external sources (ERA5, WorldPop, Malaria Atlas Project, DHS) into a one-row-per-ADM2
-malaria **subnational tailoring** results table.
+plus external sources (ERA5, WorldPop, Malaria Atlas Project, DHS) into ADM2-level data layers for
+malaria **subnational tailoring**, published as OpenHEXA datasets and read by the SNT Explorer.
 
 Orchestration is OpenHEXA's `@pipeline` / `@task` SDK. The analytics themselves live in **R
 notebooks executed by papermill**. Each pipeline is launched by hand from the OpenHEXA UI, and
 pipelines pass data to each other through **OpenHEXA datasets** — never by calling each other.
 
-An inventory of all 21 pipelines is in
-[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-21-pipelines-at-a-glance).
+An inventory of the analytics pipelines is in
+[`docs/DATA_ARCHITECTURE.md` §1.1](docs/DATA_ARCHITECTURE.md#11-the-pipelines-at-a-glance).
 
 ```
 <pipeline_name>/pipeline.py            ← deployed by CI. Orchestration only.
@@ -154,7 +154,7 @@ Local development is a **known pain point**, honestly stated:
 
 | Kind | Local story |
 |---|---|
-| **Python-only pipelines** (`snt_assemble_results`, `snt_dhis2_extract`, `snt_map_extracts`, `snt_worldpop_extract`, `snt_era5_climate_data`) | The best-supported path. Editable and lintable locally; still needs a workspace to actually run. |
+| **Python-only pipelines** (`snt_dhis2_extract`, `snt_map_extracts`, `snt_worldpop_extract`, `snt_era5_climate_data`) | The best-supported path. Editable and lintable locally; still needs a workspace to actually run. |
 | **Notebook-driven pipelines** (15 of them) | Editable locally and **executable against the remote workspace kernel** — see [Editing R notebooks](#editing-r-notebooks-the-vs-code-remote-kernel-loop). There is no fully offline loop. |
 
 ### Getting set up locally
@@ -363,7 +363,7 @@ Not implemented — recorded here so they can be assessed:
   currently arrive only as transitive dependencies).
 - **Give `SNT_DATASET_IDENTIFIERS` a single key-naming convention.** Its keys follow no consistent
   rule today: some carry an `SNT_` prefix (`SNT_HEALTHCARE_ACCESS`, `SNT_MAP_EXTRACTS`,
-  `SNT_RESULTS`, `SNT_SEASONALITY_*`) and some do not (`DHIS2_INCIDENCE`, `DHIS2_REPORTING_RATE`,
+  `SNT_SEASONALITY_*`) and some do not (`DHIS2_INCIDENCE`, `DHIS2_REPORTING_RATE`,
   `ERA5_DATASET_CLIMATE`); `DHIS2_DATASET_EXTRACTS` is plural while `WORLDPOP_DATASET_EXTRACT` is
   singular; and the key often does not resemble the dataset it points at (`DHIS2_INCIDENCE` → the
   dataset shown in the OpenHEXA UI as `SNT_DHIS2_INCIDENCE`).
@@ -568,15 +568,16 @@ Keep these names and behaviours identical across pipelines — operators rely on
 - **All column names UPPERCASE** in every published artefact. Python: `df.columns.str.upper()`
   at the merge boundary. R: `clean_column_names()`.
 - Join keys: `ADM1_ID` / `ADM2_ID` (+ `_NAME`), `YEAR`, `MONTH`, `PERIOD`. `ADM2_ID` is the grain
-  of the final results table.
+  of the SNT data layers.
 - **Never hardcode an admin level.** Read `DHIS2_ADMINISTRATION_1` / `DHIS2_ADMINISTRATION_2`
   (strings like `"level_3_name"`, parsed with `re.search(r"level_(\d+)_", …)`) and
   `ANALYTICS_ORG_UNITS_LEVEL` (integer). They differ per country and are *not* interchangeable:
   `ANALYTICS_ORG_UNITS_LEVEL` is the facility level for routine data, `DHIS2_ADMINISTRATION_2`
   the district level for population, shapes and reporting indicators. Validate against
   `pyramid["level"].max()` as the existing tasks do.
-- A results column must be declared in `configuration/SNT_metadata.json` or
-  `snt_assemble_results` **silently drops it**. Adding an indicator means editing that file too.
+- A published column reaches the SNT Explorer only if a layer in
+  [`metadata/SNT_metadata_master.json`](metadata/README.md) points at it. Adding an indicator means
+  adding its layer there too (see the [Handover checklist](#handover-checklist)).
 - **Every published output table carries a `YEAR` column** (**R21**). Data points are always
   attached to a year, so this costs nothing — and the SNT Explorer imports `YEAR` alongside the
   layer's value column to let the user choose which year to display. A table without it cannot be
@@ -585,9 +586,9 @@ Keep these names and behaviours identical across pipelines — operators rely on
   pyramid, or other genuinely time-independent artefacts. **This rule is newly stated — existing
   outputs have not been audited against it.** Bring a table into line when you touch it; do not
   assume every current output already complies.
-- **`SNT_metadata.json` is mid-format-change.** The file in `configuration/` is the old shape and
-  is what runs today. The **target** shape — one entry per SNT Explorer data layer, with a
-  `SOURCE_DATA` pointer and bilingual labels — is specified in
+- **`SNT_metadata.json` is mid-format-change.** The file in `configuration/` is the old shape;
+  its only reader, `snt_assemble_results`, is retired, so nothing reads it today. The **target**
+  shape — one entry per SNT Explorer data layer, with a `SOURCE_DATA` pointer and bilingual labels — is specified in
   [`docs/schemas/snt_metadata_json/`](docs/schemas/snt_metadata_json/README.md), with a JSON Schema as its
   source of truth. Write new
   metadata entries to that schema, and read its **Open questions** before assuming a field's
@@ -764,8 +765,12 @@ file as a backup, not as the running code.
   `ROUTINE_FILE` and makes no choice of its own. Copy that shape rather than inventing another.
   (Its `_dataset` sibling no longer reads routine data: it uses only the formatted reporting
   extract.)
-- **`snt_assemble_results` is being deprecated** — the SNT Explorer will read the OpenHEXA datasets
-  directly instead. Don't extend it, and treat `configuration/SNT_metadata.json` as mid-change.
+- **`snt_assemble_results` is retired** — moved to `deprecated/DEPRECATED_snt_assemble_results/`,
+  no longer deployed by CI, and its OpenHEXA template is deleted. The SNT Explorer reads the
+  OpenHEXA datasets directly instead. Its `SNT_RESULTS` dataset id is removed from
+  `SNT_config.skeleton.json` but remains in the older `SNT_config_<CC>.json` reference copies and
+  in live workspace configs; nothing reads it. `configuration/SNT_metadata.json` (the old format)
+  was read only by this pipeline and has no consumer left.
 
 ---
 

@@ -1,5 +1,12 @@
 # SNT Assemble Results Pipeline
 
+> **⚠️ Retired (2026-10).** This pipeline is no longer maintained or deployed: CI no longer pushes
+> it to `snt-development`, and it ships in no release. Its replacement is the SNT Explorer reading
+> the OpenHEXA datasets directly, with layers listed in `metadata/SNT_metadata_master.json` and
+> trimmed per workspace by `snt_metadata_json_trim` (see
+> [`metadata/README.md`](../../metadata/README.md)). Kept for reference only — never a template.
+> The text below describes the pipeline as it was when retired.
+
 The **SNT Assemble Results** pipeline builds a single **ADM2**-level results table from **`SNT_metadata.json`** column definitions, enriches it by joining curated inputs from multiple OpenHEXA datasets via **`get_file_from_dataset`**, applies configurable **aggregations** for incidence and reporting rates, and publishes the consolidated outputs to **`SNT_RESULTS`**.
 
 ---

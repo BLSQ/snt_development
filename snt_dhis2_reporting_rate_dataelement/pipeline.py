@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from openhexa.sdk import current_run, pipeline, workspace, parameter
 
@@ -10,6 +11,7 @@ from snt_lib.snt_pipeline_utils import (
     validate_config,
     dataset_file_exists,
     save_pipeline_parameters,
+    check_outputs_generated,
 )
 
 
@@ -30,8 +32,11 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "activity_indicators",
     name="Facility Activity indicators",
-    help="Define which data elements will be used to determine the activity of a facility."
-    " A facility is considered 'active' if at least one of these indicators has a non-missing value greater than zero.",
+    help=(
+        "Define which data elements will be used to determine the activity of a facility."
+        " A facility is considered 'active' if at least one of these indicators has a non-missing "
+        "value greater than zero."
+    ),
     multiple=True,
     choices=["CONF", "SUSP", "TEST", "PRES"],
     type=str,
@@ -87,8 +92,8 @@ from snt_lib.snt_pipeline_utils import (
 )
 def snt_dhis2_reporting_rate_dataelement(
     routine_data_choice: str,
-    activity_indicators: str,
-    volume_activity_indicators: str,
+    activity_indicators: list,
+    volume_activity_indicators: list,
     dataelement_method_denominator: str,
     use_weighted_reporting_rates: bool,
     run_report_only: bool,
@@ -103,53 +108,67 @@ def snt_dhis2_reporting_rate_dataelement(
             code_scripts=["snt_dhis2_reporting_rate_dataelement.ipynb"],
         )
 
-    try:
-        # Set paths
-        root_path = Path(workspace.files_path)
-        pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate_dataelement"
-        data_path = root_path / "data" / "dhis2" / "reporting_rate"
-        data_path.mkdir(parents=True, exist_ok=True)
+    # Set paths
+    root_path = Path(workspace.files_path)
+    pipeline_path = root_path / "pipelines" / "snt_dhis2_reporting_rate_dataelement"
+    data_path = root_path / "data" / "dhis2" / "reporting_rate"
+    data_path.mkdir(parents=True, exist_ok=True)
 
+    try:
         # Load configuration
         snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    except Exception as e:
+        current_run.log_error(f"Failed to load or validate configuration: {e}")
+        raise
 
-        # Build parameters dict and save to JSON in all cases (like other pipelines)
-        routine_file = resolve_routine_filename(
-            country_code=country_code, routine_data_choice=routine_data_choice
+    if not run_report_only:
+        # Resolve routine data source based on the user's choice
+        dataset_id, routine_file = resolve_routine_source(
+            country_code=country_code, routine_data_choice=routine_data_choice, snt_config=snt_config
         )
+
+        # Check the file exists in the dataset
+        if not dataset_file_exists(ds_id=dataset_id, filename=routine_file):
+            pipeline_target = "formatting" if routine_data_choice == "raw" else "outliers imputation"
+            current_run.log_error(
+                f"Routine file {routine_file} not found in the dataset {dataset_id}, "
+                f"perhaps the {pipeline_target} pipeline has not been run yet. "
+                "Processing cannot continue."
+            )
+            raise FileNotFoundError(f"Routine file {routine_file} not found in the dataset {dataset_id}")
+
+        # Build parameters dict
         nb_parameters = {
-            "SNT_ROOT_PATH": root_path.as_posix(),
+            "ROOT_PATH": root_path.as_posix(),
             "ROUTINE_FILE": routine_file,
+            "DATASET_ID": dataset_id,
             "DATAELEMENT_METHOD_DENOMINATOR": dataelement_method_denominator,
             "ACTIVITY_INDICATORS": activity_indicators,
             "VOLUME_ACTIVITY_INDICATORS": volume_activity_indicators,
             "USE_WEIGHTED_REPORTING_RATES": use_weighted_reporting_rates,
         }
-        parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_dhis2_reporting_rate_dataelement",
-            parameters=nb_parameters,
-            output_path=data_path,
-            country_code=country_code,
-        )
+
+        try:
+            parameters_file = save_pipeline_parameters(
+                pipeline_name="snt_dhis2_reporting_rate_dataelement",
+                parameters=nb_parameters,
+                output_path=data_path,
+                country_code=country_code,
+            )
+        except Exception as e:
+            current_run.log_error(f"Failed to save pipeline parameters: {e}")
+            raise
         current_run.log_info(f"Saved pipeline parameters to {parameters_file}")
 
-        if not run_report_only:
-            if routine_data_choice == "raw":
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_DATASET_FORMATTED"]
-            else:
-                ds_outliers_id = snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_OUTLIERS_IMPUTATION"]
+        expected_outputs = [
+            data_path / f"{country_code}_reporting_rate_dataelement.parquet",
+            data_path / f"{country_code}_reporting_rate_dataelement.csv",
+        ]
 
-            # Check the file exists in the dataset
-            if not dataset_file_exists(ds_id=ds_outliers_id, filename=routine_file):
-                current_run.log_warning(
-                    f"Routine file {routine_file} not found in the dataset {ds_outliers_id}, "
-                    "perhaps the outliers imputation pipeline has not been run yet. "
-                    "Processing cannot continue."
-                )
-                return
-
+        run_start_ts = time.time()
+        try:
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_dhis2_reporting_rate_dataelement.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -157,47 +176,67 @@ def snt_dhis2_reporting_rate_dataelement(
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
                 country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Failed to run notebook: {e}")
+            raise
 
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
-                country_code=country_code,
-                file_paths=[
-                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataelement.parquet"))],
-                    *[p for p in (data_path.glob(f"{country_code}_reporting_rate_dataelement.csv"))],
-                    parameters_file,
-                ],
-            )
+        check_outputs_generated(file_paths=expected_outputs, run_start_ts=run_start_ts)
 
-        else:
-            current_run.log_info("Skipping calculations, running only the reporting.")
+        add_files_to_dataset(
+            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["DHIS2_REPORTING_RATE"],
+            country_code=country_code,
+            file_paths=[*expected_outputs, parameters_file],
+        )
 
-        # Compatible with snt_lib (snt_utils): do not pass nb_parameters
+    else:
+        current_run.log_info("Skipping calculations, running only the reporting.")
+
+    try:
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_dhis2_reporting_rate_dataelement_report.ipynb",
             nb_output_path=pipeline_path / "reporting" / "outputs",
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
-
-        current_run.log_info("Pipeline completed successfully!")
-
     except Exception as e:
-        current_run.log_error(f"Pipeline failed: {e}")
+        current_run.log_error(f"Failed to run reporting notebook: {e}")
         raise
 
+    current_run.log_info("Pipeline completed successfully!")
 
-def resolve_routine_filename(country_code: str, routine_data_choice: str) -> str:
-    """Returns the canonical routine filename for a routine data choice."""
-    if routine_data_choice == "raw":
-        return f"{country_code}_routine.parquet"
 
-    if routine_data_choice == "imputed":
-        return f"{country_code}_routine_outliers_imputed.parquet"
+def resolve_routine_source(country_code: str, routine_data_choice: str, snt_config: dict) -> tuple[str, str]:
+    """Resolve the dataset id and routine filename for a routine data choice.
 
-    if routine_data_choice == "outliers_removed":
-        return f"{country_code}_routine_outliers_removed.parquet"
+    Parameters
+    ----------
+    country_code : str
+        Country code used as the routine filename prefix.
+    routine_data_choice : str
+        The routine data to use: "raw", "imputed" or "outliers_removed".
+    snt_config : dict
+        The loaded SNT configuration, used to look up the dataset identifier.
 
-    raise ValueError(f"Unknown routine data choice: {routine_data_choice}")
+    Returns
+    -------
+    tuple[str, str]
+        The dataset id holding the routine file, and the routine filename.
+
+    Raises
+    ------
+    ValueError
+        If ``routine_data_choice`` is not a known choice.
+    """
+    routine_sources = {
+        "raw": ("DHIS2_DATASET_FORMATTED", f"{country_code}_routine.parquet"),
+        "imputed": ("DHIS2_OUTLIERS_IMPUTATION", f"{country_code}_routine_outliers_imputed.parquet"),
+        "outliers_removed": ("DHIS2_OUTLIERS_IMPUTATION", f"{country_code}_routine_outliers_removed.parquet"),
+    }
+    if routine_data_choice not in routine_sources:
+        raise ValueError(f"Unknown routine data choice: {routine_data_choice}")
+
+    dataset_key, routine_file = routine_sources[routine_data_choice]
+    return snt_config["SNT_DATASET_IDENTIFIERS"][dataset_key], routine_file
 
 
 if __name__ == "__main__":

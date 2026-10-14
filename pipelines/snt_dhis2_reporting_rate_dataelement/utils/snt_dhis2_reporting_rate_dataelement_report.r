@@ -1,6 +1,15 @@
 # Helpers for the reporting rate (data element) report
 
-#' extract the routine data type from the saved pipeline parameters (raw = routine / imputed / removed)
+#' Get the Routine Data Type
+#'
+#' Extracts the routine data type from the routine filename saved in the
+#' pipeline parameters, as the last underscore-separated part of the name
+#' without extension: "routine" (raw), "imputed" or "removed".
+#'
+#' @param input_filename Character. Routine filename, e.g. "NER_routine_outliers_imputed.parquet".
+#' @return Character. Lowercase routine data type.
+#'
+#' @export
 get_routine_type <- function(input_filename){
     
     filename_without_extension <- tools::file_path_sans_ext(input_filename)
@@ -11,7 +20,16 @@ get_routine_type <- function(input_filename){
 }
 
 
-#' extract the FOSAs expected to submit reports from the saved pipeline parameters (actives / ouvertes)
+#' Get the Facility Denominator Type
+#'
+#' Extracts which facilities (FOSA) are expected to report from the
+#' denominator method saved in the pipeline parameters, as the second
+#' underscore-separated part of the method name: "active" or "open".
+#'
+#' @param input_string Character. Denominator method, e.g. "ROUTINE_ACTIVE_FACILITIES".
+#' @return Character. Lowercase denominator type.
+#'
+#' @export
 get_fosa_denominator <- function(input_string){
 
     string_components <- strsplit(input_string, c("_", "."))[[1]]
@@ -22,22 +40,28 @@ get_fosa_denominator <- function(input_string){
 }
 
 
-#' @description make reporting rate scatter plot with ggplot2 faceted by year
-#' @param df_to_plot data frame containing the plotting data
-#' @param admin_colname column with administrative unit identifier
-#' @param year_colname column with year values used in faceting
-#' @param month_colname column with month values on x axis
-#' @param value_colname column with numeric values on y axis
-#' @param category_colname column with categorical variable mapped to color
-#' @param break_vector numeric vector of breaks for y axis ticks
-#' @param plot_palette named list or vector of colors for categories
-#' @param none_color hex color string for missing values
-#' @param plot_title optional plot title
-#' @param plot_subtitle optional plot subtitle
-#' @param plot_caption optional plot caption
-#' @param x_title optional x axis label
-#' @param y_title optional y axis label
-#' @returns a ggplot object with scattered points by month and value colored by category and faceted by year
+#' Make Reporting Rate Scatter Plot
+#'
+#' Builds a ggplot2 scatter plot of reporting rate values by month, with one
+#' point per administrative unit, colored by category and faceted by year.
+#'
+#' @param df_to_plot Data frame. Data to plot.
+#' @param admin_colname Character. Column with the administrative unit identifier.
+#' @param year_colname Character. Column with the year values used for faceting.
+#' @param month_colname Character. Column with the month values on the x axis.
+#' @param value_colname Character. Column with the numeric values on the y axis.
+#' @param category_colname Character. Column with the category mapped to color.
+#' @param break_vector Numeric. Breaks used for the y axis ticks.
+#' @param plot_palette Character. Named vector (or list) of colors for the categories.
+#' @param none_color Character. Hex color for missing values. Default: "#D3D3D3".
+#' @param plot_title Character. Optional plot title.
+#' @param plot_subtitle Character. Optional plot subtitle.
+#' @param plot_caption Character. Optional plot caption.
+#' @param x_title Character. Optional x axis label.
+#' @param y_title Character. Optional y axis label.
+#' @return ggplot. Scatter plot of values by month, colored by category and faceted by year.
+#'
+#' @export
 make_reporting_rate_scatterplot <- function(
   df_to_plot, admin_colname, year_colname, month_colname, value_colname, category_colname, break_vector, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, x_title = NULL, y_title = NULL
 ){
@@ -107,22 +131,29 @@ make_reporting_rate_scatterplot <- function(
 }
 
 
-#' @description make reporting rate heatmap with ggplot2 tiles faceted by year
-#' @param df_to_plot data frame containing the plotting data
-#' @param admin_colname column with administrative unit identifier on y axis
-#' @param admin_labels column with the administrative unit names for y axis labels
-#' @param year_colname column with year values used in column faceting
-#' @param month_colname column with month values on x axis
-#' @param category_colname column with categorical variable mapped to fill color
-#' @param plot_palette named list or vector of colors for categories
-#' @param none_color hex color string for missing values
-#' @param plot_title optional plot title
-#' @param plot_subtitle optional plot subtitle
-#' @param plot_caption optional plot caption
-#' @param legend_title optional legend title
-#' @param x_title optional x axis label
-#' @param y_title optional y axis label
-#' @returns a ggplot object with heat tiles by month and admin unit colored by category and faceted by year
+#' Make Reporting Rate Heatmap
+#'
+#' Builds a ggplot2 heatmap with one tile per administrative unit and month,
+#' filled by category and faceted by year. The y axis shows the administrative
+#' unit names.
+#'
+#' @param df_to_plot Data frame. Data to plot.
+#' @param admin_colname Character. Column with the administrative unit identifier on the y axis.
+#' @param admin_labels Character. Column with the administrative unit names used as y axis labels.
+#' @param year_colname Character. Column with the year values used for column faceting.
+#' @param month_colname Character. Column with the month values on the x axis.
+#' @param category_colname Character. Column with the category mapped to fill color.
+#' @param plot_palette Character. Named vector (or list) of colors for the categories.
+#' @param none_color Character. Hex color for missing values. Default: "#D3D3D3".
+#' @param plot_title Character. Optional plot title.
+#' @param plot_subtitle Character. Optional plot subtitle.
+#' @param plot_caption Character. Optional plot caption.
+#' @param legend_title Character. Optional legend title.
+#' @param x_title Character. Optional x axis label.
+#' @param y_title Character. Currently unused: the y axis title is hidden.
+#' @return ggplot. Heatmap of categories by month and administrative unit, faceted by year.
+#'
+#' @export
 make_reporting_rate_heatmap <- function(
     df_to_plot, admin_colname, admin_labels, year_colname, month_colname, category_colname, plot_palette, none_color = "#D3D3D3", plot_title = NULL, plot_subtitle = NULL, plot_caption = NULL, legend_title = NULL, x_title = NULL, y_title = NULL
 ){
@@ -192,18 +223,24 @@ ggplot(data = df_to_plot) +
 }
 
 
-#' @description make reporting rate maps faceted by year and month
-#' @param df_to_plot data frame containing the plotting data
-#' @param admin_colname column with administrative unit identifier
-#' @param year_colname column with year values used in faceting
-#' @param month_colname column with month values on x axis
-#' @param category_colname column with categorical variable mapped to color
-#' @param plot_palette named list or vector of colors for categories
-#' @param none_color hex color string for missing values
-#' @param plot_title optional plot title
-#' @param plot_subtitle optional plot subtitle
-#' @param plot_caption optional plot caption
-#' @returns a ggplot object with maps of the category variable, faceted by year and month
+#' Make Monthly Reporting Rate Map
+#'
+#' Builds ggplot2 maps of the reporting rate category per administrative unit,
+#' with one map per month (columns) and year (rows).
+#'
+#' @param df_to_plot Data frame. Data to plot, including a `geometry` column.
+#' @param admin_colname Character. Column with the administrative unit identifier. Currently unused.
+#' @param year_colname Character. Column with the year values used for row faceting.
+#' @param month_colname Character. Column with the month values used for column faceting.
+#' @param category_colname Character. Column with the category mapped to fill color.
+#' @param plot_palette Character. Named vector (or list) of colors for the categories.
+#' @param none_color Character. Hex color for missing values.
+#' @param plot_title Character. Plot title.
+#' @param plot_subtitle Character. Plot subtitle.
+#' @param plot_caption Character. Plot caption.
+#' @return ggplot. Maps of the category, faceted by year and month.
+#'
+#' @export
 make_monthly_reporting_map <- function(
     df_to_plot, admin_colname, year_colname, month_colname, category_colname, plot_palette, none_color, plot_title, plot_subtitle, plot_caption
 ){
@@ -259,17 +296,23 @@ make_monthly_reporting_map <- function(
 }
 
 
-#' @description make reporting rate maps faceted by year
-#' @param df_to_plot data frame containing the plotting data
-#' @param admin_colname column with administrative unit identifier
-#' @param year_colname column with year values used in faceting
-#' @param category_colname column with categorical variable mapped to color
-#' @param plot_palette named list or vector of colors for categories
-#' @param none_color hex color string for missing values
-#' @param plot_title optional plot title
-#' @param plot_subtitle optional plot subtitle
-#' @param plot_caption optional plot caption
-#' @returns a ggplot object with maps of the category variable, faceted by year
+#' Make Yearly Reporting Rate Map
+#'
+#' Builds ggplot2 maps of the reporting rate category per administrative unit,
+#' with one map per year (columns).
+#'
+#' @param df_to_plot Data frame. Data to plot, including a `geometry` column.
+#' @param admin_colname Character. Column with the administrative unit identifier. Currently unused.
+#' @param year_colname Character. Column with the year values used for column faceting.
+#' @param category_colname Character. Column with the category mapped to fill color.
+#' @param plot_palette Character. Named vector (or list) of colors for the categories.
+#' @param none_color Character. Hex color for missing values.
+#' @param plot_title Character. Plot title.
+#' @param plot_subtitle Character. Plot subtitle.
+#' @param plot_caption Character. Plot caption.
+#' @return ggplot. Maps of the category, faceted by year.
+#'
+#' @export
 make_yearly_reporting_map <- function(
     df_to_plot, admin_colname, year_colname, category_colname, plot_palette, none_color, plot_title, plot_subtitle, plot_caption
 ){

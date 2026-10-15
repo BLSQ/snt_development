@@ -13,8 +13,8 @@
             "FR": "Population totale (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Total number of people living in the district, as recorded in DHIS2.",
-            "FR": "Nombre total de personnes vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Total number of people living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre total de personnes vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -53,8 +53,8 @@
             "FR": "Population de moins de 5 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children under 5 years old living in the district, as recorded in DHIS2.",
-            "FR": "Nombre d'enfants de moins de 5 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of children under 5 years old living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants de moins de 5 ans vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -91,8 +91,8 @@
             "FR": "Femmes enceintes (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of pregnant women living in the district, as recorded in DHIS2.",
-            "FR": "Nombre de femmes enceintes vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of pregnant women living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre de femmes enceintes vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -129,8 +129,8 @@
             "FR": "Population de 0 à 1 an (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 0 to 1 year living in the district, as recorded in DHIS2.",
-            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of children aged 0 to 1 year living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -167,8 +167,8 @@
             "FR": "Population de 1 à 2 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 1 to 2 years living in the district, as recorded in DHIS2.",
-            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of children aged 1 to 2 years living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -205,8 +205,8 @@
             "FR": "Population de 5 à 10 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 5 to 10 years living in the district, as recorded in DHIS2.",
-            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of children aged 5 to 10 years living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -243,8 +243,8 @@
             "FR": "Population de 5 à 36 mois (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 5 to 36 months living in the district, as recorded in DHIS2.",
-            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of children aged 5 to 36 months living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -281,8 +281,8 @@
             "FR": "Population de 50 ans et plus (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of people aged 50 years and over living in the district, as recorded in DHIS2.",
-            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans le district, tel qu'enregistré dans le DHIS2."
+            "EN": "Number of people aged 50 years and over living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -319,8 +319,8 @@
             "FR": "Population totale (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Total number of people living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre total de personnes vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Total number of people living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre total de personnes vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -359,8 +359,8 @@
             "FR": "Population de moins de 5 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children under 5 years old living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre d'enfants de moins de 5 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of children under 5 years old living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants de moins de 5 ans vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -397,8 +397,8 @@
             "FR": "Femmes enceintes (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of pregnant women living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre de femmes enceintes vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of pregnant women living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre de femmes enceintes vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -435,8 +435,8 @@
             "FR": "Population de 0 à 1 an (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 0 to 1 year living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of children aged 0 to 1 year living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -473,8 +473,8 @@
             "FR": "Population de 1 à 2 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 1 to 2 years living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of children aged 1 to 2 years living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -511,8 +511,8 @@
             "FR": "Population de 5 à 10 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 5 to 10 years living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of children aged 5 to 10 years living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -549,8 +549,8 @@
             "FR": "Population de 5 à 36 mois (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of children aged 5 to 36 months living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of children aged 5 to 36 months living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -587,8 +587,8 @@
             "FR": "Population de 50 ans et plus (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Number of people aged 50 years and over living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
-            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
+            "EN": "Number of people aged 50 years and over living in the administrative unit, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans l'unité administrative, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
             "EN": "",
@@ -1681,8 +1681,8 @@
             "FR": "Saisonnalité des cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Classification of seasonal malaria transmission based on monthly confirmed malaria cases: a district is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the cases. Used to identify districts eligible for seasonal interventions.",
-            "FR": "Classification de la transmission saisonnière du paludisme sur base des cas de paludisme confirmés mensuels : un district est saisonnier quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des cas. Sert à identifier les districts éligibles pour des interventions saisonnières."
+            "EN": "Classification of seasonal malaria transmission based on monthly confirmed malaria cases: an administrative unit is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the cases. Used to identify administrative units eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des cas de paludisme confirmés mensuels : une unité administrative est saisonnière quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des cas. Sert à identifier les unités administratives éligibles pour des interventions saisonnières."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -1717,8 +1717,8 @@
             "FR": "Durée du bloc saisonnier, cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Shortest number of consecutive months that concentrates a large share of the cases. Empty for non-seasonal districts.",
-            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des cas. Vide pour les districts non saisonniers."
+            "EN": "Shortest number of consecutive months that concentrates a large share of the cases. Empty for non-seasonal administrative units.",
+            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des cas. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -1754,8 +1754,8 @@
             "FR": "Mois de début du bloc saisonnier, cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Calendar month in which the seasonal block of confirmed malaria cases most often starts. Empty for non-seasonal districts.",
-            "FR": "Mois calendaire où le bloc saisonnier de cas de paludisme confirmés commence le plus souvent. Vide pour les districts non saisonniers."
+            "EN": "Calendar month in which the seasonal block of confirmed malaria cases most often starts. Empty for non-seasonal administrative units.",
+            "FR": "Mois calendaire où le bloc saisonnier de cas de paludisme confirmés commence le plus souvent. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -1800,8 +1800,8 @@
             "FR": "Part des cas dans le bloc saisonnier (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Average share of each year's monthly confirmed malaria cases that falls within the peak seasonal block. Empty for non-seasonal districts.",
-            "FR": "Part moyenne des cas de paludisme confirmés mensuels de chaque année tombant dans le bloc saisonnier de pic. Vide pour les districts non saisonniers."
+            "EN": "Average share of each year's monthly confirmed malaria cases that falls within the peak seasonal block. Empty for non-seasonal administrative units.",
+            "FR": "Part moyenne des cas de paludisme confirmés mensuels de chaque année tombant dans le bloc saisonnier de pic. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -1838,8 +1838,8 @@
             "FR": "Saisonnalité des précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Classification of seasonal malaria transmission based on monthly rainfall: a district is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the rainfall. Used to identify districts eligible for seasonal interventions.",
-            "FR": "Classification de la transmission saisonnière du paludisme sur base des précipitations mensuelles : un district est saisonnier quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des précipitations. Sert à identifier les districts éligibles pour des interventions saisonnières."
+            "EN": "Classification of seasonal malaria transmission based on monthly rainfall: an administrative unit is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the rainfall. Used to identify administrative units eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des précipitations mensuelles : une unité administrative est saisonnière quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des précipitations. Sert à identifier les unités administratives éligibles pour des interventions saisonnières."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -1874,8 +1874,8 @@
             "FR": "Durée du bloc saisonnier, précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Shortest number of consecutive months that concentrates a large share of the rainfall. Empty for non-seasonal districts.",
-            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des précipitations. Vide pour les districts non saisonniers."
+            "EN": "Shortest number of consecutive months that concentrates a large share of the rainfall. Empty for non-seasonal administrative units.",
+            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des précipitations. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -1911,8 +1911,8 @@
             "FR": "Mois de début du bloc saisonnier, précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Calendar month in which the seasonal rainfall block most often starts each year. Empty for non-seasonal districts.",
-            "FR": "Mois calendaire où le bloc saisonnier de précipitations commence le plus souvent chaque année. Vide pour les districts non saisonniers."
+            "EN": "Calendar month in which the seasonal rainfall block most often starts each year. Empty for non-seasonal administrative units.",
+            "FR": "Mois calendaire où le bloc saisonnier de précipitations commence le plus souvent chaque année. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -1957,8 +1957,8 @@
             "FR": "Part des précipitations dans le bloc saisonnier (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Average share of each year's monthly rainfall that falls within the peak seasonal block. Empty for non-seasonal districts.",
-            "FR": "Part moyenne des précipitations mensuelles de chaque année tombant dans le bloc saisonnier de pic. Vide pour les districts non saisonniers."
+            "EN": "Average share of each year's monthly rainfall that falls within the peak seasonal block. Empty for non-seasonal administrative units.",
+            "FR": "Part moyenne des précipitations mensuelles de chaque année tombant dans le bloc saisonnier de pic. Vide pour les unités administratives non saisonnières."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -1991,12 +1991,12 @@
             "COLUMN": "MEAN"
         },
         "LABEL": {
-            "EN": "Monthly rainfall, district average (ERA5)",
-            "FR": "Précipitations mensuelles, moyenne du district (ERA5)"
+            "EN": "Monthly rainfall, average over the administrative unit (ERA5)",
+            "FR": "Précipitations mensuelles, moyenne sur l'unité administrative (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Total rainfall over the month, averaged over the district, from the ERA5-Land climate reanalysis.",
-            "FR": "Précipitations totales sur le mois, en moyenne sur le district, selon la réanalyse climatique ERA5-Land."
+            "EN": "Total rainfall over the month, averaged over the administrative unit, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations totales sur le mois, en moyenne sur l'unité administrative, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -2030,12 +2030,12 @@
             "COLUMN": "MIN"
         },
         "LABEL": {
-            "EN": "Monthly rainfall, district minimum (ERA5)",
-            "FR": "Précipitations mensuelles, minimum du district (ERA5)"
+            "EN": "Monthly rainfall, minimum over the administrative unit (ERA5)",
+            "FR": "Précipitations mensuelles, minimum sur l'unité administrative (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Rainfall at the driest location of the district at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
-            "FR": "Précipitations à l'endroit le plus sec du district à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
+            "EN": "Rainfall at the driest location in the administrative unit at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations à l'endroit le plus sec de l'unité administrative à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -2069,12 +2069,12 @@
             "COLUMN": "MAX"
         },
         "LABEL": {
-            "EN": "Monthly rainfall, district maximum (ERA5)",
-            "FR": "Précipitations mensuelles, maximum du district (ERA5)"
+            "EN": "Monthly rainfall, maximum over the administrative unit (ERA5)",
+            "FR": "Précipitations mensuelles, maximum sur l'unité administrative (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Rainfall at the wettest location of the district at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
-            "FR": "Précipitations à l'endroit le plus humide du district à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
+            "EN": "Rainfall at the wettest location in the administrative unit at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations à l'endroit le plus humide de l'unité administrative à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
             "EN": "ERA5",
@@ -2112,8 +2112,8 @@
             "FR": "Population totale (WorldPop)"
         },
         "DESCRIPTION": {
-            "EN": "Estimated number of people living in the district, from WorldPop modelled population estimates.",
-            "FR": "Nombre estimé de personnes vivant dans le district, selon les estimations modélisées de WorldPop."
+            "EN": "Estimated number of people living in the administrative unit, from WorldPop modelled population estimates.",
+            "FR": "Nombre estimé de personnes vivant dans l'unité administrative, selon les estimations modélisées de WorldPop."
         },
         "SOURCE": {
             "EN": "WorldPop",
@@ -2152,8 +2152,8 @@
             "FR": "Population totale, accès aux soins (WorldPop)"
         },
         "DESCRIPTION": {
-            "EN": "Estimated number of people living in the district (WorldPop), for the year used in the health care access analysis.",
-            "FR": "Nombre estimé de personnes vivant dans le district (WorldPop), pour l'année utilisée dans l'analyse de l'accès aux soins."
+            "EN": "Estimated number of people living in the administrative unit (WorldPop), for the year used in the health care access analysis.",
+            "FR": "Nombre estimé de personnes vivant dans l'unité administrative (WorldPop), pour l'année utilisée dans l'analyse de l'accès aux soins."
         },
         "SOURCE": {
             "EN": "WorldPop",
@@ -2232,8 +2232,8 @@
             "FR": "Accès aux soins (5 km)"
         },
         "DESCRIPTION": {
-            "EN": "Percentage of the district's population living within 5 km, in a straight line, of a health facility (about one hour's walk).",
-            "FR": "Pourcentage de la population du district vivant à moins de 5 km, à vol d'oiseau, d'une formation sanitaire (FOSA), soit environ une heure de marche."
+            "EN": "Percentage of the population of the administrative unit living within 5 km, in a straight line, of a health facility (about one hour's walk).",
+            "FR": "Pourcentage de la population de l'unité administrative vivant à moins de 5 km, à vol d'oiseau, d'une formation sanitaire (FOSA), soit environ une heure de marche."
         },
         "SOURCE": {
             "EN": "",

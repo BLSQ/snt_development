@@ -89,7 +89,7 @@ load_population_data <- function(country_code, population_dataset_id) {
 prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELECTION, N1_METHOD) {
 
   # Initial log msg
-    log_msg(glue::glue("Starting preparation of disaggregated indicators for selection '{DISAGGREGATION_SELECTION}' and N1_METHOD '{N1_METHOD}'."))
+  log_msg(glue::glue("Starting preparation of disaggregated indicators for selection '{DISAGGREGATION_SELECTION}' and N1_METHOD '{N1_METHOD}'.", .null = "none"))
 
   # Initialize the flag locally
   DISAGGREGATED_INDICATORS_FOUND <<- FALSE # AVOID (!)
@@ -375,7 +375,7 @@ export_monthly_cases <- function(monthly_cases) {
 coherence_check_PRES <- function(monthly_cases) {
     # Run this check only if N1_METHOD == "PRES" (else, problem doesn't exist)
     if (N1_METHOD == "PRES") {
-        nr_of_pres_0_adm2_month <<- monthly_cases |> filter(PRES == 0) |> nrow()
+        nr_of_pres_0_adm2_month <- monthly_cases |> filter(PRES == 0) |> nrow()
         log_msg(glue::glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
     } else {
         log_msg(glue::glue("N1_METHOD is not set to 'PRES'. No need to check for coherence of `PRES` column."))
@@ -385,7 +385,7 @@ coherence_check_PRES <- function(monthly_cases) {
 coherence_check_SUSP_TEST <- function(monthly_cases) {
   # Logically, there should not be more tested cases than suspected cases. 
     if (N1_METHOD == "SUSP-TEST") {
-        nr_of_negative <<- monthly_cases |> mutate(SUSP_minus_TEST = SUSP - TEST) |> filter(SUSP_minus_TEST < 0) |> nrow() 
+        nr_of_negative <- monthly_cases |> mutate(SUSP_minus_TEST = SUSP - TEST) |> filter(SUSP_minus_TEST < 0) |> nrow() 
         if (nr_of_negative > 0) {
             log_msg(
             glue::glue("🚨 Note: using formula `SUSP - TEST` for incidence adjustement, but higher tested than suspected cases (`SUSP < TEST`) detected in {nr_of_negative} rows (ADM2 x MONTH)."),
@@ -401,7 +401,7 @@ coherence_check_SUSP_TEST <- function(monthly_cases) {
 
 
 coherence_check_CONF_TEST <- function(monthly_cases) {
-    more_confirmed_than_tested <<- monthly_cases |> mutate(CONF_divby_TEST = CONF / TEST) |> filter(CONF_divby_TEST > 1) |> nrow() 
+    more_confirmed_than_tested <- monthly_cases |> mutate(CONF_divby_TEST = CONF / TEST) |> filter(CONF_divby_TEST > 1) |> nrow() 
     if (more_confirmed_than_tested > 0) {
         log_msg(glue::glue("🚨 Note: higher confirmed than tested cases (`CONF/TEST`) detected in {more_confirmed_than_tested} rows (ADM2 x MONTH)."), "warning")
     } else {

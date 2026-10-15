@@ -10,10 +10,14 @@
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
 | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from the old-format `SNT_metadata_20260226.json` on 2026-09-08. Nine layers, schema-valid. Read [§7](#7-the-ner-conversion-2026-09-08) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
-| [`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. **All text is still placeholder** and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
+| [`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code** (2026-10-15), awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
 
 > **Format change, 2026-09-08:** `TYPE` now also accepts `"Ordinal"`, and `SCALE` is read differently
 > under it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
+>
+> **Documented 2026-10-15, not yet in the schema:** the SNT Explorer also supports a third `TYPE`,
+> `"Linear"` (gradient legend, `SCALE` = `[start, end]`). It is blocked for now by an Explorer-side
+> bug, so the schema enum still rejects it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
 
 **Strict JSON only — no comments.** The SNT Explorer does not accept JSONC, so a `//` comment
 anywhere in the file breaks ingestion. Notes belong in the schema's `description` fields or in this
@@ -184,12 +188,25 @@ coupling is the thing to get right; the two fields cannot be reasoned about sepa
 |---|---|---|---|---|
 | `"Threshold"` | A continuous measure — incidence, population, a rate | the **cut points** between bins | **excluded** — the Explorer adds bottom and top | *n+1* bins |
 | `"Ordinal"` | A discrete measure with few ordered values — a 0/1 flag, a duration in whole months | the **complete ordered list of values** the column can take | **included** — there is nothing to add | *n* classes |
+| `"Linear"` ⚠ | A continuous measure shown as a colour **gradient** instead of bins | exactly **2 values**: the start and the end of the gradient | **included** — they are the two values | a gradient legend |
 
 ```jsonc
 "INCIDENCE_CRUDE":                   { "TYPE": "Threshold", "SCALE": [100, 250, 450, 1000] },  // 5 bins
 "SEASONALITY_RAINFALL":              { "TYPE": "Ordinal",   "SCALE": [0, 1] },                 // 2 classes
 "SEASONAL_BLOCK_DURATION_RAINFALL":  { "TYPE": "Ordinal",   "SCALE": [3, 4, 5] },              // 3 classes
+"PCT_HEALTH_ACCESS":                 { "TYPE": "Linear",    "SCALE": [0, 100] },               // gradient (not usable yet)
 ```
+
+**⚠ `"Linear"` is documented but not usable yet** (documented 2026-10-15). The SNT Explorer supports
+it, but a small Explorer-side bug currently blocks it; the IASO developers are aware and will fix it.
+Until then, do not use it in `metadata/SNT_metadata_master.json`. The schema `TYPE` enum
+deliberately still rejects it, so the validator in [§5](#5-validating) fails on it. Once the bug is
+fixed, add `"Linear"` to the enum in [`snt_metadata.schema.json`](snt_metadata.schema.json).
+
+The SNT Explorer might later compute the end value as max() of the loaded data instead of reading it
+from `SCALE` ([Open question #10](#open-questions)). That matters most for **population** layers. They
+always run from 0 to max(), but max() differs massively between countries, so no generic default for
+the end value — or for `Threshold` cut points — can be meaningful.
 
 Getting it backwards fails quietly in one of two ways: a `Threshold` scale written *with* its limits
 produces two degenerate empty bins at the ends, and an `Ordinal` scale written *without* them loses a
@@ -223,8 +240,8 @@ The authoritative description of every field is the `description` text inside
 | `SOURCE` | `{EN, FR}` | Display credit (`DHIS2`, `DHS`, …), not a machine reference. |
 | `UNITS` | `{EN, FR}` | Spelled out (`Per 1000 people`). |
 | `CATEGORY` | `{EN, FR}` | Grouping in the layer list. Must match sibling layers **exactly**. |
-| `TYPE` | `"Threshold"` or `"Ordinal"` | Continuous or discrete. Determines how `SCALE` is read — [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each). The schema rejects any other value deliberately. |
-| `SCALE` | array of numbers | Ascending. Bin **cut points** (outer limits excluded) under `Threshold`; the **full list of values** (outer limits included) under `Ordinal`. |
+| `TYPE` | `"Threshold"` or `"Ordinal"` | Continuous or discrete. Determines how `SCALE` is read — [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each). The schema rejects any other value deliberately. A third value, `"Linear"` (gradient), is documented in §2.6 but not accepted yet. |
+| `SCALE` | array of numbers | Ascending. Bin **cut points** (outer limits excluded) under `Threshold`; the **full list of values** (outer limits included) under `Ordinal`; exactly **`[start, end]`** under `Linear` (not usable yet). |
 | `UNIT_SYMBOL` | string or `null` | Short symbol (`"%"`), or `null`. |
 
 No field is optional: the schema requires all nine, and rejects unknown ones. That is deliberate —
@@ -504,9 +521,11 @@ checked against a live workspace. The file passes the validator in [§5](#5-vali
 
 ### What is placeholder
 
-- **All text.** `LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` read `"Placeholder text for <layer id>"`
-  in both languages. `CATEGORY` reads `"Placeholder text for <DATASET.NAME>"` so layers from one
-  dataset still share a group in the Explorer. Writing the real text is a separate task.
+- **Text — drafted 2026-10-15, not yet reviewed.** As bootstrapped, `LABEL`, `DESCRIPTION`, `SOURCE`
+  and `UNITS` read `"Placeholder text for <layer id>"`. They now hold a draft in EN and FR for all 58
+  layers, written from the code that computes each column — see
+  [Where the draft text came from](#where-the-draft-text-came-from-2026-10-15). `CATEGORY` is `""` in
+  both languages, to be decided. `UNIT_SYMBOL` was left as bootstrapped.
 - **`SCALE`.** No data was inspected. Where a layer already exists in
   [`SNT_metadata.example.json`](SNT_metadata.example.json) or [`SNT_metadata_NER.json`](SNT_metadata_NER.json)
   its scale is reused; otherwise it is a generic default for the unit traced in the code:
@@ -525,6 +544,47 @@ checked against a live workspace. The file passes the validator in [§5](#5-vali
   | Share captured by the seasonal block, 0–1 | Threshold | `[0.5, 0.6, 0.7, 0.8]` | `null` |
   | Precipitation, mm per month | Threshold | `[25, 50, 100, 200, 300]` | `"mm"` |
   | Percentage, 0–100 | Threshold | `[25, 50, 75]` | `"%"` |
+
+### Where the draft text came from (2026-10-15)
+
+All 58 entries were written from the code (the notebook or `pipeline.py` that computes the column),
+not copied from older catalogues, and are a draft for review. Conventions used:
+
+- `SOURCE` is `DHIS2`, `ERA5` or `WorldPop`, and `""` where the source depends on the run or mixes
+  several: every `*_TRANSFORMED` layer (DHIS2 or user-provided input), `POPULATION_INCIDENCE`
+  (operator-chosen population source), and `POP_COVERED` / `PCT_HEALTH_ACCESS` (WorldPop population
+  plus DHIS2 or user-provided facilities). `LABEL` ends with `(SOURCE)` only when `SOURCE` is set.
+- `UNITS` says `Proportion` where the column is a 0–1 fraction (reporting rates, `*_PROPORTION`), in
+  line with [Open question #2](#open-questions).
+
+Some layers also exist in an older catalogue. To compare by hand if needed:
+
+| Master layer | `configuration/SNT_metadata.json` (old format, FR only) | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) (EN + FR) |
+|---|---|---|
+| `POPULATION` | `POPULATION` | `POPULATION` |
+| `POP_UNDER_5` | — | `POPULATION_U5` |
+| `POP_PREGNANT_WOMEN` | — | `POPULATION_FE` |
+| `REPORTING_RATE_DATAELEMENT` | — | `REPORTING_RATE` (same method: facility activity) |
+| `REPORTING_RATE_DATASET` | `REPORTING_RATE` (same wording: reports received / expected) | — |
+| `INCIDENCE_CRUDE` | `INCIDENCE_CRUDE` | `INCIDENCE_CRUDE` |
+| `INCIDENCE_ADJ_TESTING` | `INCIDENCE_ADJ_TESTING` | `INCIDENCE_ADJ_TESTING` |
+| `INCIDENCE_ADJ_REPORTING` | `INCIDENCE_ADJ_REPORTING` | `INCIDENCE_ADJ_REPORTING` |
+| `INCIDENCE_ADJ_CARESEEKING` | `INCIDENCE_ADJ_CARESEEKING` | — |
+| `SEASONALITY_CASES` | `SEASONALITY_CASES` | — |
+| `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` |
+| `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` |
+
+**8 layers have an exact id match in `configuration/SNT_metadata.json`:** `POPULATION`, the four
+`INCIDENCE_*`, `SEASONALITY_CASES`, `SEASONALITY_RAINFALL` and `SEASONAL_BLOCK_DURATION_RAINFALL`.
+The old file's other 21 entries (`REPORTING_RATE`, DHS, MAP) have no master layer with the same id
+([What was left out](#what-was-left-out-and-why)). Known differences from the older text:
+
+- **Incidence `UNITS`** is now `Cases per 1000 people per year` (was `Per 1000 people`).
+- **Incidence adjustments are described as stacking** — reporting builds on testing, care-seeking
+  builds on both — as the code computes them.
+- **`INCIDENCE_ADJ_CARESEEKING`**: the code adjusts for **public-sector** care-seeking only, so the
+  draft says so.
+- **Labels say "district"**, not "zone spécifique", and the source is `DHIS2`, not NER's `SNIS`.
 
 ### How layer ids were chosen
 
@@ -556,7 +616,7 @@ choices produce. Expect those layers to fail to load where the column is absent:
   `1_2_Y`, `50_PLUS`) and NER (`UNDER_5`, `PREGNANT_WOMEN`). `POP_5_10_Y` and `POP_5_36_M` have no ids
   in any reference config.
 - **`POP_*_TRANSFORMED`** exist only when the operator sets the matching disaggregation parameter,
-  or supplies a disaggregation file (the only route to `POP_50_PLUS`).
+  or supplies a disaggregation file.
 - **The quality-of-care counts** are written only if the column is in the routine data, so they vary
   with each country's `DHIS2_INDICATOR_DEFINITIONS` (`ALLADM`, `ALLDTH`, `ALLOUT` in particular).
 - **Only one variant of an alternative is present at a time.** Quality of care writes the `imputed`
@@ -677,3 +737,8 @@ guess.
    Until this is settled, **R21 has a genuine exception** and `CLAUDE.md` says the rule was never
    audited against existing outputs. Whichever way it goes, R21's wording should gain the exception
    so the next person does not "fix" the seasonality table by adding a meaningless `YEAR`.
+10. **Data-driven scale limits.** For `"Linear"` ([§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each)),
+    the SNT Explorer might compute the end value as max() of the loaded data instead of reading it
+    from `SCALE`. Population layers need this most: their max() differs too much between countries
+    for a generic default. How a layer would request it (an omitted value, a sentinel, a flag) is not
+    decided.

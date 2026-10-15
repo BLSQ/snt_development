@@ -9,24 +9,24 @@
             "COLUMN": "POPULATION"
         },
         "LABEL": {
-            "EN": "Placeholder text for POPULATION",
-            "FR": "Placeholder text for POPULATION"
+            "EN": "Total population (DHIS2)",
+            "FR": "Population totale (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POPULATION",
-            "FR": "Placeholder text for POPULATION"
+            "EN": "Total number of people living in the district, as recorded in DHIS2.",
+            "FR": "Nombre total de personnes vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POPULATION",
-            "FR": "Placeholder text for POPULATION"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POPULATION",
-            "FR": "Placeholder text for POPULATION"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -49,24 +49,24 @@
             "COLUMN": "POP_UNDER_5"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_UNDER_5",
-            "FR": "Placeholder text for POP_UNDER_5"
+            "EN": "Population under 5 years (DHIS2)",
+            "FR": "Population de moins de 5 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_UNDER_5",
-            "FR": "Placeholder text for POP_UNDER_5"
+            "EN": "Number of children under 5 years old living in the district, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants de moins de 5 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_UNDER_5",
-            "FR": "Placeholder text for POP_UNDER_5"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_UNDER_5",
-            "FR": "Placeholder text for POP_UNDER_5"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -87,24 +87,24 @@
             "COLUMN": "POP_PREGNANT_WOMEN"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+            "EN": "Pregnant women (DHIS2)",
+            "FR": "Femmes enceintes (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+            "EN": "Number of pregnant women living in the district, as recorded in DHIS2.",
+            "FR": "Nombre de femmes enceintes vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -125,24 +125,24 @@
             "COLUMN": "POP_0_1_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_0_1_Y",
-            "FR": "Placeholder text for POP_0_1_Y"
+            "EN": "Population aged 0-1 year (DHIS2)",
+            "FR": "Population de 0 à 1 an (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_0_1_Y",
-            "FR": "Placeholder text for POP_0_1_Y"
+            "EN": "Number of children aged 0 to 1 year living in the district, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_0_1_Y",
-            "FR": "Placeholder text for POP_0_1_Y"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_0_1_Y",
-            "FR": "Placeholder text for POP_0_1_Y"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -163,24 +163,24 @@
             "COLUMN": "POP_1_2_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_1_2_Y",
-            "FR": "Placeholder text for POP_1_2_Y"
+            "EN": "Population aged 1-2 years (DHIS2)",
+            "FR": "Population de 1 à 2 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_1_2_Y",
-            "FR": "Placeholder text for POP_1_2_Y"
+            "EN": "Number of children aged 1 to 2 years living in the district, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_1_2_Y",
-            "FR": "Placeholder text for POP_1_2_Y"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_1_2_Y",
-            "FR": "Placeholder text for POP_1_2_Y"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -201,24 +201,24 @@
             "COLUMN": "POP_5_10_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_5_10_Y",
-            "FR": "Placeholder text for POP_5_10_Y"
+            "EN": "Population aged 5-10 years (DHIS2)",
+            "FR": "Population de 5 à 10 ans (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_5_10_Y",
-            "FR": "Placeholder text for POP_5_10_Y"
+            "EN": "Number of children aged 5 to 10 years living in the district, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_5_10_Y",
-            "FR": "Placeholder text for POP_5_10_Y"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_5_10_Y",
-            "FR": "Placeholder text for POP_5_10_Y"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -239,24 +239,24 @@
             "COLUMN": "POP_5_36_M"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_5_36_M",
-            "FR": "Placeholder text for POP_5_36_M"
+            "EN": "Population aged 5-36 months (DHIS2)",
+            "FR": "Population de 5 à 36 mois (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_5_36_M",
-            "FR": "Placeholder text for POP_5_36_M"
+            "EN": "Number of children aged 5 to 36 months living in the district, as recorded in DHIS2.",
+            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_5_36_M",
-            "FR": "Placeholder text for POP_5_36_M"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_5_36_M",
-            "FR": "Placeholder text for POP_5_36_M"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -277,24 +277,24 @@
             "COLUMN": "POP_50_PLUS"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_50_PLUS",
-            "FR": "Placeholder text for POP_50_PLUS"
+            "EN": "Population aged 50 and over (DHIS2)",
+            "FR": "Population de 50 ans et plus (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_50_PLUS",
-            "FR": "Placeholder text for POP_50_PLUS"
+            "EN": "Number of people aged 50 years and over living in the district, as recorded in DHIS2.",
+            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans le district, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_50_PLUS",
-            "FR": "Placeholder text for POP_50_PLUS"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_50_PLUS",
-            "FR": "Placeholder text for POP_50_PLUS"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_DATASET_FORMATTED",
-            "FR": "Placeholder text for DHIS2_DATASET_FORMATTED"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -315,24 +315,24 @@
             "COLUMN": "POPULATION"
         },
         "LABEL": {
-            "EN": "Placeholder text for POPULATION_TRANSFORMED",
-            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+            "EN": "Total population (transformed)",
+            "FR": "Population totale (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POPULATION_TRANSFORMED",
-            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+            "EN": "Total number of people living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre total de personnes vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POPULATION_TRANSFORMED",
-            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POPULATION_TRANSFORMED",
-            "FR": "Placeholder text for POPULATION_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -355,24 +355,24 @@
             "COLUMN": "POP_UNDER_5"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
-            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+            "EN": "Population under 5 years (transformed)",
+            "FR": "Population de moins de 5 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
-            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+            "EN": "Number of children under 5 years old living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants de moins de 5 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
-            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_UNDER_5_TRANSFORMED",
-            "FR": "Placeholder text for POP_UNDER_5_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -393,24 +393,24 @@
             "COLUMN": "POP_PREGNANT_WOMEN"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+            "EN": "Pregnant women (transformed)",
+            "FR": "Femmes enceintes (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+            "EN": "Number of pregnant women living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre de femmes enceintes vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED",
-            "FR": "Placeholder text for POP_PREGNANT_WOMEN_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -431,24 +431,24 @@
             "COLUMN": "POP_0_1_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+            "EN": "Population aged 0-1 year (transformed)",
+            "FR": "Population de 0 à 1 an (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+            "EN": "Number of children aged 0 to 1 year living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 0 à 1 an vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_0_1_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_0_1_Y_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -469,24 +469,24 @@
             "COLUMN": "POP_1_2_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+            "EN": "Population aged 1-2 years (transformed)",
+            "FR": "Population de 1 à 2 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+            "EN": "Number of children aged 1 to 2 years living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 1 à 2 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_1_2_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_1_2_Y_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -507,24 +507,24 @@
             "COLUMN": "POP_5_10_Y"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+            "EN": "Population aged 5-10 years (transformed)",
+            "FR": "Population de 5 à 10 ans (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+            "EN": "Number of children aged 5 to 10 years living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 5 à 10 ans vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_5_10_Y_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_10_Y_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -545,24 +545,24 @@
             "COLUMN": "POP_5_36_M"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+            "EN": "Population aged 5-36 months (transformed)",
+            "FR": "Population de 5 à 36 mois (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+            "EN": "Number of children aged 5 to 36 months living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre d'enfants âgés de 5 à 36 mois vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_5_36_M_TRANSFORMED",
-            "FR": "Placeholder text for POP_5_36_M_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -583,24 +583,24 @@
             "COLUMN": "POP_50_PLUS"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
-            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+            "EN": "Population aged 50 and over (transformed)",
+            "FR": "Population de 50 ans et plus (transformée)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
-            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+            "EN": "Number of people aged 50 years and over living in the district, after the population transformation: DHIS2 or user-provided figures, which may be rescaled to a national total, estimated as a fixed share of the total population, or projected to other years with a growth rate.",
+            "FR": "Nombre de personnes âgées de 50 ans et plus vivant dans le district, après la transformation de la population : chiffres du DHIS2 ou fournis par l'utilisateur, qui peuvent être ajustés à un total national, estimés comme une part fixe de la population totale, ou projetés sur d'autres années avec un taux de croissance."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
-            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_50_PLUS_TRANSFORMED",
-            "FR": "Placeholder text for POP_50_PLUS_TRANSFORMED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION",
-            "FR": "Placeholder text for DHIS2_POPULATION_TRANSFORMATION"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -621,24 +621,24 @@
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
-            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+            "EN": "Reporting rate, based on facility activity (DHIS2)",
+            "FR": "Taux de rapportage, selon l'activité des FOSA (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
-            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+            "EN": "Share of health facilities that reported routine malaria data in the month, out of the facilities that reported at least once during the year.",
+            "FR": "Proportion des formations sanitaires (FOSA) ayant rapporté des données de routine sur le paludisme dans le mois, parmi celles ayant rapporté au moins une fois dans l'année."
         },
         "SOURCE": {
-            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
-            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for REPORTING_RATE_DATAELEMENT",
-            "FR": "Placeholder text for REPORTING_RATE_DATAELEMENT"
+            "EN": "Proportion",
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_REPORTING_RATE",
-            "FR": "Placeholder text for DHIS2_REPORTING_RATE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -659,24 +659,24 @@
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "Placeholder text for REPORTING_RATE_DATASET",
-            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+            "EN": "Reporting rate, based on DHIS2 reports (DHIS2)",
+            "FR": "Taux de rapportage, selon les rapports DHIS2 (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for REPORTING_RATE_DATASET",
-            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+            "EN": "Number of reports received in the month, out of the number of reports expected, as recorded in DHIS2 for the selected data sets.",
+            "FR": "Nombre de rapports reçus dans le mois, sur le nombre total de rapports attendus, tel qu'enregistré dans le DHIS2 pour les formulaires sélectionnés."
         },
         "SOURCE": {
-            "EN": "Placeholder text for REPORTING_RATE_DATASET",
-            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for REPORTING_RATE_DATASET",
-            "FR": "Placeholder text for REPORTING_RATE_DATASET"
+            "EN": "Proportion",
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_REPORTING_RATE",
-            "FR": "Placeholder text for DHIS2_REPORTING_RATE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -697,24 +697,24 @@
             "COLUMN": "POPULATION"
         },
         "LABEL": {
-            "EN": "Placeholder text for POPULATION_INCIDENCE",
-            "FR": "Placeholder text for POPULATION_INCIDENCE"
+            "EN": "Population used for incidence",
+            "FR": "Population utilisée pour l'incidence"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POPULATION_INCIDENCE",
-            "FR": "Placeholder text for POPULATION_INCIDENCE"
+            "EN": "Population used as the denominator of the incidence rates. By default the total population; the analyst can choose its source (DHIS2, user-provided or transformed) and a target group such as children under 5.",
+            "FR": "Population utilisée comme dénominateur des taux d'incidence. Par défaut la population totale ; l'analyste peut en choisir la source (DHIS2, fournie par l'utilisateur ou transformée) et un groupe cible comme les enfants de moins de 5 ans."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POPULATION_INCIDENCE",
-            "FR": "Placeholder text for POPULATION_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POPULATION_INCIDENCE",
-            "FR": "Placeholder text for POPULATION_INCIDENCE"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_INCIDENCE",
-            "FR": "Placeholder text for DHIS2_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -737,24 +737,24 @@
             "COLUMN": "INCIDENCE_CRUDE"
         },
         "LABEL": {
-            "EN": "Placeholder text for INCIDENCE_CRUDE",
-            "FR": "Placeholder text for INCIDENCE_CRUDE"
+            "EN": "Crude incidence (DHIS2)",
+            "FR": "Incidence brute (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for INCIDENCE_CRUDE",
-            "FR": "Placeholder text for INCIDENCE_CRUDE"
+            "EN": "Number of confirmed malaria cases over the year, relative to the population.",
+            "FR": "Nombre de cas de paludisme confirmés sur l'année, rapporté à la population."
         },
         "SOURCE": {
-            "EN": "Placeholder text for INCIDENCE_CRUDE",
-            "FR": "Placeholder text for INCIDENCE_CRUDE"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for INCIDENCE_CRUDE",
-            "FR": "Placeholder text for INCIDENCE_CRUDE"
+            "EN": "Cases per 1000 people per year",
+            "FR": "Cas pour 1000 personnes par an"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_INCIDENCE",
-            "FR": "Placeholder text for DHIS2_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -777,24 +777,24 @@
             "COLUMN": "INCIDENCE_ADJ_TESTING"
         },
         "LABEL": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+            "EN": "Incidence adjusted for testing (DHIS2)",
+            "FR": "Incidence ajustée pour le dépistage (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+            "EN": "Number of malaria cases relative to the population, where confirmed cases are complemented by the untested cases expected to be positive, given the test positivity rate.",
+            "FR": "Nombre de cas de paludisme rapporté à la population, où les cas confirmés sont complétés par les cas non testés qui seraient positifs, selon le taux de positivité des tests."
         },
         "SOURCE": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_TESTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_TESTING"
+            "EN": "Cases per 1000 people per year",
+            "FR": "Cas pour 1000 personnes par an"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_INCIDENCE",
-            "FR": "Placeholder text for DHIS2_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -817,24 +817,24 @@
             "COLUMN": "INCIDENCE_ADJ_REPORTING"
         },
         "LABEL": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+            "EN": "Incidence adjusted for reporting rate (DHIS2)",
+            "FR": "Incidence ajustée pour le taux de rapportage (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+            "EN": "Incidence adjusted for testing, further adjusted for the reports that are missing, using the monthly reporting rate.",
+            "FR": "Incidence ajustée pour le dépistage, ajustée en plus pour les rapports manquants, selon le taux de rapportage mensuel."
         },
         "SOURCE": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_REPORTING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_REPORTING"
+            "EN": "Cases per 1000 people per year",
+            "FR": "Cas pour 1000 personnes par an"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_INCIDENCE",
-            "FR": "Placeholder text for DHIS2_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -857,24 +857,24 @@
             "COLUMN": "INCIDENCE_ADJ_CARESEEKING"
         },
         "LABEL": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+            "EN": "Incidence adjusted for care-seeking (DHIS2)",
+            "FR": "Incidence ajustée pour la recherche de soins (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+            "EN": "Incidence adjusted for testing and reporting rate, further adjusted for people with fever who do not seek care in public health facilities. Empty when no care-seeking data is available.",
+            "FR": "Incidence ajustée pour le dépistage et le taux de rapportage, ajustée en plus pour les personnes avec de la fièvre qui ne recherchent pas de soins dans les formations sanitaires publiques. Vide si aucune donnée de recherche de soins n'est disponible."
         },
         "SOURCE": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for INCIDENCE_ADJ_CARESEEKING",
-            "FR": "Placeholder text for INCIDENCE_ADJ_CARESEEKING"
+            "EN": "Cases per 1000 people per year",
+            "FR": "Cas pour 1000 personnes par an"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_INCIDENCE",
-            "FR": "Placeholder text for DHIS2_INCIDENCE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -897,24 +897,24 @@
             "COLUMN": "TEST"
         },
         "LABEL": {
-            "EN": "Placeholder text for TEST_QOC_IMPUTED",
-            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+            "EN": "Suspected cases tested, outliers imputed (DHIS2)",
+            "FR": "Cas suspects testés, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for TEST_QOC_IMPUTED",
-            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+            "EN": "Suspected cases tested in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Cas suspects testés dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for TEST_QOC_IMPUTED",
-            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for TEST_QOC_IMPUTED",
-            "FR": "Placeholder text for TEST_QOC_IMPUTED"
+            "EN": "Number of tests",
+            "FR": "Nombre de tests"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -936,24 +936,24 @@
             "COLUMN": "SUSP"
         },
         "LABEL": {
-            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
-            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+            "EN": "Suspected malaria cases, outliers imputed (DHIS2)",
+            "FR": "Cas suspects de paludisme, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
-            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+            "EN": "Suspected malaria cases in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Cas suspects de paludisme dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
-            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for SUSP_QOC_IMPUTED",
-            "FR": "Placeholder text for SUSP_QOC_IMPUTED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -975,24 +975,24 @@
             "COLUMN": "MALTREAT"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
-            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+            "EN": "Malaria cases treated, outliers imputed (DHIS2)",
+            "FR": "Cas de paludisme traités, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
-            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+            "EN": "Malaria cases treated in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Cas de paludisme traités dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
-            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALTREAT_QOC_IMPUTED",
-            "FR": "Placeholder text for MALTREAT_QOC_IMPUTED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1014,24 +1014,24 @@
             "COLUMN": "CONF"
         },
         "LABEL": {
-            "EN": "Placeholder text for CONF_QOC_IMPUTED",
-            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+            "EN": "Confirmed malaria cases, outliers imputed (DHIS2)",
+            "FR": "Cas de paludisme confirmés, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for CONF_QOC_IMPUTED",
-            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+            "EN": "Confirmed malaria cases in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Cas de paludisme confirmés dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for CONF_QOC_IMPUTED",
-            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for CONF_QOC_IMPUTED",
-            "FR": "Placeholder text for CONF_QOC_IMPUTED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1053,24 +1053,24 @@
             "COLUMN": "MALDTH"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+            "EN": "Malaria deaths, outliers imputed (DHIS2)",
+            "FR": "Décès dus au paludisme, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+            "EN": "Malaria deaths in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Décès dus au paludisme dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for MALDTH_QOC_IMPUTED"
+            "EN": "Number of deaths",
+            "FR": "Nombre de décès"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1092,24 +1092,24 @@
             "COLUMN": "MALADM"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
-            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+            "EN": "Malaria admissions, outliers imputed (DHIS2)",
+            "FR": "Hospitalisations pour paludisme, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
-            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+            "EN": "Malaria admissions in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Hospitalisations pour paludisme dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
-            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALADM_QOC_IMPUTED",
-            "FR": "Placeholder text for MALADM_QOC_IMPUTED"
+            "EN": "Number of admissions",
+            "FR": "Nombre d'hospitalisations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1131,24 +1131,24 @@
             "COLUMN": "ALLADM"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+            "EN": "All-cause admissions, outliers imputed (DHIS2)",
+            "FR": "Hospitalisations toutes causes, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+            "EN": "All-cause admissions in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Hospitalisations toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLADM_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLADM_QOC_IMPUTED"
+            "EN": "Number of admissions",
+            "FR": "Nombre d'hospitalisations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1170,24 +1170,24 @@
             "COLUMN": "ALLDTH"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+            "EN": "All-cause deaths, outliers imputed (DHIS2)",
+            "FR": "Décès toutes causes, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+            "EN": "All-cause deaths in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Décès toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLDTH_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLDTH_QOC_IMPUTED"
+            "EN": "Number of deaths",
+            "FR": "Nombre de décès"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1209,24 +1209,24 @@
             "COLUMN": "ALLOUT"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+            "EN": "All-cause outpatient consultations, outliers imputed (DHIS2)",
+            "FR": "Consultations externes toutes causes, valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+            "EN": "All-cause outpatient consultations in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Consultations externes toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLOUT_QOC_IMPUTED",
-            "FR": "Placeholder text for ALLOUT_QOC_IMPUTED"
+            "EN": "Number of consultations",
+            "FR": "Nombre de consultations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1248,24 +1248,24 @@
             "COLUMN": "PRES"
         },
         "LABEL": {
-            "EN": "Placeholder text for PRES_QOC_IMPUTED",
-            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+            "EN": "Presumed malaria cases (not tested), outliers imputed (DHIS2)",
+            "FR": "Cas de paludisme présumés (non testés), valeurs aberrantes imputées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PRES_QOC_IMPUTED",
-            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+            "EN": "Presumed malaria cases (not tested) in health facilities over the year, from routine data in which outliers were replaced by estimated values.",
+            "FR": "Cas de paludisme présumés (non testés) dans les formations sanitaires sur l'année, à partir des données de routine dans lesquelles les valeurs aberrantes ont été remplacées par des valeurs estimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PRES_QOC_IMPUTED",
-            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for PRES_QOC_IMPUTED",
-            "FR": "Placeholder text for PRES_QOC_IMPUTED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1287,24 +1287,24 @@
             "COLUMN": "TEST"
         },
         "LABEL": {
-            "EN": "Placeholder text for TEST_QOC_REMOVED",
-            "FR": "Placeholder text for TEST_QOC_REMOVED"
+            "EN": "Suspected cases tested, outliers removed (DHIS2)",
+            "FR": "Cas suspects testés, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for TEST_QOC_REMOVED",
-            "FR": "Placeholder text for TEST_QOC_REMOVED"
+            "EN": "Suspected cases tested in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Cas suspects testés dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for TEST_QOC_REMOVED",
-            "FR": "Placeholder text for TEST_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for TEST_QOC_REMOVED",
-            "FR": "Placeholder text for TEST_QOC_REMOVED"
+            "EN": "Number of tests",
+            "FR": "Nombre de tests"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1326,24 +1326,24 @@
             "COLUMN": "SUSP"
         },
         "LABEL": {
-            "EN": "Placeholder text for SUSP_QOC_REMOVED",
-            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+            "EN": "Suspected malaria cases, outliers removed (DHIS2)",
+            "FR": "Cas suspects de paludisme, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SUSP_QOC_REMOVED",
-            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+            "EN": "Suspected malaria cases in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Cas suspects de paludisme dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SUSP_QOC_REMOVED",
-            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for SUSP_QOC_REMOVED",
-            "FR": "Placeholder text for SUSP_QOC_REMOVED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1365,24 +1365,24 @@
             "COLUMN": "MALTREAT"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
-            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+            "EN": "Malaria cases treated, outliers removed (DHIS2)",
+            "FR": "Cas de paludisme traités, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
-            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+            "EN": "Malaria cases treated in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Cas de paludisme traités dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
-            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALTREAT_QOC_REMOVED",
-            "FR": "Placeholder text for MALTREAT_QOC_REMOVED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1404,24 +1404,24 @@
             "COLUMN": "CONF"
         },
         "LABEL": {
-            "EN": "Placeholder text for CONF_QOC_REMOVED",
-            "FR": "Placeholder text for CONF_QOC_REMOVED"
+            "EN": "Confirmed malaria cases, outliers removed (DHIS2)",
+            "FR": "Cas de paludisme confirmés, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for CONF_QOC_REMOVED",
-            "FR": "Placeholder text for CONF_QOC_REMOVED"
+            "EN": "Confirmed malaria cases in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Cas de paludisme confirmés dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for CONF_QOC_REMOVED",
-            "FR": "Placeholder text for CONF_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for CONF_QOC_REMOVED",
-            "FR": "Placeholder text for CONF_QOC_REMOVED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1443,24 +1443,24 @@
             "COLUMN": "MALDTH"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
-            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+            "EN": "Malaria deaths, outliers removed (DHIS2)",
+            "FR": "Décès dus au paludisme, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
-            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+            "EN": "Malaria deaths in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Décès dus au paludisme dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
-            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALDTH_QOC_REMOVED",
-            "FR": "Placeholder text for MALDTH_QOC_REMOVED"
+            "EN": "Number of deaths",
+            "FR": "Nombre de décès"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1482,24 +1482,24 @@
             "COLUMN": "MALADM"
         },
         "LABEL": {
-            "EN": "Placeholder text for MALADM_QOC_REMOVED",
-            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+            "EN": "Malaria admissions, outliers removed (DHIS2)",
+            "FR": "Hospitalisations pour paludisme, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for MALADM_QOC_REMOVED",
-            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+            "EN": "Malaria admissions in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Hospitalisations pour paludisme dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for MALADM_QOC_REMOVED",
-            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for MALADM_QOC_REMOVED",
-            "FR": "Placeholder text for MALADM_QOC_REMOVED"
+            "EN": "Number of admissions",
+            "FR": "Nombre d'hospitalisations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1521,24 +1521,24 @@
             "COLUMN": "ALLADM"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
-            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+            "EN": "All-cause admissions, outliers removed (DHIS2)",
+            "FR": "Hospitalisations toutes causes, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
-            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+            "EN": "All-cause admissions in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Hospitalisations toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
-            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLADM_QOC_REMOVED",
-            "FR": "Placeholder text for ALLADM_QOC_REMOVED"
+            "EN": "Number of admissions",
+            "FR": "Nombre d'hospitalisations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1560,24 +1560,24 @@
             "COLUMN": "ALLDTH"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
-            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+            "EN": "All-cause deaths, outliers removed (DHIS2)",
+            "FR": "Décès toutes causes, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
-            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+            "EN": "All-cause deaths in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Décès toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
-            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLDTH_QOC_REMOVED",
-            "FR": "Placeholder text for ALLDTH_QOC_REMOVED"
+            "EN": "Number of deaths",
+            "FR": "Nombre de décès"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1599,24 +1599,24 @@
             "COLUMN": "ALLOUT"
         },
         "LABEL": {
-            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
-            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+            "EN": "All-cause outpatient consultations, outliers removed (DHIS2)",
+            "FR": "Consultations externes toutes causes, valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
-            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+            "EN": "All-cause outpatient consultations in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Consultations externes toutes causes dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
-            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for ALLOUT_QOC_REMOVED",
-            "FR": "Placeholder text for ALLOUT_QOC_REMOVED"
+            "EN": "Number of consultations",
+            "FR": "Nombre de consultations"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1638,24 +1638,24 @@
             "COLUMN": "PRES"
         },
         "LABEL": {
-            "EN": "Placeholder text for PRES_QOC_REMOVED",
-            "FR": "Placeholder text for PRES_QOC_REMOVED"
+            "EN": "Presumed malaria cases (not tested), outliers removed (DHIS2)",
+            "FR": "Cas de paludisme présumés (non testés), valeurs aberrantes supprimées (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PRES_QOC_REMOVED",
-            "FR": "Placeholder text for PRES_QOC_REMOVED"
+            "EN": "Presumed malaria cases (not tested) in health facilities over the year, from routine data from which outliers were removed.",
+            "FR": "Cas de paludisme présumés (non testés) dans les formations sanitaires sur l'année, à partir des données de routine dont les valeurs aberrantes ont été supprimées."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PRES_QOC_REMOVED",
-            "FR": "Placeholder text for PRES_QOC_REMOVED"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for PRES_QOC_REMOVED",
-            "FR": "Placeholder text for PRES_QOC_REMOVED"
+            "EN": "Number of cases",
+            "FR": "Nombre de cas"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for DHIS2_QUALITY_OF_CARE",
-            "FR": "Placeholder text for DHIS2_QUALITY_OF_CARE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1677,24 +1677,24 @@
             "COLUMN": "SEASONALITY_CASES"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONALITY_CASES",
-            "FR": "Placeholder text for SEASONALITY_CASES"
+            "EN": "Seasonality of cases (DHIS2)",
+            "FR": "Saisonnalité des cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONALITY_CASES",
-            "FR": "Placeholder text for SEASONALITY_CASES"
+            "EN": "Classification of seasonal malaria transmission based on monthly confirmed malaria cases: a district is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the cases. Used to identify districts eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des cas de paludisme confirmés mensuels : un district est saisonnier quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des cas. Sert à identifier les districts éligibles pour des interventions saisonnières."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONALITY_CASES",
-            "FR": "Placeholder text for SEASONALITY_CASES"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONALITY_CASES",
-            "FR": "Placeholder text for SEASONALITY_CASES"
+            "EN": "Not seasonal (0), Seasonal (1)",
+            "FR": "Pas saisonnier (0), Saisonnier (1)"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
-            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1713,24 +1713,24 @@
             "COLUMN": "SEASONAL_BLOCK_DURATION_CASES"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+            "EN": "Duration of the seasonal block, cases (DHIS2)",
+            "FR": "Durée du bloc saisonnier, cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+            "EN": "Shortest number of consecutive months that concentrates a large share of the cases. Empty for non-seasonal districts.",
+            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des cas. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_CASES"
+            "EN": "Number of months",
+            "FR": "Nombre de mois"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
-            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1750,24 +1750,24 @@
             "COLUMN": "SEASONAL_BLOCK_START_MONTH_CASES"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+            "EN": "Start month of the seasonal block, cases (DHIS2)",
+            "FR": "Mois de début du bloc saisonnier, cas (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+            "EN": "Calendar month in which the seasonal block of confirmed malaria cases most often starts. Empty for non-seasonal districts.",
+            "FR": "Mois calendaire où le bloc saisonnier de cas de paludisme confirmés commence le plus souvent. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_CASES"
+            "EN": "Month (1 = January … 12 = December)",
+            "FR": "Mois (1 = janvier … 12 = décembre)"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
-            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1796,24 +1796,24 @@
             "COLUMN": "CASES_PROPORTION"
         },
         "LABEL": {
-            "EN": "Placeholder text for CASES_PROPORTION",
-            "FR": "Placeholder text for CASES_PROPORTION"
+            "EN": "Share of cases in the seasonal block (DHIS2)",
+            "FR": "Part des cas dans le bloc saisonnier (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for CASES_PROPORTION",
-            "FR": "Placeholder text for CASES_PROPORTION"
+            "EN": "Average share of each year's monthly confirmed malaria cases that falls within the peak seasonal block. Empty for non-seasonal districts.",
+            "FR": "Part moyenne des cas de paludisme confirmés mensuels de chaque année tombant dans le bloc saisonnier de pic. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for CASES_PROPORTION",
-            "FR": "Placeholder text for CASES_PROPORTION"
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Placeholder text for CASES_PROPORTION",
-            "FR": "Placeholder text for CASES_PROPORTION"
+            "EN": "Proportion",
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_CASES",
-            "FR": "Placeholder text for SNT_SEASONALITY_CASES"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1834,24 +1834,24 @@
             "COLUMN": "SEASONALITY_RAINFALL"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+            "EN": "Seasonality of rainfall (ERA5)",
+            "FR": "Saisonnalité des précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+            "EN": "Classification of seasonal malaria transmission based on monthly rainfall: a district is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the rainfall. Used to identify districts eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des précipitations mensuelles : un district est saisonnier quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des précipitations. Sert à identifier les districts éligibles pour des interventions saisonnières."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SEASONALITY_RAINFALL"
+            "EN": "Not seasonal (0), Seasonal (1)",
+            "FR": "Pas saisonnier (0), Saisonnier (1)"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1870,24 +1870,24 @@
             "COLUMN": "SEASONAL_BLOCK_DURATION_RAINFALL"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+            "EN": "Duration of the seasonal block, rainfall (ERA5)",
+            "FR": "Durée du bloc saisonnier, précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+            "EN": "Shortest number of consecutive months that concentrates a large share of the rainfall. Empty for non-seasonal districts.",
+            "FR": "Plus petit nombre de mois consécutifs concentrant une grande part des précipitations. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_DURATION_RAINFALL"
+            "EN": "Number of months",
+            "FR": "Nombre de mois"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1907,24 +1907,24 @@
             "COLUMN": "SEASONAL_BLOCK_START_MONTH_RAINFALL"
         },
         "LABEL": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+            "EN": "Start month of the seasonal block, rainfall (ERA5)",
+            "FR": "Mois de début du bloc saisonnier, précipitations (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+            "EN": "Calendar month in which the seasonal rainfall block most often starts each year. Empty for non-seasonal districts.",
+            "FR": "Mois calendaire où le bloc saisonnier de précipitations commence le plus souvent chaque année. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL",
-            "FR": "Placeholder text for SEASONAL_BLOCK_START_MONTH_RAINFALL"
+            "EN": "Month (1 = January … 12 = December)",
+            "FR": "Mois (1 = janvier … 12 = décembre)"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Ordinal",
         "SCALE": [
@@ -1953,24 +1953,24 @@
             "COLUMN": "RAIN_PROPORTION"
         },
         "LABEL": {
-            "EN": "Placeholder text for RAIN_PROPORTION",
-            "FR": "Placeholder text for RAIN_PROPORTION"
+            "EN": "Share of rainfall in the seasonal block (ERA5)",
+            "FR": "Part des précipitations dans le bloc saisonnier (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for RAIN_PROPORTION",
-            "FR": "Placeholder text for RAIN_PROPORTION"
+            "EN": "Average share of each year's monthly rainfall that falls within the peak seasonal block. Empty for non-seasonal districts.",
+            "FR": "Part moyenne des précipitations mensuelles de chaque année tombant dans le bloc saisonnier de pic. Vide pour les districts non saisonniers."
         },
         "SOURCE": {
-            "EN": "Placeholder text for RAIN_PROPORTION",
-            "FR": "Placeholder text for RAIN_PROPORTION"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for RAIN_PROPORTION",
-            "FR": "Placeholder text for RAIN_PROPORTION"
+            "EN": "Proportion",
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_SEASONALITY_RAINFALL",
-            "FR": "Placeholder text for SNT_SEASONALITY_RAINFALL"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -1991,24 +1991,24 @@
             "COLUMN": "MEAN"
         },
         "LABEL": {
-            "EN": "Placeholder text for PRECIPITATION_MEAN",
-            "FR": "Placeholder text for PRECIPITATION_MEAN"
+            "EN": "Monthly rainfall, district average (ERA5)",
+            "FR": "Précipitations mensuelles, moyenne du district (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PRECIPITATION_MEAN",
-            "FR": "Placeholder text for PRECIPITATION_MEAN"
+            "EN": "Total rainfall over the month, averaged over the district, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations totales sur le mois, en moyenne sur le district, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PRECIPITATION_MEAN",
-            "FR": "Placeholder text for PRECIPITATION_MEAN"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for PRECIPITATION_MEAN",
-            "FR": "Placeholder text for PRECIPITATION_MEAN"
+            "EN": "Millimetres per month",
+            "FR": "Millimètres par mois"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
-            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2030,24 +2030,24 @@
             "COLUMN": "MIN"
         },
         "LABEL": {
-            "EN": "Placeholder text for PRECIPITATION_MIN",
-            "FR": "Placeholder text for PRECIPITATION_MIN"
+            "EN": "Monthly rainfall, district minimum (ERA5)",
+            "FR": "Précipitations mensuelles, minimum du district (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PRECIPITATION_MIN",
-            "FR": "Placeholder text for PRECIPITATION_MIN"
+            "EN": "Rainfall at the driest location of the district at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations à l'endroit le plus sec du district à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PRECIPITATION_MIN",
-            "FR": "Placeholder text for PRECIPITATION_MIN"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for PRECIPITATION_MIN",
-            "FR": "Placeholder text for PRECIPITATION_MIN"
+            "EN": "Millimetres per month",
+            "FR": "Millimètres par mois"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
-            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2069,24 +2069,24 @@
             "COLUMN": "MAX"
         },
         "LABEL": {
-            "EN": "Placeholder text for PRECIPITATION_MAX",
-            "FR": "Placeholder text for PRECIPITATION_MAX"
+            "EN": "Monthly rainfall, district maximum (ERA5)",
+            "FR": "Précipitations mensuelles, maximum du district (ERA5)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PRECIPITATION_MAX",
-            "FR": "Placeholder text for PRECIPITATION_MAX"
+            "EN": "Rainfall at the wettest location of the district at each time step, summed over the month, from the ERA5-Land climate reanalysis.",
+            "FR": "Précipitations à l'endroit le plus humide du district à chaque pas de temps, additionnées sur le mois, selon la réanalyse climatique ERA5-Land."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PRECIPITATION_MAX",
-            "FR": "Placeholder text for PRECIPITATION_MAX"
+            "EN": "ERA5",
+            "FR": "ERA5"
         },
         "UNITS": {
-            "EN": "Placeholder text for PRECIPITATION_MAX",
-            "FR": "Placeholder text for PRECIPITATION_MAX"
+            "EN": "Millimetres per month",
+            "FR": "Millimètres par mois"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for ERA5_DATASET_CLIMATE",
-            "FR": "Placeholder text for ERA5_DATASET_CLIMATE"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2108,24 +2108,24 @@
             "COLUMN": "POPULATION"
         },
         "LABEL": {
-            "EN": "Placeholder text for POPULATION_WORLDPOP",
-            "FR": "Placeholder text for POPULATION_WORLDPOP"
+            "EN": "Total population (WorldPop)",
+            "FR": "Population totale (WorldPop)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POPULATION_WORLDPOP",
-            "FR": "Placeholder text for POPULATION_WORLDPOP"
+            "EN": "Estimated number of people living in the district, from WorldPop modelled population estimates.",
+            "FR": "Nombre estimé de personnes vivant dans le district, selon les estimations modélisées de WorldPop."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POPULATION_WORLDPOP",
-            "FR": "Placeholder text for POPULATION_WORLDPOP"
+            "EN": "WorldPop",
+            "FR": "WorldPop"
         },
         "UNITS": {
-            "EN": "Placeholder text for POPULATION_WORLDPOP",
-            "FR": "Placeholder text for POPULATION_WORLDPOP"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for WORLDPOP_DATASET_EXTRACT",
-            "FR": "Placeholder text for WORLDPOP_DATASET_EXTRACT"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2148,24 +2148,24 @@
             "COLUMN": "POP_TOTAL"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_TOTAL",
-            "FR": "Placeholder text for POP_TOTAL"
+            "EN": "Total population, health care access (WorldPop)",
+            "FR": "Population totale, accès aux soins (WorldPop)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_TOTAL",
-            "FR": "Placeholder text for POP_TOTAL"
+            "EN": "Estimated number of people living in the district (WorldPop), for the year used in the health care access analysis.",
+            "FR": "Nombre estimé de personnes vivant dans le district (WorldPop), pour l'année utilisée dans l'analyse de l'accès aux soins."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_TOTAL",
-            "FR": "Placeholder text for POP_TOTAL"
+            "EN": "WorldPop",
+            "FR": "WorldPop"
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_TOTAL",
-            "FR": "Placeholder text for POP_TOTAL"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
-            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2188,24 +2188,24 @@
             "COLUMN": "POP_COVERED"
         },
         "LABEL": {
-            "EN": "Placeholder text for POP_COVERED",
-            "FR": "Placeholder text for POP_COVERED"
+            "EN": "Population within 5 km of a health facility",
+            "FR": "Population à moins de 5 km d'une FOSA"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for POP_COVERED",
-            "FR": "Placeholder text for POP_COVERED"
+            "EN": "Estimated number of people (WorldPop) living within 5 km, in a straight line, of a health facility.",
+            "FR": "Nombre estimé de personnes (WorldPop) vivant à moins de 5 km, à vol d'oiseau, d'une formation sanitaire (FOSA)."
         },
         "SOURCE": {
-            "EN": "Placeholder text for POP_COVERED",
-            "FR": "Placeholder text for POP_COVERED"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for POP_COVERED",
-            "FR": "Placeholder text for POP_COVERED"
+            "EN": "Number of people",
+            "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
-            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -2228,24 +2228,24 @@
             "COLUMN": "PCT_HEALTH_ACCESS"
         },
         "LABEL": {
-            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
-            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+            "EN": "Health care access (5 km)",
+            "FR": "Accès aux soins (5 km)"
         },
         "DESCRIPTION": {
-            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
-            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+            "EN": "Percentage of the district's population living within 5 km, in a straight line, of a health facility (about one hour's walk).",
+            "FR": "Pourcentage de la population du district vivant à moins de 5 km, à vol d'oiseau, d'une formation sanitaire (FOSA), soit environ une heure de marche."
         },
         "SOURCE": {
-            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
-            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+            "EN": "",
+            "FR": ""
         },
         "UNITS": {
-            "EN": "Placeholder text for PCT_HEALTH_ACCESS",
-            "FR": "Placeholder text for PCT_HEALTH_ACCESS"
+            "EN": "Percentage of the population",
+            "FR": "Pourcentage de la population"
         },
         "CATEGORY": {
-            "EN": "Placeholder text for SNT_HEALTHCARE_ACCESS",
-            "FR": "Placeholder text for SNT_HEALTHCARE_ACCESS"
+            "EN": "",
+            "FR": ""
         },
         "TYPE": "Threshold",
         "SCALE": [

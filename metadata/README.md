@@ -37,7 +37,9 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
   - **Objective:** the layer id and `SOURCE_DATA` (dataset key, filename, column). Check them against
     the code that writes the column.
   - **Curated:** `LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS`, `CATEGORY`, `TYPE`, `SCALE`,
-    `UNIT_SYMBOL`. These need a person with domain knowledge. All text is still placeholder today.
+    `UNIT_SYMBOL`. These need a person with domain knowledge. Text is a draft written from the code
+    (2026-10-15), not yet reviewed; `CATEGORY` is empty. Which layers also exist in older catalogues:
+    [`docs/schemas/snt_metadata_json/README.md` §8](../docs/schemas/snt_metadata_json/README.md#where-the-draft-text-came-from-2026-10-15).
 - **When a pipeline adds or renames a published column**, add or update the master list entry in the
   same PR (CLAUDE.md handover checklist). A column with no entry is invisible in the Explorer. An
   entry whose column was renamed is dropped by the trim pipeline as `COLUMN_NOT_FOUND` in every

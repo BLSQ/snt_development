@@ -273,3 +273,6 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
 | Why things are the way they are | [`docs/decisions/`](docs/decisions/README.md) |
 | Local setup | [`dev/README.md`](dev/README.md) |
 | How the git guardrail is enforced | [`.claude/README.md`](.claude/README.md) |
+| Skill: run the handover checklist + write the note (incl. R11/R12 parameter checker) | [`.claude/skills/handover/`](.claude/skills/handover/SKILL.md) |
+| Skill: write or audit a pipeline `readme.md` against the code | [`.claude/skills/write-pipeline-readme/`](.claude/skills/write-pipeline-readme/SKILL.md) |
+| Skill: add/edit an SNT Explorer layer + validate the metadata file | [`.claude/skills/add-explorer-layer/`](.claude/skills/add-explorer-layer/SKILL.md) |

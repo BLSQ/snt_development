@@ -45,9 +45,9 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
   same PR (CLAUDE.md handover checklist). A column with no entry is invisible in the Explorer. An
   entry whose column was renamed is dropped by the trim pipeline as `COLUMN_NOT_FOUND` in every
   workspace.
-- **Validate before merging** with the snippet in
-  [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating),
-  with `METADATA = 'metadata/SNT_metadata_master.json'`.
+- **Validate before merging**: `python3 .claude/skills/add-explorer-layer/validate_metadata.py`
+  (checks the master list by default) — see
+  [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating).
 - **What the master list includes, what it leaves out and why:**
   [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#the-master-list).
 

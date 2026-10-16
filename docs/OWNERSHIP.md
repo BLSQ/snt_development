@@ -6,7 +6,7 @@
 |---|---|
 | **Revision** | `0.1` — first draft, names not yet filled in |
 | **Last updated** | **2026-08-31** |
-| **Status** | 🚧 **Placeholder.** Every `Responsible` cell is `_TBD_`. See [§4](#4-open-items). |
+| **Status** | 🚧 **Placeholder.** Every `Responsible` cell is `_TBD_`. See [BACKLOG DOC-4](BACKLOG.md#doc-4). |
 | **Owner** | @sPuntinG |
 
 <!-- ▲▲▲ End of version block ▲▲▲ -->
@@ -24,8 +24,8 @@ member.** For a change to a pipeline's analytics, that reviewer should be the pe
 that pipeline in [§2](#2-pipeline-responsibilities).
 
 This is a **convention, not an enforced rule**. Nothing in GitHub blocks an unreviewed merge, and
-there is no `CODEOWNERS` file — one was drafted and the team decided against it. So the convention
-holds only because people follow it. Two consequences worth stating:
+there is no `CODEOWNERS` file — one was drafted and the team decided against it
+([ADR 0005](decisions/0005-no-codeowners.md)). So the convention holds only because people follow it. Two consequences worth stating:
 
 - **The burden is on the author.** Requesting the right reviewer is your job, not the reviewer's.
 - **Silence is not approval.** If nobody with context has read a change to `pipelines/*/code/` or
@@ -108,26 +108,6 @@ variants](../CLAUDE.md#country-specific-notebook-variants)
 
 ## 4. Open items
 
-`[TODO: Giulia]` — these need a decision or information that cannot be derived from the code.
-
-- [ ] **Fill in every `_TBD_`** in [§2](#2-pipeline-responsibilities) and
-      [§3](#3-cross-cutting-assets). Decide whether a `Backup` column is worth maintaining or
-      should be dropped.
-- [ ] **Confirm the licence.** [`../LICENSE`](../LICENSE) is currently **MIT**, added
-      provisionally so a public repository is not left unlicensed. Rationale: maximally permissive,
-      universally understood, and it lets ministries and national malaria programmes adapt the code
-      without legal review. **Worth discussing with the team:**
-      - **Apache-2.0** — same permissions, plus an explicit patent grant and contribution terms.
-        The usual choice for organisation-backed public projects; slightly more paperwork.
-      - **Consistency with sibling BLSQ repositories** (`openhexa`, `openhexa-toolbox`,
-        `snt_utils`) — matching them is probably the strongest argument either way. Not verified
-        here.
-      - **The documentation.** This repo is unusually documentation-heavy. Some organisations
-        license docs separately (CC-BY-4.0). Simpler to keep one licence for everything unless
-        someone objects.
-      - Confirm the copyright holder string and year in `LICENSE`.
-- [ ] **Link the published method reference.** Neither the README nor the glossary points to an
-      authoritative external description of the SNT method — WHO subnational-tailoring guidance, a
-      protocol document, or a paper. External readers (epidemiologists reading the R code without
-      workspace access) currently have this repository as their only context. Add the link to
-      [`../README.md`](../README.md) §*Start here* and to [`GLOSSARY.md`](GLOSSARY.md) §1.1.
+In [`BACKLOG.md`](BACKLOG.md#documentation): filling in the `_TBD_` cells ([DOC-4](BACKLOG.md#doc-4)),
+confirming the licence ([DOC-5](BACKLOG.md#doc-5)) and linking a published reference for the SNT
+method ([DOC-6](BACKLOG.md#doc-6)).

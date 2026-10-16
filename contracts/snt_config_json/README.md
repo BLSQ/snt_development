@@ -35,8 +35,8 @@ there.
 
 - **It does not explain how to fill in the country-specific values.** That belongs in a future
   `snt_config.schema.json`, on the same model as the schema proposed for `SNT_metadata.json` in
-  [`../snt_metadata_json/`](../snt_metadata_json/README.md).
-  `[TODO: Giulia — not created yet]`
+  [`../snt_metadata_json/`](../snt_metadata_json/README.md). Not created yet:
+  [BACKLOG CFG-3](../../docs/BACKLOG.md#cfg-3).
 - **It is not a working config.** Copying it into a workspace without filling it in will make the
   pipelines fail or skip steps.
 
@@ -74,20 +74,8 @@ webapp repo**, not here. Until that happens:
 
 ---
 
-## Open question: the shape of `REPORTING_DATASETS[].METRICS`
+## Open questions
 
-Today every config has:
-
-```json
-"METRICS": {
-  "ACTUAL_REPORTS": "float",
-  "EXPECTED_REPORTS": "float"
-}
-```
-
-The value is always `"float"`, which looks like a placeholder that just avoids an empty value.  
-It is possible that the type `"float"` *is* used during
-extraction. No such use is visible in this repo. If it exists, it is probably in `snt_lib`
-([BLSQ/snt_utils](https://github.com/BLSQ/snt_utils), external and unpinned) or somewhere else
-outside this repo. **An automated search of this repo cannot detect it**, so do not take "no usage
-found" as proof that the value is unused.
+- The shape of `REPORTING_DATASETS[].METRICS`, whose value is always `"float"`:
+  [BACKLOG CFG-2](../../docs/BACKLOG.md#cfg-2).
+- A key-naming convention for `SNT_DATASET_IDENTIFIERS`: [BACKLOG CFG-1](../../docs/BACKLOG.md#cfg-1).

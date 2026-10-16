@@ -2,32 +2,30 @@
 
 > **Status: work in progress.** The shape described here is the one dated **2026-09-08**, currently
 > being validated with the IASO developers. It is written down so the work is not lost and can be
-> built on progressively — not because it is settled. Section [Open questions](#open-questions)
-> lists what is still undecided; do not treat a silence there as a decision.
+> built on progressively — not because it is settled. The open questions are the `META-*` items in
+> [`docs/BACKLOG.md`](../../docs/BACKLOG.md#snt-explorer-metadata); do not treat a silence there as a
+> decision. Why the format looks like this: [ADR 0007](../../docs/decisions/0007-snt-metadata-json-format.md).
 
 | File | Role |
 |---|---|
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
-| [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from the old-format `SNT_metadata_20260226.json` on 2026-09-08. Nine layers, schema-valid. Read [§7](#7-the-ner-conversion-2026-09-08) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
-| [`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code** (2026-10-15), awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
+| [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from Niger's old-format file. Nine layers, schema-valid. Read [§6](#snt_metadata_nerjson) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
+| [`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) | **The master list**: every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code**, awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../metadata/README.md), and [§6](#the-master-list) for what it leaves out and why. |
 
-> **Format change, 2026-09-08:** `TYPE` now also accepts `"Ordinal"`, and `SCALE` is read differently
-> under it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
->
-> **Documented 2026-10-15, not yet in the schema:** the SNT Explorer also supports a third `TYPE`,
-> `"Linear"` (gradient legend, `SCALE` = `[start, end]`). It is blocked for now by an Explorer-side
-> bug, so the schema enum still rejects it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
+> **Not yet in the schema:** the SNT Explorer also supports a third `TYPE`, `"Linear"` (gradient
+> legend, `SCALE` = `[start, end]`). It is blocked for now by an Explorer-side bug, so the schema enum
+> still rejects it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
 
 **Strict JSON only — no comments.** The SNT Explorer does not accept JSONC, so a `//` comment
 anywhere in the file breaks ingestion. Notes belong in the schema's `description` fields or in this
 document, never in the data file. (They would not survive the future editing webapp either: an app
 that reads, edits and rewrites JSON drops comments silently.)
 
-**These two files describe the target format. They do not describe what is deployed today.**
-The old-format `SNT_metadata.json` (archived in `deprecated/configuration/`) is still the older shape, and nothing reads it:
-its only reader, `snt_assemble_results`, is retired. It has not been migrated. See
-[Relationship to what exists today](#6-relationship-to-what-exists-today).
+**These two files describe the target format. They do not describe what is deployed today.** The
+old-format `SNT_metadata.json` (repo copy archived in `deprecated/configuration/`) is a different,
+older shape and has not been migrated. A workspace may still hold an old-format copy in its
+`configuration/` folder; see [BACKLOG DOC-3](../../docs/BACKLOG.md#doc-3) for what still reads it.
 
 ---
 
@@ -63,19 +61,14 @@ One entry does two jobs at once:
 
 ## 2. The decisions worth understanding
 
-Everything else in the format follows from these six.
+Everything else in the format follows from these six. The reasoning behind them, and what the old
+format did instead, is in [ADR 0007](../../docs/decisions/0007-snt-metadata-json-format.md).
 
 ### 2.1 `SOURCE_DATA` — the file became a pointer, not just a caption
 
-The older format described a layer (`LABEL`, `UNITS`, `SCALE`…) but never said where its values
-came from. The consumer had to already know. That works when the consumer is one pipeline written
-by the same team; it does not work when the consumer is a general-purpose tool ingesting layers it
-was not built for.
-
-Adding `SOURCE_DATA` makes each entry **self-resolving**: given this file and the country's
-`SNT_config.json`, a consumer can locate the values without any hardcoded mapping. That is what
-lets the IASO-based Explorer add a layer through configuration rather than through a code change,
-and it is the single biggest reason the format changed.
+Each entry is **self-resolving**: given this file and the country's `SNT_config.json`, a consumer can
+locate the values without any hardcoded mapping. That is what lets the IASO-based Explorer add a
+layer through configuration rather than through a code change.
 
 The consequence to keep in mind: this file now makes a **promise about data that lives elsewhere**.
 Rename a column or a file in a pipeline and this file becomes wrong, with nothing to detect the
@@ -85,8 +78,7 @@ a change that must be mirrored here — the same discipline the repo already app
 
 ### 2.2 The layer id is not the column name
 
-The top-level key is a **layer id**. In the old format it was effectively the column name, and the
-two happened to coincide. They no longer must:
+The top-level key is a **layer id**, and it need not equal the column:
 
 ```jsonc
 "REPORTING_RATE_DATAELEMENT": { … "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
@@ -96,8 +88,8 @@ two happened to coincide. They no longer must:
 ```
 
 Two genuinely different layers — reporting rate computed per data element, and per dataset — that
-carry the same column name in different files. Under the old rule one would have overwritten the
-other. Hence the rule now: **the layer id is unique and arbitrary; `COLUMN` need not be unique.**
+carry the same column name in different files. Hence the rule: **the layer id is unique and
+arbitrary; `COLUMN` need not be unique.**
 
 Practical consequences:
 
@@ -108,18 +100,15 @@ Practical consequences:
 
 ### 2.3 Bilingual by construction
 
-`LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS` and `CATEGORY` are `{ "EN": …, "FR": … }` objects. The
-old format held a single string, in practice French, which left no room for an English Explorer
-and no way to tell a deliberate choice from a missing translation.
+`LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS` and `CATEGORY` are `{ "EN": …, "FR": … }` objects.
 
 Both keys are **required even when empty**, so an untranslated field shows up as `""` — visible,
 greppable, and countable — rather than as an absent key that reads like the format changed. What
-the Explorer should *do* with an empty string is [Open question #1](#open-questions).
+the Explorer should *do* with an empty string is [BACKLOG META-1](../../docs/BACKLOG.md#meta-1).
 
 ### 2.4 Time is carried by the data, via the `YEAR` column
 
-This file says nothing about *when* a layer's values apply, and that is deliberate. The old format
-had a `PERIOD` field that `snt_assemble_results` wrote back at runtime; it is gone.
+This file says nothing about *when* a layer's values apply, and that is deliberate.
 
 Instead, the referenced table carries a **`YEAR` column**, the Explorer imports it alongside
 `COLUMN`, and the user picks which year to display. So one metadata entry yields a layer the user
@@ -135,11 +124,11 @@ Two consequences when adding a layer:
 
 - **Check the table actually has `YEAR`** before writing the entry. It is not verifiable from here.
 - For a monthly output, `YEAR` is still required — how the Explorer handles a finer grain
-  (aggregate, or offer a month selector) is [Open question #7](#open-questions).
+  (aggregate, or offer a month selector) is [BACKLOG META-7](../../docs/BACKLOG.md#meta-7).
 - **Some layers genuinely have no year.** A result computed *across* years — rainfall seasonality is
   the known case — has nothing to put in `YEAR`, and adding one would misrepresent the analysis. How
-  the Explorer should treat such a layer is [Open question #9](#open-questions). Do not resolve it by
-  inventing a `YEAR`.
+  the Explorer should treat such a layer is [BACKLOG META-9](../../docs/BACKLOG.md#meta-9). Do not
+  resolve it by inventing a `YEAR`.
 
 ### 2.5 `DATASET.NAME` is a config key, not a dataset name
 
@@ -168,16 +157,11 @@ Two things follow:
   the config — the validator in [§5](#5-validating) does exactly that. Do run it: a bad key is
   invisible until the Explorer tries to load the layer.
 
-> **Correction applied.** The 2026-09-08 working file used `SNT_DHIS2_INCIDENCE` and
-> `SNT_DHIS2_REPORTING_RATE` — the datasets' *display names*, which are not config keys. The
-> committed example uses the correct keys `DHIS2_INCIDENCE` and `DHIS2_REPORTING_RATE`
-> (6 of its 7 entries were affected); all now resolve in all five country configs.
-> The 2026-09-08 working draft (not committed) still has the old values and has not been touched.
->
-> The confusion is understandable, because the config keys follow no single convention — some carry
-> an `SNT_` prefix and some do not, so the key rarely looks like the dataset it points at. That
-> cleanup is logged for Giulia in
-> [`CLAUDE.md`](../../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
+> **An easy mistake.** The config keys follow no single convention — some carry an `SNT_` prefix and
+> some do not — so the key rarely looks like the dataset it points at, and writing the dataset's
+> display name instead (`SNT_DHIS2_INCIDENCE` for `DHIS2_INCIDENCE`) is a natural slip. A cleanup of
+> the key names is [BACKLOG CFG-1](../../docs/BACKLOG.md#cfg-1); renaming the field itself is
+> [META-5](../../docs/BACKLOG.md#meta-5).
 
 ### 2.6 `TYPE`: `Threshold` versus `Ordinal`, and what `SCALE` means under each
 
@@ -197,16 +181,16 @@ coupling is the thing to get right; the two fields cannot be reasoned about sepa
 "PCT_HEALTH_ACCESS":                 { "TYPE": "Linear",    "SCALE": [0, 100] },               // gradient (not usable yet)
 ```
 
-**⚠ `"Linear"` is documented but not usable yet** (documented 2026-10-15). The SNT Explorer supports
-it, but a small Explorer-side bug currently blocks it; the IASO developers are aware and will fix it.
-Until then, do not use it in `metadata/SNT_metadata_master.json`. The schema `TYPE` enum
-deliberately still rejects it, so the validator in [§5](#5-validating) fails on it. Once the bug is
-fixed, add `"Linear"` to the enum in [`snt_metadata.schema.json`](snt_metadata.schema.json).
+**⚠ `"Linear"` is documented but not usable yet.** The SNT Explorer supports it, but a small
+Explorer-side bug currently blocks it; the IASO developers are aware and will fix it. Until then, do
+not use it in `metadata/SNT_metadata_master.json`. The schema `TYPE` enum deliberately still rejects
+it, so the validator in [§5](#5-validating) fails on it. Once the bug is fixed, add `"Linear"` to the
+enum in [`snt_metadata.schema.json`](snt_metadata.schema.json) ([BACKLOG META-4](../../docs/BACKLOG.md#meta-4)).
 
 The SNT Explorer might later compute the end value as max() of the loaded data instead of reading it
-from `SCALE` ([Open question #10](#open-questions)). That matters most for **population** layers. They
-always run from 0 to max(), but max() differs massively between countries, so no generic default for
-the end value — or for `Threshold` cut points — can be meaningful.
+from `SCALE` ([BACKLOG META-10](../../docs/BACKLOG.md#meta-10)). That matters most for **population**
+layers. They always run from 0 to max(), but max() differs massively between countries, so no generic
+default for the end value — or for `Threshold` cut points — can be meaningful.
 
 Getting it backwards fails quietly in one of two ways: a `Threshold` scale written *with* its limits
 produces two degenerate empty bins at the ends, and an `Ordinal` scale written *without* them loses a
@@ -214,14 +198,9 @@ class. Neither is a validation error — the schema can check the type of `SCALE
 
 **`Ordinal` is still numeric.** `SCALE` remains an array of numbers, so a categorical layer is
 expressed by the numbers its column actually holds (`[0, 1]`), not by the labels those numbers stand
-for. The labels belong in `UNITS` — `"Not seasonal (0), Seasonal (1)"` — which is where the old
-format's `"[not-seasonal, seasonal]"` content now lives. A layer whose values are genuinely
-non-numeric strings still has no home in this format; that remains
-[Open question #4](#open-questions).
-
-> **Added 2026-09-08**, when Niger's catalogue was converted: both of its seasonality layers are
-> ordinal, and forcing them into `Threshold` would have meant expressing a 0/1 flag as a single cut
-> point. `"Threshold"` was the only accepted value before this change.
+for. The labels belong in `UNITS` — `"Not seasonal (0), Seasonal (1)"`. A layer whose values are
+genuinely non-numeric strings still has no home in this format; that is
+[BACKLOG META-4](../../docs/BACKLOG.md#meta-4).
 
 ## 3. Field reference
 
@@ -256,8 +235,7 @@ a typo like `SCALEE` should fail loudly instead of silently producing a layer wi
 2. **Ascending order is required, and the schema cannot check it.** JSON Schema has no way to
    express "sorted". The validator below does check it.
 
-`SCALE` also changed type: it was a *stringified* array (`"[50, 150]"`) and is now a real JSON
-array (`[50, 150]`). Every consumer had to parse that string by hand; now it is just data.
+`SCALE` is a real JSON array (`[50, 150]`), not a string.
 
 ## 4. How to make common changes
 
@@ -353,39 +331,15 @@ must:
 - That `CATEGORY` strings are consistent across layers.
 - That the bins in `SCALE` suit the country's actual value range.
 
-## 6. Relationship to what exists today
+## 6. The reference files
 
-| | Status |
-|---|---|
-| `deprecated/configuration/SNT_metadata.json` | **Old format**, no reader since `snt_assemble_results` was retired. Single-language strings, stringified `SCALE`, no `SOURCE_DATA`, plus `ORDER` and `PERIOD`. Not migrated. |
-| The 2026-09-08 working draft (not committed) | The working file this schema was derived from. It carries `//` comments; the committed example does not, because the Explorer cannot read JSONC (see the note at the top of this document). |
-| `snt_assemble_results` | **Retired** (archived in `deprecated/`). Read the **old** format, and wrote `PERIOD` back into it at runtime via `update_metadata(...)`. The Explorer reads the OpenHEXA datasets directly instead. |
+Every `SOURCE_DATA` pointer in both files below was traced to the code that writes the column (the
+`add_files_to_dataset(...)` calls in `pipeline.py`, and the notebook cells that build the final
+table). Nothing was checked against a live workspace.
 
-**Two fields were dropped:**
+### `SNT_metadata_NER.json`
 
-- **`ORDER`** — an integer that ordered layers in the list. No longer needed.
-- **`PERIOD`** — the data's time coverage, which `snt_assemble_results` *wrote back into the file at
-  runtime*. It is not needed either, and its removal ends the oddity of a pipeline mutating a
-  configuration file. Time is now carried by the **data**, not by this file: see
-  [§2.4](#24-time-is-carried-by-the-data-via-the-year-column).
-
-**Where the file will live.** A new OpenHEXA dataset, `SNT_CONFIGURATION`, will hold
-`SNT_config.json` and `SNT_metadata.json`. (The repo's own `configuration/` folder is already
-retired: its old copies are archived in `deprecated/configuration/`.) A user-facing OpenHEXA
-webapp will let non-technical users edit them, most likely
-writing through a Python pipeline that validates the structure first — which is where this schema
-becomes an executable gate rather than documentation. **None of that exists yet**; nothing in this
-folder assumes it, and the paths above are the ones that are real today.
-
-## 7. The NER conversion (2026-09-08)
-
-[`SNT_metadata_NER.json`](SNT_metadata_NER.json) was produced from Niger's old-format
-`SNT_metadata_20260226.json` (12 layers). **Nine layers carried over; three did not.** Every
-`SOURCE_DATA` pointer was traced to the pipeline that writes the column — none was guessed — and the
-result passes the validator in [§5](#5-validating), including `DATASET.NAME` resolution against all
-five country configs.
-
-### What the nine layers point at
+Niger's catalogue: nine layers, converted from Niger's old-format file.
 
 | Layers | `DATASET.NAME` | `FILENAME` | Written by |
 |---|---|---|---|
@@ -394,136 +348,49 @@ five country configs.
 | `INCIDENCE_CRUDE`, `INCIDENCE_ADJ_TESTING`, `INCIDENCE_ADJ_REPORTING` | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
 | `SEASONALITY_RAINFALL`, `SEASONAL_BLOCK_DURATION_RAINFALL` | `SNT_SEASONALITY_RAINFALL` | `{COUNTRY_CODE}_rainfall_seasonality.csv` | `snt_seasonality_rainfall` |
 
-The old file named no columns, so three had to be resolved from
-`POPULATION_INDICATOR_DEFINITIONS` in [`SNT_config_NER.json`](../../deprecated/configuration/SNT_config_NER.json):
-`POPULATION` → `POPULATION`, `POPULATION_FE` ("femmes enceintes") → `POP_PREGNANT_WOMEN`,
-`POPULATION_U5` → `POP_UNDER_5`. All three have real DHIS2 ids in Niger's config.
+What to know before using it:
 
-`REPORTING_RATE` was ambiguous between the two reporting-rate pipelines, which both publish to
-`DHIS2_REPORTING_RATE`. The **data element** variant was chosen because the old description read
-*"Taux de rapportage sur base de l'activité des FOSAs"*, and that pipeline is the one that derives
-reporting from facility activity indicators; the dataset variant uses DHIS2's own pre-computed
-actual/expected report counts instead. **Worth confirming with whoever wrote the original file** —
-the two produce different numbers from the same dataset, and nothing in the file records which was
-meant.
+- **Population columns:** `POPULATION_FE` ("femmes enceintes") reads `POP_PREGNANT_WOMEN`, and
+  `POPULATION_U5` reads `POP_UNDER_5`.
+- **`REPORTING_RATE` is on 0–1**, so its `SCALE` is fractional (`[0.5, 0.8, 0.9, 0.95]`) with
+  `UNIT_SYMBOL: null` ([BACKLOG META-2](../../docs/BACKLOG.md#meta-2)).
+- **`SOURCE` credits `SNIS`**, Niger's national HIS, where the generic example credits `DHIS2`.
+- **The three MAP layers** (`PF_INCIDENCE_RATE`, `PF_PR_RATE`, `PF_MORTALITY_RATE`) are not in the
+  file: the MAP output is long-format, one file per year, which the format cannot express
+  ([BACKLOG META-14](../../docs/BACKLOG.md#meta-14)).
+- **The two seasonality layers reference a table with no `YEAR` column.** It is keyed on `ADM2_ID`
+  alone, and the layers may fail to load ([BACKLOG META-9](../../docs/BACKLOG.md#meta-9)). In Niger
+  the country variant `snt_seasonality_rainfall_NER.ipynb` is what runs; both columns are present in
+  it as well as in the generic notebook.
+- **Still to confirm:** the reporting-rate method, the English translations and the population layer
+  ids ([BACKLOG META-17](../../docs/BACKLOG.md#meta-17)).
 
-### The three MAP layers were omitted
-
-`PF_INCIDENCE_RATE`, `PF_PR_RATE` and `PF_MORTALITY_RATE` **cannot be expressed in this format
-today.** `snt_map_extracts` publishes a **long-format** table, **one file per year**:
-
-```
-{CC}_map_data_2022.csv, {CC}_map_data_2023.csv, …
-  columns: METRIC_CATEGORY, METRIC_NAME, STATISTIC, VALUE, YEAR, VERSION
-```
-
-So locating `PF_INCIDENCE_RATE` needs two things `SOURCE_DATA` has no field for: a **row filter**
-(`METRIC_NAME == "Pf_Incidence_Rate"`, `STATISTIC == …`) and a **year wildcard** in `FILENAME`,
-whose schema pattern requires a fixed name. `COLUMN` would be `VALUE` for all three layers, which
-carries no information.
-
-The one wide source is `{CC}_results_dataset.csv` on `SNT_RESULTS`, where `snt_assemble_results`
-pivots `METRIC_NAME` into real `PF_*` columns — but it **filters each metric to a single year and
-drops `YEAR`**, so the layer could not be stepped through time ([§2.4](#24-time-is-carried-by-the-data-via-the-year-column)),
-and that pipeline was retired precisely so the Explorer can read source datasets directly.
-Pointing at it would encode the dependency the format exists to remove.
-
-**To restore these three layers, one of the following has to happen** (a decision for the SNT and
-IASO developers together, not a metadata edit):
-
-1. `snt_map_extracts` also publishes a **wide** table — one column per metric, one row per
-   `ADM2_ID` × `YEAR`, in a single year-independent file. Then each layer is an ordinary entry and
-   nothing else changes. *Cheapest, and consistent with every other pipeline in the repo.*
-2. `SOURCE_DATA` gains an optional **`FILTER`** field (`{"METRIC_NAME": "Pf_Incidence_Rate"}`), plus
-   a way to express the per-year filenames. A format change, and it makes every consumer implement
-   row filtering.
-
-### Two layers reference a table with no `YEAR` column
-
-`SEASONALITY_RAINFALL` and `SEASONAL_BLOCK_DURATION_RAINFALL` are included and validate, but
-`{CC}_rainfall_seasonality.csv` is `admin_seasonality_wide_dt` — seasonality **per admin unit,
-irrespective of year**, aggregated across the whole rainfall series. It is keyed on `ADM2_ID` alone.
-
-That breaks [§2.4](#24-time-is-carried-by-the-data-via-the-year-column) and repo rule **R21**, and it
-is not a metadata problem: the two entries are as correct as they can be, and **the layers may
-simply fail to load** if the Explorer requires `YEAR`. The rule and the analysis genuinely disagree
-here — seasonality is *defined* over multiple years, so there is no year to attach and adding one
-would misrepresent the result. **This is now [Open question #9](#open-questions)**, which sets out the
-options; it needs a decision from the IASO developers rather than a fix in this repo. **Unverified
-either way** — neither the table nor the Explorer's behaviour was checked against a live workspace.
-
-Also relevant for Niger specifically: `snt_seasonality_rainfall` has a country-specific variant,
-`pipelines/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb`, and it is in an
-**active** location, so it is what actually runs in the NER workspace. Both columns were confirmed
-present in that variant as well as in the generic notebook.
-
-### Other changes made while converting
-
-- **Encoding.** The source file was mojibake throughout (`spÃ©cifique`, `santÃ©`) — a UTF-8 file read
-  as Latin-1. All accents restored.
-- **`SNIS` as the source credit.** Niger's file credits `SNIS` (the national HIS) where the generic
-  example credits `DHIS2`. Kept as `SNIS`, since `SOURCE` is a display credit for the user
-  ([§3](#3-field-reference)) and Niger's operators use that name.
-- **Two inconsistencies in the source were normalised**, both flagged rather than silent:
-  `POPULATION_U5` was labelled `(DHIS2)` while its own `SOURCE` said `SNIS`, and
-  `INCIDENCE_ADJ_TESTING` was labelled `(DHI2)` — a typo. Both now read `(SNIS)`.
-- **English translations were written for all nine layers.** The source file was French-only, so
-  every `EN` value is new. They are a faithful translation of the French, but they have **not been
-  reviewed by a domain speaker** — worth a pass, particularly `REPORTING_RATE`, where the French
-  said only "based on FOSA activity" and the English states the numerator and denominator explicitly.
-- **`CATEGORY` strings were reused verbatim** from [`SNT_metadata.example.json`](SNT_metadata.example.json)
-  where one existed (`Variable of population and health`, `Epidemiological indicators`), so the two
-  files do not split one Explorer group into two. `Data quality` and `Environmental indicators` are
-  new English strings — the example leaves the former blank.
-- **`REPORTING_RATE`'s `SCALE` was rescaled** from `[50, 80, 90, 95, 100]` to `[0.5, 0.8, 0.9, 0.95]`
-  to match what the pipeline writes, and the trailing limit dropped. See
-  [Open question #2](#open-questions).
-
-### Where the file lives
-
-`SNT_metadata_NER.json` lives here, in `contracts/snt_metadata_json/`, beside the schema it was
-converted to. The repo's old `configuration/` folder is retired (its files are archived in
-`deprecated/configuration/`), and `.gitignore` ignores `*.json` wholesale, so a JSON file is only
-tracked where a negation reaches it.
-
-> The negation is `contracts/**/*.json`, not `contracts/*.json`, precisely so a per-file
-> subfolder like this one stays tracked. Do not narrow it when adding a schema for another
-> configuration file — see [`contracts/README.md`](../README.md).
-
-## 8. The master list (2026-09-28)
+### The master list
 
 [`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) declares **every
-column the current pipelines can publish** that fits this format. It started as an interoperability
-test file for the SNT Explorer and is now the **master list**: `snt_metadata_json_trim` fetches it
-from this repository and keeps, per workspace, the layers whose data exists. It was created as
-`SNT_metadata_all_layers.json` in this folder and moved and renamed on 2026-10-12.
-`snt_assemble_results` is out of scope (retired).
+column the current pipelines can publish** that fits this format. `snt_metadata_json_trim` fetches it
+from this repository and keeps, per workspace, the layers whose data exists. It is edited by hand
+([ADR 0008](../../docs/decisions/0008-master-list-maintained-by-hand.md)); how to maintain it:
+[`metadata/README.md`](../../metadata/README.md). Validate it with [§5](#5-validating), with
+`METADATA` pointed at it. `snt_assemble_results` is out of scope (retired,
+[ADR 0006](../../docs/decisions/0006-retire-snt-assemble-results.md)).
 
-**The JSON is the source of truth — edit it by hand, reviewed in a PR.** It was bootstrapped by a
-one-off generator, `build_snt_metadata_all_layers.py`, deleted on 2026-10-12 so it can never
-overwrite curated text. It is in git history at commit `062cf0c`. After editing, validate with
-[§5](#5-validating) with `METADATA` pointed at the JSON. How to maintain it:
-[`metadata/README.md`](../../metadata/README.md).
+#### Draft content
 
-The rest of this section records how the 2026-09-28 content was produced. The placeholder and
-default-scale tables below describe the file as bootstrapped; they stop being accurate entry by
-entry as real text and scales are written.
-
-Every `SOURCE_DATA` pointer was traced to the code that writes the column (`pipeline.py`
-`add_files_to_dataset(...)` calls, and the notebook cells that build the final table). Nothing was
-checked against a live workspace. The file passes the validator in [§5](#5-validating), including
-`DATASET.NAME` resolution against all five country configs.
-
-### What is placeholder
-
-- **Text — drafted 2026-10-15, not yet reviewed.** As bootstrapped, `LABEL`, `DESCRIPTION`, `SOURCE`
-  and `UNITS` read `"Placeholder text for <layer id>"`. They now hold a draft in EN and FR for all 58
-  layers, written from the code that computes each column — see
-  [Where the draft text came from](#where-the-draft-text-came-from-2026-10-15). `CATEGORY` is `""` in
-  both languages, to be decided. `UNIT_SYMBOL` was left as bootstrapped.
-- **`SCALE`.** No data was inspected. Where a layer already exists in
+- **Text.** `LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` hold a draft in EN and FR for all 58
+  layers, written from the code that computes each column, not yet reviewed
+  ([BACKLOG META-13](../../docs/BACKLOG.md#meta-13)). `CATEGORY` is `""` in both languages, to be
+  decided. Conventions used in the draft:
+  - `SOURCE` is `DHIS2`, `ERA5` or `WorldPop`, and `""` where the source depends on the run or mixes
+    several: every `*_TRANSFORMED` layer (DHIS2 or user-provided input), `POPULATION_INCIDENCE`
+    (operator-chosen population source), and `POP_COVERED` / `PCT_HEALTH_ACCESS` (WorldPop population
+    plus DHIS2 or user-provided facilities). `LABEL` ends with `(SOURCE)` only when `SOURCE` is set.
+  - `UNITS` says `Proportion` where the column is a 0–1 fraction (reporting rates, `*_PROPORTION`), in
+    line with [BACKLOG META-2](../../docs/BACKLOG.md#meta-2).
+- **`SCALE`.** No data was inspected. Where a layer also exists in
   [`SNT_metadata.example.json`](SNT_metadata.example.json) or [`SNT_metadata_NER.json`](SNT_metadata_NER.json)
-  its scale is reused; otherwise it is a generic default for the unit traced in the code:
+  its scale is reused; otherwise it is a generic default for the unit traced in the code. Entries
+  stop matching this table as real scales are written:
 
   | Unit (from the code) | `TYPE` | `SCALE` | `UNIT_SYMBOL` |
   |---|---|---|---|
@@ -540,17 +407,27 @@ checked against a live workspace. The file passes the validator in [§5](#5-vali
   | Precipitation, mm per month | Threshold | `[25, 50, 100, 200, 300]` | `"mm"` |
   | Percentage, 0–100 | Threshold | `[25, 50, 75]` | `"%"` |
 
-### Where the draft text came from (2026-10-15)
+#### Layer ids and where they point
 
-All 58 entries were written from the code (the notebook or `pipeline.py` that computes the column),
-not copied from older catalogues, and are a draft for review. Conventions used:
+The layer id is the column name, plus a qualifier where two layers would otherwise collide
+([§2.2](#22-the-layer-id-is-not-the-column-name)). Ids already in the example are kept.
 
-- `SOURCE` is `DHIS2`, `ERA5` or `WorldPop`, and `""` where the source depends on the run or mixes
-  several: every `*_TRANSFORMED` layer (DHIS2 or user-provided input), `POPULATION_INCIDENCE`
-  (operator-chosen population source), and `POP_COVERED` / `PCT_HEALTH_ACCESS` (WorldPop population
-  plus DHIS2 or user-provided facilities). `LABEL` ends with `(SOURCE)` only when `SOURCE` is set.
-- `UNITS` says `Proportion` where the column is a 0–1 fraction (reporting rates, `*_PROPORTION`), in
-  line with [Open question #2](#open-questions).
+| Layers | Dataset key | File | Pipeline |
+|---|---|---|---|
+| `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
+| `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
+| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_{dataelement,dataset}.csv` | `snt_dhis2_reporting_rate_*` |
+| `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
+| `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
+| `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |
+| `PRECIPITATION_{MEAN,MIN,MAX}` | `ERA5_DATASET_CLIMATE` | `{COUNTRY_CODE}_total_precipitation_monthly.parquet` | `snt_era5_climate_data` |
+| `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
+| `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
+
+The population ids differ from Niger's file (`POP_UNDER_5` here, `POPULATION_U5` there); see
+[BACKLOG META-17](../../docs/BACKLOG.md#meta-17).
+
+#### Comparison with older catalogues
 
 Some layers also exist in an older catalogue. To compare by hand if needed:
 
@@ -569,39 +446,20 @@ Some layers also exist in an older catalogue. To compare by hand if needed:
 | `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` |
 | `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` |
 
-**8 layers have an exact id match in `deprecated/configuration/SNT_metadata.json`:** `POPULATION`, the four
-`INCIDENCE_*`, `SEASONALITY_CASES`, `SEASONALITY_RAINFALL` and `SEASONAL_BLOCK_DURATION_RAINFALL`.
-The old file's other 21 entries (`REPORTING_RATE`, DHS, MAP) have no master layer with the same id
-([What was left out](#what-was-left-out-and-why)). Known differences from the older text:
+**8 layers have an exact id match in `deprecated/configuration/SNT_metadata.json`:** `POPULATION`,
+the four `INCIDENCE_*`, `SEASONALITY_CASES`, `SEASONALITY_RAINFALL` and
+`SEASONAL_BLOCK_DURATION_RAINFALL`. The old file's other 21 entries (`REPORTING_RATE`, DHS, MAP) have
+no master layer with the same id ([What was left out](#what-was-left-out-and-why)). Where the draft
+text differs from the older text:
 
-- **Incidence `UNITS`** is now `Cases per 1000 people per year` (was `Per 1000 people`).
+- **Incidence `UNITS`** is `Cases per 1000 people per year` (older: `Per 1000 people`).
 - **Incidence adjustments are described as stacking** — reporting builds on testing, care-seeking
   builds on both — as the code computes them.
 - **`INCIDENCE_ADJ_CARESEEKING`**: the code adjusts for **public-sector** care-seeking only, so the
   draft says so.
 - **Labels say "district"**, not "zone spécifique", and the source is `DHIS2`, not NER's `SNIS`.
 
-### How layer ids were chosen
-
-The layer id is the column name, plus a qualifier where two layers would otherwise collide
-([§2.2](#22-the-layer-id-is-not-the-column-name)). Ids already in the example are kept.
-
-| Layers | Dataset key | File | Pipeline |
-|---|---|---|---|
-| `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
-| `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
-| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_{dataelement,dataset}.csv` | `snt_dhis2_reporting_rate_*` |
-| `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
-| `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
-| `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |
-| `PRECIPITATION_{MEAN,MIN,MAX}` | `ERA5_DATASET_CLIMATE` | `{COUNTRY_CODE}_total_precipitation_monthly.parquet` | `snt_era5_climate_data` |
-| `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
-| `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
-
-The population ids differ from Niger's file (`POP_UNDER_5` here, `POPULATION_U5` there). Reconcile
-them before either file is published.
-
-### Layers that will not load everywhere
+#### Layers that will not load everywhere
 
 "Every column that *can* be published" includes columns that only some countries or parameter
 choices produce. Expect those layers to fail to load where the column is absent:
@@ -620,28 +478,28 @@ choices produce. Expect those layers to fail to load where the column is absent:
 - **`INCIDENCE_ADJ_CARESEEKING`** is always written, but is all `NA` when no care-seeking data was
   available.
 
-### Tables that break other assumptions of the format
+#### Tables that break other assumptions of the format
 
 Included, but likely to exercise open questions:
 
 - **No `YEAR` column:** both seasonality tables and the healthcare-access table
-  ([Open question #9](#open-questions)). Healthcare access is computed for a single WorldPop year,
-  which is not stored in the table.
+  ([BACKLOG META-9](../../docs/BACKLOG.md#meta-9)). Healthcare access is computed for a single
+  WorldPop year, which is not stored in the table.
 - **Monthly grain** (`YEAR` + `MONTH`): both reporting-rate tables and ERA5
-  ([Open question #7](#open-questions)).
+  ([BACKLOG META-7](../../docs/BACKLOG.md#meta-7)).
 - **`YEAR` stored as text:** the WorldPop table.
 - **Parquet only:** ERA5 publishes no `.csv` twin, so its `FILENAME` is the `.parquet`.
 - **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the
   files of that run, `"latest"` on `DHIS2_REPORTING_RATE` holds only the variant run last, and the
   same goes for the two quality-of-care files.
 
-### What was left out, and why
+#### What was left out, and why
 
 | Left out | Pipeline | Why |
 |---|---|---|
-| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year — see [§7](#the-three-map-layers-were-omitted). |
-| All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column (the survey year is computed but not written). Excluded until the ADM1 question is agreed with the IASO developers. |
-| The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects (and which breaks repo rule R10). Restoring them needs a pipeline change to uppercase names. |
+| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year ([BACKLOG META-14](../../docs/BACKLOG.md#meta-14)). |
+| All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column (the survey year is computed but not written) ([BACKLOG META-15](../../docs/BACKLOG.md#meta-15)). |
+| The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects and which breaks repo rule R10 ([BACKLOG META-16](../../docs/BACKLOG.md#meta-16)). |
 | `non_malaria_all_cause_outpatients`, `presumed_cases` | `snt_dhis2_quality_of_care` | Lowercase, as above, and copies of `ALLOUT` / `PRES`, which are included. |
 | Routine indicators (`{CC}_routine.*`) | `snt_dhis2_formatting` | **Facility × month** grain, not ADM2. The Explorer would need aggregation the format cannot express. |
 | `{CC}_routine_outliers_imputed.parquet`, `…_removed.parquet` | the five `snt_dhis2_outliers_imputation_*` | Facility × month grain, as above. |
@@ -651,89 +509,6 @@ Included, but likely to exercise open questions:
 | All raw extracts (`{CC}_dhis2_raw_*.parquet`) | `snt_dhis2_extract` | Long format, raw DHIS2 ids, no `YEAR`. |
 | Extra columns from an uploaded disaggregation file | `snt_dhis2_population_transformation` | Arbitrary operator-chosen names, not uppercased. Only the template's `POP_*` columns are included. |
 | Seasonality admin columns `ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME` | `snt_seasonality_*`, `snt_healthcare_access` | Admin columns. |
-| `SNT_RESULTS` | `snt_assemble_results` | Out of scope (retired; no longer written). |
+| `SNT_RESULTS` | `snt_assemble_results` | Retired; no longer written. |
 
 `snt_workspace_check` publishes nothing to a dataset.
-
-## Open questions
-
-Carried forward from the working file and from writing this up. Unresolved — flag rather than
-guess.
-
-1. **Empty translations.** `""` appears in several fields. Should a consumer fall back to the other
-   language, show the layer id, or hide the layer? *Until decided: fill both languages where you
-   can, and treat `""` as a visible to-do.*
-2. **Percentage or proportion.** `REPORTING_RATE_*` in [`SNT_metadata.example.json`](SNT_metadata.example.json)
-   has `SCALE: [0.25, 0.5, 0.75]` (fractions) with `UNIT_SYMBOL: "%"` and `UNITS: "Proportion"`.
-   Those disagree: as written, a legend would read "0.25 %". Either `SCALE` becomes `[25, 50, 75]`
-   with `"%"`, or `UNIT_SYMBOL` becomes `null`. The schema documents the constraint but cannot
-   enforce it — the underlying data's own scale decides.
-
-   **Settled for the reporting rate itself, 2026-09-08:** `snt_dhis2_reporting_rate_dataelement`
-   computes `REPORTING_RATE` as a bare ratio (`HF_ACTIVE_THIS_PERIOD_BY_ADM2 / HF_ACTIVE_THIS_YEAR_BY_ADM2`
-   — no `× 100`), so the published column is on **0–1**. Any entry pointing at it therefore takes
-   fractional cut points with `UNIT_SYMBOL: null`, which is what
-   [`SNT_metadata_NER.json`](SNT_metadata_NER.json) does. The example file has **not** been changed;
-   fixing it is a one-line edit whenever someone touches it. The general question — whether the
-   Explorer ever scales a fraction to a percentage on ingest — is still open.
-3. **Is `CATEGORY` a controlled vocabulary?** Free text today, so a typo silently creates a group.
-   A fixed list (enum in the schema, dropdown in the webapp) would prevent that, at the cost of a
-   schema edit whenever a category is added.
-4. **Which rendering modes does IASO actually support?** `"Ordinal"` was added on 2026-09-08
-   alongside `"Threshold"`, and `SCALE` does now carry a different meaning per `TYPE`
-   ([§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each)) — so the "may then
-   need" in the original wording has come true. Two parts are still open: **(a)** whether the
-   Explorer implements `"Ordinal"` at all, or silently falls back to threshold binning, which is the
-   one thing that would make the two seasonality layers in
-   [`SNT_metadata_NER.json`](SNT_metadata_NER.json) render wrongly rather than not at all; and
-   **(b)** whether a genuinely **categorical** layer — unordered, or with non-numeric values — needs
-   a third `TYPE`, since `SCALE` is an array of numbers and cannot hold labels. Confirm (a) with the
-   IASO developers before treating `"Ordinal"` as delivered.
-5. **Should `DATASET.NAME` be renamed?** It holds a config *key*, not a name ([§2.5](#25-datasetname-is-a-config-key-not-a-dataset-name)),
-   and the mismatch already caused six wrong pointers in the working file. `DATASET_KEY`, or
-   `IDENTIFIER_KEY`, would be self-explanatory. Renaming means a coordinated change with the IASO
-   developers, so it is worth deciding **before** the format is adopted rather than after.
-6. **`VERSION: "latest"` versus pinning.** `"latest"` means a published Explorer view changes under
-   the user when a pipeline re-runs — usually wanted, occasionally not (a view cited in a report).
-   Does IASO accept a specific version id here?
-7. **Sub-annual data.** `YEAR` is the time column the Explorer uses ([§2.4](#24-time-is-carried-by-the-data-via-the-year-column)).
-   For an output that is monthly or by epi-week, does the Explorer aggregate to the year, or can it
-   offer a finer selector — and if so, which column does it expect (`MONTH`, `PERIOD`)?
-8. **No `$schema` key in the data file.** The example does not point at its own schema, so an editor
-   will not validate it automatically and nothing records which format version a given file follows.
-   Worth adding once the shape settles — as a `$schema` property, or a `FORMAT_VERSION` field, or by
-   letting the `SNT_CONFIGURATION` dataset version carry it.
-9. **Year-independent layers — how does a layer with no single `YEAR` work?** Confirmed real, not an
-   oversight in a pipeline. [§2.4](#24-time-is-carried-by-the-data-via-the-year-column) and repo rule
-   **R21** assume every layer's table carries `YEAR`, but **rainfall seasonality is by construction a
-   multi-year classification**: `snt_seasonality_rainfall` decides whether an `ADM2` is seasonal by
-   how *often* — across the whole rainfall series — a month starts a concentrated block, so the
-   published table is keyed on `ADM2_ID` alone. There is no year to attach, and inventing one would
-   misrepresent the analysis. The two affected layers are in
-   [`SNT_metadata_NER.json`](SNT_metadata_NER.json) and may simply fail to load.
-
-   Nothing here is decidable from this repo alone; it needs the IASO developers. Roughly in order of
-   preference:
-
-   - **The Explorer tolerates a table with no `YEAR`** and renders the layer as time-invariant — no
-     year selector, or the layer greyed out in the selector rather than dropped. Cheapest, and
-     honest about what the data is. Needs confirming that a missing `YEAR` is a supported case and
-     not a load failure.
-   - **The metadata declares it**, e.g. an optional `TIME: "invariant"` (or `YEAR: null`) on the
-     layer, so a consumer knows not to look for the column instead of discovering it missing. A
-     format change, but it turns a silent failure into a declaration.
-   - **The table carries its coverage instead of a year** — `YEAR_START` / `YEAR_END`, or a
-     `PERIOD_LABEL` like `"2019–2024"` — which is genuinely useful provenance for a reader regardless
-     of what the Explorer does with it. Costs a pipeline change and a new convention.
-   - **Repeat the value for every year in the range.** Makes the layer step through time with no
-     format change at all, but it fabricates a per-year result the analysis never produced and would
-     read as a finding. Recorded to be rejected, not adopted.
-
-   Until this is settled, **R21 has a genuine exception** and `CLAUDE.md` says the rule was never
-   audited against existing outputs. Whichever way it goes, R21's wording should gain the exception
-   so the next person does not "fix" the seasonality table by adding a meaningless `YEAR`.
-10. **Data-driven scale limits.** For `"Linear"` ([§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each)),
-    the SNT Explorer might compute the end value as max() of the loaded data instead of reading it
-    from `SCALE`. Population layers need this most: their max() differs too much between countries
-    for a generic default. How a layer would request it (an omitted value, a sentinel, a flag) is not
-    decided.

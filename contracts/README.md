@@ -9,7 +9,7 @@ open questions are in [`docs/BACKLOG.md`](../docs/BACKLOG.md).
 | Contract | What | Producer | Consumer(s) | Schema / reference | Status |
 |---|---|---|---|---|---|
 | `SNT_config.json` | Per-workspace configuration, one country | Operator, by hand (config webapp in future) | Every pipeline | [`snt_config_json/`](snt_config_json/README.md) — skeleton; `snt_config.schema.json` `[TODO]` | Skeleton current; schema not written |
-| `SNT_metadata.json` | SNT Explorer data-layer catalogue, one country | [`metadata/SNT_metadata_master.json`](../metadata/README.md) → `snt_metadata_json_trim` | SNT Explorer (IASO) | [`snt_metadata_json/`](snt_metadata_json/README.md) | **Work in progress**, being validated with the IASO developers |
+| `SNT_metadata.json` | SNT Explorer data-layer catalogue, one country | [`catalogs/SNT_metadata_master.json`](../catalogs/README.md) → `snt_metadata_json_trim` | SNT Explorer (IASO) | [`snt_metadata_json/`](snt_metadata_json/README.md) | **Work in progress**, being validated with the IASO developers |
 | `release_manifest.json` | Files and hashes shipped by a release | [`.github/workflows/generate_manifest.yaml`](../.github/workflows/generate_manifest.yaml) | `snt_workspace_bootstrap` deployer and checker | Owned by that repo: [`docs/contracts/release_manifest.schema.json`](https://github.com/BLSQ/snt_workspace_bootstrap/blob/main/docs/contracts/release_manifest.schema.json) | Stable (rule R22) |
 | Per-dataset outputs | Files, columns and `YEAR` per OpenHEXA dataset | Each `pipeline.py` | Downstream pipelines, SNT Explorer, master list | — | **Planned**, not started ([BACKLOG CFG-5](../docs/BACKLOG.md#cfg-5)) |
 

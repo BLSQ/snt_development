@@ -14,7 +14,7 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
 * **`repository_ref`** (String, Required, Default: `latest`):
   * **Name:** Master list version (release tag or branch)
   * **Description:** Which version of
-    [`metadata/SNT_metadata_master.json`](../metadata/SNT_metadata_master.json) to fetch from
+    [`catalogs/SNT_metadata_master.json`](../catalogs/SNT_metadata_master.json) to fetch from
     `github.com/BLSQ/snt_development`:
     * `latest` — the latest published GitHub release (drafts and pre-releases excluded).
     * a release tag (e.g. `v2026.10.0`) — pins that release.
@@ -33,7 +33,7 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
 1. **Configuration:** Load **`configuration/SNT_config.json`** for **`COUNTRY_CODE`** and
    **`SNT_DATASET_IDENTIFIERS`**. If it cannot be loaded, the run fails (nothing written).
 2. **Get the master list:** If `metadata_file` is given, read it. Otherwise resolve `repository_ref`
-   (`latest` → the latest release's tag) and download `metadata/SNT_metadata_master.json` at that
+   (`latest` → the latest release's tag) and download `catalogs/SNT_metadata_master.json` at that
    ref, unauthenticated (the repository is public). Its SHA256 is recorded in the report. If the
    download fails, or the content is not a JSON object, the run fails with an error naming the cause. The
    possible causes are: no release published yet, unknown ref, or a ref that predates the master
@@ -110,7 +110,7 @@ Both are overwritten on each run.
 >   `FILENAME`, `COLUMN`), and `SOURCES`: one entry per file checked, including the **resolved
 >   dataset version**, which records which vintage each kept layer was validated against.
 > - **`MASTER.SHA256` ties the run to a release.** It is the SHA256 of the master list's bytes, the
->   same hash `release_manifest.json` records for `metadata/SNT_metadata_master.json`, so a run can
+>   same hash `release_manifest.json` records for `catalogs/SNT_metadata_master.json`, so a run can
 >   be matched to the release it trimmed.
 > - **A kept layer is only as fresh as its dataset version.** The check is made against whatever
 >   version is latest *at run time*. Re-run this pipeline after upstream pipelines publish.

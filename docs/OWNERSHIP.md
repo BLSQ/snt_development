@@ -43,7 +43,7 @@ orchestration.
 | Change to | Review needed |
 |---|---|
 | `pipelines/*/code/*.ipynb`, `pipelines/*/utils/*.r`, `code/*.r` | The pipeline's responsible person **and** someone who understands the method |
-| `deprecated/configuration/SNT_metadata.json` | Old format, no reader since `snt_assemble_results` was retired. Layers now live in `metadata/SNT_metadata_master.json` |
+| `deprecated/configuration/SNT_metadata.json` | Old format, no reader since `snt_assemble_results` was retired. Layers now live in `catalogs/SNT_metadata_master.json` |
 | `<pipeline>/pipeline.py`, `requirements.txt`, `.github/workflows/` | Any team member |
 | `docs/`, `readme.md`, `CLAUDE.md` | Any team member |
 

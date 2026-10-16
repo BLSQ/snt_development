@@ -26,7 +26,7 @@ REPORT_FILENAME = "SNT_metadata_trimmed_report.json"
 
 # Where the master list is fetched from. "latest" resolves to the latest published GitHub release.
 REPOSITORY = "BLSQ/snt_development"
-MASTER_REPO_PATH = "metadata/SNT_metadata_master.json"
+MASTER_REPO_PATH = "catalogs/SNT_metadata_master.json"
 LATEST_RELEASE = "latest"
 HTTP_TIMEOUT_SECONDS = 30
 
@@ -706,7 +706,7 @@ def build_report(
 
 
 def write_json(content: dict, path: Path) -> Path:
-    """Write JSON in the same format as metadata/SNT_metadata_master.json (4-space indent, UTF-8).
+    """Write JSON in the same format as catalogs/SNT_metadata_master.json (4-space indent, UTF-8).
 
     Parameters
     ----------

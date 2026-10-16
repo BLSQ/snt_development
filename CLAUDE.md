@@ -50,7 +50,8 @@ pipelines/CLAUDE.md                    ← notebook rules; loaded when you work 
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
 contracts/                             ← config skeleton + SNT_metadata.json schema.
 deprecated/configuration/              ← archived per-country config copies; examples only.
-metadata/SNT_metadata_master.json      ← SNT Explorer master list; fetched by snt_metadata_json_trim.
+catalogs/                              ← universal references, fetched from GitHub at a release tag
+                                         (SNT_metadata_master.json → snt_metadata_json_trim).
 dev/                                   ← local Python dev tools + setup. Never runs on OpenHEXA.
 pyproject.toml                         ← ruff's rulebook + PEP 621 metadata. Never runs on OpenHEXA.
 .claude/                               ← agent guardrails (R19). Active on clone.
@@ -243,7 +244,7 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
 - [ ] New outputs are in `add_files_to_dataset(...)`, in the pipeline `readme.md`, and in
       `docs/DATA_ARCHITECTURE.md`. *(R4, R16)*
 - [ ] A published column added or renamed → its entry in
-      [`metadata/SNT_metadata_master.json`](metadata/README.md) added or updated, in the same PR.
+      [`catalogs/SNT_metadata_master.json`](catalogs/README.md) added or updated, in the same PR.
 - [ ] New notebook/`.r` filenames registered in `pull_scripts_from_repository(...)`. *(R6)*
 - [ ] New pipeline: workflow file added with the name updated in *all* places, `workspace:` left
       as `snt-development`. *(R5)*
@@ -267,7 +268,7 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
 | Domain vocabulary | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
 | Writing a pipeline `readme.md` | [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
 | Contracts: config skeleton, `SNT_metadata.json` schema (WIP) | [`contracts/README.md`](contracts/README.md) |
-| SNT Explorer master list | [`metadata/README.md`](metadata/README.md) |
+| SNT Explorer master list | [`catalogs/README.md`](catalogs/README.md) |
 | Who to ask, how review works | [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) |
 | Open items (do not start a list elsewhere) | [`docs/BACKLOG.md`](docs/BACKLOG.md) |
 | Why things are the way they are | [`docs/decisions/`](docs/decisions/README.md) |

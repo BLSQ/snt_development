@@ -1,13 +1,13 @@
 ---
 name: add-explorer-layer
-description: Add, edit or check a layer in the SNT Explorer master list (metadata/SNT_metadata_master.json), tracing that the column is really published, has YEAR, and resolves to a valid dataset key, then validating the file. Use when a published column is added or renamed, or when asked to add/fix/check an Explorer layer or validate an SNT_metadata.json file.
+description: Add, edit or check a layer in the SNT Explorer master list (catalogs/SNT_metadata_master.json), tracing that the column is really published, has YEAR, and resolves to a valid dataset key, then validating the file. Use when a published column is added or renamed, or when asked to add/fix/check an Explorer layer or validate an SNT_metadata.json file.
 ---
 
 # Add, edit or check an SNT Explorer layer
 
 The file format and its reasoning are in
 [`contracts/snt_metadata_json/README.md`](../../../contracts/snt_metadata_json/README.md) (below:
-"contract README"); the master list's own rules in [`metadata/README.md`](../../../metadata/README.md).
+"contract README"); the master list's own rules in [`catalogs/README.md`](../../../catalogs/README.md).
 Read the sections each step names — not the whole file. When only **checking** a layer, skip step 4.
 
 Run commands from the repo root. Cite notebooks as `<file>.ipynb` cell *N* (0-based code+markdown

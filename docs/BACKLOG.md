@@ -305,7 +305,7 @@ is not decided.
 
 ### <a id="meta-11"></a>META-11 · Scripted checks for the master list
 
-`metadata/SNT_metadata_master.json` is checked by hand today. Estimated at about 1.5–2 days in all;
+`catalogs/SNT_metadata_master.json` is checked by hand today. Estimated at about 1.5–2 days in all;
 deferred because the trim pipeline works without it.
 
 | Piece | What it does | Effort |
@@ -319,7 +319,7 @@ deferred because the trim pipeline works without it.
 `mutate`/`select`, from config-driven names (`POP_*`), from parameter-dependent branches and from NA
 fallback columns. A parser would be costly and still wrong.
 
-**Source:** CLAUDE.md *Suggestions*; `metadata/README.md` *Known open points*.
+**Source:** CLAUDE.md *Suggestions*; `catalogs/README.md` *Known open points*.
 
 ### <a id="meta-12"></a>META-12 · Per-country tuning of `SCALE` and labels
 
@@ -327,7 +327,7 @@ fallback columns. A parser would be costly and still wrong.
 trimmed file, the next trim run overwrites them. A per-country override mechanism is still to be
 decided.
 
-**Source:** `metadata/README.md` *Known open points*; CLAUDE.md *Suggestions*.
+**Source:** `catalogs/README.md` *Known open points*; CLAUDE.md *Suggestions*.
 
 ### <a id="meta-13"></a>META-13 · Review the master-list text
 

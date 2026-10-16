@@ -9,7 +9,8 @@ Guardrails for anyone (human or agent) changing code in this repository.
 - Domain vocabulary: [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 - Writing a pipeline `readme.md`: [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md).
 - `SNT_metadata.json` layer format (schema + reasoning, WIP):
-  [`docs/schemas/snt_metadata_json/`](docs/schemas/snt_metadata_json/README.md).
+  [`contracts/snt_metadata_json/`](contracts/snt_metadata_json/README.md). All contracts:
+  [`contracts/README.md`](contracts/README.md).
 - Who to ask / how review works: [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
 
 ---
@@ -85,7 +86,8 @@ pipelines/<pipeline_name>/code/*.ipynb ← R analytics. NOT deployed by CI.
 pipelines/<pipeline_name>/utils/*.r    ← R helpers sourced by the notebooks.
 pipelines/<pipeline_name>/reporting/   ← R reporting notebooks.
 code/*.r                               ← shared R library (snt_utils, snt_report, snt_palettes).
-configuration/SNT_config_<CC>.json     ← reference copies only (see below).
+contracts/                             ← config skeleton + SNT_metadata.json schema (see below).
+deprecated/configuration/              ← archived per-country config copies; examples only.
 metadata/SNT_metadata_master.json      ← SNT Explorer master list; fetched by snt_metadata_json_trim.
 dev/environment.yml                    ← local Python dev tools. Never runs on OpenHEXA.
 pyproject.toml                         ← ruff's rulebook + PEP 621 metadata. Never runs on OpenHEXA.
@@ -373,12 +375,13 @@ Not implemented — recorded here so they can be assessed:
   name instead of the *key* produces a layer that silently fails to load. That already happened:
   six of the seven entries in the 2026-09-08 `SNT_metadata.json` draft pointed at
   `SNT_DHIS2_INCIDENCE` / `SNT_DHIS2_REPORTING_RATE`, neither of which is a key
-  ([`docs/schemas/snt_metadata_json/README.md` §2.5](docs/schemas/snt_metadata_json/README.md)).
+  ([`contracts/snt_metadata_json/README.md` §2.5](contracts/snt_metadata_json/README.md)).
 
   Two parts, separable: (a) agree one convention and apply it to the keys; (b) decide whether the
   key should simply *equal* the OpenHEXA dataset name, which would remove the trap entirely. Note
-  the migration cost — these keys are read by every `pipeline.py`, appear in all five
-  `configuration/SNT_config_<CC>.json` files, and would need the country workspaces' live configs
+  the migration cost — these keys are read by every `pipeline.py`, appear in
+  `contracts/snt_config_json/SNT_config.skeleton.json` and all five archived
+  `deprecated/configuration/SNT_config_<CC>.json` files, and would need the country workspaces' live configs
   updated in step, so it is a coordinated change rather than a rename. Also note the key set is
   **not** identical across countries today (NER's config has `DHIS2_OUTLIERS_DETECTION`,
   `DHIS2_OUTLIERS_REMOVAL_IMPUTATION` and `SNT_SEASONALITY`; the other four do not), which is
@@ -390,7 +393,7 @@ Not implemented — recorded here so they can be assessed:
 
   | Piece | What it does | Effort |
   |---|---|---|
-  | Schema + config check | Turn the §5 validator in `docs/schemas/snt_metadata_json/README.md` into a script. Also check that every `DATASET.NAME` is a key in all `configuration/SNT_config_*.json`. | ~2 h |
+  | Schema + config check | Turn the §5 validator in `contracts/snt_metadata_json/README.md` into a script. Also check that every `DATASET.NAME` is a key of `SNT_DATASET_IDENTIFIERS` in `contracts/snt_config_json/SNT_config.skeleton.json`. | ~2 h |
   | Filename cross-check | Read the `add_files_to_dataset(...)` calls in every `*/pipeline.py` (AST or regex). Flag layers that point at a file no pipeline publishes, and published csv/parquet files that no layer uses. | ~0.5–1 day |
   | Column inventory | Have the trim report also list each source's columns, and which ones no layer uses. Combining several workspaces' reports gives a list of candidate new layers. | ~0.5 day |
   | Release CI | Run the checks in the release workflow, and block a release on schema errors. | ~2 h |
@@ -586,10 +589,10 @@ Keep these names and behaviours identical across pipelines — operators rely on
   pyramid, or other genuinely time-independent artefacts. **This rule is newly stated — existing
   outputs have not been audited against it.** Bring a table into line when you touch it; do not
   assume every current output already complies.
-- **`SNT_metadata.json` is mid-format-change.** The file in `configuration/` is the old shape;
-  its only reader, `snt_assemble_results`, is retired, so nothing reads it today. The **target**
+- **`SNT_metadata.json` is mid-format-change.** The copy archived in `deprecated/configuration/` is the
+  old shape; its only reader, `snt_assemble_results`, is retired, so nothing reads it today. The **target**
   shape — one entry per SNT Explorer data layer, with a `SOURCE_DATA` pointer and bilingual labels — is specified in
-  [`docs/schemas/snt_metadata_json/`](docs/schemas/snt_metadata_json/README.md), with a JSON Schema as its
+  [`contracts/snt_metadata_json/`](contracts/snt_metadata_json/README.md), with a JSON Schema as its
   source of truth. Write new
   metadata entries to that schema, and read its **Open questions** before assuming a field's
   meaning: the format is still being validated with the IASO developers.
@@ -597,11 +600,13 @@ Keep these names and behaviours identical across pipelines — operators rely on
 ### Configuration
 
 - Pipelines read `<workspace>/configuration/SNT_config.json` — one file, one country, one workspace.
-- `configuration/SNT_config_<CC>.json` are **reference copies, not loadable**. In a workspace the
-  file is renamed manually to drop the `_<CC>` suffix. Keep the versioned copies in sync when a
-  schema key changes, and do not add logic that reads the `_<CC>` names.
-- `.gitignore` blocks `*.json` except `configuration/SNT_config_*.json`,
-  `.claude/settings.json`, `docs/schemas/**/*.json` and `metadata/SNT_metadata_master.json` — a new
+  (That is the workspace path — this repo has no `configuration/` folder.)
+- The current structure of that file is `contracts/snt_config_json/SNT_config.skeleton.json` — keep
+  it in sync when a schema key changes. The old `SNT_config_<CC>.json` copies in
+  `deprecated/configuration/` are **examples only, not loadable**, and were never verified against
+  the workspaces. Do not add logic that reads the `_<CC>` names.
+- `.gitignore` blocks `*.json` except `deprecated/configuration/*.json`,
+  `.claude/settings.json`, `contracts/**/*.json` and `metadata/SNT_metadata_master.json` — a new
   JSON file needs a deliberate negation, not a force-add. The `.claude/settings.json` negation is
   load-bearing: without it the destructive-git guardrail (**R19**) is ignored by git and never
   reaches a colleague's clone.
@@ -767,8 +772,8 @@ file as a backup, not as the running code.
 - **`snt_assemble_results` is retired** — moved to `deprecated/DEPRECATED_snt_assemble_results/`,
   no longer deployed by CI, and its OpenHEXA template is deleted. The SNT Explorer reads the
   OpenHEXA datasets directly instead. Its `SNT_RESULTS` dataset id is removed from
-  `SNT_config.skeleton.json` but remains in the older `SNT_config_<CC>.json` reference copies and
-  in live workspace configs; nothing reads it. `configuration/SNT_metadata.json` (the old format)
+  `SNT_config.skeleton.json` but remains in the archived `SNT_config_<CC>.json` copies and
+  in live workspace configs; nothing reads it. `deprecated/configuration/SNT_metadata.json` (the old format)
   was read only by this pipeline and has no consumer left.
 
 ---

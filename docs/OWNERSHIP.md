@@ -43,7 +43,7 @@ orchestration.
 | Change to | Review needed |
 |---|---|
 | `pipelines/*/code/*.ipynb`, `pipelines/*/utils/*.r`, `code/*.r` | The pipeline's responsible person **and** someone who understands the method |
-| `configuration/SNT_metadata.json` | Old format, no reader since `snt_assemble_results` was retired. Layers now live in `metadata/SNT_metadata_master.json` |
+| `deprecated/configuration/SNT_metadata.json` | Old format, no reader since `snt_assemble_results` was retired. Layers now live in `metadata/SNT_metadata_master.json` |
 | `<pipeline>/pipeline.py`, `requirements.txt`, `.github/workflows/` | Any team member |
 | `docs/`, `readme.md`, `CLAUDE.md` | Any team member |
 
@@ -89,8 +89,8 @@ Not owned by any one pipeline; a change here affects many.
 | Asset | Responsible | Note |
 |---|---|---|
 | `code/snt_utils.r`, `code/snt_report.r`, `code/snt_palettes.r` | `_TBD_` | Sourced by most notebooks. A signature change breaks pipelines silently. |
-| `configuration/SNT_config_<CC>.json` | `_TBD_` | Reference copies. The live file is renamed by hand inside each workspace. |
-| `configuration/SNT_metadata.json` | `_TBD_` | Old-format column list. Its only reader, `snt_assemble_results`, is retired. |
+| `deprecated/configuration/SNT_config_<CC>.json` | `_TBD_` | Archived reference copies, examples only. The live file is renamed by hand inside each workspace. |
+| `deprecated/configuration/SNT_metadata.json` | `_TBD_` | Old-format column list. Its only reader, `snt_assemble_results`, is retired. |
 | `.github/workflows/push_snt_*.yaml` | `_TBD_` | Never change `workspace: "snt-development"`. |
 | `CLAUDE.md`, `.claude/` | @sPuntinG | Agent guardrails and the rule Register. |
 | `docs/` | @sPuntinG | Architecture, glossary, standards. |

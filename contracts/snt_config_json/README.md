@@ -1,14 +1,17 @@
-# `configuration/`
+# `contracts/snt_config_json/` — `SNT_config.json`
 
-Reference files for the SNT configuration. **Nothing in this folder is read by a pipeline.** In a
-workspace, pipelines read `<workspace>/configuration/SNT_config.json`: one file, one country, one
-workspace. That file is placed there by hand (or, in future, by the config webapp, see below).
+Reference for the structure of the SNT configuration file. **Nothing in this folder is read by a
+pipeline.** In a workspace, pipelines read `<workspace>/configuration/SNT_config.json`: one file, one
+country, one workspace. That file is placed there by hand (or, in future, by the config webapp, see
+below).
 
 | File | What it is | Trust it? |
 |---|---|---|
 | `SNT_config.skeleton.json` | The **fixed part** of `SNT_config.json`, which is the same in every country and workspace. The country-specific values are left empty. | **Yes.** This is the reference for the current structure. |
-| `SNT_config_<CC>.json` | Past per-country copies (BDI, BFA, CMR, COD, NER). | **No.** Not checked against the running workspaces, so they may be out of date. Use them as examples only. |
-| `SNT_metadata.json` | Old-format column metadata, read only by `snt_assemble_results`, which is now retired. Nothing reads it today. | See the root `CLAUDE.md`, *Traps*. |
+
+Past per-country copies (BDI, BFA, CMR, COD, NER) are archived in
+[`deprecated/configuration/`](../../deprecated/configuration/README.md). They were never checked
+against the running workspaces: use them as examples only.
 
 ---
 
@@ -31,8 +34,8 @@ there.
 ### What it deliberately does not do
 
 - **It does not explain how to fill in the country-specific values.** That belongs in a future
-  `snt_config.schema.json`, on the same model as the schema proposed for `SNT_metadata.json` under
-  [`docs/schemas/`](https://github.com/BLSQ/snt_development/tree/main/docs/schemas).
+  `snt_config.schema.json`, on the same model as the schema proposed for `SNT_metadata.json` in
+  [`../snt_metadata_json/`](../snt_metadata_json/README.md).
   `[TODO: Giulia — not created yet]`
 - **It is not a working config.** Copying it into a workspace without filling it in will make the
   pipelines fail or skip steps.

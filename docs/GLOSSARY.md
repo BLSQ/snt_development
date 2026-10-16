@@ -51,7 +51,8 @@ Companion documents: [`CLAUDE.md`](../CLAUDE.md) (working rules),
 Every ❓ is collected again in [§7 Open questions](#7-open-questions) so they can be cleared in one pass.
 
 **The `FR` column is deliberate.** A French version of the documentation is planned. Where a French
-label already exists — almost all of them come from `configuration/SNT_metadata.json`, which is the
+label already exists — almost all of them come from the old-format `SNT_metadata.json` (archived in
+`deprecated/configuration/`), which is the
 Explorer's user-facing vocabulary — it is recorded here so the English and French halves stay tied
 to the same term. `—` means no French label exists yet, not that none is needed. When translating,
 translate the *Definition* column and keep `Term` untouched: the terms are column names and
@@ -148,7 +149,7 @@ data. Rates return `NA` rather than zero when the denominator is zero.
 ## 2. DHIS2 indicator codes
 
 The keys of `DHIS2_DATA_DEFINITIONS.DHIS2_INDICATOR_DEFINITIONS` in
-`configuration/SNT_config_<CC>.json`. Each maps a short SNT code to a **list of DHIS2 data-element
+`SNT_config.json` (structure: `contracts/snt_config_json/SNT_config.skeleton.json`). Each maps a short SNT code to a **list of DHIS2 data-element
 UIDs for that country** — the mapping is per-country, and an empty list means the country does not
 report that indicator. The codes then become the `INDICATOR` values (long form) or column names
 (wide form) throughout the routine data.
@@ -387,10 +388,10 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 
 ## 5. Results-table columns
 
-The 29 columns of the former ADM2 results table, declared in `configuration/SNT_metadata.json`.
+The 29 columns of the former ADM2 results table, declared in `deprecated/configuration/SNT_metadata.json`.
 That file was read by `snt_assemble_results`, now retired, which **silently dropped** any column
 absent from it; the SNT Explorer's layer list is now `metadata/SNT_metadata_master.json`. French
-labels below are quoted verbatim from `configuration/SNT_metadata.json` and are what an SNT
+labels below are quoted verbatim from `deprecated/configuration/SNT_metadata.json` and are what an SNT
 Explorer user saw.
 
 | Column | Source | FR label | Units | Status |

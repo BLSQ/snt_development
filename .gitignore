@@ -50,19 +50,21 @@ __pycache__/
 # .claude/
 
 # Config file -----------------
-# ignore .json files unless if SNT_config.json
+# ignore .json files (country data)...
 *.json
-!configuration/SNT_config*.json
+# ...except the archived per-country config copies and old-format SNT_metadata.json
+# (examples only, nothing reads them; see deprecated/configuration/README.md).
+!deprecated/configuration/*.json
 # ...or the shared Claude Code settings, which must reach every clone for the
 # destructive-git guardrail to be active (see CLAUDE.md "Agent guardrails").
 !.claude/settings.json
-# ...or the JSON Schemas and reference examples under docs/schemas/. These are
+# ...or the JSON Schemas, skeletons and reference examples under contracts/. These are
 # documentation, not country data: an example holds no real values, only the layer
-# catalogue and the {COUNTRY_CODE} placeholder (see docs/schemas/README.md).
-# The ** is load-bearing: one subfolder per documented file (docs/schemas/snt_metadata_json/,
+# catalogue and the {COUNTRY_CODE} placeholder (see contracts/README.md).
+# The ** is load-bearing: one subfolder per contract (contracts/snt_metadata_json/,
 # ...), and a single-* negation would not reach inside them — the files would be
 # silently untracked, with git status never mentioning them.
-!docs/schemas/**/*.json
+!contracts/**/*.json
 # ...or the SNT Explorer master list, fetched from this repo by snt_metadata_json_trim and
 # shipped with each release. Layer definitions only, no country data (see metadata/README.md).
 # Named exactly, so a stray data .json dropped into metadata/ is still ignored.

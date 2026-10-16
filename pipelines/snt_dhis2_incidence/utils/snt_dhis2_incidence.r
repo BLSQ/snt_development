@@ -85,26 +85,34 @@ check_dhis2_indicators_cols_in_routine <- function(dhis2_routine) {
     }
 }
 
-#' Check that the PRES column is present when N1 uses PRES
+#' Check that the PRES column can be used for N1
 #'
-#' Runs only when the global `N1_METHOD` exists and equals "PRES": stops the run if
-#' `dhis2_routine` has no `PRES` column. Otherwise prints a note (notebook only, not logged).
+#' Runs only when `N1_METHOD == "PRES"`: stops the run if `dhis2_routine` has no `PRES` column,
+#' or if `PRES` contains only missing values. Expects `dhis2_routine` after
+#' `prepare_disaggregated_indicators()`, so with a disaggregation `PRES` holds the values of
+#' `PRES_{DISAGGREGATION_SELECTION}`, and the error message names that column. Otherwise prints a
+#' note (notebook only, not logged).
 #'
-#' @param dhis2_routine Data frame. Routine data as loaded from the dataset.
-#' @return Called for its side effects; the return value is not meaningful.
+#' @param dhis2_routine Data frame. Routine data, after the disaggregation mapping.
+#' @param N1_METHOD Character. "SUSP-TEST" or "PRES".
+#' @param DISAGGREGATION_SELECTION Character or NULL. Population group, e.g. "UNDER_5".
+#' @return Invisible NULL. Called for its side effects.
 #' @export
-check_pres_col <- function(dhis2_routine) {
-    if (exists("N1_METHOD") && N1_METHOD == "PRES") {
-        pres_in_routine <- any(names(dhis2_routine) == "PRES")        
-    if (!pres_in_routine) {
-        log_msg(glue::glue("🛑 Column `PRES` missing from routine data!"), "error")
-        stop()
-    }
-        log_msg(glue::glue("Column `PRES` is present. Proceeding."))
+check_pres_col <- function(dhis2_routine, N1_METHOD, DISAGGREGATION_SELECTION) {
+    if (N1_METHOD == "PRES") {
+        pres_col <- if (is.null(DISAGGREGATION_SELECTION)) "PRES" else glue::glue("PRES_{DISAGGREGATION_SELECTION}")
+        if (!"PRES" %in% names(dhis2_routine)) {
+            stop(glue::glue("[ERROR] Column `{pres_col}` missing from routine data. Cannot calculate N1 with 'PRES'."))
+        }
+        if (all(is.na(dhis2_routine$PRES))) {
+            stop(glue::glue("[ERROR] Column `{pres_col}` contains only missing values. Cannot calculate N1 with 'PRES'."))
+        }
+        log_msg(glue::glue("Column `{pres_col}` is present and contains values. Proceeding."))
     } else {
-        # This is just for the nb, no need to long in pipeline run
+        # This is just for the nb, no need to log in pipeline run
         print("N1_METHOD is not set to 'PRES'. No need to check for `PRES` column.")
     }
+    invisible(NULL)
 }
 
 #' Load population data from the selected dataset
@@ -510,16 +518,16 @@ export_monthly_cases <- function(monthly_cases) {
 
 #' Check for months with zero presumed cases
 #'
-#' Runs only when `N1_METHOD_USED == "PRES"`. Logs, as a warning, the number of ADM2 x MONTH rows
-#' with `PRES == 0`, where N1 equals CONF. The warning is logged even when that number is 0.
+#' Runs only when `N1_METHOD == "PRES"`. Logs a warning with the number of ADM2 x MONTH rows
+#' with `PRES == 0`, where N1 equals CONF, when there are any.
 #'
 #' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH), with a PRES column.
-#' @param N1_METHOD_USED Character. N1 method used, after any PRES fallback: "SUSP-TEST" or "PRES".
+#' @param N1_METHOD Character. "SUSP-TEST" or "PRES".
 #' @return Invisible NULL. Called for its side effects.
 #' @export
-coherence_check_PRES <- function(monthly_cases, N1_METHOD_USED) {
-    # Run this check only if N1_METHOD_USED == "PRES" (else, problem doesn't exist)
-    if (N1_METHOD_USED == "PRES") {
+coherence_check_PRES <- function(monthly_cases, N1_METHOD) {
+    # Run this check only if N1_METHOD == "PRES" (else, problem doesn't exist)
+    if (N1_METHOD == "PRES") {
         nr_of_pres_0_adm2_month <- monthly_cases %>% filter(PRES == 0) %>% nrow()
         if (nr_of_pres_0_adm2_month > 0) {
             log_msg(glue::glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
@@ -531,16 +539,16 @@ coherence_check_PRES <- function(monthly_cases, N1_METHOD_USED) {
 
 #' Check for more tested than suspected cases
 #'
-#' Runs only when `N1_METHOD_USED == "SUSP-TEST"`. Counts the ADM2 x MONTH rows where
+#' Runs only when `N1_METHOD == "SUSP-TEST"`. Counts the ADM2 x MONTH rows where
 #' `TEST > SUSP` and logs a warning when there are any. Expects `monthly_cases` before `TEST` is
 #' capped to `SUSP`.
 #'
 #' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH), with SUSP and TEST.
-#' @param N1_METHOD_USED Character. N1 method used, after any PRES fallback: "SUSP-TEST" or "PRES".
+#' @param N1_METHOD Character. "SUSP-TEST" or "PRES".
 #' @return Invisible NULL. Called for its side effects.
 #' @export
-coherence_check_SUSP_TEST <- function(monthly_cases, N1_METHOD_USED) {
-    if (N1_METHOD_USED == "SUSP-TEST") {
+coherence_check_SUSP_TEST <- function(monthly_cases, N1_METHOD) {
+    if (N1_METHOD == "SUSP-TEST") {
         nr_of_negative <- monthly_cases %>% filter(TEST > SUSP) %>% nrow()
         if (nr_of_negative > 0) {
             log_msg(
@@ -551,7 +559,7 @@ coherence_check_SUSP_TEST <- function(monthly_cases, N1_METHOD_USED) {
             log_msg(glue::glue("✅ Note: using `SUSP - TEST` for incidence adjustment, no cases where `TEST > SUSP` detected."))
         }
     } else {
-        log_msg(glue::glue("N1_METHOD_USED is not 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns."))
+        log_msg(glue::glue("N1_METHOD is not set to 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns."))
     }
     invisible(NULL)
 }

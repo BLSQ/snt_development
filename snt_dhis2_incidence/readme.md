@@ -9,7 +9,7 @@ The **SNT DHIS2 Incidence** pipeline estimates monthly malaria case metrics and 
 * **`n1_method`** (String, Required):
   * **Name:** Method for N1 calculations
   * **Description:** Defines how **`N1`** (cases adjusted for testing gaps) is derived: from presumed cases or from suspected minus tested cases.
-    * With `PRES`, the run fails if the routine data has no **`PRES`** column. If the column exists but contains only missing values, **`N1`** falls back to `SUSP-TEST` with a warning; with a **`disaggregation_selection`**, the run fails instead, since the fallback would mix the selected group with all-population values.
+    * With `PRES`, the run fails if the routine data has no **`PRES`** column, or if that column contains only missing values. With a **`disaggregation_selection`**, the column checked is **`PRES_[DISAGGREGATION_SELECTION]`**.
   * **Choices/Default:** `PRES`, `SUSP-TEST`. Default: `PRES`.
 * **`routine_data_choice`** (String, Required):
   * **Name:** Routine data to use
@@ -47,9 +47,9 @@ The **SNT DHIS2 Incidence** pipeline estimates monthly malaria case metrics and 
 3. **Parameter mapping:** Save **`N1_METHOD`**, **`ROUTINE_DATA_CHOICE`**, **`POPULATION_DATASET_ID`** (the resolved dataset id), **`DISAGGREGATION_SELECTION`**, **`CARESEEKING_FILE_PATH`** and **`ROOT_PATH`** to **`[COUNTRY_CODE]_parameters.json`** and inject them into the notebook.
 4. **Computation:** Run **`pipelines/snt_dhis2_incidence/code/snt_dhis2_incidence.ipynb`**:
    1. Load the routine data of the selected variant (fails with an `[ERROR]` naming the upstream pipeline if the file is missing), the population from **`POPULATION_DATASET_ID`**, and the reporting rate.
-   2. Apply the optional disaggregation to the routine and population columns.
+   2. Apply the optional disaggregation to the routine and population columns. With `PRES`, fail if the **`PRES`** column is missing or empty (see **`n1_method`**).
    3. Load care-seeking data: the uploaded file if provided and readable, else the DHS file, else none.
-   4. Resolve the **`N1`** method actually used (see **`n1_method`** for the `PRES` fallback), then compute monthly **`TPR`**, **`N1`**, **`N2`** and (with care-seeking data) **`N3`** at ADM2 × monthly, and write **`[COUNTRY_CODE]_monthly_cases.parquet`**.
+   4. Compute monthly **`TPR`**, **`N1`**, **`N2`** and (with care-seeking data) **`N3`** at ADM2 × monthly, and write **`[COUNTRY_CODE]_monthly_cases.parquet`**.
    5. Aggregate to ADM2 × yearly (summing **`CONF`**, **`TEST`**, the **`N1`** input column — **`PRES`** or **`SUSP`** — **`N1`**, **`N2`** and **`N3`**), join the population on **`ADM2_ID`** + **`YEAR`**, compute the incidence rates, and write **`[COUNTRY_CODE]_incidence.parquet`** and **`.csv`**.
 5. **Output check:** Fail if the incidence parquet / CSV were not written during this run.
 6. **Dataset publication:** Upload **`[COUNTRY_CODE]_incidence.parquet`**, **`[COUNTRY_CODE]_incidence.csv`** and the parameters JSON to **`DHIS2_INCIDENCE`**.
@@ -87,8 +87,8 @@ The **SNT DHIS2 Incidence** pipeline estimates monthly malaria case metrics and 
 > **Notes for the Data Analyst:**
 >
 > - **Grain:** ADM2 × yearly. Columns: **`YEAR`**, **`ADM1_ID`**, **`ADM1_NAME`**, **`ADM2_ID`**, **`ADM2_NAME`**, **`POPULATION`**, the yearly totals **`CONF`**, **`TEST`**, **`N1`**, **`N2`**, **`N3`** (only with care-seeking data), the **`N1`** input column, and the **`INCIDENCE_*`** columns.
-> - **`N1` input column:** the case column that entered **`N1`** besides **`CONF`** and **`TEST`**, following the method actually used: **`PRES`** with `PRES`, **`SUSP`** with `SUSP-TEST` (including the `PRES` fallback). The other one is not published.
-> - **Yearly totals:** sums of the monthly values per ADM2 × **`YEAR`**. With `SUSP-TEST` (including the fallback), **`TEST`** is the value capped at **`SUSP`** (see **`N1`**), not the reported one. A month with a missing **`N2`** leaves the yearly **`N2`** and **`INCIDENCE_ADJ_REPORTING`** missing.
+> - **`N1` input column:** the case column that entered **`N1`** besides **`CONF`** and **`TEST`**, following **`n1_method`**: **`PRES`** with `PRES`, **`SUSP`** with `SUSP-TEST`. The other one is not published.
+> - **Yearly totals:** sums of the monthly values per ADM2 × **`YEAR`**. With `SUSP-TEST`, **`TEST`** is the value capped at **`SUSP`** (see **`N1`**), not the reported one. A month with a missing **`N2`** leaves the yearly **`N2`** and **`INCIDENCE_ADJ_REPORTING`** missing.
 > - **With a `disaggregation_selection`:** every published case column (**`CONF`**, **`TEST`**, the **`N1`** input column) and **`POPULATION`** hold the selected group's values.
 > - **`TPR`**: Test positivity rate, **`CONF`** / **`TEST`**. If **`TEST`** is zero or missing, **`TPR`** is set to `1` to avoid division by zero.
 > - **`N1`**: Testing-adjusted cases. With **`SUSP-TEST`**: **`CONF`** + ((**`SUSP`** − **`TEST`**) × **`TPR`**), capping **`TEST`** at **`SUSP`** when needed. With **`PRES`**: **`CONF`** + (**`PRES`** × **`TPR`**).

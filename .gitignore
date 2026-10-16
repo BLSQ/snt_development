@@ -66,9 +66,9 @@ __pycache__/
 # silently untracked, with git status never mentioning them.
 !contracts/**/*.json
 # ...or the SNT Explorer master list, fetched from this repo by snt_metadata_json_trim and
-# shipped with each release. Layer definitions only, no country data (see metadata/README.md).
-# Named exactly, so a stray data .json dropped into metadata/ is still ignored.
-!metadata/SNT_metadata_master.json
+# shipped with each release. Layer definitions only, no country data (see catalogs/README.md).
+# Named exactly, so a stray data .json dropped into catalogs/ is still ignored.
+!catalogs/SNT_metadata_master.json
 
 # R ----------------------------------------
 *.rds

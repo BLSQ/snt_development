@@ -11,7 +11,7 @@
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
 | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from Niger's old-format file. Nine layers, schema-valid. Read [§6](#snt_metadata_nerjson) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
-| [`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) | **The master list**: every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code**, awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../metadata/README.md), and [§6](#the-master-list) for what it leaves out and why. |
+| [`catalogs/SNT_metadata_master.json`](../../catalogs/SNT_metadata_master.json) | **The master list**: every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code**, awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`catalogs/README.md`](../../catalogs/README.md), and [§6](#the-master-list) for what it leaves out and why. |
 
 > **Not yet in the schema:** the SNT Explorer also supports a third `TYPE`, `"Linear"` (gradient
 > legend, `SCALE` = `[start, end]`). It is blocked for now by an Explorer-side bug, so the schema enum
@@ -183,7 +183,7 @@ coupling is the thing to get right; the two fields cannot be reasoned about sepa
 
 **⚠ `"Linear"` is documented but not usable yet.** The SNT Explorer supports it, but a small
 Explorer-side bug currently blocks it; the IASO developers are aware and will fix it. Until then, do
-not use it in `metadata/SNT_metadata_master.json`. The schema `TYPE` enum deliberately still rejects
+not use it in `catalogs/SNT_metadata_master.json`. The schema `TYPE` enum deliberately still rejects
 it, so the validator in [§5](#5-validating) fails on it. Once the bug is fixed, add `"Linear"` to the
 enum in [`snt_metadata.schema.json`](snt_metadata.schema.json) ([BACKLOG META-4](../../docs/BACKLOG.md#meta-4)).
 
@@ -340,11 +340,11 @@ What to know before using it:
 
 ### The master list
 
-[`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) declares **every
+[`catalogs/SNT_metadata_master.json`](../../catalogs/SNT_metadata_master.json) declares **every
 column the current pipelines can publish** that fits this format. `snt_metadata_json_trim` fetches it
 from this repository and keeps, per workspace, the layers whose data exists. It is edited by hand
 ([ADR 0008](../../docs/decisions/0008-master-list-maintained-by-hand.md)); how to maintain it:
-[`metadata/README.md`](../../metadata/README.md). Validate it with [§5](#5-validating) (the
+[`catalogs/README.md`](../../catalogs/README.md). Validate it with [§5](#5-validating) (the
 validator checks the master list by default). `snt_assemble_results` is out of scope (retired,
 [ADR 0006](../../docs/decisions/0006-retire-snt-assemble-results.md)).
 

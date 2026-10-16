@@ -399,7 +399,7 @@ deliberate migration rather than a quiet rename ([BACKLOG PIPE-2](BACKLOG.md#pip
 **SNT Explorer** and published it to `SNT_RESULTS`. It is **retired**: the code is archived in
 `deprecated/DEPRECATED_snt_assemble_results/`, CI no longer deploys it, and it ships in no
 release. The Explorer now imports data layers **directly from the per-stage OpenHEXA datasets**,
-listed in [`metadata/SNT_metadata_master.json`](../metadata/README.md) and trimmed per workspace by
+listed in [`catalogs/SNT_metadata_master.json`](../catalogs/README.md) and trimmed per workspace by
 `snt_metadata_json_trim`. Why: [ADR 0006](decisions/0006-retire-snt-assemble-results.md).
 
 Leftovers to know about:
@@ -449,7 +449,7 @@ ERA5_DATASET_CLIMATE   SNT_MAP_EXTRACTS              WORLDPOP_DATASET_EXTRACT   
    └──────────────────────────┴──────────────────┬───────────────────────────────────┘
                                                  ▼
                      SNT Explorer — imports each layer directly from its dataset
-                     (layers listed in metadata/SNT_metadata_master.json)
+                     (layers listed in catalogs/SNT_metadata_master.json)
 ```
 
 Not drawn above: **`snt_user_population`** reads an operator CSV (validated against the pyramid

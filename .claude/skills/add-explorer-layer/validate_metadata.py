@@ -29,7 +29,7 @@ except ImportError:
 REPO = Path(__file__).resolve().parents[3]
 SCHEMA = REPO / "contracts/snt_metadata_json/snt_metadata.schema.json"
 CONFIG = REPO / "contracts/snt_config_json/SNT_config.skeleton.json"  # config to resolve NAME against
-DEFAULT = REPO / "metadata/SNT_metadata_master.json"
+DEFAULT = REPO / "catalogs/SNT_metadata_master.json"
 
 
 def load(path: Path) -> dict:

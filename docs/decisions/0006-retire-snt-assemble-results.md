@@ -18,7 +18,7 @@ it to `SNT_RESULTS` for the SNT Explorer. That step:
 ## Decision
 
 Retire `snt_assemble_results`. The SNT Explorer imports each data layer **directly from its per-stage
-OpenHEXA dataset**. The layers are listed in `metadata/SNT_metadata_master.json` and trimmed per
+OpenHEXA dataset**. The layers are listed in `catalogs/SNT_metadata_master.json` and trimmed per
 workspace by `snt_metadata_json_trim`, in the format of [0007](0007-snt-metadata-json-format.md).
 
 ## Consequences

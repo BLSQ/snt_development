@@ -1,14 +1,33 @@
-# `metadata/` — the SNT Explorer master list
+# `catalogs/` — universal reference files
 
-| File | Role |
-|---|---|
-| [`SNT_metadata_master.json`](SNT_metadata_master.json) | **The master list**: every SNT Explorer data layer the current SNT pipelines can publish, for any country. Generic — it describes the pipeline collection, not a workspace. |
+A catalog is a file that is the same for every country and every workspace, kept in this repository
+so it has one versioned source of truth. Pipelines download it from GitHub at run time, at a
+release tag. It is **never** read from a workspace, so workspaces cannot drift from it.
+
+`contracts/` holds the **shape** of a file (schema, skeleton). `catalogs/` holds **content** that
+ships with a release.
+
+| File | Role | Fetched by |
+|---|---|---|
+| [`SNT_metadata_master.json`](SNT_metadata_master.json) | **The master list**: every SNT Explorer data layer the current SNT pipelines can publish, for any country. Generic — it describes the pipeline collection, not a workspace. | [`snt_metadata_json_trim`](../snt_metadata_json_trim/readme.md) |
+
+## Adding a catalog
+
+- **No country data** (R1). A catalog is generic by definition.
+- **Un-ignore it by exact name** in `.gitignore` (`!catalogs/<file>`). The repo ignores `*.json`
+  wholesale; naming each file keeps a stray data file dropped here ignored.
+- **It is hashed into `release_manifest.json`** (`repository_files`) only if it matches
+  `catalogs/*.json` in [`generate_manifest.yaml`](../.github/workflows/generate_manifest.yaml). A
+  non-JSON catalog needs that pattern extended (R22).
+- **Add a row above** and a section below: what it is, who fetches it, how to maintain it. If it
+  has a shape other tools depend on, its schema goes in [`contracts/`](../contracts/README.md).
+
+## `SNT_metadata_master.json`
 
 The **format** (fields, `TYPE` / `SCALE` rules, JSON Schema, validator) is specified in
-[`contracts/snt_metadata_json/`](../contracts/snt_metadata_json/README.md). This folder holds
-only the shipped file.
+[`contracts/snt_metadata_json/`](../contracts/snt_metadata_json/README.md).
 
-## How it reaches a workspace
+### How it reaches a workspace
 
 It is **not** deployed with any pipeline: `openhexa pipelines push` packages only
 `.py .ipynb .txt .md .r .sql` files. Instead, the
@@ -28,7 +47,7 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 **So a change here reaches workspaces only once it is in a release** — or when an operator sets
 `repository_ref` to a branch on purpose.
 
-## Maintaining it
+### Maintaining it
 
 - **The JSON is the source of truth.** Edit it by hand, in a PR. There is no generator. The
   one-off bootstrap script is in git history at commit `062cf0c`; do not resurrect it over curated
@@ -51,7 +70,7 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 - **What the master list includes, what it leaves out and why:**
   [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#the-master-list).
 
-## Known open points
+### Known open points
 
 - **Country tuning has no home yet**: a trim run overwrites hand-tuned scales or labels
   ([BACKLOG META-12](../docs/BACKLOG.md#meta-12)).

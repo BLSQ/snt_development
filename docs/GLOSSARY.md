@@ -68,7 +68,7 @@ parameter values, and they do not localise.
 | Term | FR | Definition | Status |
 |---|---|---|---|
 | **SNT** | *Stratification nationale du paludisme / ciblage infranational* | **Subnational Tailoring.** The WHO-promoted exercise of stratifying a country by district and choosing the malaria intervention mix per stratum, rather than applying one national package. Everything in this repository exists to produce the one-row-per-ADM2 evidence table that exercise consumes. | 🟡 |
-| **SNT Explorer** | — | The downstream web application that reads the results. It imports data layers directly from the OpenHEXA datasets; the layers it can show are listed in `metadata/SNT_metadata_master.json`. | ✅ |
+| **SNT Explorer** | — | The downstream web application that reads the results. It imports data layers directly from the OpenHEXA datasets; the layers it can show are listed in `catalogs/SNT_metadata_master.json`. | ✅ |
 | **Routine data** | *Données de routine* | Monthly aggregate counts reported by health facilities into DHIS2 (cases, tests, treatments, deaths). The primary input. Distinct from *survey* data (DHS) and *modelled* data (MAP). | ✅ |
 
 ### 1.2. The incidence cascade — `N1`, `N2`, `N3`
@@ -391,7 +391,7 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 
 The 29 columns of the former ADM2 results table, declared in `deprecated/configuration/SNT_metadata.json`.
 That file was read by `snt_assemble_results`, now retired, which **silently dropped** any column
-absent from it; the SNT Explorer's layer list is now `metadata/SNT_metadata_master.json`. French
+absent from it; the SNT Explorer's layer list is now `catalogs/SNT_metadata_master.json`. French
 labels below are quoted verbatim from `deprecated/configuration/SNT_metadata.json` and are what an SNT
 Explorer user saw.
 

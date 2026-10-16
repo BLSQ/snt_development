@@ -206,7 +206,7 @@ not assume every current output already complies.
 ### SNT Explorer metadata
 
 - A published column reaches the SNT Explorer only if a layer in
-  [`../metadata/SNT_metadata_master.json`](../metadata/README.md) points at it. Adding an indicator
+  [`../catalogs/SNT_metadata_master.json`](../catalogs/README.md) points at it. Adding an indicator
   means adding its layer there too, in the same PR.
 - **`SNT_metadata.json` is mid-format-change.** The copy archived in `deprecated/configuration/` is
   the old shape; its only reader, `snt_assemble_results`, is retired, so nothing reads it today. The
@@ -227,7 +227,7 @@ not assume every current output already complies.
   `deprecated/configuration/` are **examples only, not loadable**, and were never verified against
   the workspaces. Do not add logic that reads the `_<CC>` names.
 - `.gitignore` blocks `*.json` except `deprecated/configuration/*.json`, `.claude/settings.json`,
-  `contracts/**/*.json` and `metadata/SNT_metadata_master.json` — a new JSON file needs a deliberate
+  `contracts/**/*.json` and `catalogs/SNT_metadata_master.json` — a new JSON file needs a deliberate
   negation, not a force-add. The `.claude/settings.json` negation is load-bearing: without it the
   destructive-git guardrail (R19) is ignored by git and never reaches a colleague's clone.
 

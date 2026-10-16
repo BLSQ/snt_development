@@ -5,7 +5,7 @@ Status: Accepted
 
 ## Context
 
-`metadata/SNT_metadata_master.json` lists every SNT Explorer layer the pipelines can publish. It was
+`catalogs/SNT_metadata_master.json` lists every SNT Explorer layer the pipelines can publish. It was
 bootstrapped on 2026-09-28 by a one-off generator, `build_snt_metadata_all_layers.py`, which traced
 each `SOURCE_DATA` pointer from the code and wrote placeholder text. After that, the file started to
 receive **curated** content: labels, descriptions, scales. Re-running the generator would overwrite
@@ -27,5 +27,5 @@ not resurrect it over curated content.
 - Two kinds of field get two kinds of review: the objective `SOURCE_DATA` against the code, and the
   curated fields by someone with domain knowledge.
 
-Sources: [`metadata/README.md`](../../metadata/README.md); `contracts/snt_metadata_json/README.md`
+Sources: [`catalogs/README.md`](../../catalogs/README.md); `contracts/snt_metadata_json/README.md`
 (master-list section, before 2026-10-16).

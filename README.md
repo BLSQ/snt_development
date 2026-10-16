@@ -149,6 +149,11 @@ person *or* an agent.
   that blocks destructive and history-rewriting `git` commands, plus a matching deny list. If an
   agent gets blocked, that is the guardrail working — don't route around it.
   → [`.claude/README.md`](.claude/README.md)
+- **[`.claude/skills/`](.claude/skills/) holds three task skills** — `handover` (runs the
+  handover checklist, including a script that checks injected notebook parameters against their
+  `exists()` fallbacks), `write-pipeline-readme` and `add-explorer-layer` (with the metadata
+  validator). Claude Code offers them automatically; with another assistant, point it at the
+  `SKILL.md`. The scripts are plain Python and work without any assistant.
 - **[`pipelines/CLAUDE.md`](pipelines/CLAUDE.md) holds the notebook-only rules.** Claude Code loads
   it only when working under `pipelines/`; with another assistant, give it that file too when the
   task touches a notebook.

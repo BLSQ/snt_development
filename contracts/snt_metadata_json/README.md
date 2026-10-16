@@ -281,49 +281,22 @@ update the schema, this document and the example together, and date the change.
 
 The schema is only useful if it is run. `jsonschema` is **not** currently in
 [`dev/environment.yml`](../../dev/environment.yml) — install it, or use a system Python that has
-it:
+it.
 
-This runs the schema, plus the two checks JSON Schema cannot express on its own: `SCALE` ordering,
-and whether every `DATASET.NAME` is a key of `SNT_DATASET_IDENTIFIERS` in the config skeleton
+The validator is
+[`.claude/skills/add-explorer-layer/validate_metadata.py`](../../.claude/skills/add-explorer-layer/validate_metadata.py)
+(also used by the `add-explorer-layer` agent skill). It runs the schema, plus the two checks JSON
+Schema cannot express on its own: `SCALE` ordering, and whether every `DATASET.NAME` is a key of
+`SNT_DATASET_IDENTIFIERS` in the config skeleton
 ([`contracts/snt_config_json/SNT_config.skeleton.json`](../snt_config_json/SNT_config.skeleton.json) —
 the trusted key set; the archived per-country copies were never verified).
 
 ```bash
-python3 -c "
-import json, sys
-from jsonschema import Draft202012Validator
-
-METADATA = 'contracts/snt_metadata_json/SNT_metadata.example.json'   # <- the file being checked
-CONFIG   = 'contracts/snt_config_json/SNT_config.skeleton.json'      # <- config to resolve NAME against
-
-schema = json.load(open('contracts/snt_metadata_json/snt_metadata.schema.json', encoding='utf-8'))
-inst   = json.load(open(METADATA, encoding='utf-8'))
-bad = []
-
-for e in sorted(Draft202012Validator(schema).iter_errors(inst), key=lambda e: list(e.path)):
-    bad.append(('/'.join(map(str, e.path)) or '(root)') + ': ' + e.message)
-
-# SCALE must ascend - not expressible in JSON Schema
-for lid, layer in inst.items():
-    s = layer.get('SCALE', [])
-    if s != sorted(s):
-        bad.append(lid + ': SCALE is not in ascending order')
-
-# every DATASET.NAME must be a key of SNT_DATASET_IDENTIFIERS in the skeleton
-keys = json.load(open(CONFIG, encoding='utf-8')).get('SNT_DATASET_IDENTIFIERS', {})
-for lid, l in inst.items():
-    n = l['SOURCE_DATA']['DATASET']['NAME']
-    if n not in keys:
-        bad.append(lid + ': DATASET.NAME ' + repr(n) + ' is not a key of SNT_DATASET_IDENTIFIERS in ' + CONFIG)
-
-print(*bad, sep='\n')
-print('FAIL' if bad else 'OK')
-sys.exit(1 if bad else 0)
-"
+python3 .claude/skills/add-explorer-layer/validate_metadata.py            # the master list
+python3 .claude/skills/add-explorer-layer/validate_metadata.py <file>     # any other file
 ```
 
-Point `METADATA` at whichever file you are checking. What this still **cannot** catch, and a human
-must:
+What this still **cannot** catch, and a human must:
 
 - That `FILENAME` and `COLUMN` actually exist in the resolved dataset — the most likely real
   breakage, and only detectable against a live workspace.
@@ -371,8 +344,8 @@ What to know before using it:
 column the current pipelines can publish** that fits this format. `snt_metadata_json_trim` fetches it
 from this repository and keeps, per workspace, the layers whose data exists. It is edited by hand
 ([ADR 0008](../../docs/decisions/0008-master-list-maintained-by-hand.md)); how to maintain it:
-[`metadata/README.md`](../../metadata/README.md). Validate it with [§5](#5-validating), with
-`METADATA` pointed at it. `snt_assemble_results` is out of scope (retired,
+[`metadata/README.md`](../../metadata/README.md). Validate it with [§5](#5-validating) (the
+validator checks the master list by default). `snt_assemble_results` is out of scope (retired,
 [ADR 0006](../../docs/decisions/0006-retire-snt-assemble-results.md)).
 
 #### Draft content

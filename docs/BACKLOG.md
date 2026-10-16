@@ -310,7 +310,6 @@ deferred because the trim pipeline works without it.
 
 | Piece | What it does | Effort |
 |---|---|---|
-| Schema + config check | Turn the validator in [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating) into a script, including the `DATASET.NAME` check against the skeleton. | ~2 h |
 | Filename cross-check | Read the `add_files_to_dataset(...)` calls in every `*/pipeline.py` (AST or regex). Flag layers pointing at a file no pipeline publishes, and published csv/parquet files no layer uses. | ~0.5–1 day |
 | Column inventory | Have the trim report list each source's columns, and which ones no layer uses. Combining several workspaces' reports gives candidate new layers. | ~0.5 day |
 | Release CI | Run the checks in the release workflow; block a release on schema errors. | ~2 h |

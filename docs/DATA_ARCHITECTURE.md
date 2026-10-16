@@ -205,7 +205,7 @@ A second, smaller consequence sits on the *authoring* side: because the R code l
 workspace at run time, the `utils/*.r` helpers a notebook `source()`s are read from the workspace
 filesystem, not from a developer's clone. Editing a helper therefore means changing it in the
 workspace and copying it back to git by hand. The working loop, and that gap, are described in
-[`CLAUDE.md` → Editing R notebooks](../CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop).
+[`pipelines/CLAUDE.md` → Editing R notebooks](../pipelines/CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop).
 
 ### 2.3 Language split
 
@@ -216,7 +216,7 @@ workspace and copying it back to git by hand. The working loop, and that gap, ar
 | everything else (13 pipelines) | thin orchestration shell | **yes — analytics live in `.ipynb` (kernel `ir`)** |
 
 Python pipelines are the only ones with a workable local development story today
-(see [`CLAUDE.md` §Local development](../CLAUDE.md#local-development--current-state)).
+(see [`dev/README.md`](../dev/README.md#what-works-locally-today)).
 
 ---
 
@@ -504,8 +504,8 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
 
 - Parameters are injected as globals into the R notebook, and every notebook has a fallback cell
   `if (!exists("PARAM")) PARAM <- <default>` so it stays runnable interactively. Injected globals
-  are **UPPERCASE** (`ROOT_PATH`, `N1_METHOD`, `DEVIATION_IQR`, `SNT_ROOT_PATH`…) — rule **R11** in
-  [`CLAUDE.md`](../CLAUDE.md). Two pipelines predate the rule and use lowercase on both sides:
+  are **UPPERCASE** (`ROOT_PATH`, `N1_METHOD`, `DEVIATION_IQR`, `SNT_ROOT_PATH`…) — rule
+  [**R11**](CONVENTIONS.md#r11). Two pipelines predate the rule and use lowercase on both sides:
   `snt_seasonality_cases` and `snt_seasonality_rainfall` (`minimum_month_block_size`, …). Each is internally consistent, so
   nothing is broken today, and they are logged for migration. Until then, do not assume the case
   of a parameter — read `pipeline.py`'s injected dict, and keep it and the fallback cell in exact
@@ -767,7 +767,7 @@ One more workflow, `generate_manifest.yaml`, is not a deployment. It runs when a
 published (or by hand) and attaches `release_manifest.json` to the release. That manifest is read by
 the deployer and checker in
 [`BLSQ/snt_workspace_bootstrap`](https://github.com/BLSQ/snt_workspace_bootstrap), whose schema
-fixes its shape — see [`CLAUDE.md` → Release management](../CLAUDE.md#release-management) (R22).
+fixes its shape — see [R22 in `CONVENTIONS.md`](CONVENTIONS.md#r22).
 
 ### 7.4 The workspace runtime image
 
@@ -804,7 +804,7 @@ Two consequences worth knowing:
   name, so they are safe.)
 
 Because the image is public on Docker Hub, it is also the most faithful basis for a local
-environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
+environment — see [`dev/README.md`](../dev/README.md).
 
 ---
 

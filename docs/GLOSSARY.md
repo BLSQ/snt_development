@@ -350,7 +350,7 @@ The file alone does not say which method produced it; the `{CC}_parameters.json`
 
 > ⚠️ **The same concept has three different names.** "Routine data with outliers removed" is spelled
 > differently in three places. Check the target pipeline's `choices=[...]` before assuming. This is a
-> known violation of rule **R15**, logged for migration in `CLAUDE.md`.
+> known violation of rule **R15**, logged for migration as [BACKLOG PIPE-2](BACKLOG.md#pipe-2).
 
 | Concept | `snt_dhis2_incidence` | `snt_dhis2_reporting_rate_dataelement` | `snt_dhis2_quality_of_care` |
 |---|---|---|---|

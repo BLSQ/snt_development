@@ -97,35 +97,20 @@ Pick the row that matches what you came for.
 Facts that are not visible from the code and that newcomers reliably get wrong. Each is
 deliberate; none is a bug to fix.
 
-1. **These pipelines are not a DAG.** Nothing schedules them and nothing enforces an order. A
-   person opens the OpenHEXA UI and presses Run, one pipeline at a time. So a results table can
-   mix data of different vintages, and you can never assume your upstream ran today.
-   → [§4](docs/DATA_ARCHITECTURE.md#4-orchestration-model)
-
-2. **The Python and R halves ship by different routes.** Merging `pipeline.py` to `main` deploys
-   it. Merging a notebook deploys **nothing** — R code reaches a workspace only when an operator
-   runs that pipeline with **`Pull scripts` = ON**. Always say so when handing over a notebook
-   change. → [`CLAUDE.md` rule 2](CLAUDE.md#the-five-rules-that-matter-most)
-
-3. **A country may not be running the notebook you are looking at.** A notebook named
-   `<generic_name>_<CC>.ipynb` — e.g. `snt_seasonality_rainfall_NER.ipynb` — runs *instead of* the
-   generic one, in the single workspace whose configured country code matches. This lets a country
-   keep a bespoke analysis that `Pull scripts` will not clobber; the flip side is that `Pull
-   scripts` cannot deliver one either, so variants have to be edited **in the workspace** and there
-   is no mechanism propagating them. A fix to the generic notebook silently misses those countries.
-   → [`CLAUDE.md`](CLAUDE.md#country-specific-notebook-variants)
-
-4. **OpenHEXA datasets are the contract, not the filesystem.** A file written to `data/` that is
-   not registered with `add_files_to_dataset(...)` is invisible to every downstream pipeline.
-
-5. **Some pipelines deliberately overwrite each other.** The five outlier-imputation pipelines
-   write identical filenames, as do the two reporting-rate pipelines. They are *alternatives*: the
-   analyst tries several methods and the last run wins. Renaming outputs per method would break
-   this. → [Traps](CLAUDE.md#traps)
-
+1. **These pipelines are not a DAG.** Nothing schedules them; a person presses Run, one at a time,
+   so a results table can mix data vintages. → [§4](docs/DATA_ARCHITECTURE.md#4-orchestration-model)
+2. **The Python and R halves ship by different routes.** Merging a notebook deploys **nothing** —
+   it reaches a workspace only via a run with **`Pull scripts` = ON**.
+   → [`CLAUDE.md` rule 2](CLAUDE.md#the-five-rules-that-matter-most)
+3. **A country may not be running the notebook you are looking at.** A `<generic_name>_<CC>.ipynb`
+   variant runs *instead*, in that one country's workspace, and no mechanism propagates it.
+   → [`pipelines/CLAUDE.md`](pipelines/CLAUDE.md#country-specific-notebook-variants)
+4. **OpenHEXA datasets are the contract, not the filesystem.** A file not registered with
+   `add_files_to_dataset(...)` is invisible downstream. → [R4](docs/CONVENTIONS.md#r4)
+5. **Some pipelines deliberately overwrite each other** — alternative methods, last run wins.
+   → [Traps](CLAUDE.md#traps)
 6. **There is no test suite and no CI lint.** `ruff` is the only automated check and nothing runs
-   it for you. Analytics changes are reviewed by eye. Do not report a test run you could not have
-   performed.
+   it for you. → [`CLAUDE.md`](CLAUDE.md#commands)
 
 ---
 
@@ -163,6 +148,10 @@ person *or* an agent.
 - **[`.claude/`](.claude/) ships live guardrails.** They are active the moment you clone: a hook
   that blocks destructive and history-rewriting `git` commands, plus a matching deny list. If an
   agent gets blocked, that is the guardrail working — don't route around it.
+  → [`.claude/README.md`](.claude/README.md)
+- **[`pipelines/CLAUDE.md`](pipelines/CLAUDE.md) holds the notebook-only rules.** Claude Code loads
+  it only when working under `pipelines/`; with another assistant, give it that file too when the
+  task touches a notebook.
 - **[`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) is deliberately
   tool-agnostic** — it works as instructions for a human or as a prompt for any model.
 - **An agent's output still needs the domain review below.** An assistant cannot tell you that an
@@ -185,7 +174,7 @@ Four things that are never OK:
 - **Committing notebook outputs.** Strip them first (`nbstripout`).
 - **Putting business logic in `pipeline.py`.** It orchestrates; the analytics live in R.
 - **Publishing from a workspace other than `snt-development`.** It creates a duplicate template
-  nobody is subscribed to. → [why](CLAUDE.md#always-publish-from-snt-development)
+  nobody is subscribed to. → [why](docs/CONVENTIONS.md#r5)
 
 Before opening a PR, walk the
 [handover checklist](CLAUDE.md#handover-checklist) — it is short and it maps to the rules.
@@ -203,7 +192,7 @@ against one live in their own repo,
 The manifest's shape is a **contract** between the two repos, defined by
 [`release_manifest.schema.json`](https://github.com/BLSQ/snt_workspace_bootstrap/blob/main/docs/contracts/release_manifest.schema.json)
 there. Do not change the shape without updating that schema in the same change.
-→ [`CLAUDE.md` R22](CLAUDE.md#release-management)
+→ [R22](docs/CONVENTIONS.md#r22)
 
 ---
 
@@ -215,7 +204,7 @@ Stated plainly, so nobody spends a day rediscovering them:
 |---|---|
 | **No automated tests** | `ruff` is the only check, and no CI job runs it. |
 | **Dependencies are unpinned** | Both entries in every `requirements.txt` install from a Git branch, so two deploys of identical code can produce different runtimes. → [detail](docs/BACKLOG.md#dep-1) |
-| **No full offline development** | R notebooks are edited locally but execute on the workspace kernel. → [the loop](CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop) |
+| **No full offline development** | R notebooks are edited locally but execute on the workspace kernel. → [the loop](pipelines/CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop) |
 | **Run order is not written down yet** | Tracked in [`docs/DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md). |
 
 Everything still open — tasks, questions, pending decisions — is in

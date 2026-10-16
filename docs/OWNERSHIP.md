@@ -102,7 +102,7 @@ of the generic notebook in one country's workspace. Whoever owns the country eng
 consulted before changing either — and note that a variant lives in the workspace, not in `main`,
 so this repository is not a reliable record of which ones exist.
 → [Traps](../CLAUDE.md#traps) · [Country-specific notebook
-variants](../CLAUDE.md#country-specific-notebook-variants)
+variants](../pipelines/CLAUDE.md#country-specific-notebook-variants)
 
 ---
 

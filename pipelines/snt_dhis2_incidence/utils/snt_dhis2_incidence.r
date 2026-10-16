@@ -9,6 +9,14 @@ It basically handles all the boring stuff so that you can focus on the code that
 source(file.path("~/workspace/code", "snt_utils.r"))
 
 
+#' Resolve the routine data filename suffix
+#'
+#' Maps the global `ROUTINE_DATA_CHOICE` to the filename suffix of the routine file:
+#' "raw" -> `_routine.parquet`, "raw_without_outliers" -> `_routine_outliers_removed.parquet`,
+#' any other value -> `_routine_outliers_imputed.parquet`.
+#'
+#' @return Character. Filename suffix, without the country code prefix.
+#' @export
 resolve_routine_filename <- function() {
     if (ROUTINE_DATA_CHOICE == "raw") {
         return("_routine.parquet")
@@ -18,6 +26,15 @@ resolve_routine_filename <- function() {
 }
 
 
+#' Select the routine dataset and filename
+#'
+#' Uses the global `ROUTINE_DATA_CHOICE`: "raw" reads from `DHIS2_DATASET_FORMATTED`, any other
+#' choice from `DHIS2_OUTLIERS_IMPUTATION`. The filename is the global `COUNTRY_CODE` followed by
+#' the suffix from `resolve_routine_filename()`.
+#'
+#' @param config_json List. Parsed SNT configuration, with `SNT_DATASET_IDENTIFIERS`.
+#' @return List with `routine_dataset_name` and `routine_filename` (both character).
+#' @export
 select_routine_dataset_and_filename <- function(config_json) {
     routine_dataset_name <- if (ROUTINE_DATA_CHOICE == "raw") {
         config_json$SNT_DATASET_IDENTIFIERS$DHIS2_DATASET_FORMATTED
@@ -31,7 +48,15 @@ select_routine_dataset_and_filename <- function(config_json) {
     list(routine_dataset_name = routine_dataset_name, routine_filename = routine_filename)
 }
 
- 
+
+#' Check that the fixed columns are present in the routine data
+#'
+#' Compares the columns of `dhis2_routine` with the global `fixed_cols` and logs a warning
+#' listing any missing ones. Does not stop the run.
+#'
+#' @param dhis2_routine Data frame. Routine data as loaded from the dataset.
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 check_fixed_cols_in_routine <- function(dhis2_routine) {
     actual_cols <- colnames(dhis2_routine)
     missing_cols <- setdiff(fixed_cols, actual_cols)
@@ -42,6 +67,14 @@ check_fixed_cols_in_routine <- function(dhis2_routine) {
     }
 }
 
+#' Check that the DHIS2 indicator columns are present in the routine data
+#'
+#' Compares the columns of `dhis2_routine` with the global `DHIS2_INDICATORS` and logs a warning
+#' listing any missing ones. Does not stop the run.
+#'
+#' @param dhis2_routine Data frame. Routine data as loaded from the dataset.
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 check_dhis2_indicators_cols_in_routine <- function(dhis2_routine) {
     actual_cols <- colnames(dhis2_routine)
     missing_cols <- setdiff(DHIS2_INDICATORS, actual_cols)
@@ -52,6 +85,14 @@ check_dhis2_indicators_cols_in_routine <- function(dhis2_routine) {
     }
 }
 
+#' Check that the PRES column is present when N1 uses PRES
+#'
+#' Runs only when the global `N1_METHOD` exists and equals "PRES": stops the run if
+#' `dhis2_routine` has no `PRES` column. Otherwise prints a note (notebook only, not logged).
+#'
+#' @param dhis2_routine Data frame. Routine data as loaded from the dataset.
+#' @return Called for its side effects; the return value is not meaningful.
+#' @export
 check_pres_col <- function(dhis2_routine) {
     if (exists("N1_METHOD") && N1_METHOD == "PRES") {
         pres_in_routine <- any(names(dhis2_routine) == "PRES")        
@@ -86,6 +127,23 @@ load_population_data <- function(country_code, population_dataset_id) {
 
 # --- DISAGGREGATION LOGIC --- --- --- --- --- --- ---
 
+#' Map disaggregated indicator columns to the generic names
+#'
+#' When `DISAGGREGATION_SELECTION` is set, copies `{SUSP|PRES}_{SELECTION}`, `TEST_{SELECTION}`
+#' and `CONF_{SELECTION}` into `SUSP` (or `PRES`), `TEST` and `CONF`, so the rest of the notebook
+#' uses the generic names. The method prefix is `SUSP` for "SUSP-TEST" and `PRES` for "PRES".
+#' Stops the run if any of the disaggregated columns is missing. When `DISAGGREGATION_SELECTION`
+#' is NULL, the data is returned unchanged.
+#'
+#' Sets the globals `DISAGGREGATED_INDICATORS_FOUND` (TRUE when the mapping was applied, else
+#' FALSE) and `target_colnames` (the disaggregated column names looked for).
+#'
+#' @param dhis2_routine Data frame. Routine data as loaded from the dataset.
+#' @param DISAGGREGATION_SELECTION Character or NULL. Population group, e.g. "UNDER_5".
+#' @param N1_METHOD Character. "SUSP-TEST" or "PRES".
+#' @return Data frame. `dhis2_routine`, with the generic indicator columns overwritten when the
+#'   mapping is applied.
+#' @export
 prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELECTION, N1_METHOD) {
 
   # Initial log msg
@@ -128,9 +186,18 @@ prepare_disaggregated_indicators <- function(dhis2_routine, DISAGGREGATION_SELEC
   return(dhis2_routine)
 }
 
-# Rewrote select_population_column() to be mapping the DISAGGREGATION_SELECTION 
-# only if it exists in the population dataset, otherwise log an error and break 
-# (instead of silently using the non-disaggregated population)
+#' Select the population column matching the disaggregation
+#'
+#' When `DISAGGREGATED_INDICATORS_FOUND` is TRUE, copies `POP_{DISAGGREGATION_SELECTION}` into
+#' `POPULATION` and sets the global `POPULATION_SELECTION` to that column name. Stops the run if
+#' the column is not in the population data. When FALSE, the data is returned unchanged and its
+#' existing `POPULATION` column is used.
+#'
+#' @param dhis2_population_adm2 Data frame. ADM2 x yearly population.
+#' @param DISAGGREGATED_INDICATORS_FOUND Logical. Whether disaggregated indicators were mapped.
+#' @param DISAGGREGATION_SELECTION Character or NULL. Population group, e.g. "UNDER_5".
+#' @return Data frame. `dhis2_population_adm2`, with `POPULATION` set from the selected column.
+#' @export
 select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICATORS_FOUND, DISAGGREGATION_SELECTION) {
   if (DISAGGREGATED_INDICATORS_FOUND) { 
       POPULATION_SELECTION <<- paste0("POP_", DISAGGREGATION_SELECTION) # GP: Make this a global var so it can be used downstream
@@ -152,6 +219,17 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 
 # --- --- --- --- --- --- --- --- ---
 
+#' Load DHS careseeking data
+#'
+#' Loads `{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet` from the latest version
+#' of the `DHS_INDICATORS` dataset. On success, sets the global `careseeking_file_name` (used in
+#' the final log summary). On failure, logs a warning and returns NULL; the run continues.
+#'
+#' @param country_code Character. Country code used as the filename prefix. Default: `COUNTRY_CODE`.
+#' @param config List. Parsed SNT configuration, with `SNT_DATASET_IDENTIFIERS`.
+#'   Default: `config_json`.
+#' @return Data frame of ADM1 careseeking percentages, or NULL if the file could not be loaded.
+#' @export
 load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = config_json) {
     # 1. Prepare identifiers
     dataset_name <- config$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
@@ -179,6 +257,18 @@ load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = conf
 }
 
 
+#' Validate and format careseeking data
+#'
+#' Expects `ADM1_ID` and a percentage column: `CARESEEKING_PCT` for a user-provided file,
+#' `PCT_PUBLIC_CARE` for DHS data. Converts the percentage column to numeric, scales it to 0-100
+#' when its maximum is <= 1, and renames it to `CARESEEKING_PCT`. Logs an error and returns NULL
+#' when a required column is missing or contains non-numeric values.
+#'
+#' @param data Data frame or NULL. Careseeking data, from a user file or from DHS.
+#' @param from_file Logical. TRUE for a user-provided file, FALSE for DHS data.
+#' @return Data frame with a `CARESEEKING_PCT` column (0-100), or NULL if `data` is NULL or
+#'   validation fails.
+#' @export
 validate_and_format_careseeking_data <- function(data, from_file) {
     if (is.null(data)) {
         print("No careseeking data to validate.")
@@ -231,12 +321,14 @@ validate_and_format_careseeking_data <- function(data, from_file) {
 #' Join careseeking data to the monthly cases table
 #'
 #' Joins on ADM2_ID if present in the careseeking data, otherwise on ADM1_ID. If the careseeking
-#' data also has a YEAR column, the join is done per year as well, so each year uses its own value.
+#' data also has a YEAR column, the join is done per year as well, so each year uses its own value,
+#' and a warning lists the routine years with no careseeking value. Keeps one row per join key,
+#' and sets missing or non-numeric `CARESEEKING_PCT` values to 100.
 #'
-#' @param main_df Monthly cases table, with ADM1_ID, ADM2_ID and YEAR columns.
-#' @param careseeking_data Validated careseeking data, with CARESEEKING_PCT and ADM1_ID or ADM2_ID
-#'   (optionally YEAR).
-#' @return main_df with a CARESEEKING_PCT column added.
+#' @param main_df Data frame. Monthly cases table, with ADM1_ID, ADM2_ID and YEAR columns.
+#' @param careseeking_data Data frame. Validated careseeking data, with CARESEEKING_PCT and
+#'   ADM1_ID or ADM2_ID (optionally YEAR).
+#' @return Data frame. `main_df` with a CARESEEKING_PCT column added.
 #' @export
 join_careseeking_data <- function(main_df, careseeking_data) {
   # --- 1. Determine the join key based on available columns ---
@@ -285,7 +377,18 @@ join_careseeking_data <- function(main_df, careseeking_data) {
   return(result)
 }
 
- 
+
+#' Load monthly reporting rate data
+#'
+#' Loads `{COUNTRY_CODE}_reporting_rate_dataelement.parquet` from the latest version of the
+#' `DHIS2_REPORTING_RATE` dataset, or `{COUNTRY_CODE}_reporting_rate_dataset.parquet` if the first
+#' cannot be loaded. Stops the run if neither can be loaded.
+#'
+#' Sets the globals `reporting_rate_month` (the loaded data), `REPORTING_RATE_METHOD`
+#' ("dataelement" or "dataset"), `rr_dataset_name`, `file_name_de` and `file_name_ds`.
+#'
+#' @return Data frame. The first 3 rows of `reporting_rate_month`, for display in the notebook.
+#' @export
 load_reporting_rate_data <- function() {
     rr_dataset_name <<- config_json$SNT_DATASET_IDENTIFIERS$DHIS2_REPORTING_RATE
     file_name_de <<- paste0(COUNTRY_CODE, "_reporting_rate_dataelement.parquet")
@@ -317,6 +420,14 @@ load_reporting_rate_data <- function() {
 }
 
 
+#' Check the reporting rate data for missing values
+#'
+#' Counts NA values in `REPORTING_RATE` of the global `reporting_rate_month`, stores the count in
+#' the global `na_count` and logs a warning when it is above 0. Logs an error when
+#' `reporting_rate_month` is NULL. Does not stop the run.
+#'
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 check_reporting_rate_data <- function() {
     if (!is.null(reporting_rate_month)) {
         na_count <<- sum(is.na(reporting_rate_month$REPORTING_RATE))     
@@ -331,6 +442,15 @@ check_reporting_rate_data <- function() {
 }
 
 
+#' Convert routine and reporting rate columns to numeric
+#'
+#' Creates the global `routine_data` from the global `dhis2_routine`, with YEAR, MONTH, CONF, TEST,
+#' SUSP and PRES (where present) as numeric. Creates the global `reporting_rate_data` from the
+#' global `reporting_rate_month`, with YEAR, MONTH and REPORTING_RATE as numeric, or logs a warning
+#' when `reporting_rate_month` is NULL.
+#'
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 enforce_numeric_cols <- function() {
     routine_data <<- dhis2_routine |>
         mutate(across(any_of(c("YEAR", "MONTH", "CONF", "TEST", "SUSP", "PRES")), as.numeric))
@@ -345,6 +465,14 @@ enforce_numeric_cols <- function() {
 }
 
 
+#' Report months with a zero reporting rate
+#'
+#' Counts the rows of the global `reporting_rate_data` with `REPORTING_RATE == 0` and the number of
+#' ADM2 affected, stores both in the global `zero_reporting` and logs them. N2 is NA for these rows
+#' (set where N2 is calculated, not here). Logs an error when `reporting_rate_data` is NULL.
+#'
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 handle_zeros_in_reporting_rate <- function() {
     if (!is.null(reporting_rate_data)) {
         zero_reporting <<- reporting_rate_data %>%
@@ -365,6 +493,14 @@ handle_zeros_in_reporting_rate <- function() {
 }
 
 
+#' Export the monthly cases table
+#'
+#' Writes `monthly_cases` to `{INTERMEDIATE_DATA_PATH}/{COUNTRY_CODE}_monthly_cases.parquet`, read
+#' by the reporting notebook. The file is not added to any dataset.
+#'
+#' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH).
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 export_monthly_cases <- function(monthly_cases) {
     file_path <- file.path(INTERMEDIATE_DATA_PATH, paste0(COUNTRY_CODE, "_monthly_cases.parquet"))
     arrow::write_parquet(monthly_cases, file_path)
@@ -372,36 +508,68 @@ export_monthly_cases <- function(monthly_cases) {
 }
 
 
-coherence_check_PRES <- function(monthly_cases) {
-    # Run this check only if N1_METHOD == "PRES" (else, problem doesn't exist)
-    if (N1_METHOD == "PRES") {
-        nr_of_pres_0_adm2_month <- monthly_cases |> filter(PRES == 0) |> nrow()
-        log_msg(glue::glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
+#' Check for months with zero presumed cases
+#'
+#' Runs only when `N1_METHOD_USED == "PRES"`. Logs, as a warning, the number of ADM2 x MONTH rows
+#' with `PRES == 0`, where N1 equals CONF. The warning is logged even when that number is 0.
+#'
+#' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH), with a PRES column.
+#' @param N1_METHOD_USED Character. N1 method used, after any PRES fallback: "SUSP-TEST" or "PRES".
+#' @return Invisible NULL. Called for its side effects.
+#' @export
+coherence_check_PRES <- function(monthly_cases, N1_METHOD_USED) {
+    # Run this check only if N1_METHOD_USED == "PRES" (else, problem doesn't exist)
+    if (N1_METHOD_USED == "PRES") {
+        nr_of_pres_0_adm2_month <- monthly_cases %>% filter(PRES == 0) %>% nrow()
+        if (nr_of_pres_0_adm2_month > 0) {
+            log_msg(glue::glue("🚨 Note: using `PRES` for incidence adjustement, but `PRES == 0` for {nr_of_pres_0_adm2_month} rows (ADM2 x MONTH)."), "warning")
+        }        
     } else {
         log_msg(glue::glue("N1_METHOD is not set to 'PRES'. No need to check for coherence of `PRES` column."))
     }
 }
 
-coherence_check_SUSP_TEST <- function(monthly_cases) {
-  # Logically, there should not be more tested cases than suspected cases. 
-    if (N1_METHOD == "SUSP-TEST") {
-        nr_of_negative <- monthly_cases |> mutate(SUSP_minus_TEST = SUSP - TEST) |> filter(SUSP_minus_TEST < 0) |> nrow() 
+#' Check for more tested than suspected cases
+#'
+#' Runs only when `N1_METHOD_USED == "SUSP-TEST"`. Counts the ADM2 x MONTH rows where
+#' `TEST > SUSP` and logs a warning when there are any. Expects `monthly_cases` before `TEST` is
+#' capped to `SUSP`.
+#'
+#' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH), with SUSP and TEST.
+#' @param N1_METHOD_USED Character. N1 method used, after any PRES fallback: "SUSP-TEST" or "PRES".
+#' @return Invisible NULL. Called for its side effects.
+#' @export
+coherence_check_SUSP_TEST <- function(monthly_cases, N1_METHOD_USED) {
+    if (N1_METHOD_USED == "SUSP-TEST") {
+        nr_of_negative <- monthly_cases %>% filter(TEST > SUSP) %>% nrow()
         if (nr_of_negative > 0) {
             log_msg(
-            glue::glue("🚨 Note: using formula `SUSP - TEST` for incidence adjustement, but higher tested than suspected cases (`SUSP < TEST`) detected in {nr_of_negative} rows (ADM2 x MONTH)."),
+            glue::glue("🚨 Note: using formula `SUSP - TEST` for incidence adjustement, but higher tested than suspected cases (`TEST > SUSP`) detected in {nr_of_negative} rows (ADM2 x MONTH). `TEST` is capped to `SUSP` in these rows for the N1 calculation."),
             "warning"
             )
         } else {
             log_msg(glue::glue("✅ Note: using `SUSP - TEST` for incidence adjustment, no cases where `TEST > SUSP` detected."))
         }
     } else {
-        log_msg(glue::glue("N1_METHOD is not set to 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns."))
+        log_msg(glue::glue("N1_METHOD_USED is not 'SUSP-TEST'. No need to check for coherence of `SUSP` and `TEST` columns."))
     }
+    invisible(NULL)
 }
 
 
+#' Check for more confirmed than tested cases
+#'
+#' Counts the ADM2 x MONTH rows where `CONF / TEST > 1`, which includes rows with `TEST == 0` and
+#' `CONF > 0`, and logs a warning when there are any.
+#'
+#' @param monthly_cases Data frame. Monthly cases table (ADM2 x MONTH), with CONF and TEST.
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 coherence_check_CONF_TEST <- function(monthly_cases) {
-    more_confirmed_than_tested <- monthly_cases |> mutate(CONF_divby_TEST = CONF / TEST) |> filter(CONF_divby_TEST > 1) |> nrow() 
+    more_confirmed_than_tested <- monthly_cases %>% 
+        mutate(CONF_divby_TEST = CONF / TEST) %>% 
+        filter(CONF_divby_TEST > 1) %>% 
+        nrow() 
     if (more_confirmed_than_tested > 0) {
         log_msg(glue::glue("🚨 Note: higher confirmed than tested cases (`CONF/TEST`) detected in {more_confirmed_than_tested} rows (ADM2 x MONTH)."), "warning")
     } else {
@@ -410,6 +578,17 @@ coherence_check_CONF_TEST <- function(monthly_cases) {
 }
 
 
+#' Check that an adjusted incidence is not below the incidence it adjusts
+#'
+#' Counts the ADM2 x YEAR rows where `incidence_col_2 < incidence_col_1`, stores the count in the
+#' global `nr_of_impossible_values` and logs a warning when it is above 0. Also logs a warning when
+#' every value of `incidence_col_2` is NA.
+#'
+#' @param yearly_incidence Data frame. Yearly incidence table (ADM2 x YEAR).
+#' @param incidence_col_1 Character. Name of the less adjusted incidence column.
+#' @param incidence_col_2 Character. Name of the more adjusted incidence column.
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 coherence_check_yearly_incidence <- function(yearly_incidence, incidence_col_1, incidence_col_2) {
     nr_of_impossible_values <<- yearly_incidence |>
       mutate(IMPOSSIBLE_VALUE = if_else(!!sym(incidence_col_2) < !!sym(incidence_col_1), TRUE, FALSE)) |>
@@ -425,7 +604,18 @@ coherence_check_yearly_incidence <- function(yearly_incidence, incidence_col_1, 
 }
 
 
-# Reusable function to generate filename and save data ---------------------------------------------
+#' Save the yearly incidence table
+#'
+#' Writes `yearly_incidence` to `{data_path}/{COUNTRY_CODE}_incidence{file_extension}` with the
+#' given write function, creating the directory if needed.
+#'
+#' @param yearly_incidence Data frame. Yearly incidence table (ADM2 x YEAR).
+#' @param data_path Character. Output directory.
+#' @param file_extension Character. File extension, including the dot, e.g. ".parquet".
+#' @param write_function Function. Called as `write_function(data, path)`, e.g. `write_csv` or
+#'   `arrow::write_parquet`.
+#' @return Invisible NULL. Called for its side effects.
+#' @export
 save_yearly_incidence <- function(yearly_incidence, data_path, file_extension, write_function) {
   base_name_parts <- c(COUNTRY_CODE, "_incidence")
   # --- Concatenate all parts to form the final filename ---

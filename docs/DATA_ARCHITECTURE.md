@@ -5,51 +5,23 @@ Reference for the data lineage, storage layout and orchestration patterns of the
 
 Companion document: [`CLAUDE.md`](../CLAUDE.md) — conventions, guardrails and working rules.
 
-> **Status of this document.** Written from a code audit of `main` (2026-08-26/27). Sections
-> marked **`[TODO: Giulia]`** need input that cannot be derived from the code.
+> **Status of this document.** Sections marked **`[TODO: Giulia]`** need input that cannot be
+> derived from the code. Open items: [`BACKLOG.md`](BACKLOG.md). Decisions: [`decisions/`](decisions/README.md).
 
 ---
 
 ## 0. Audit scope — what is verified here, and what is not
 
-Read this before trusting any claim below. This document was produced by reading code, not by
-running it, and the coverage is uneven on purpose.
+**Verified by reading the code** on 2026-08-27 (branch `SNT25-640_codebase-documentation`; commit
+not recorded), and updated since as the code changed: every `pipeline.py` and `push_snt_*.yaml` in
+full, the `utils/*.r` helpers behind filename and column resolution, and the workspace image's
+registry manifest ([§7.4](#74-the-workspace-runtime-image)). Notebooks were **read selectively**, and
+**nothing was executed**: no pipeline run, no workspace inspected, no output file opened.
 
-**Verified by reading the code** (2026-08-27, branch `SNT25-640_codebase-documentation`):
-
-- All 20 `pipeline.py` files, in full — parameters, guards, and every `add_files_to_dataset(...)`
-  call. Published-output claims in §3 come from those calls, not from the pipelines' `readme.md`.
-- The `utils/*.r` helpers behind filename resolution and column selection, and the notebook cells
-  that resolve dataset ids (`config_json$SNT_DATASET_IDENTIFIERS$…`).
-- All 20 `.github/workflows/push_snt_*.yaml`, `pyproject.toml`, `.gitignore`, and
-  the five `SNT_config_<CC>.json` reference copies (now archived in `deprecated/configuration/`).
-- The OpenHEXA workspace image `blsq/openhexa-blsq-r-environment:latest`, read from its registry
-  manifest (see [§7.4](#74-the-workspace-runtime-image)).
-
-**Read selectively, not exhaustively:** the analytics notebooks. They were opened where a specific
-question needed answering (parameter fallbacks, grouping keys, dataset ids, the population-column
-defect). Nobody has line-by-line reviewed the statistics in them, and this document does not claim
-the methods are correct — only what they consume and produce.
-
-**Deliberately out of scope:**
-
-| Excluded | Why |
-|---|---|
-| `deprecated/configuration/SNT_metadata.json` | old format, no reader left; excluded on Giulia's instruction (see §3.2 Stage E) |
-| `snt_assemble_results` | retired, moved to `deprecated/` (see §3.2 Stage E) |
-| `snt_dhis2_outliers_detection/` | discontinued; local-only leftover, not on the remote |
-| `deprecated/` | history, never a template |
-| `snt_lib` (`BLSQ/snt_utils`) internals | external repo, not in this checkout |
-
-**Not verified at all:** nothing here was executed. No pipeline was run, no workspace was
-inspected, no output file was opened. Runtime behaviour — actual data volumes, real DHIS2
-responses, whether a given country's config is valid — is unverified. Where the code makes a
-behaviour conditional on data that only exists in a workspace, this document says so rather than
-guessing.
-
-**A future agent picking this up should:** trust §3's published-output lists (checked against the
-code), treat the statistical descriptions as summaries rather than specifications, and re-verify
-anything in a pipeline whose `pipeline.py` has changed since the commit above.
+So: trust §3's published-output lists (they come from the `add_files_to_dataset(...)` calls, not
+from the readmes); treat the statistical descriptions as summaries, not specifications; and
+re-verify any pipeline whose `pipeline.py` has changed since. Out of scope: `deprecated/`, and the
+internals of `snt_lib` (external repo).
 
 ---
 
@@ -226,7 +198,7 @@ be running the newest `pipeline.py` (auto-updated via the template) against mont
 analytics (never pulled) — with nothing anywhere reporting the mismatch.
 
 This is a known, acknowledged pain point; solutions are being discussed with the OpenHEXA
-developers. Until it changes, treat the two halves of every pipeline as **independently
+developers ([BACKLOG OH-1](BACKLOG.md#oh-1)). Until it changes, treat the two halves of every pipeline as **independently
 versioned**, and see [`CLAUDE.md` rule 2](../CLAUDE.md#the-five-rules-that-matter-most).
 
 A second, smaller consequence sits on the *authoring* side: because the R code lives in the
@@ -342,7 +314,9 @@ only relational sink in the system, and likewise overwritten by whichever varian
 > is currently paused and may be replaced by a different tool. Unlike the dataset files, the table
 > has no parameters JSON beside it, so once overwritten there is no record of which method or run
 > produced its rows. Before anything depends on this table again, decide whether it needs a
-> method/run-id discriminator (or append-with-run-id semantics instead of overwrite).
+> method/run-id discriminator (or append-with-run-id semantics instead of overwrite):
+> [BACKLOG PIPE-4](BACKLOG.md#pipe-4). Why the dataset files overwrite each other:
+> [ADR 0002](decisions/0002-alternative-methods-last-run-wins.md).
 
 **Stage D — Derived indicators**
 
@@ -417,7 +391,7 @@ operator muscle-memory the shared parameter names are supposed to buy:
 
 Three names for "routine data with outliers removed", and a fourth parameter name for the same
 choice. Worth unifying; changing published parameter names is operator-visible, so it needs a
-deliberate migration rather than a quiet rename.
+deliberate migration rather than a quiet rename ([BACKLOG PIPE-2](BACKLOG.md#pipe-2)).
 
 **Stage E — Assemble (egress) — RETIRED**
 
@@ -426,10 +400,7 @@ deliberate migration rather than a quiet rename.
 `deprecated/DEPRECATED_snt_assemble_results/`, CI no longer deploys it, and it ships in no
 release. The Explorer now imports data layers **directly from the per-stage OpenHEXA datasets**,
 listed in [`metadata/SNT_metadata_master.json`](../metadata/README.md) and trimmed per workspace by
-`snt_metadata_json_trim`. The per-stage datasets already *were* the contract (§1); reading them
-directly removes a lossy flattening step — it aggregated over time and dropped `YEAR` — along with
-the metadata gate that silently dropped any column not declared in
-`SNT_metadata.json` (old format; repo copy archived in `deprecated/configuration/`).
+`snt_metadata_json_trim`. Why: [ADR 0006](decisions/0006-retire-snt-assemble-results.md).
 
 Leftovers to know about:
 
@@ -514,7 +485,8 @@ Note the shapes fan-out: the three external-source pipelines are **downstream of
 
 ### 4.2 `[TODO: Giulia]` — authoritative order & dependency map
 
-Giulia holds a mapping of pipeline order and dependencies. **Action point: paste it here.**
+Giulia holds a mapping of pipeline order and dependencies. **Action point: paste it here**
+([BACKLOG DOC-1](BACKLOG.md#doc-1)).
 Expected to resolve: the `A.n` numbering used in parameter help text (`A.2 DHIS2 Formatting`,
 `A.5 DHIS2 Population Transformation`); which stages are mandatory vs optional; which outlier
 imputation variant is the recommended default; which reporting-rate variant to prefer.
@@ -675,11 +647,11 @@ plural coincide.
 indicator suffix. It needs an explicit disaggregation → population-column mapping in
 `select_population_column()`. Note also that `configuration/readme.txt` records the historical
 population blocks with the singular `POP_PREGNANT_WOMAN`, which is where the ambiguity likely
-originates.
+originates. Open: [BACKLOG PIPE-5](BACKLOG.md#pipe-5).
 
 ### 6.2 Known blind spots
 
-(Candidates for hardening, not defects to fix silently.)
+(Candidates for hardening, not defects to fix silently: [BACKLOG PIPE-6](BACKLOG.md#pipe-6).)
 - No row-count or schema assertion between stages; an empty period yields a warning and a
   smaller merged file, not a failure.
 - `download_dhis2_analytics` catches per-period exceptions and `continue`s — a systematically
@@ -736,8 +708,8 @@ What this means in practice:
 
 Mitigation would be to pin a fixed point — a tag (`…/snt_utils.git@v1.4.0`) or a commit SHA
 (`…/snt_utils.git@a1b2c3d`) — turning upgrades into reviewable, revertible one-line PRs. Cost:
-someone must bump the refs to adopt upstream changes. **Not currently implemented**; logged in
-[`CLAUDE.md`](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) for evaluation.
+someone must bump the refs to adopt upstream changes. **Not currently implemented**:
+[BACKLOG DEP-1](BACKLOG.md#dep-1).
 
 ### 7.1.1 Pipeline versions: three different numbers — ⚠️ pain point
 
@@ -755,8 +727,8 @@ in a country workspace may be template v5 may be source v11. Combined with the R
 versioned at all (§2.2.1), a country workspace's effective state is currently not expressible as a
 single version string.
 
-**Recorded as a pain point to raise with the OpenHEXA developers**, alongside the R propagation
-problem. Any drift-detection scheme (§7.3) has to pick *which* of these three numbers it compares,
+**Recorded as a pain point to raise with the OpenHEXA developers**
+([BACKLOG OH-2](BACKLOG.md#oh-2)), alongside the R propagation problem. Any drift-detection scheme (§7.3) has to pick *which* of these three numbers it compares,
 and the answer is not obvious.
 
 ### 7.2 `readme.md` drift — ⚠️ pain point
@@ -778,6 +750,7 @@ top of each `readme.md`, so a check can compare it against the deployed pipeline
 mismatch. Blocked on §7.1.1 — the check has to decide *which* version number is authoritative.
 A weaker but immediately available variant: record the **commit SHA** of the `pipeline.py` the
 readme was last verified against, which is well-defined today and needs no OpenHEXA involvement.
+Tracked as [BACKLOG DOC-2](BACKLOG.md#doc-2).
 
 ### 7.3 CI coverage
 
@@ -826,7 +799,7 @@ Two consequences worth knowing:
 - **Two R packages the code uses are not named in the image build**: `data.table` (67 call sites)
   and `rmapshaper` (4). They evidently resolve transitively today, since the notebooks run — but a
   transitive dependency is not a guarantee, and an upstream image rebuild could drop either
-  without warning. Worth asking the OH devs to name them explicitly. (`glue`, `jsonlite`, `terra`,
+  without warning. Worth asking the OH devs to name them explicitly ([BACKLOG OH-3](BACKLOG.md#oh-3)). (`glue`, `jsonlite`, `terra`,
   `scales`, `rlang` are likewise transitive but are hard dependencies of packages the image *does*
   name, so they are safe.)
 
@@ -837,37 +810,13 @@ environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
 
 ## 8. Excluded / historical
 
-- `snt_dhis2_outliers_detection/` — **discontinued**; present in some local clones, absent from
-  the remote. Do not document, extend, or deploy it.
-- `pipelines/snt_dhis2_outliers_removal_imputation/` — stub only (Zone.Identifier file).
-- `deprecated/` — retired pipelines kept for reference, including `snt_assemble_results`
-  (retired 2026-10, §3.2 Stage E). Never a template for new work.
+Not documented here, and never a template for new work: `deprecated/` (retired pipelines, including
+`snt_assemble_results`); `snt_dhis2_outliers_detection/`, a discontinued pipeline that may linger in
+old local clones (do not extend or deploy it); and `pipelines/snt_dhis2_outliers_removal_imputation/`,
+a stub.
 
 ---
 
 ## 9. Open questions
 
-1. **[TODO: Giulia]** Pipeline order & dependency mapping (§4.2).
-2. **Under discussion with the OpenHEXA developers** — how to version and propagate the R half of
-   each pipeline, so notebooks stop depending on an operator remembering `Pull scripts` (§2.2.1).
-3. **Under discussion with the OpenHEXA developers** — the three-way pipeline version split, which
-   blocks any readme-drift check (§7.1.1, §7.2).
-4. **Confirmed defect, needs a decision** — `POP_PREGNANT_WOMAN` vs `POP_PREGNANT_WOMEN` makes the
-   pregnant-women disaggregation unusable in `snt_dhis2_incidence` (§6.1).
-5. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
-   (paused Shiny app, or its replacement) is resumed (§3.2 Stage C).
-6. With `snt_assemble_results` retired, should `deprecated/configuration/SNT_metadata.json` be removed too?
-   (The `SNT_RESULTS` key is already gone from `SNT_config.skeleton.json`; §3.2 Stage E.)
-7. Should the routine-data-choice vocabulary be unified across the four pipelines that use it?
-   (§3.2 Stage D)
-8. Should `snt_lib` / `openhexa.toolbox` be pinned to tags rather than `main`? (§7.1)
-9. Should a `pull_request`-triggered `ruff check` job be added? (§7.3)
-10. Should `worldpopclient.py` be consolidated into `snt_lib` instead of triplicated? (§7)
-11. **[TODO: Giulia]** A domain glossary. `PRES` / `SUSP-TEST`, `CSB`, `FOSA`, `PfPR`, the five
-    outlier methods and similar cannot be derived from the code, and are the largest remaining
-    documentation gap. Needs a full term sweep plus domain input — see
-    [`CLAUDE.md` → Suggestions](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
-12. **For the OpenHEXA developers** — pin the workspace image to a digest, and name `data.table`
-    and `rmapshaper` explicitly in it rather than relying on transitive resolution (§7.4).
-13. Is the toolbox-version split worth closing — image pins `openhexa.toolbox=2.11.3`, every
-    `requirements.txt` overrides it with `@main` (§7.4)?
+All open items for this document are in [`BACKLOG.md`](BACKLOG.md).

@@ -30,16 +30,17 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 
 ## Maintaining it
 
-- **The JSON is the source of truth.** Edit it by hand, in a PR. There is no generator any more. The
+- **The JSON is the source of truth.** Edit it by hand, in a PR. There is no generator. The
   one-off bootstrap script is in git history at commit `062cf0c`; do not resurrect it over curated
-  content.
+  content ([ADR 0008](../docs/decisions/0008-master-list-maintained-by-hand.md)).
 - **Two kinds of field, two kinds of review:**
   - **Objective:** the layer id and `SOURCE_DATA` (dataset key, filename, column). Check them against
     the code that writes the column.
   - **Curated:** `LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS`, `CATEGORY`, `TYPE`, `SCALE`,
-    `UNIT_SYMBOL`. These need a person with domain knowledge. Text is a draft written from the code
-    (2026-10-15), not yet reviewed; `CATEGORY` is empty. Which layers also exist in older catalogues:
-    [`contracts/snt_metadata_json/README.md` §8](../contracts/snt_metadata_json/README.md#where-the-draft-text-came-from-2026-10-15).
+    `UNIT_SYMBOL`. These need a person with domain knowledge. Text is a draft written from the code,
+    not yet reviewed ([BACKLOG META-13](../docs/BACKLOG.md#meta-13)); `CATEGORY` is empty. Which
+    layers also exist in older catalogues:
+    [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#comparison-with-older-catalogues).
 - **When a pipeline adds or renames a published column**, add or update the master list entry in the
   same PR (CLAUDE.md handover checklist). A column with no entry is invisible in the Explorer. An
   entry whose column was renamed is dropped by the trim pipeline as `COLUMN_NOT_FOUND` in every
@@ -47,16 +48,12 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 - **Validate before merging** with the snippet in
   [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating),
   with `METADATA = 'metadata/SNT_metadata_master.json'`.
-- **What the bootstrap included, what it left out and why:**
-  [`contracts/snt_metadata_json/README.md` §8](../contracts/snt_metadata_json/README.md#8-the-master-list-2026-09-28).
+- **What the master list includes, what it leaves out and why:**
+  [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#the-master-list).
 
 ## Known open points
 
-- **Country tuning has no home yet.** `SCALE` here is a generic default. If a country hand-tunes
-  scales or labels in its trimmed file, the next trim run overwrites them. A per-country override
-  mechanism is still to be decided.
-- **Checking the master list against the pipelines is manual.** Scripted checks are logged as a later
-  development item in [`CLAUDE.md`](../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
-  They would cover the schema, config keys, filenames against `add_files_to_dataset(...)`, and
-  columns observed in workspaces. Columns built in R cannot be extracted statically at reasonable
-  cost.
+- **Country tuning has no home yet**: a trim run overwrites hand-tuned scales or labels
+  ([BACKLOG META-12](../docs/BACKLOG.md#meta-12)).
+- **Checking the master list against the pipelines is manual**
+  ([BACKLOG META-11](../docs/BACKLOG.md#meta-11)).

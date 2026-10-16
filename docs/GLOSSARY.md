@@ -4,15 +4,15 @@
 
 | | |
 |---|---|
-| **Revision** | `0.1` — first draft |
-| **Last updated** | **2026-08-31** |
-| **Status** | 🚧 **Draft — out for review.** 16 items still open in [§7](#7-open-questions). |
+| **Revision** | `0.2` — open questions moved to `BACKLOG.md`; definitions unchanged since `0.1` |
+| **Last updated** | **2026-10-16** |
+| **Status** | 🚧 **Draft — out for review.** 16 items still open: [BACKLOG `DOM-*`](BACKLOG.md#questions-for-the-snt-team-domain). |
 | **Verified against** | branch `SNT25-640_codebase-documentation`, at commit `11e10f0` (working tree clean) |
 | **Owner** | @sPuntinG |
 
 > **Reviewers:** this file is generated *from the code* for everything marked ✅, and from standard
 > usage or guesswork for everything marked 🟡 / ❓. Your review is most valuable on the 🟡 and ❓
-> entries — see [§7](#7-open-questions) for the shortlist. Please do not "fix" a ✅ entry without
+> entries — see [BACKLOG `DOM-*`](BACKLOG.md#questions-for-the-snt-team-domain) for the shortlist. Please do not "fix" a ✅ entry without
 > also changing the code it was read from.
 >
 > **Editors:** bump *Revision*, set *Last updated* to the edit date, and re-point *Verified against*
@@ -48,7 +48,8 @@ Companion documents: [`CLAUDE.md`](../CLAUDE.md) (working rules),
 | 🟡 | **Proposed.** Consistent with the code and with standard malaria-programme usage, but no artefact in this repo states it. Usable; confirm before quoting it in an operator-facing document. |
 | ❓ | **Unconfirmed.** The term appears in the code, but its meaning is a guess. **Do not propagate it into a `readme.md`.** Listed here so it is visible, not so it is reusable. |
 
-Every ❓ is collected again in [§7 Open questions](#7-open-questions) so they can be cleared in one pass.
+Every ❓ is collected again in [BACKLOG `DOM-*`](BACKLOG.md#questions-for-the-snt-team-domain) so
+they can be cleared in one pass. When one is answered, update the entry here and delete the item there.
 
 **The `FR` column is deliberate.** A French version of the documentation is planned. Where a French
 label already exists — almost all of them come from the old-format `SNT_metadata.json` (archived in
@@ -67,7 +68,7 @@ parameter values, and they do not localise.
 | Term | FR | Definition | Status |
 |---|---|---|---|
 | **SNT** | *Stratification nationale du paludisme / ciblage infranational* | **Subnational Tailoring.** The WHO-promoted exercise of stratifying a country by district and choosing the malaria intervention mix per stratum, rather than applying one national package. Everything in this repository exists to produce the one-row-per-ADM2 evidence table that exercise consumes. | 🟡 |
-| **SNT Explorer** | — | The downstream web application that reads the results. It imports data layers directly from the OpenHEXA datasets; the layers it can show are listed in `metadata/SNT_metadata_master.json`. It formerly read one flattened table built by `snt_assemble_results`, now retired. | ✅ |
+| **SNT Explorer** | — | The downstream web application that reads the results. It imports data layers directly from the OpenHEXA datasets; the layers it can show are listed in `metadata/SNT_metadata_master.json`. | ✅ |
 | **Routine data** | *Données de routine* | Monthly aggregate counts reported by health facilities into DHIS2 (cases, tests, treatments, deaths). The primary input. Distinct from *survey* data (DHS) and *modelled* data (MAP). | ✅ |
 
 ### 1.2. The incidence cascade — `N1`, `N2`, `N3`
@@ -192,7 +193,7 @@ Used by `snt_dhis2_quality_of_care` to express malaria as a share of total facil
 > ⚠️ **Naming mismatch, worth confirming.** The quality-of-care column is named
 > `NON_MALARIA_ALL_CAUSE_OUTPATIENTS` but is a direct district-year sum of `ALLOUT`, with no malaria
 > subtraction anywhere in the notebook. Either the column name or the computation is wrong. Flagged
-> in [§7](#7-open-questions).
+> as [BACKLOG DOM-13](BACKLOG.md#dom-13).
 
 ### 2.4. Antenatal care and prevention codes
 
@@ -426,7 +427,7 @@ Explorer user saw.
 > ADM1, `PCT_*_SAMPLE_AVERAGE`) and once from MAP (modelled, ADM2, `*_RATE`). They are not
 > duplicates and should not be reconciled. And `ITN_USE_RATE_RATE` has a doubled suffix, while
 > `ANTIMALARIAL_EFT_RATE` is the one entry whose French `LABEL` was never translated — both are in
-> [§7](#7-open-questions).
+> the backlog ([DOM-14](BACKLOG.md#dom-14), [DOM-10](BACKLOG.md#dom-10)).
 
 ---
 
@@ -446,47 +447,6 @@ Explorer user saw.
 
 ## 7. Open questions
 
-Everything marked ❓ above, plus inconsistencies the sweep turned up. Each needs a person with the
-domain knowledge — not another pass over the code.
-
-**Indicator codes whose meaning is genuinely unknown:**
-
-1. `CASRECU` — "cas reçus"? How does it differ from `SUSP`? (Empty in all five config copies.)
-2. `UTILISATION` — utilisation of *what*, over *what* denominator?
-3. `VAR1` — measles vaccination dose 1 (*vaccination anti-rougeoleuse*)?
-4. `MILDA_VAR` — LLINs distributed at measles-vaccination contacts? If so, `MILDA_CPN` and
-   `MILDA_VAR` are the two routine distribution channels, which is worth saying explicitly.
-5. `PRESSEV`, `MALSIMP`, `MALSEV`, `CPN`/`CPN1`, `TPI1`/`TPI3` — proposed definitions above are
-   from standard usage, not from anything in the repo. Confirm or correct.
-6. `POP_5_36_M` — confirm the band is 5–36 **months** and not years.
-
-**Method provenance:**
-
-7. How closely does the SNT **MAD15 → MAD10 → seasonal5 → seasonal3** chain track
-   [Magic Glasses 2](https://github.com/jpainter/MagicGlasses2)? Were the thresholds taken from
-   upstream, or chosen here?
-8. What exactly do the **seasonal5 / seasonal3** passes decompose against?
-9. The **PATH** method needs a fuller write-up — rationale for the central-80% trim and the
-   deviation multiplier, the stock-out and epidemic rules in epidemiological terms, the low-count
-   floors, and a citable reference if one exists. Itemised in
-   [§4.1](#41-outlier-detection-and-imputation); for the SNT team.
-
-**Definitions that affect how results are read:**
-
-10. **EFT** in `ANTIMALARIAL_EFT_RATE` — "effective treatment"? Its `LABEL` in `SNT_metadata.json`
-    is the only English one in an otherwise French file, which suggests it was never finished.
-11. **CSB vs DHS care-seeking** — is the `N3` care-seeking denominator meant to be
-    `PCT_PUBLIC_CARE`, some combination, or always an externally supplied national figure?
-12. `GRAY_INDEX` — what MAP delivers in that band, and whether averaging it is meaningful.
-
-**Naming problems found during the sweep** (each is a code question, not just a glossary one):
-
-13. `NON_MALARIA_ALL_CAUSE_OUTPATIENTS` in `snt_dhis2_quality_of_care` is a plain sum of `ALLOUT`
-    with no malaria subtraction. Is the name wrong, or the computation?
-14. `ITN_USE_RATE_RATE` — doubled suffix in `SNT_metadata.json`. Renaming it is operator-visible,
-    so it needs a migration rather than an edit.
-15. `_PREGNANT_WOMAN` (indicator suffix, singular) vs `POP_PREGNANT_WOMEN` (population column,
-    plural) — the confirmed defect in `select_population_column()`. Fixing the code would also
-    let this glossary state one spelling.
-16. `_UNDER5` vs `_UNDER_5` and `_ABOVE5` vs `_ABOVE_5` vary across country configs. Is one
-    canonical, or are both genuinely in use in the respective DHIS2 instances?
+The 16 open questions on this vocabulary (every ❓ above, plus naming problems the sweep turned up)
+are [`DOM-1` to `DOM-16` in the backlog](BACKLOG.md#questions-for-the-snt-team-domain), numbered as
+they were here.

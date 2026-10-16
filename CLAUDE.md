@@ -12,6 +12,8 @@ Guardrails for anyone (human or agent) changing code in this repository.
   [`contracts/snt_metadata_json/`](contracts/snt_metadata_json/README.md). All contracts:
   [`contracts/README.md`](contracts/README.md).
 - Who to ask / how review works: [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
+- Open items (suggestions, questions, pending decisions): [`docs/BACKLOG.md`](docs/BACKLOG.md).
+  Why things are the way they are: [`docs/decisions/`](docs/decisions/README.md).
 
 ---
 
@@ -104,7 +106,7 @@ exist, and do not report running a check that lives in none of them.
 |---|---|---|
 | Scheduler / DAG engine | **deliberate** | Nothing enforces run order. Pipelines are launched by hand, one at a time, and may run against stale upstreams. Operator-facing order is unwritten: [`DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md) `[TODO: Giulia]`. |
 | dbt | **permanent** | Analytics are R, not SQL. |
-| Test suite | **debt** | `ruff` is the only automated check and [no CI runs it](#suggestions-logged-for-later-evaluation-giulia). Verify by reading; say what you could not verify. |
+| Test suite | **debt** | `ruff` is the only automated check and [no CI runs it](docs/BACKLOG.md#tool-2). Verify by reading; say what you could not verify. |
 | Full local runtime | **debt** | Partial only — see [Getting set up locally](#getting-set-up-locally). |
 
 **Why no DAG engine, in one line:** pipelines are re-run independently with different parameters,
@@ -281,170 +283,10 @@ In descending order of what is actually achievable:
    is the most common breakage and fails only at runtime.
 4. State plainly in the PR/handover what was *not* verified.
 
-### Suggestions logged for later evaluation (Giulia)
+### Open items
 
-Not implemented — recorded here so they can be assessed:
-
-- **Pin the two Git dependencies.** Every `requirements.txt` in this repo is these two lines:
-
-  ```
-  openhexa.toolbox @ git+https://github.com/BLSQ/openhexa-toolbox@main
-  snt_lib @ git+https://git@github.com/BLSQ/snt_utils.git
-  ```
-
-  Both install straight from a GitHub branch rather than a released version. `@main` means
-  "whatever the tip of `main` is **at install time**"; the `snt_lib` line names no ref at all, so
-  it takes that repo's default branch. Nothing records which commit was actually installed.
-
-  Consequences: (a) deploying a pipeline today and redeploying the identical `pipeline.py`
-  next month can produce two different runtimes, because `snt_utils` moved in between;
-  (b) a change to `snt_utils` — say a new required argument on `run_notebook()` — reaches every
-  SNT pipeline on its next deploy, with no PR in this repo and no CI signal here; (c) when a run
-  breaks, "which version of `snt_lib` was this?" is unanswerable after the fact.
-
-  The fix is to name a fixed point instead of a moving branch — a tag
-  (`…/snt_utils.git@v1.4.0`) or a commit SHA (`…/snt_utils.git@a1b2c3d`). Upgrades then become a
-  deliberate one-line PR you can review, roll back, and correlate with a broken run. The cost is
-  that someone has to bump those refs when `snt_utils` ships something you want. Tags are the
-  usual compromise: readable, and cheap to move forward.
-- **`nbstripout --install` as a repo git filter** plus a committed `.gitattributes`, so output
-  stripping stops depending on each developer remembering.
-- **Add a `ruff check` CI job on pull requests.** Today the only GitHub Actions workflows are the
-  20 `push_snt_*.yaml` deployment files, plus `generate_manifest.yaml`, which runs only when a
-  release is published ([Release management](#release-management)). Each deployment file is
-  narrowly triggered:
-
-  ```yaml
-  on:
-    push:
-      branches: [main]           # ← only after merge, never on the PR
-      paths:
-        - "snt_dhis2_extract/pipeline.py"
-        - "snt_dhis2_extract/requirements.txt"
-        - ".github/workflows/push_snt_dhis2_extract.yaml"
-  ```
-
-  Two gaps follow. First, `paths:` does not list `pipelines/**` — so a PR that only touches R
-  notebooks or `.r` helpers (the majority of analytics changes) matches no workflow, and GitHub
-  shows no checks at all. That is expected behaviour here, not a broken pipeline; it also means
-  those PRs are reviewed entirely by eye. Second, because the trigger is `push` to `main` rather
-  than `pull_request`, the workflow that *does* fire on a `pipeline.py` change fires **after**
-  merge, and its only job is `openhexa pipelines push` — deployment. No linting runs anywhere,
-  before or after. `ruff` is configured in `pyproject.toml` and is the repo's only automated
-  quality gate, but nothing enforces it; it passes only if a developer remembers to run it.
-
-  A single small `pull_request`-triggered workflow running `ruff check .` would close the second
-  gap for every PR at once, without touching the 20 deployment files.
-- **A `tests/` seed**: pure functions such as `validate_yyyymm`, `validate_period_range`,
-  `get_unique_data_elements`, `validate_reporting_rates`, `merge_parquet_files`,
-  `raw_reporting_ds_format` are dependency-free and unit-testable today.
-- **R local loop**: a `renv.lock` + a small `Rscript` harness that sets the `PARAM` globals and
-  sources `code/snt_utils.r` + `pipelines/<name>/utils/<name>.r` against a tiny fixture would
-  make the R half testable without a workspace. `pipeline_msg()` already degrades gracefully
-  when the `openhexa` object is absent, so the helpers are closer to runnable than they look.
-- **Reproducible local environments — the *R* half is still open.** The Python half is good enough:
-  `dev/environment.yml` (conda, team convention) + `pyproject.toml` for the `ruff` rules and PEP 621
-  metadata. The one loose end is that the two carry overlapping dependency lists — accepted for now,
-  to be revisited when the local-workflow strategy is settled; harmless meanwhile, because these are
-  desk tools that never run in a workspace. What is still genuinely unsolved is reproducing the **R**
-  side. Recommendation: **pull the workspace image.**
-
-  | Option | Verdict |
-  |---|---|
-  | **conda / mamba, extended to R** | **Adopted for Python, not for R.** For desk tools it is the right call and it is done. Do not extend it to R: conda's `r-base` would drift from whatever the workspace actually runs, so "works locally" still would not mean "works in the workspace" — and it would not carry the system libraries either. |
-  | **`renv.lock`** | **Useful, narrow.** R's native lockfile; the workspace image already ships `r-renv`. Pairs with the R-local-loop suggestion above. Gives reproducible R *packages*, but not the system libraries (GDAL/PROJ for `sf`, TeX for reports) that are the usual cause of "works there, not here". |
-  | **Pull `blsq/openhexa-blsq-r-environment:latest`** | **Best value.** It is the *actual* runtime — public on Docker Hub, ~2.5 GB, R 4.5, all R packages, Quarto and the geo stack included. A `.devcontainer/` pointing at it gives VS Code a local environment identical to production, with no second dependency list to maintain. Contents documented in [`DATA_ARCHITECTURE.md` §7.4](docs/DATA_ARCHITECTURE.md#74-the-workspace-runtime-image). |
-
-  Caveat before adopting: a local container has no OpenHEXA workspace mounted, so `workspace.files_path`,
-  dataset access and connections are absent. It gives you a faithful *language* environment for
-  helpers and pure functions — not a way to run a whole pipeline offline. The remote-kernel loop
-  stays the way to run real analytics.
-
-  Two questions for the OH devs: pin `latest` to a digest for reproducibility, and add
-  `data.table` and `rmapshaper` to the image explicitly (see §7.4 — the code uses both, and both
-  currently arrive only as transitive dependencies).
-- **Give `SNT_DATASET_IDENTIFIERS` a single key-naming convention.** Its keys follow no consistent
-  rule today: some carry an `SNT_` prefix (`SNT_HEALTHCARE_ACCESS`, `SNT_MAP_EXTRACTS`,
-  `SNT_SEASONALITY_*`) and some do not (`DHIS2_INCIDENCE`, `DHIS2_REPORTING_RATE`,
-  `ERA5_DATASET_CLIMATE`); `DHIS2_DATASET_EXTRACTS` is plural while `WORLDPOP_DATASET_EXTRACT` is
-  singular; and the key often does not resemble the dataset it points at (`DHIS2_INCIDENCE` → the
-  dataset shown in the OpenHEXA UI as `SNT_DHIS2_INCIDENCE`).
-
-  This is not cosmetic. The SNT Explorer resolves a data layer by looking its
-  `SOURCE_DATA.DATASET.NAME` up in this map, so an author who reasonably writes the *dataset's*
-  name instead of the *key* produces a layer that silently fails to load. That already happened:
-  six of the seven entries in the 2026-09-08 `SNT_metadata.json` draft pointed at
-  `SNT_DHIS2_INCIDENCE` / `SNT_DHIS2_REPORTING_RATE`, neither of which is a key
-  ([`contracts/snt_metadata_json/README.md` §2.5](contracts/snt_metadata_json/README.md)).
-
-  Two parts, separable: (a) agree one convention and apply it to the keys; (b) decide whether the
-  key should simply *equal* the OpenHEXA dataset name, which would remove the trap entirely. Note
-  the migration cost — these keys are read by every `pipeline.py`, appear in
-  `contracts/snt_config_json/SNT_config.skeleton.json` and all five archived
-  `deprecated/configuration/SNT_config_<CC>.json` files, and would need the country workspaces' live configs
-  updated in step, so it is a coordinated change rather than a rename. Also note the key set is
-  **not** identical across countries today (NER's config has `DHIS2_OUTLIERS_DETECTION`,
-  `DHIS2_OUTLIERS_REMOVAL_IMPUTATION` and `SNT_SEASONALITY`; the other four do not), which is
-  worth resolving at the same time.
-- **De-duplicate `worldpopclient.py`**, currently copied into three pipelines.
-- **Scripted checks for the SNT Explorer master list** (`metadata/SNT_metadata_master.json`,
-  maintained by hand today — see [`metadata/README.md`](metadata/README.md)). Estimated at about
-  1.5–2 days in all; deferred because the trim pipeline works without them.
-
-  | Piece | What it does | Effort |
-  |---|---|---|
-  | Schema + config check | Turn the §5 validator in `contracts/snt_metadata_json/README.md` into a script. Also check that every `DATASET.NAME` is a key of `SNT_DATASET_IDENTIFIERS` in `contracts/snt_config_json/SNT_config.skeleton.json`. | ~2 h |
-  | Filename cross-check | Read the `add_files_to_dataset(...)` calls in every `*/pipeline.py` (AST or regex). Flag layers that point at a file no pipeline publishes, and published csv/parquet files that no layer uses. | ~0.5–1 day |
-  | Column inventory | Have the trim report also list each source's columns, and which ones no layer uses. Combining several workspaces' reports gives a list of candidate new layers. | ~0.5 day |
-  | Release CI | Run the checks in the release workflow, and block a release on schema errors. | ~2 h |
-  | Column audit | Per release, an agent reviews only the diff of `pipelines/**` since the last tag. | small, recurring |
-
-  **Not worth building:** static extraction of *columns* from the R code. Columns come from
-  `mutate`/`select`, from config-driven names (`POP_*`), from parameter-dependent branches and from
-  NA fallback columns. A parser would be costly and still wrong.
-
-  **Separate open point:** per-country tuning of `SCALE` and labels has no home yet. Re-running the
-  trim pipeline overwrites any hand edits to a workspace's trimmed file.
-- **Stamp readmes with the version they describe**, to make drift detectable. Blocked on deciding
-  *which* version number counts (source / template / workspace — see
-  [`docs/DATA_ARCHITECTURE.md` §7.1.1](docs/DATA_ARCHITECTURE.md)). A commit SHA of the
-  `pipeline.py` last verified against is well-defined today and needs no OpenHEXA change.
-- **Unify the routine-data-choice vocabulary** across `snt_dhis2_incidence`,
-  `snt_dhis2_reporting_rate_dataelement` and `snt_dhis2_quality_of_care` — operator-visible, so it
-  needs a migration rather than a rename. (Rule **R15**.)
-- **Migrate the two lowercase-parameter pipelines to UPPERCASE** (rule **R11**):
-  `snt_seasonality_cases` and `snt_seasonality_rainfall` (`minimum_month_block_size`, `maximum_month_block_size`,
-  `threshold_for_seasonality`, `threshold_proportion_seasonal_years`,
-  `use_calendar_year_denominator`). Purely internal — these are notebook globals, not `@parameter`
-  codes, so **no operator-visible name changes and no OpenHEXA UI churn**, unlike R15. Each is a
-  contained three-part edit: the injected dict in `pipeline.py`, the `if (!exists("X"))` fallback
-  cell, and every use inside the notebook and its `utils/*.r`. It must be atomic per pipeline —
-  a missed use site fails only at runtime, in a workspace, with an "object not found" error.
-  `snt_dhis2_quality_of_care` has been migrated (`data_action` → `DATA_ACTION`); its operator-facing
-  `@parameter` code is still `data_action`, which is R15's concern, not R11's.
-- **Write a domain glossary** (`docs/GLOSSARY.md`) — **the largest documentation gap left, and the
-  one nobody but the SNT team can fill.** The code is full of domain terms that cannot be inferred
-  from it: `N1_METHOD` with choices `PRES` / `SUSP-TEST`, `CSB` (care-seeking behaviour), `FOSA`,
-  `PfPR`, `ITN`, `IRS`, epi-weeks, `ADM1`/`ADM2`, "incidence adjusted for reporting", the five
-  outlier methods (what is "Magic Glasses"? what does the "PATH" method do?), and the difference
-  between `ANALYTICS_ORG_UNITS_LEVEL` and `DHIS2_ADMINISTRATION_2` in *epidemiological* rather than
-  structural terms. Without these, a newcomer — human or AI — guesses, and the guess ends up in a
-  `readme.md`.
-
-  Doing it properly needs a full sweep of the codebase (`pipeline.py` help strings, `choices`
-  values, notebook markdown cells, output column names in `SNT_metadata.json`, config keys) to
-  collect every term, then a pass by someone with the domain knowledge to define them. Suggested
-  split: an agent produces the *list* with each term's call sites and a proposed definition where
-  the code makes it unambiguous; Giulia (or a malaria epidemiologist) fills in and corrects the
-  rest. Mark anything unconfirmed rather than shipping a plausible guess.
-- **Documentation open items are tracked separately** in
-  [`docs/OWNERSHIP.md` §4](docs/OWNERSHIP.md#4-open-items): filling in the per-pipeline responsible
-  persons, confirming the (provisional MIT) licence, and linking an external published reference for
-  the SNT method.
-- **Give the `outliers_detected` DB table a provenance discriminator** (method + run id, or
-  append-with-run-id instead of overwrite) before its consumer is resumed. The dataset *files*
-  are fine as they are — overwriting is the intended override mechanism and their companion
-  `{CC}_parameters.json` records the method. The table has no such companion.
+Suggestions, open questions and pending decisions are kept in one place:
+[`docs/BACKLOG.md`](docs/BACKLOG.md). Do not start a list here.
 
 ---
 
@@ -463,7 +305,7 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | ID | Rule | Status |
 |---|---|---|
 | **R1** | No country data in git — no `.csv`/`.xlsx`/`.parquet`/`.rds`/`.geojson` with real values | `enforced` (`.gitignore`); never `git add -f` |
-| **R2** | Notebook outputs stripped before commit | `convention` → [nbstripout git filter](#suggestions-logged-for-later-evaluation-giulia) |
+| **R2** | Notebook outputs stripped before commit | `convention` → [nbstripout git filter](docs/BACKLOG.md#tool-1) |
 | **R3** | `pipeline.py` orchestrates, never computes | `convention` |
 | **R4** | An output only exists if it is passed to `add_files_to_dataset(...)` | `convention` |
 | **R5** | Publish only from the `snt-development` workspace | `convention` — [why](#always-publish-from-snt-development) |
@@ -472,14 +314,14 @@ this table is the *what*. **Status** is honest about the gap between the rule an
 | **R8** | Parquet is the machine contract; write the `.csv` twin beside it | `convention` |
 | **R9** | `{CC}_parameters.json` published beside the data, via `save_pipeline_parameters(...)` | `⚠ exceptions` — ERA5 stamps `pipeline_name="snt_era5_aggregate"`; healthcare_access stores the `File` object, not `.path` |
 | **R10** | All **column** names UPPERCASE in every published artefact | `convention` |
-| **R11** | All **notebook parameter** globals UPPERCASE, injected side and `exists()` side alike | `⚠ exceptions` — [TODO: migrate 2 pipelines](#suggestions-logged-for-later-evaluation-giulia) |
+| **R11** | All **notebook parameter** globals UPPERCASE, injected side and `exists()` side alike | `⚠ exceptions` — [TODO: migrate 2 pipelines](docs/BACKLOG.md#pipe-3) |
 | **R12** | Every injected parameter has a matching `if (!exists("X")) X <- …` fallback, spelled identically | `convention` |
 | **R13** | Admin levels read from config, never hardcoded | `convention` — [Schema](#schema) |
 | **R14** | Standard flags named `run_report_only` / `pull_scripts` / `overwrite` | `⚠ exceptions` — `run_reports_only` in `snt_dhs_indicators` |
-| **R15** | One vocabulary per concept in operator-facing `choices=[...]` | `⚠ exceptions` — 3 routine-data vocabularies ([TODO](#suggestions-logged-for-later-evaluation-giulia)) |
+| **R15** | One vocabulary per concept in operator-facing `choices=[...]` | `⚠ exceptions` — 3 routine-data vocabularies ([TODO](docs/BACKLOG.md#pipe-2)) |
 | **R16** | `readme.md` updated in the same PR as the `pipeline.py` change it describes | `convention` — [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
 | **R17** | R failure messages prefixed `[ERROR]` or `[WARNING]`, chosen deliberately | `convention` — [Logging](#logging--error-labels) |
-| **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](#suggestions-logged-for-later-evaluation-giulia) |
+| **R18** | Python: snake_case, line-length 110, numpydoc docstrings with `Returns` | `ruff` — configured, but [nothing runs it in CI](docs/BACKLOG.md#tool-2) |
 | **R19** | Agents never run destructive / history-rewriting `git` or `gh` commands | `enforced` — hook + `permissions.deny` in `.claude/` ([how](#how-this-is-enforced-r19)) |
 | **R20** | R: roxygen2 docstrings above every function (`#' Title`, blank, description, `@param`, `@return`, `@export`) | `convention` — see `code/snt_utils.r` |
 | **R21** | Every published output **table** carries a `YEAR` column | `convention` — new, existing outputs not audited ([why](#schema)) |
@@ -594,7 +436,8 @@ Keep these names and behaviours identical across pipelines — operators rely on
   shape — one entry per SNT Explorer data layer, with a `SOURCE_DATA` pointer and bilingual labels — is specified in
   [`contracts/snt_metadata_json/`](contracts/snt_metadata_json/README.md), with a JSON Schema as its
   source of truth. Write new
-  metadata entries to that schema, and read its **Open questions** before assuming a field's
+  metadata entries to that schema, and read its open questions
+  ([BACKLOG `META-*`](docs/BACKLOG.md#snt-explorer-metadata)) before assuming a field's
   meaning: the format is still being validated with the IASO developers.
 
 ### Configuration
@@ -715,7 +558,8 @@ file as a backup, not as the running code.
   - ⚠️ **Needs attention (not a rule yet):** the same runs also overwrite the workspace DB table
     `outliers_detected`. No pipeline reads that table — its consumer is a Shiny app, currently
     paused and possibly to be replaced. Whoever resumes that work should decide whether the table
-    needs a method/run discriminator column before it is depended on again.
+    needs a method/run discriminator column before it is depended on again
+    ([BACKLOG PIPE-4](docs/BACKLOG.md#pipe-4)).
 - **A country may not be running the notebook you are editing.** If a `<generic>_<CC>.ipynb`
   variant exists in that workspace, it runs *instead* of the generic notebook, and `Pull scripts`
   neither overwrites nor delivers it. Your fix silently misses that country, and `main` is not a
@@ -750,7 +594,7 @@ file as a backup, not as the running code.
   `snt_seasonality_rainfall` inject lowercase globals.
   Each is internally self-consistent, so it works — but it means you cannot assume the case of a
   parameter without checking. Read the pipeline's injected dict before writing the notebook's
-  `exists()` cell. **Not a permitted variant**: logged for migration below. Do not half-convert
+  `exists()` cell. **Not a permitted variant**: logged for migration as [BACKLOG PIPE-3](docs/BACKLOG.md#pipe-3). Do not half-convert
   one — a notebook mixing `threshold_for_seasonality` and `THRESHOLD_FOR_SEASONALITY` is worse
   than either.
   - Beware the near-miss in `snt_healthcare_access`: it injects UPPERCASE

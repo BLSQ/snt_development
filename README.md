@@ -66,7 +66,7 @@ the stage letters above are used throughout (stage `A2` here is written `A′` t
 | [`pipelines/`](pipelines/) | **The analytics: R notebooks and helpers.** *Not* deployed by CI — see below. |
 | [`code/`](code/) | Shared R library used across pipelines (`snt_utils`, `snt_report`, `snt_palettes`). |
 | [`contracts/`](contracts/README.md) | Contracts between this repo and its consumers: the `SNT_config.json` skeleton, the `SNT_metadata.json` schema, … The live config lives in each workspace. |
-| [`docs/`](docs/) | Architecture, glossary, standards, ownership. |
+| [`docs/`](docs/) | Architecture, glossary, standards, ownership, the backlog of open items, and decision records. |
 | [`dev/`](dev/) | Optional local Python tooling. Never runs on OpenHEXA. |
 | [`.claude/`](.claude/) | Guardrails for AI coding agents. Active on clone. |
 | [`deprecated/`](deprecated/) | History. Never use as a template. |
@@ -214,16 +214,19 @@ Stated plainly, so nobody spends a day rediscovering them:
 | | |
 |---|---|
 | **No automated tests** | `ruff` is the only check, and no CI job runs it. |
-| **Dependencies are unpinned** | Both entries in every `requirements.txt` install from a Git branch, so two deploys of identical code can produce different runtimes. → [detail](CLAUDE.md#suggestions-logged-for-later-evaluation-giulia) |
+| **Dependencies are unpinned** | Both entries in every `requirements.txt` install from a Git branch, so two deploys of identical code can produce different runtimes. → [detail](docs/BACKLOG.md#dep-1) |
 | **No full offline development** | R notebooks are edited locally but execute on the workspace kernel. → [the loop](CLAUDE.md#editing-r-notebooks-the-vs-code-remote-kernel-loop) |
 | **Run order is not written down yet** | Tracked in [`docs/DATA_ARCHITECTURE.md` §4.2](docs/DATA_ARCHITECTURE.md). |
+
+Everything still open — tasks, questions, pending decisions — is in
+[`docs/BACKLOG.md`](docs/BACKLOG.md). Why things are the way they are: [`docs/decisions/`](docs/decisions/README.md).
 
 ---
 
 ## ⚖️ Licence
 
-[MIT](LICENSE) — **provisional**, pending confirmation by the team. See
-[`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) for open documentation items.
+[MIT](LICENSE) — **provisional**, pending confirmation by the team
+([BACKLOG DOC-5](docs/BACKLOG.md#doc-5)).
 
 This repository contains **code and documentation only**. No country health data is stored here,
 and none ever should be.

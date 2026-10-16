@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import geopandas as gpd
@@ -20,6 +21,7 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     save_pipeline_parameters,
     validate_config,
+    check_outputs_generated,
 )
 from utils import (
     compute_population_weighted_metric,
@@ -35,6 +37,7 @@ from worldpopclient import WorldPopClient
 # https://bluesquare.atlassian.net/browse/SNT25-284
 # https://bluesquare.atlassian.net/browse/SNT25-518 (include periods)
 # https://bluesquare.atlassian.net/browse/SNT25-606 (AHADI)
+# https://bluesquare.atlassian.net/browse/SNT25-693 (file formats)
 
 
 @pipeline("snt_map_extracts")
@@ -105,7 +108,6 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
         pull_scripts_from_repository(
             pipeline_name="snt_map_extracts",
             report_scripts=["snt_map_extracts_report.ipynb"],
-            code_scripts=[],
         )
 
     # Load configuration
@@ -154,22 +156,140 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
                 output_path=output_path,
             )
 
+        # SNT explorer format
+        run_start_ts = time.time()
+        formatted_files = format_data_for_snt(
+            processed_files=files_to_dataset,
+            country_code=country_code,
+            output_path=output_path / "formatted_snt",
+            snt_indicators=snt_indicators,
+        )
+
+        if not formatted_files:
+            current_run.log_warning("No formatted files were generated. Process finished without outputs.")
+            raise ValueError("No formatted files were generated.")
+
+        check_outputs_generated(file_paths=formatted_files, run_start_ts=run_start_ts)
         add_files_to_dataset(
             dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_MAP_EXTRACTS"),
             country_code=country_code,
-            file_paths=files_to_dataset + [parameters_file],
+            file_paths=formatted_files + [parameters_file],
         )
 
     else:
         current_run.log_info("Skipping calculations, running reporting.")
 
-    run_report_notebook(
-        nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
-        nb_output_path=pipeline_path / "reporting" / "outputs",
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_map_extracts_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Failed to run report notebook: {e}")
+        raise RuntimeError(f"Failed to run report notebook witherror: {e}") from e
 
     current_run.log_info("Pipeline completed successfully!")
+
+
+def format_data_for_snt(
+    processed_files: list[Path], country_code: str, output_path: Path, snt_indicators: dict[str, list[str]]
+) -> list[Path]:
+    """Format the processed map data for SNT indicators.
+
+    Parameters
+    ----------
+    processed_files : list[Path]
+        Processed per-year files; only the parquet files are read.
+    country_code : str
+        Country code used as the output filename prefix.
+    output_path : Path
+        Output directory for the formatted files.
+    snt_indicators : dict[str, list[str]]
+        SNT indicators, by category.
+
+    Returns
+    -------
+    list[Path]
+        Paths to the formatted parquet and CSV files.
+    """
+    # Define the output file paths for the formatted data.
+    file_parquet = output_path / f"{country_code}_map_data.parquet"
+    file_csv = output_path / f"{country_code}_map_data.csv"
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    formatted_files = []
+    processed_parquet = [f for f in processed_files if f.suffix == ".parquet"]
+    for file_path in processed_parquet:
+        try:
+            df = pl.read_parquet(file_path)
+        except Exception as e:
+            current_run.log_warning(f"Failed to read file: {file_path} with error: {e}")
+            continue
+        current_run.log_info(f"Formatting file: {file_path}")
+        formatted_df = format_map_indicators(df=df, snt_indicators=snt_indicators)
+        formatted_files.append(formatted_df)
+
+    if not formatted_files:
+        current_run.log_warning("No valid parquet files were found to format.")
+        return []
+
+    snt_formatted_df = pl.concat(formatted_files)
+    snt_formatted_df.write_parquet(file_parquet)
+    snt_formatted_df.write_csv(file_csv)
+    current_run.log_info(f"Output SNT MAP table saved under : {file_csv}")
+
+    return [file_parquet, file_csv]
+
+
+def format_map_indicators(
+    df: pl.DataFrame,
+    snt_indicators: dict[str, list[str]],
+) -> pl.DataFrame:
+    """Format the input DataFrame for SNT MAP indicators.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Long-format map data, one row per ADM2, statistic and metric.
+    snt_indicators : dict[str, list[str]]
+        SNT indicators, by category.
+
+    Returns
+    -------
+    pl.DataFrame
+        Wide table with one row per ADM2, year and statistic, and for each metric a value column
+        followed by its population-weighted `{METRIC}_POP_W` column.
+    """
+    # Build a template table on which we'll add the metric values.
+    fixed_columns = ["YEAR", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID", "STATISTIC"]
+    metric_names = sorted(name.upper() for names in snt_indicators.values() for name in names)
+
+    # Each metric is followed by its population-weighted column
+    template_df = (
+        df.select(fixed_columns)
+        .with_columns(
+            [
+                pl.lit(None, dtype=pl.Float64).alias(col)
+                for name in metric_names
+                for col in (name, f"{name}_POP_W")
+            ]
+        )
+        .unique()
+    )
+
+    # Populate the template table with the actual metric values from the input DataFrame.
+    present_metrics = sorted(df["METRIC_NAME"].unique().to_list())
+    for metric in present_metrics:
+        df_metric = df.filter(pl.col("METRIC_NAME") == metric)
+        df_metric_value = df_metric.select(fixed_columns + ["VALUE"]).rename({"VALUE": metric.upper()})
+        df_metric_pop_w = df_metric.select(fixed_columns + ["POPULATION_WEIGHTED"]).rename(
+            {"POPULATION_WEIGHTED": f"{metric.upper()}_POP_W"}
+        )
+        template_df = template_df.update(df_metric_value, on=fixed_columns, how="left")
+        template_df = template_df.update(df_metric_pop_w, on=fixed_columns, how="left")
+
+    return template_df.sort(["STATISTIC", "YEAR", "ADM1_NAME", "ADM2_NAME"])
 
 
 def get_or_download_population_table(

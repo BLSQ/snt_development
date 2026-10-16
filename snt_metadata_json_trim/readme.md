@@ -26,7 +26,7 @@ the **`SNT_METADATA`** dataset, creating that dataset on first run.
   * **Name:** Master list file (optional override)
   * **Description:** A local master list to use instead of the repository one, e.g. to test an edited
     copy. A JSON object keyed by layer id, in the format described in
-    `docs/schemas/snt_metadata_json/`. Leave empty for normal runs.
+    `contracts/snt_metadata_json/`. Leave empty for normal runs.
 
 ## Functionality Overview
 

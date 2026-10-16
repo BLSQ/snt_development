@@ -65,7 +65,7 @@ the stage letters above are used throughout (stage `A2` here is written `A′` t
 | `<pipeline_name>/readme.md` | The pipeline's user-facing contract — read this before running it. |
 | [`pipelines/`](pipelines/) | **The analytics: R notebooks and helpers.** *Not* deployed by CI — see below. |
 | [`code/`](code/) | Shared R library used across pipelines (`snt_utils`, `snt_report`, `snt_palettes`). |
-| [`configuration/`](configuration/) | Per-country config **reference copies** — the live file lives in each workspace. |
+| [`contracts/`](contracts/README.md) | Contracts between this repo and its consumers: the `SNT_config.json` skeleton, the `SNT_metadata.json` schema, … The live config lives in each workspace. |
 | [`docs/`](docs/) | Architecture, glossary, standards, ownership. |
 | [`dev/`](dev/) | Optional local Python tooling. Never runs on OpenHEXA. |
 | [`.claude/`](.claude/) | Guardrails for AI coding agents. Active on clone. |
@@ -86,7 +86,7 @@ Pick the row that matches what you came for.
 | read the epidemiological method | the R notebooks in `pipelines/<name>/code/*.ipynb`, with [`docs/GLOSSARY.md`](docs/GLOSSARY.md) §4 open beside them |
 | **change any code** | [`CLAUDE.md`](CLAUDE.md) — start at the [rule Register](CLAUDE.md#register) |
 | write or update a pipeline `readme.md` | [`docs/PIPELINE_README_STANDARD.md`](docs/PIPELINE_README_STANDARD.md) |
-| add or edit an SNT Explorer data layer in `SNT_metadata.json` | [`docs/schemas/snt_metadata_json/README.md`](docs/schemas/snt_metadata_json/README.md) |
+| add or edit an SNT Explorer data layer in `SNT_metadata.json` | [`contracts/snt_metadata_json/README.md`](contracts/snt_metadata_json/README.md) |
 | know who to ask about a pipeline | [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) |
 | set up locally | [`dev/README.md`](dev/README.md) |
 

@@ -22,7 +22,7 @@ running it, and the coverage is uneven on purpose.
 - The `utils/*.r` helpers behind filename resolution and column selection, and the notebook cells
   that resolve dataset ids (`config_json$SNT_DATASET_IDENTIFIERS$…`).
 - All 20 `.github/workflows/push_snt_*.yaml`, `pyproject.toml`, `.gitignore`, and
-  the five `configuration/SNT_config_<CC>.json` reference copies.
+  the five `SNT_config_<CC>.json` reference copies (now archived in `deprecated/configuration/`).
 - The OpenHEXA workspace image `blsq/openhexa-blsq-r-environment:latest`, read from its registry
   manifest (see [§7.4](#74-the-workspace-runtime-image)).
 
@@ -35,7 +35,7 @@ the methods are correct — only what they consume and produce.
 
 | Excluded | Why |
 |---|---|
-| `configuration/SNT_metadata.json` | old format, no reader left; excluded on Giulia's instruction (see §3.2 Stage E) |
+| `deprecated/configuration/SNT_metadata.json` | old format, no reader left; excluded on Giulia's instruction (see §3.2 Stage E) |
 | `snt_assemble_results` | retired, moved to `deprecated/` (see §3.2 Stage E) |
 | `snt_dhis2_outliers_detection/` | discontinued; local-only leftover, not on the remote |
 | `deprecated/` | history, never a template |
@@ -244,7 +244,7 @@ workspace and copying it back to git by hand. The working loop, and that gap, ar
 | everything else (13 pipelines) | thin orchestration shell | **yes — analytics live in `.ipynb` (kernel `ir`)** |
 
 Python pipelines are the only ones with a workable local development story today
-(see [`CLAUDE.md` §Local development](../CLAUDE.md#local-development-current-state)).
+(see [`CLAUDE.md` §Local development](../CLAUDE.md#local-development--current-state)).
 
 ---
 
@@ -429,15 +429,15 @@ listed in [`metadata/SNT_metadata_master.json`](../metadata/README.md) and trimm
 `snt_metadata_json_trim`. The per-stage datasets already *were* the contract (§1); reading them
 directly removes a lossy flattening step — it aggregated over time and dropped `YEAR` — along with
 the metadata gate that silently dropped any column not declared in
-`configuration/SNT_metadata.json`.
+`SNT_metadata.json` (old format; repo copy archived in `deprecated/configuration/`).
 
 Leftovers to know about:
 
-- **`configuration/SNT_metadata.json`** — the old-format column list it read. Nothing reads it
+- **`deprecated/configuration/SNT_metadata.json`** — the old-format column list it read. Nothing reads it
   now; it is deliberately *not* audited in this document. The target format it was replaced by is
-  specified in [`docs/schemas/snt_metadata_json/`](schemas/snt_metadata_json/README.md).
+  specified in [`contracts/snt_metadata_json/`](../contracts/snt_metadata_json/README.md).
 - **`SNT_RESULTS`** — removed from `SNT_config.skeleton.json`, but still a key in the older
-  `SNT_config_<CC>.json` reference copies and in live workspace configs, where it is harmless:
+  `SNT_config_<CC>.json` reference copies (archived in `deprecated/configuration/`) and in live workspace configs, where it is harmless:
   nothing reads it. The dataset still exists in workspaces that ran the pipeline, frozen at its
   last run.
 - The OpenHEXA template is deleted, so no new copies can be created from it.
@@ -619,7 +619,7 @@ DHIS2_DATA_DEFINITIONS
   DHIS2_REPORTING_RATES              REPORTING_DATASETS[] xor REPORTING_INDICATORS{}
 ```
 
-Versioned variants `configuration/SNT_config_<CC>.json` are **reference copies only** — not
+Versioned variants `deprecated/configuration/SNT_config_<CC>.json` are **archived reference copies only** — not
 loadable as-is. In a workspace the file is manually renamed to drop the `_<CC>` suffix.
 `configuration/readme.txt` records population blocks removed from those variants.
 
@@ -856,7 +856,7 @@ environment — see [`CLAUDE.md` → Getting set up locally](../CLAUDE.md).
    pregnant-women disaggregation unusable in `snt_dhis2_incidence` (§6.1).
 5. **Needs attention** — provenance for the `outliers_detected` DB table before its consumer
    (paused Shiny app, or its replacement) is resumed (§3.2 Stage C).
-6. With `snt_assemble_results` retired, should `configuration/SNT_metadata.json` be removed too?
+6. With `snt_assemble_results` retired, should `deprecated/configuration/SNT_metadata.json` be removed too?
    (The `SNT_RESULTS` key is already gone from `SNT_config.skeleton.json`; §3.2 Stage E.)
 7. Should the routine-data-choice vocabulary be unified across the four pipelines that use it?
    (§3.2 Stage D)

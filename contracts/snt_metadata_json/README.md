@@ -10,7 +10,7 @@
 | [`snt_metadata.schema.json`](snt_metadata.schema.json) | **Source of truth for the shape.** JSON Schema (draft 2020-12) describing the 2026-09-08 format and nothing else. Every field carries a `description`. |
 | [`SNT_metadata.example.json`](SNT_metadata.example.json) | The canonical valid instance — the 2026-09-08 file, verbatim except that its `//` comments were removed. Everything those comments said is preserved in the schema's `description` fields and in this document. |
 | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) | **Niger's catalogue**, converted from the old-format `SNT_metadata_20260226.json` on 2026-09-08. Nine layers, schema-valid. Read [§7](#7-the-ner-conversion-2026-09-08) before using it: three MAP layers could not be carried over, and two seasonality layers reference a table with no `YEAR` column. |
-| [`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code** (2026-10-15), awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
+| [`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) | **The master list** (moved from here on 2026-10-12, formerly `SNT_metadata_all_layers.json`): every layer the current pipelines can publish in the wide "one layer = one column" shape — 58 layers, schema-valid. Text is a **draft written from the code** (2026-10-15), awaiting review; `CATEGORY` is empty and scales are defaults. It is what `snt_metadata_json_trim` trims per workspace. See [`metadata/README.md`](../../metadata/README.md), and [§8](#8-the-master-list-2026-09-28) for what it leaves out and why. |
 
 > **Format change, 2026-09-08:** `TYPE` now also accepts `"Ordinal"`, and `SCALE` is read differently
 > under it. See [§2.6](#26-type-threshold-versus-ordinal-and-what-scale-means-under-each).
@@ -25,7 +25,7 @@ document, never in the data file. (They would not survive the future editing web
 that reads, edits and rewrites JSON drops comments silently.)
 
 **These two files describe the target format. They do not describe what is deployed today.**
-`configuration/SNT_metadata.json` in this repo is still the older shape, and nothing reads it:
+The old-format `SNT_metadata.json` (archived in `deprecated/configuration/`) is still the older shape, and nothing reads it:
 its only reader, `snt_assemble_results`, is retired. It has not been migrated. See
 [Relationship to what exists today](#6-relationship-to-what-exists-today).
 
@@ -172,12 +172,12 @@ Two things follow:
 > `SNT_DHIS2_REPORTING_RATE` — the datasets' *display names*, which are not config keys. The
 > committed example uses the correct keys `DHIS2_INCIDENCE` and `DHIS2_REPORTING_RATE`
 > (6 of its 7 entries were affected); all now resolve in all five country configs.
-> `configuration/SNT_metadata_20260908.json` still has the old values and has not been touched.
+> The 2026-09-08 working draft (not committed) still has the old values and has not been touched.
 >
 > The confusion is understandable, because the config keys follow no single convention — some carry
 > an `SNT_` prefix and some do not, so the key rarely looks like the dataset it points at. That
 > cleanup is logged for Giulia in
-> [`CLAUDE.md`](../../../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
+> [`CLAUDE.md`](../../CLAUDE.md#suggestions-logged-for-later-evaluation-giulia).
 
 ### 2.6 `TYPE`: `Threshold` versus `Ordinal`, and what `SCALE` means under each
 
@@ -302,21 +302,23 @@ update the schema, this document and the example together, and date the change.
 ## 5. Validating
 
 The schema is only useful if it is run. `jsonschema` is **not** currently in
-[`dev/environment.yml`](../../../dev/environment.yml) — install it, or use a system Python that has
+[`dev/environment.yml`](../../dev/environment.yml) — install it, or use a system Python that has
 it:
 
 This runs the schema, plus the two checks JSON Schema cannot express on its own: `SCALE` ordering,
-and whether every `DATASET.NAME` resolves against the country configs.
+and whether every `DATASET.NAME` is a key of `SNT_DATASET_IDENTIFIERS` in the config skeleton
+([`contracts/snt_config_json/SNT_config.skeleton.json`](../snt_config_json/SNT_config.skeleton.json) —
+the trusted key set; the archived per-country copies were never verified).
 
 ```bash
 python3 -c "
-import glob, json, sys
+import json, sys
 from jsonschema import Draft202012Validator
 
-METADATA = 'docs/schemas/snt_metadata_json/SNT_metadata.example.json'   # <- the file being checked
-CONFIGS  = 'configuration/SNT_config_*.json'          # <- configs to resolve NAME against
+METADATA = 'contracts/snt_metadata_json/SNT_metadata.example.json'   # <- the file being checked
+CONFIG   = 'contracts/snt_config_json/SNT_config.skeleton.json'      # <- config to resolve NAME against
 
-schema = json.load(open('docs/schemas/snt_metadata_json/snt_metadata.schema.json', encoding='utf-8'))
+schema = json.load(open('contracts/snt_metadata_json/snt_metadata.schema.json', encoding='utf-8'))
 inst   = json.load(open(METADATA, encoding='utf-8'))
 bad = []
 
@@ -329,13 +331,12 @@ for lid, layer in inst.items():
     if s != sorted(s):
         bad.append(lid + ': SCALE is not in ascending order')
 
-# every DATASET.NAME must be a key of SNT_DATASET_IDENTIFIERS, in every country
-names = {lid: l['SOURCE_DATA']['DATASET']['NAME'] for lid, l in inst.items()}
-for f in sorted(glob.glob(CONFIGS)):
-    keys = json.load(open(f, encoding='utf-8')).get('SNT_DATASET_IDENTIFIERS', {})
-    for lid, n in names.items():
-        if n not in keys:
-            bad.append(lid + ': DATASET.NAME ' + repr(n) + ' is not a key of SNT_DATASET_IDENTIFIERS in ' + f)
+# every DATASET.NAME must be a key of SNT_DATASET_IDENTIFIERS in the skeleton
+keys = json.load(open(CONFIG, encoding='utf-8')).get('SNT_DATASET_IDENTIFIERS', {})
+for lid, l in inst.items():
+    n = l['SOURCE_DATA']['DATASET']['NAME']
+    if n not in keys:
+        bad.append(lid + ': DATASET.NAME ' + repr(n) + ' is not a key of SNT_DATASET_IDENTIFIERS in ' + CONFIG)
 
 print(*bad, sep='\n')
 print('FAIL' if bad else 'OK')
@@ -356,8 +357,8 @@ must:
 
 | | Status |
 |---|---|
-| `configuration/SNT_metadata.json` | **Old format**, no reader since `snt_assemble_results` was retired. Single-language strings, stringified `SCALE`, no `SOURCE_DATA`, plus `ORDER` and `PERIOD`. Not migrated. |
-| `configuration/SNT_metadata_20260908.json` | The working file this schema was derived from. It carries `//` comments; the committed example does not, because the Explorer cannot read JSONC (see the note at the top of this document). |
+| `deprecated/configuration/SNT_metadata.json` | **Old format**, no reader since `snt_assemble_results` was retired. Single-language strings, stringified `SCALE`, no `SOURCE_DATA`, plus `ORDER` and `PERIOD`. Not migrated. |
+| The 2026-09-08 working draft (not committed) | The working file this schema was derived from. It carries `//` comments; the committed example does not, because the Explorer cannot read JSONC (see the note at the top of this document). |
 | `snt_assemble_results` | **Retired** (archived in `deprecated/`). Read the **old** format, and wrote `PERIOD` back into it at runtime via `update_metadata(...)`. The Explorer reads the OpenHEXA datasets directly instead. |
 
 **Two fields were dropped:**
@@ -369,8 +370,9 @@ must:
   [§2.4](#24-time-is-carried-by-the-data-via-the-year-column).
 
 **Where the file will live.** A new OpenHEXA dataset, `SNT_CONFIGURATION`, will hold
-`SNT_config.json` and `SNT_metadata.json`, and the `configuration/` folder in this repo is expected
-to be deprecated. A user-facing OpenHEXA webapp will let non-technical users edit them, most likely
+`SNT_config.json` and `SNT_metadata.json`. (The repo's own `configuration/` folder is already
+retired: its old copies are archived in `deprecated/configuration/`.) A user-facing OpenHEXA
+webapp will let non-technical users edit them, most likely
 writing through a Python pipeline that validates the structure first — which is where this schema
 becomes an executable gate rather than documentation. **None of that exists yet**; nothing in this
 folder assumes it, and the paths above are the ones that are real today.
@@ -393,7 +395,7 @@ five country configs.
 | `SEASONALITY_RAINFALL`, `SEASONAL_BLOCK_DURATION_RAINFALL` | `SNT_SEASONALITY_RAINFALL` | `{COUNTRY_CODE}_rainfall_seasonality.csv` | `snt_seasonality_rainfall` |
 
 The old file named no columns, so three had to be resolved from
-`POPULATION_INDICATOR_DEFINITIONS` in [`SNT_config_NER.json`](../../../configuration/SNT_config_NER.json):
+`POPULATION_INDICATOR_DEFINITIONS` in [`SNT_config_NER.json`](../../deprecated/configuration/SNT_config_NER.json):
 `POPULATION` → `POPULATION`, `POPULATION_FE` ("femmes enceintes") → `POP_PREGNANT_WOMEN`,
 `POPULATION_U5` → `POP_UNDER_5`. All three have real DHIS2 ids in Niger's config.
 
@@ -477,27 +479,20 @@ present in that variant as well as in the generic notebook.
   to match what the pipeline writes, and the trailing limit dropped. See
   [Open question #2](#open-questions).
 
-### Where the file lives, and why not `configuration/`
+### Where the file lives
 
-`SNT_metadata_NER.json` is in `docs/schemas/snt_metadata_json/` rather than beside the country
-configs because **`.gitignore` would silently swallow it in `configuration/`**: `*.json` is ignored
-wholesale and the only negations are `configuration/SNT_config_*.json`, `.claude/settings.json` and
-`docs/schemas/**/*.json`. `configuration/SNT_metadata.json` is tracked only because it predates that
-rule — a *new* `configuration/SNT_metadata_NER.json` would not be, and `git status` would never
-mention it.
+`SNT_metadata_NER.json` lives here, in `contracts/snt_metadata_json/`, beside the schema it was
+converted to. The repo's old `configuration/` folder is retired (its files are archived in
+`deprecated/configuration/`), and `.gitignore` ignores `*.json` wholesale, so a JSON file is only
+tracked where a negation reaches it.
 
-Moving it there means adding a negation (`!configuration/SNT_metadata_*.json`) in the same commit.
-Since [§6](#6-relationship-to-what-exists-today) expects `configuration/` to be deprecated in favour
-of an `SNT_CONFIGURATION` dataset anyway, `docs/schemas/` is the safer home for a file that is a
-reference copy either way.
-
-> The negation is `docs/schemas/**/*.json`, not `docs/schemas/*.json`, precisely so a per-file
+> The negation is `contracts/**/*.json`, not `contracts/*.json`, precisely so a per-file
 > subfolder like this one stays tracked. Do not narrow it when adding a schema for another
-> configuration file — see [`docs/schemas/README.md`](../README.md).
+> configuration file — see [`contracts/README.md`](../README.md).
 
 ## 8. The master list (2026-09-28)
 
-[`metadata/SNT_metadata_master.json`](../../../metadata/SNT_metadata_master.json) declares **every
+[`metadata/SNT_metadata_master.json`](../../metadata/SNT_metadata_master.json) declares **every
 column the current pipelines can publish** that fits this format. It started as an interoperability
 test file for the SNT Explorer and is now the **master list**: `snt_metadata_json_trim` fetches it
 from this repository and keeps, per workspace, the layers whose data exists. It was created as
@@ -508,7 +503,7 @@ from this repository and keeps, per workspace, the layers whose data exists. It 
 one-off generator, `build_snt_metadata_all_layers.py`, deleted on 2026-10-12 so it can never
 overwrite curated text. It is in git history at commit `062cf0c`. After editing, validate with
 [§5](#5-validating) with `METADATA` pointed at the JSON. How to maintain it:
-[`metadata/README.md`](../../../metadata/README.md).
+[`metadata/README.md`](../../metadata/README.md).
 
 The rest of this section records how the 2026-09-28 content was produced. The placeholder and
 default-scale tables below describe the file as bootstrapped; they stop being accurate entry by
@@ -559,7 +554,7 @@ not copied from older catalogues, and are a draft for review. Conventions used:
 
 Some layers also exist in an older catalogue. To compare by hand if needed:
 
-| Master layer | `configuration/SNT_metadata.json` (old format, FR only) | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) (EN + FR) |
+| Master layer | `deprecated/configuration/SNT_metadata.json` (old format, FR only) | [`SNT_metadata_NER.json`](SNT_metadata_NER.json) (EN + FR) |
 |---|---|---|
 | `POPULATION` | `POPULATION` | `POPULATION` |
 | `POP_UNDER_5` | — | `POPULATION_U5` |
@@ -574,7 +569,7 @@ Some layers also exist in an older catalogue. To compare by hand if needed:
 | `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` | `SEASONALITY_RAINFALL` |
 | `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` | `SEASONAL_BLOCK_DURATION_RAINFALL` |
 
-**8 layers have an exact id match in `configuration/SNT_metadata.json`:** `POPULATION`, the four
+**8 layers have an exact id match in `deprecated/configuration/SNT_metadata.json`:** `POPULATION`, the four
 `INCIDENCE_*`, `SEASONALITY_CASES`, `SEASONALITY_RAINFALL` and `SEASONAL_BLOCK_DURATION_RAINFALL`.
 The old file's other 21 entries (`REPORTING_RATE`, DHS, MAP) have no master layer with the same id
 ([What was left out](#what-was-left-out-and-why)). Known differences from the older text:

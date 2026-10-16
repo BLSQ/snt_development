@@ -5,7 +5,7 @@
 | [`SNT_metadata_master.json`](SNT_metadata_master.json) | **The master list**: every SNT Explorer data layer the current SNT pipelines can publish, for any country. Generic — it describes the pipeline collection, not a workspace. |
 
 The **format** (fields, `TYPE` / `SCALE` rules, JSON Schema, validator) is specified in
-[`docs/schemas/snt_metadata_json/`](../docs/schemas/snt_metadata_json/README.md). This folder holds
+[`contracts/snt_metadata_json/`](../contracts/snt_metadata_json/README.md). This folder holds
 only the shipped file.
 
 ## How it reaches a workspace
@@ -39,16 +39,16 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
   - **Curated:** `LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS`, `CATEGORY`, `TYPE`, `SCALE`,
     `UNIT_SYMBOL`. These need a person with domain knowledge. Text is a draft written from the code
     (2026-10-15), not yet reviewed; `CATEGORY` is empty. Which layers also exist in older catalogues:
-    [`docs/schemas/snt_metadata_json/README.md` §8](../docs/schemas/snt_metadata_json/README.md#where-the-draft-text-came-from-2026-10-15).
+    [`contracts/snt_metadata_json/README.md` §8](../contracts/snt_metadata_json/README.md#where-the-draft-text-came-from-2026-10-15).
 - **When a pipeline adds or renames a published column**, add or update the master list entry in the
   same PR (CLAUDE.md handover checklist). A column with no entry is invisible in the Explorer. An
   entry whose column was renamed is dropped by the trim pipeline as `COLUMN_NOT_FOUND` in every
   workspace.
 - **Validate before merging** with the snippet in
-  [`docs/schemas/snt_metadata_json/README.md` §5](../docs/schemas/snt_metadata_json/README.md#5-validating),
+  [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating),
   with `METADATA = 'metadata/SNT_metadata_master.json'`.
 - **What the bootstrap included, what it left out and why:**
-  [`docs/schemas/snt_metadata_json/README.md` §8](../docs/schemas/snt_metadata_json/README.md#8-the-master-list-2026-09-28).
+  [`contracts/snt_metadata_json/README.md` §8](../contracts/snt_metadata_json/README.md#8-the-master-list-2026-09-28).
 
 ## Known open points
 

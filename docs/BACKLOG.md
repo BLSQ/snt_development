@@ -462,6 +462,25 @@ but keep it in a separate PR: changing a `pipeline.py` triggers that pipeline's 
 
 **Owner:** Giulia. **Source:** docs restructure plan, 2026-10.
 
+### <a id="pipe-8"></a>PIPE-8 · Post-merge review of the `snt_dhis2_incidence` changes from PR #138
+
+[PR #138](https://github.com/BLSQ/snt_development/pull/138) was merged on 2026-10-05, before
+its review. It changes the population selection, the care-seeking import, and the yearly `N3`
+aggregation in `snt_dhis2_incidence.ipynb`. Things to check:
+
+- **NA instead of 0.** The yearly `N3` aggregation (cell 61 at merge time) now returns NA, not `0`,
+  when every month is NA. Before, `INCIDENCE_ADJ_CARESEEKING` showed `0`, which read as "zero
+  incidence". Confirm that leaving it empty is correct for a district-year with no usable
+  care-seeking value. The readme already documents this behaviour.
+- **Blank `CARESEEKING_PCT` is still treated as 100%,** so no adjustment is applied and `N3 = N2`.
+  This is inconsistent with the NA rule above. Decide whether a blank value should also give an
+  empty result, then document the choice in the readme's `careseeking_file_path` section.
+- Validate the rest of the PR's incidence changes: population selection by dataset id, the
+  care-seeking import fix, and the stale-dataset guard on error.
+
+**Owner:** Giulia. **Source:** [PR #138 comment](https://github.com/BLSQ/snt_development/pull/138#issuecomment-5956725607)
+(2026-10-02) and the merge note (2026-10-05).
+
 ---
 
 ## Documentation

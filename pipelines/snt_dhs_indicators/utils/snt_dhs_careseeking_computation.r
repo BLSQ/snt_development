@@ -1,7 +1,8 @@
 # Utils entrypoint for snt_dhs_careseeking_computation.ipynb
-if (!exists("ROOT_PATH", inherits = TRUE)) ROOT_PATH <- "~/workspace"
-if (!exists("PIPELINE_PATH", inherits = TRUE)) PIPELINE_PATH <- file.path(ROOT_PATH, "pipelines", "snt_dhs_indicators")
+# Expects snt_utils.r to be loaded and PIPELINE_PATH to be set by the notebook.
+# Loads the DHS indicator helpers (snt_dhs_indicator_tables.r); careseeking-specific helpers are defined below.
 source(file.path(PIPELINE_PATH, "utils", "snt_dhs_indicator_tables.r"))
+
 
 #' Compute and export careseeking indicators with confidence intervals.
 #'

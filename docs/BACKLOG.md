@@ -448,7 +448,7 @@ Related: [DOM-15](#dom-15).
 ### <a id="pipe-6"></a>PIPE-6 · Hardening candidates
 
 [`DATA_ARCHITECTURE.md` §6.2](DATA_ARCHITECTURE.md#62-known-blind-spots) lists known blind spots,
-including `snt_dhs_indicators` publishing in report-only mode, ERA5 stamping the wrong pipeline name
+including ERA5 stamping the wrong pipeline name
 into its parameters file, and `snt_healthcare_access` storing the `File` object instead of its path.
 Each needs a deliberate decision: harden it, or accept it and say so.
 

@@ -230,13 +230,15 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 #' Load DHS careseeking data
 #'
 #' Loads `{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet` from the latest version
-#' of the `DHS_INDICATORS` dataset. On success, sets the global `careseeking_file_name` (used in
-#' the final log summary). On failure, logs a warning and returns NULL; the run continues.
+#' of the `DHS_INDICATORS` dataset and keeps only `ADM1_ID` and `PCT_PUBLIC_CARE`, so the single
+#' DHS value per ADM1 applies to all routine years (a `YEAR` column, if present, is dropped). On
+#' success, sets the global `careseeking_file_name` (used in the final log summary). On failure,
+#' logs a warning and returns NULL; the run continues.
 #'
 #' @param country_code Character. Country code used as the filename prefix. Default: `COUNTRY_CODE`.
 #' @param config List. Parsed SNT configuration, with `SNT_DATASET_IDENTIFIERS`.
 #'   Default: `config_json`.
-#' @return Data frame of ADM1 careseeking percentages, or NULL if the file could not be loaded.
+#' @return Data frame with `ADM1_ID` and `PCT_PUBLIC_CARE`, or NULL if the file could not be loaded.
 #' @export
 load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = config_json) {
     # 1. Prepare identifiers
@@ -253,6 +255,9 @@ load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = conf
     
     # 3. Validation & Logging
     if (!is.null(data)) {
+        # DHS values come from a single survey and apply to all routine years:
+        # keep only the columns used downstream (a YEAR column, if present, is not used)
+        data <- dplyr::select(data, dplyr::any_of(c("ADM1_ID", "PCT_PUBLIC_CARE")))
         log_msg(glue::glue("✅ Care Seeking data: {file_name} loaded from {dataset_name}"))
         log_msg(glue::glue("Dimensions: {nrow(data)} rows, {ncol(data)} columns."))
         # Keep this global becuase it's needed for the final log summary (at the end of the script)

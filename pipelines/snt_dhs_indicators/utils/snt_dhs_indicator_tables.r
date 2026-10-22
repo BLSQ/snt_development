@@ -1,88 +1,3 @@
-#' Bootstrap runtime context for DHS indicators pipelines.
-#'
-#' Loads shared utilities/packages, initializes OpenHEXA SDK, parses
-#' configuration, and returns common paths/metadata used across DHS notebooks.
-#'
-#' @param root_path Root workspace path.
-#' @param required_packages Character vector of required R packages.
-#' @param load_openhexa Whether to import OpenHEXA SDK.
-#' @return Named list with paths, config, country code and SDK handle.
-bootstrap_dhs_indicators_context <- function(
-    root_path = "~/workspace",
-    required_packages = c(
-        "haven", "sf", "glue", "survey", "data.table", "stringi",
-        "jsonlite", "httr", "reticulate", "arrow"
-    ),
-    load_openhexa = TRUE
-) {
-    code_path <- file.path(root_path, "code")
-    config_path <- file.path(root_path, "configuration")
-    data_path <- file.path(root_path, "data")
-    dhs_data_path <- file.path(data_path, "dhs", "raw")
-
-    source(file.path(code_path, "snt_utils.r"))
-    install_and_load(required_packages)
-
-    Sys.setenv(PROJ_LIB = "/opt/conda/share/proj")
-    Sys.setenv(GDAL_DATA = "/opt/conda/share/gdal")
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-
-    openhexa <- NULL
-    if (load_openhexa) {
-        openhexa <- reticulate::import("openhexa.sdk")
-    }
-    assign("openhexa", openhexa, envir = .GlobalEnv)
-
-    config_file_name <- "SNT_config.json"
-    config_json <- tryCatch(
-        {
-            jsonlite::fromJSON(file.path(config_path, config_file_name))
-        },
-        error = function(e) {
-            msg <- paste0("Error while loading configuration", conditionMessage(e))
-            cat(msg)
-            stop(msg)
-        }
-    )
-
-    log_msg(paste0("SNT configuration loaded from  : ", file.path(config_path, config_file_name)))
-
-    list(
-        ROOT_PATH = root_path,
-        CODE_PATH = code_path,
-        CONFIG_PATH = config_path,
-        DATA_PATH = data_path,
-        DHS_DATA_PATH = dhs_data_path,
-        config_json = config_json,
-        COUNTRY_CODE = config_json$SNT_CONFIG$COUNTRY_CODE,
-        openhexa = openhexa
-    )
-}
-
-#' Load DHIS2 shapes used as spatial reference for DHS outputs.
-#'
-#' Downloads country-specific shapes from the configured DHIS2 formatted
-#' dataset with explicit logging and stop-on-error behavior.
-#'
-#' @param dhis2_dataset Dataset identifier containing shapes.
-#' @param country_code Country code used in filename prefix.
-#' @return Spatial data object loaded from `*_shapes.geojson`.
-load_dhs_spatial_data <- function(dhis2_dataset, country_code) {
-    spatial_data_filename <- paste(country_code, "shapes.geojson", sep = "_")
-    spatial_data <- tryCatch(
-        {
-            get_latest_dataset_file_in_memory(dhis2_dataset, spatial_data_filename)
-        },
-        error = function(e) {
-            msg <- glue::glue("[ERROR] Error while loading DHIS2 shapes data for {country_code}: {conditionMessage(e)}")
-            log_msg(msg, "error")
-            stop(msg)
-        }
-    )
-    log_msg(glue::glue("File {spatial_data_filename} successfully loaded from dataset version: {dhis2_dataset}"))
-    spatial_data
-}
-
 #' Compute and export a DHS indicator table with confidence intervals.
 #'
 #' Runs survey-weighted estimation by admin unit, formats confidence interval
@@ -102,7 +17,7 @@ compute_and_export_indicator_table <- function(
     indicator_name,
     output_indicator_name = indicator_name,
     admin_name_col,
-    admin_data,
+    admin_data,    
     output_data_path,
     filename_without_extension
 ) {
@@ -235,4 +150,54 @@ compute_and_export_dtp_dropout <- function(
     data.table::fwrite(dtp_dropout, file = file.path(output_data_path, paste0(filename, ".csv")))
     arrow::write_parquet(dtp_dropout, file.path(output_data_path, paste0(filename, ".parquet")))
     dtp_dropout
+}
+
+
+#' Get the Survey Year from a DHS Year Column
+#'
+#' Reads a year column from DHS recode data, either calendar years or century
+#' month codes (CMC), and returns the latest year, the earliest year, or a
+#' year-range label. Two-digit years from older surveys are read as 19xx.
+#' If the column is missing, a warning is raised and NA is returned.
+#'
+#' @param df Data frame or data.table. DHS recode data (e.g. HR, PR, KR).
+#' @param col Character. Name of the year column (e.g. "HV007", or "HV008" with `is_cmc = TRUE`).
+#' @param type Character. "latest" (default), "earliest", or "label" (e.g. "2013-2014", or a single year).
+#' @param is_cmc Logical. TRUE if `col` holds century month codes to convert to years. Default: FALSE.
+#' @return Integer year for "latest" / "earliest", character label for "label"; NA if the column is
+#'   missing or holds no values.
+#'
+#' @export
+get_survey_year <- function(df, col, type = c("latest", "earliest", "label"), is_cmc = FALSE) {
+    type <- match.arg(type)
+    empty <- if (type == "label") NA_character_ else NA_integer_
+
+    if (!col %in% names(df)) {
+        warning(sprintf("Column '%s' not found in the data", col))
+        return(empty)
+    }
+
+    years <- as.numeric(df[[col]])
+    if (is_cmc) {
+        years <- floor((years - 1) / 12) + 1900
+        current_year <- as.integer(format(Sys.Date(), "%Y"))
+        if (any(years > current_year, na.rm = TRUE)) {
+            msg <- "Converted years are in the future. Is the column really a CMC? Try is_cmc = FALSE."
+            warning(msg)
+            log_msg(msg, "warning")
+        }
+    }
+
+    years <- years[!is.na(years)]
+    if (length(years) == 0) return(empty)
+
+    # Handle two-digit years from older surveys (e.g. 92 -> 1992)
+    years <- ifelse(years < 100, years + 1900, years)
+    yrs <- sort(unique(as.integer(years)))
+
+    switch(type,
+        latest   = max(yrs),
+        earliest = min(yrs),
+        label    = if (length(yrs) > 1) paste(range(yrs), collapse = "-") else as.character(yrs)
+    )
 }

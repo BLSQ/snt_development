@@ -47,8 +47,6 @@ a comment that no longer matches the code is a bug someone needs to see. Real ex
   commented out, so only precipitation is fetched.
 - `snt_worldpop_extract` writes per-year rasters and parquets but publishes **only the
   concatenation**.
-- `snt_dhs_indicators` publishes a new dataset version even in report-only mode, because
-  `add_files_to_dataset(...)` sits outside the `if not run_reports_only:` guard.
 - `snt_era5_climate_data` stamps `pipeline_name="snt_era5_aggregate"` into its parameters JSON —
   the name of a pipeline that no longer exists.
 
@@ -107,9 +105,9 @@ Rules:
   load-bearing.
 - **Skip the generic ones.** Do not document `run_report_only` / `pull_scripts` / `overwrite`, and
   do not describe the loading of `SNT_config.json` as if it were a parameter — they behave
-  identically everywhere and are documented centrally. *Exception:* if a pipeline's variant differs
-  at all (e.g. `run_reports_only` in `snt_dhs_indicators`, which also publishes in that mode), say
-  so explicitly instead of omitting it.
+  identically everywhere and are documented centrally. *Exception:* if a pipeline's variant behaves
+  differently at all (e.g. a report-only flag that still publishes), say so explicitly instead of
+  omitting it.
 - If the pipeline takes no domain parameters, say so in one line rather than deleting the section.
 
 ### `## Functionality Overview`

@@ -43,7 +43,7 @@ def dhs_indicators(run_reports_only: bool, pull_scripts: bool) -> None:
         pull_scripts (bool): If True, pull the latest notebooks and utils scripts from the repository first.
     """
     data_source = "DHS"
-    admin_level = "ADM1"
+    admin_level = "ADM2"
 
     # general paths
     snt_root_path = Path(workspace.files_path)

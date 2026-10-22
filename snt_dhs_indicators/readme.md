@@ -1,6 +1,6 @@
 # SNT DHS Indicators Pipeline
 
-The **SNT DHS Indicators** pipeline runs five indicator families—**bed nets**, **care seeking**, **mortality**, **malaria prevalence (RDT)**, and **vaccination (DTP)**—from DHS microdata prepared in the computation notebooks. Each family produces **ADM1**-level parquet and CSV tables and refreshes its paired reporting notebook; all tables are then published together to the **`DHS_INDICATORS`** dataset.
+The **SNT DHS Indicators** pipeline runs five indicator families—**bed nets**, **care seeking**, **mortality**, **malaria prevalence (RDT)**, and **vaccination (DTP)**—from DHS microdata prepared in the computation notebooks. Each family estimates its indicators at **ADM1**, writes them as **ADM2**-level parquet and CSV tables (each ADM2 repeats its ADM1 value) and refreshes its paired reporting notebook; all tables are then published together to the **`DHS_INDICATORS`** dataset.
 
 ## Parameters
 
@@ -20,12 +20,13 @@ In report-only mode, steps 2–6 run only the report notebooks on the existing o
 
 ## Inputs
 
-* **DHS survey inputs and lookup tables** as required by each computation notebook under **`pipelines/snt_dhs_indicators/code/`** (see the respective **`.ipynb`** for exact file names and **`SNT_config.json`** keys).
-* **`configuration/SNT_config.json`** for **`COUNTRY_CODE`** and **`SNT_DATASET_IDENTIFIERS`**.
+* **DHS recode zips** in **`data/dhs/raw/`** (latest SPSS **`SV`** issue): **`HR`** for every indicator, plus **`PR`** (bed nets, prevalence), **`KR`** (care seeking, vaccination) or **`BR`** (mortality). A notebook stops if its two recodes are not from the same survey version.
+* **`[COUNTRY_CODE]_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`** (written by **`snt_dhis2_formatting`**): the ADM1/ADM2 pyramid. A notebook stops if the DHS region names do not match the DHIS2 **`ADM1_NAME`** values exactly.
+* **`configuration/SNT_config.json`**: **`SNT_CONFIG.COUNTRY_CODE`**, and **`DHIS2_DATASET_FORMATTED`** and **`DHS_INDICATORS`** under **`SNT_DATASET_IDENTIFIERS`**.
 
 ## Outputs
 
-All paths are under **`data/dhs/indicators/`** with **`{COUNTRY_CODE}_DHS_ADM1_`** prefixes and matching **`.parquet`** / **`.csv`** pairs:
+All paths are under **`data/dhs/indicators/`** with **`{COUNTRY_CODE}_DHS_ADM2_`** prefixes and matching **`.parquet`** / **`.csv`** pairs. Every table has one row per ADM2 with **`ADM1_ID`**, **`ADM1_NAME`**, **`ADM2_ID`**, **`ADM2_NAME`** and **`YEAR`** (the survey year: latest **`HV007`** in the **`HR`** recode); the indicator values are the ADM1 estimates, repeated for each ADM2 of the province.
 
 * **`bednets/`**: **`PCT_ITN_ACCESS`**, **`PCT_ITN_USE`**
 * **`careseeking/`**: **`PCT_CARESEEKING_SAMPLE_AVERAGE`**, **`PCT_NO_CARE`**, **`PCT_PUBLIC_CARE`**, **`PCT_PRIVATE_CARE`**
@@ -34,11 +35,10 @@ All paths are under **`data/dhs/indicators/`** with **`{COUNTRY_CODE}_DHS_ADM1_`
 * **`vaccination/`**: **`PCT_DTP1`**, **`PCT_DTP2`**, **`PCT_DTP3`**, **`PCT_DROPOUT_DTP`**
 * **Pipeline parameters JSON** (saved next to outputs when computation runs)
 * **Published copies** on the **`DHS_INDICATORS`** OpenHEXA dataset
-* **Reporting outputs** under each **`reporting/outputs/`** folder
+* **Reports** in **`pipelines/snt_dhs_indicators/reporting/outputs/`** (executed report notebooks and their HTML), with the map and confidence-interval PNGs in its **`figures/`** subfolder. The reports plot at ADM1.
 
 > **Notes for the Data Analyst:**
 >
-> - **`Administrative level`**: File names encode **`DHS`** as the data source and **`ADM1`** as the spatial level (`pipeline.py` sets **`admin_level = "ADM1"`**).
-> - **`Indicator definitions`**: Numerator, denominator, and survey weight handling are defined inside each computation notebook; treat those notebooks as the source of truth for column semantics.
+> - **`Administrative level`**: File names encode **`DHS`** as the data source and **`ADM2`** as the level of the tables (`pipeline.py` sets **`admin_level = "ADM2"`**). The survey estimates are computed at **ADM1** (DHS sampling level), so all ADM2 units of a province share the same value.> - **`Indicator definitions`**: Numerator, denominator, and survey weight handling are defined inside each computation notebook; treat those notebooks as the source of truth for column semantics.
 > - **`Dataset identifier`**: Upload uses **`SNT_DATASET_IDENTIFIERS["DHS_INDICATORS"]`**; a missing config entry would prevent a valid dataset upload.
 > - **`Output check`**: If a computation notebook does not write all of its expected files during the run, the pipeline stops with an error naming the missing files, and nothing is published.

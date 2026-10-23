@@ -256,8 +256,9 @@ version id here?
 ### <a id="meta-7"></a>META-7 · Sub-annual data
 
 For a monthly or epi-week output, does the Explorer aggregate to the year, or can it offer a finer
-selector? If so, which column does it expect (`MONTH`, `PERIOD`)? Affects both reporting-rate tables
-and ERA5, which are monthly.
+selector? If so, which column does it expect (`MONTH`, `PERIOD`)? Affects the
+`REPORTING_RATE_DATASET` table and ERA5, which are monthly (`REPORTING_RATE_DATAELEMENT` reads a
+yearly table).
 
 **Blocked on:** IASO developers.
 

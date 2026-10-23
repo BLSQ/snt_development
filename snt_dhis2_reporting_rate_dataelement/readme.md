@@ -1,6 +1,6 @@
 # SNT DHIS2 Reporting Rate (Data Element) Pipeline
 
-This pipeline estimates **monthly** reporting rates (routine data completeness) at **ADM2**, from whether each facility reported values for selected malaria data elements. It builds a full **facility × `PERIOD`** grid from the DHIS2 pyramid, flags active and open facilities, and computes unweighted or volume-**weighted** reporting rates. It publishes **`[COUNTRY_CODE]_reporting_rate_dataelement`** to **`DHIS2_REPORTING_RATE`** and runs the reporting notebook.
+This pipeline estimates **monthly** and **yearly** reporting rates (routine data completeness) at **ADM2**, from whether each facility reported values for selected malaria data elements. It builds a full **facility × `PERIOD`** grid from the DHIS2 pyramid, flags active and open facilities, and computes unweighted or volume-**weighted** reporting rates; the yearly rates are derived from the monthly computation. It publishes **`[COUNTRY_CODE]_reporting_rate_dataelement`** (monthly) and **`[COUNTRY_CODE]_reporting_rate_dataelement_yearly`** (yearly) to **`DHIS2_REPORTING_RATE`** and runs the reporting notebook.
 
 ## Parameters
 
@@ -48,9 +48,10 @@ This pipeline estimates **monthly** reporting rates (routine data completeness) 
    2. Build the facility × month grid over the routine data's **`PERIOD`** range, using facilities at level **`ANALYTICS_ORG_UNITS_LEVEL`** of the pyramid.
    3. Flag each facility-month as active and open, flag facilities active at least once per year, and compute facility weights from the volume indicators.
    4. Aggregate to **ADM2 × month** and compute all reporting rate variants; keep the one selected by **`dataelement_method_denominator`** and **`use_weighted_reporting_rates`** as **`REPORTING_RATE`**.
-   5. Write the final table and the intermediate tables (see Outputs).
-5. **Output check:** Fail the run if the final parquet or CSV was not written during this run.
-6. **Publish:** Upload the final parquet, CSV and parameters JSON to **`DHIS2_REPORTING_RATE`**.
+   5. Aggregate the ADM2 × month counts to **ADM2 × year** and compute the same reporting rate variants (sum of the monthly numerators / sum of the monthly denominators); keep the same selected variant as **`REPORTING_RATE`**.
+   6. Write the monthly and yearly final tables and the intermediate tables (see Outputs).
+5. **Output check:** Fail the run if any of the monthly or yearly final parquets or CSVs was not written during this run.
+6. **Publish:** Upload the monthly and yearly final parquets and CSVs, and the parameters JSON, to **`DHIS2_REPORTING_RATE`**.
 7. **Reporting:** Run **`snt_dhis2_reporting_rate_dataelement_report.ipynb`**. With `run_report_only`, steps 2–6 are skipped and only this step runs.
 
 ## Inputs
@@ -63,26 +64,34 @@ This pipeline estimates **monthly** reporting rates (routine data completeness) 
 
 **Workspace filesystem**
 
-* **`data/dhis2/reporting_rate/[COUNTRY_CODE]_reporting_rate_dataelement.parquet`** and **`.csv`**
+* **`data/dhis2/reporting_rate/[COUNTRY_CODE]_reporting_rate_dataelement.parquet`** and **`.csv`** (monthly)
+* **`data/dhis2/reporting_rate/[COUNTRY_CODE]_reporting_rate_dataelement_yearly.parquet`** and **`.csv`** (yearly)
 * **`data/dhis2/reporting_rate/[COUNTRY_CODE]_parameters.json`**
 * Intermediate tables in **`pipelines/snt_dhis2_reporting_rate_dataelement/intermediate_results/`** (written, **not published**):
   * **`[COUNTRY_CODE]_reports_dataelement_fosa_monthly.parquet`**: facility × month flags and weights.
   * **`[COUNTRY_CODE]_reports_dataelement_monthly.parquet`** and **`.csv`**: ADM2 × month counts and every reporting rate variant.
-  * **`[COUNTRY_CODE]_reports_dataelement_yearly.parquet`** and **`.csv`**: ADM2 × year counts and yearly rates. Read by the reporting notebook.
+  * **`[COUNTRY_CODE]_reports_dataelement_yearly.parquet`** and **`.csv`**: ADM2 × year counts and the share of facilities active at least once in the year (**`RR_TOTAL_HF`**, **`RR_OPEN_HF`**). Read by the reporting notebook. Not the same quantity as the published yearly **`REPORTING_RATE`**.
 * Executed notebooks under **`pipelines/snt_dhis2_reporting_rate_dataelement/papermill_outputs/`** and report outputs under **`pipelines/snt_dhis2_reporting_rate_dataelement/reporting/outputs/`**.
 
 **Published to `DHIS2_REPORTING_RATE`**
 
-* **`[COUNTRY_CODE]_reporting_rate_dataelement.parquet`** and **`.csv`**
+* **`[COUNTRY_CODE]_reporting_rate_dataelement.parquet`** and **`.csv`** (monthly)
+* **`[COUNTRY_CODE]_reporting_rate_dataelement_yearly.parquet`** and **`.csv`** (yearly)
 * **`[COUNTRY_CODE]_parameters.json`**
 
 > **Notes for the Data Analyst:**
 >
-> - **Grain:** **ADM2 × month**. Columns: **`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`**.
-> - **`REPORTING_RATE`**: proportion (0–1) of expected facilities that were active in the month.
+> - **Grain:**
+>   - **`[COUNTRY_CODE]_reporting_rate_dataelement`**: **ADM2 × month**. Columns: **`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`**.
+>   - **`[COUNTRY_CODE]_reporting_rate_dataelement_yearly`**: **ADM2 × year**. Columns: **`YEAR`**, **`ADM2_ID`**, **`REPORTING_RATE`**.
+> - **`REPORTING_RATE`** (monthly): proportion (0–1) of expected facilities that were active in the month.
 >   - `ROUTINE_ACTIVE_FACILITIES`: facilities active this month / facilities active at least once in the same year.
 >   - `PYRAMID_OPEN_FACILITIES`: facilities active this month / facilities open this month.
 >   - Weighted (`use_weighted_reporting_rates` = `true`): numerator and denominator are sums of facility weights instead of facility counts.
+> - **`REPORTING_RATE`** (yearly): the same variant, computed over facility-months: the sum of the monthly numerators over the year divided by the sum of the monthly denominators.
+>   - For `ROUTINE_ACTIVE_FACILITIES`, the denominator is constant within a year, so the yearly rate equals the mean of the monthly rates.
+>   - For `PYRAMID_OPEN_FACILITIES`, the number of open facilities can change from month to month, so months with more open facilities count more.
+>   - The first and last years of the period range can be partial; their yearly rate covers only the months in the range, and the table does not flag them.
 > - **Active facility:** a non-missing value **≥ 0** on any activity indicator, so a reported zero counts as active and an empty value does not.
 > - **Open facility:** has an **`OPENING_DATE`** on or before the month, no **`CLOSED_DATE`** on or before the month, and a name that does not match `CLOTUR` or `FERM` (case-insensitive). Facilities with no **`OPENING_DATE`** are never open, so incomplete pyramid dates lower the denominator.
 > - **Facility weights:** a facility's mean monthly volume (sum of the volume indicators, averaged over months with volume > 0, across the whole period) divided by the ADM2 total of those means, times the number of facilities in the ADM2. Weights are constant across years. Facilities with no month of positive volume get no weight and drop out of weighted rates.

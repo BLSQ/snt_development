@@ -165,6 +165,8 @@ def snt_dhis2_reporting_rate_dataelement(
         expected_outputs = [
             data_path / f"{country_code}_reporting_rate_dataelement.parquet",
             data_path / f"{country_code}_reporting_rate_dataelement.csv",
+            data_path / f"{country_code}_reporting_rate_dataelement_yearly.parquet",
+            data_path / f"{country_code}_reporting_rate_dataelement_yearly.csv",
         ]
 
         run_start_ts = time.time()

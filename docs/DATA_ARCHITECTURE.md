@@ -79,7 +79,8 @@ Notes that the table cannot carry:
 - **The five Stage C outlier pipelines are alternatives, not a sequence.** They write identical
   filenames and the last run wins, by design — see [§3.2](#32-stages).
 - **The two Stage D reporting-rate pipelines are likewise alternatives**, both writing to
-  `DHIS2_REPORTING_RATE`.
+  `DHIS2_REPORTING_RATE`. Only `_dataelement` also publishes a yearly file
+  (`{CC}_reporting_rate_dataelement_yearly`); `snt_dhis2_incidence` reads only the monthly files.
 - **Population has three interchangeable sources**, all publishing the same filename
   `{CC}_population.parquet` to different datasets: DHIS2 (`DHIS2_DATASET_FORMATTED`), operator-supplied
   (`snt_user_population` → `SNT_POPULATION_USER_PROVIDED`) and transformed
@@ -324,7 +325,7 @@ only relational sink in the system, and likewise overwritten by whichever varian
 |---|---|---|
 | `snt_user_population` | operator population CSV + `{CC}_pyramid.parquet` from `DHIS2_DATASET_FORMATTED` (validation only) | `{CC}_population.parquet/.csv` → `SNT_POPULATION_USER_PROVIDED` |
 | `snt_dhis2_population_transformation` | `{CC}_population.parquet` from `DHIS2_DATASET_FORMATTED` or `SNT_POPULATION_USER_PROVIDED` (per `pop_source`) | `{CC}_population.parquet/.csv` → `DHIS2_POPULATION_TRANSFORMATION` |
-| `snt_dhis2_reporting_rate_dataelement` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_reporting_rate_dataelement.*` → `DHIS2_REPORTING_RATE` |
+| `snt_dhis2_reporting_rate_dataelement` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_reporting_rate_dataelement.parquet/.csv` (ADM2 × month) and `{CC}_reporting_rate_dataelement_yearly.parquet/.csv` (ADM2 × year) → `DHIS2_REPORTING_RATE` |
 | `snt_dhis2_reporting_rate_dataset` | `{CC}_reporting.parquet` from `DHIS2_DATASET_FORMATTED` (no routine data) | `{CC}_reporting_rate_dataset.*` → `DHIS2_REPORTING_RATE` |
 | `snt_dhis2_incidence` | routine per `routine_data_choice`; population per `population_selection`; reporting rate from `DHIS2_REPORTING_RATE`; DHS or uploaded care-seeking | `{CC}_incidence.parquet/.csv` → `DHIS2_INCIDENCE` |
 | `snt_dhis2_quality_of_care` | `DHIS2_DATASET_FORMATTED`, `DHIS2_OUTLIERS_IMPUTATION` | `{CC}_quality_of_care_district_year_{action}.*` → `DHIS2_QUALITY_OF_CARE` |

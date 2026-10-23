@@ -389,7 +389,7 @@ The layer id is the column name, plus a qualifier where two layers would otherwi
 |---|---|---|---|
 | `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
 | `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
-| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_{dataelement,dataset}.csv` | `snt_dhis2_reporting_rate_*` |
+| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_dataelement_yearly.csv`, `…_reporting_rate_dataset.csv` | `snt_dhis2_reporting_rate_*` |
 | `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
 | `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
 | `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |
@@ -458,8 +458,9 @@ Included, but likely to exercise open questions:
 - **No `YEAR` column:** both seasonality tables and the healthcare-access table
   ([BACKLOG META-9](../../docs/BACKLOG.md#meta-9)). Healthcare access is computed for a single
   WorldPop year, which is not stored in the table.
-- **Monthly grain** (`YEAR` + `MONTH`): both reporting-rate tables and ERA5
-  ([BACKLOG META-7](../../docs/BACKLOG.md#meta-7)).
+- **Monthly grain** (`YEAR` + `MONTH`): the `REPORTING_RATE_DATASET` table and ERA5
+  ([BACKLOG META-7](../../docs/BACKLOG.md#meta-7)). `REPORTING_RATE_DATAELEMENT` reads the yearly
+  table (`YEAR`, no `MONTH`).
 - **`YEAR` stored as text:** the WorldPop table.
 - **Parquet only:** ERA5 publishes no `.csv` twin, so its `FILENAME` is the `.parquet`.
 - **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the

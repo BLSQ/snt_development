@@ -617,16 +617,16 @@
                 "NAME": "DHIS2_REPORTING_RATE",
                 "VERSION": "latest"
             },
-            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement_yearly.csv",
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "Reporting rate, based on facility activity (DHIS2)",
-            "FR": "Taux de rapportage, selon l'activité des FOSA (DHIS2)"
+            "EN": "Yearly reporting rate, based on facility activity (DHIS2)",
+            "FR": "Taux de rapportage annuel, selon l'activité des FOSA (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Share of health facilities that reported routine malaria data in the month, out of the facilities that reported at least once during the year.",
-            "FR": "Proportion des formations sanitaires (FOSA) ayant rapporté des données de routine sur le paludisme dans le mois, parmi celles ayant rapporté au moins une fois dans l'année."
+            "EN": "Share of expected facility-months in the year in which health facilities reported routine malaria data. Expected facilities are, depending on the pipeline settings, those that reported at least once during the year or those open according to the DHIS2 pyramid.",
+            "FR": "Proportion des mois-FOSA attendus dans l'année pour lesquels les formations sanitaires (FOSA) ont rapporté des données de routine sur le paludisme. Les FOSA attendues sont, selon les paramètres du pipeline, celles ayant rapporté au moins une fois dans l'année ou celles ouvertes selon la pyramide DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",

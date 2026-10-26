@@ -251,18 +251,22 @@ def format_map_indicators(
     Parameters
     ----------
     df : pl.DataFrame
-        Long-format map data, one row per ADM2, statistic and metric.
+        Long-format map data, one row per ADM2, statistic and metric. Only the `MEDIAN` rows are
+        kept.
     snt_indicators : dict[str, list[str]]
         SNT indicators, by category.
 
     Returns
     -------
     pl.DataFrame
-        Wide table with one row per ADM2, year and statistic, and for each metric a value column
-        followed by its population-weighted `{METRIC}_POP_W` column.
+        Wide table with one row per ADM2 and year, holding the `MEDIAN` statistic only, and for
+        each metric a value column followed by its population-weighted `{METRIC}_POP_W` column.
     """
+    # Keep only the MEDIAN statistic; the STATISTIC column is then constant and dropped.
+    df = df.filter(pl.col("STATISTIC") == "MEDIAN").drop("STATISTIC")
+
     # Build a template table on which we'll add the metric values.
-    fixed_columns = ["YEAR", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID", "STATISTIC"]
+    fixed_columns = ["YEAR", "ADM1_NAME", "ADM1_ID", "ADM2_NAME", "ADM2_ID"]
     metric_names = sorted(name.upper() for names in snt_indicators.values() for name in names)
 
     # Each metric is followed by its population-weighted column
@@ -289,7 +293,7 @@ def format_map_indicators(
         template_df = template_df.update(df_metric_value, on=fixed_columns, how="left")
         template_df = template_df.update(df_metric_pop_w, on=fixed_columns, how="left")
 
-    return template_df.sort(["STATISTIC", "YEAR", "ADM1_NAME", "ADM2_NAME"])
+    return template_df.sort(["YEAR", "ADM1_NAME", "ADM2_NAME"])
 
 
 def get_or_download_population_table(

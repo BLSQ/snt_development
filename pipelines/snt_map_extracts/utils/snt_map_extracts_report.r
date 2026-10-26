@@ -23,22 +23,21 @@ get_map_metric_columns <- function(map_data) {
 }
 
 
-#' Select the MAP Rows of One Year and Statistic
+#' Select the MAP Rows of One Year
 #'
-#' Filters the wide MAP table to the given `YEAR` and `STATISTIC`. Stops with an `[ERROR]`
-#' message if no row matches.
+#' Filters the wide MAP table to the given `YEAR`. Stops with an `[ERROR]` message if no row
+#' matches.
 #'
-#' @param map_data Data frame. Wide MAP table with `YEAR` and `STATISTIC` columns.
+#' @param map_data Data frame. Wide MAP table with a `YEAR` column.
 #' @param year Integer. Year to keep.
-#' @param statistic Character. Statistic to keep. Default: "MEDIAN".
 #' @return Data frame. One row per ADM2.
 #'
 #' @export
-select_map_year_data <- function(map_data, year, statistic = "MEDIAN") {
+select_map_year_data <- function(map_data, year) {
     year_data <- map_data %>%
-        dplyr::filter(YEAR == year, STATISTIC == statistic)
+        dplyr::filter(YEAR == year)
     if (nrow(year_data) == 0) {
-        stop(glue::glue("[ERROR] No MAP data for YEAR {year} and STATISTIC {statistic}."))
+        stop(glue::glue("[ERROR] No MAP data for YEAR {year}."))
     }
     year_data
 }

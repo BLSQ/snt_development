@@ -381,9 +381,9 @@ against the code:
   no collision only because the directories differ. MAP neither publishes nor reads that file.
 - **MAP publishes only the wide table.** `build_map_statistics_table` writes one long
   `{CC}_map_data_{year}.parquet/.csv` per year to `data/map/formatted/`; `format_data_for_snt`
-  combines them into one wide `{CC}_map_data.parquet/.csv` in `data/map/formatted_snt/` — one row
-  per ADM2 × `YEAR` × `STATISTIC` (`MEDIAN`, `LCI`, `UCI`), with a value column and a `_POP_W`
-  population-weighted column per indicator. Only the wide table (and the parameters JSON) is
+  keeps their `MEDIAN` rows and combines them into one wide `{CC}_map_data.parquet/.csv` in
+  `data/map/formatted_snt/` — one row per ADM2 × `YEAR`, with a value column and a `_POP_W`
+  population-weighted column per indicator. `LCI` / `UCI` stay in the per-year files. Only the wide table (and the parameters JSON) is
   published; the per-year files stay on disk.
 
 `snt_dhis2_incidence` input selection (in `pipelines/snt_dhis2_incidence/utils/snt_dhis2_incidence.r`):

@@ -1,153 +1,114 @@
+# ================================================
+# Title: Report helpers for the MAP extracts pipeline
+# Description: Selection of the MAP metrics to map and choropleth map helpers sourced by the
+#   reporting notebook.
+# Dependencies: dplyr, sf, ggplot2, gridExtra, glue
+# Requires: code/snt_utils.r, loaded by the reporting notebook before this file.
+# ================================================
 
-# Load base utils
-source(file.path("~/workspace/code", "snt_utils.r"))   
 
-
-#' Get Setup Variables for SNT Workspace
-#' Initializes workspace paths, loads R packages, and imports OpenHEXA SDK.
+#' Get the MAP Metric Columns
 #'
-#' @param SNT_ROOT_PATH Character. Root path of the SNT workspace. Default: '~/workspace'
-#' @param packages Character vector. R packages to install and load.
-#' @return List with SNT paths.
+#' Returns the metric columns of the wide MAP table: every column that has a population-weighted
+#' companion `{METRIC}_POP_W`. The order follows the table's column order.
 #'
-#' @export
-get_setup_variables <- function(
-    SNT_ROOT_PATH='~/workspace', 
-    packages=c("arrow", "dplyr", "tidyr", "stringr", "stringi", "jsonlite", "httr", "glue")
-) {
-        
-    # List required pcks
-    required_packages <- unique(c(packages, "reticulate"))
-    install_and_load(required_packages)
-
-    # Set environment to load openhexa.sdk from the right environment
-    Sys.setenv(RETICULATE_PYTHON = "/opt/conda/bin/python")
-    
-    # Attempt to import the SDK
-    tryCatch({
-        sdk <- reticulate::import("openhexa.sdk")
-        assign("openhexa", sdk, envir = .GlobalEnv)
-    }, error = function(e) {
-        log_msg("Could not import openhexa.sdk. Ensure it is installed in /opt/conda/bin/python", "warning")
-    })    
-
-    # Set paths (add paths here)
-    paths_to_check = list(
-        CONFIG_PATH = file.path(SNT_ROOT_PATH, "configuration"),  
-        UPLOADS_PATH = file.path(SNT_ROOT_PATH, "uploads"),
-        DATA_PATH = file.path(SNT_ROOT_PATH, "data")
-    )
-
-    # create if they do not exist
-    lapply(paths_to_check, dir.create, recursive = TRUE, showWarnings = FALSE)
-    
-    return(paths_to_check)
-}
-
-
-#' Print dataframe dimensions with a readable label.
-#'
-#' @param df Data frame-like object.
-#' @param name Optional display name (defaults to variable name).
-#' @return Invisibly prints dimensions to console.
-printdim <- function(df, name = deparse(substitute(df))) {
-    cat("Dimensions of", name, ":", nrow(df), "rows x", ncol(df), "columns\n\n")
-}
-
-#' Load SNT Configuration File
-#' Reads and parses a JSON configuration file.
-#' @param snt_config_path Character. Path to the configuration JSON file.
-#' @return List containing parsed configuration.
+#' @param map_data Data frame. Wide MAP table, one value column and one `_POP_W` column per metric.
+#' @return Character vector of metric column names, without the `_POP_W` suffix.
 #'
 #' @export
-load_snt_config <- function(snt_config_path) {
-
-    # config file path 
-    config_json <- tryCatch({ fromJSON(snt_config_path) },
-                error = function(e) {
-                    stop(glue::glue("[ERROR] Error while loading configuration: {snt_config_path}"))
-                })
-    
-    log_msg(paste0("SNT configuration loaded from  : ", snt_config_path))
-    return(config_json)    
+get_map_metric_columns <- function(map_data) {
+    pop_w_cols <- grep("_POP_W$", names(map_data), value = TRUE)
+    metric_cols <- sub("_POP_W$", "", pop_w_cols)
+    intersect(names(map_data), metric_cols)
 }
 
-#' Load Dataset File from OpenHEXA
-#' Retrieves the latest version of a file from an OpenHEXA dataset.
+
+#' Select the MAP Rows of One Year
 #'
-#' @param dataset_id Character. OpenHEXA dataset identifier.
-#' @param filename Character. Name of file to load.
-#' @param verbose Bool. Log messages
-#' @return Dataframe containing the loaded data.
+#' Filters the wide MAP table to the given `YEAR`. Stops with an `[ERROR]` message if no row
+#' matches.
+#'
+#' @param map_data Data frame. Wide MAP table with a `YEAR` column.
+#' @param year Integer. Year to keep.
+#' @return Data frame. One row per ADM2.
 #'
 #' @export
-load_dataset_file <- function (dataset_id, filename, verbose=TRUE) {
-    data <- tryCatch({ 
-            get_latest_dataset_file_in_memory(dataset_id, filename) 
-        }, error = function(e) {
-            stop(glue::glue("[ERROR] Error while loading {filename} file from dataset: {dataset_id}"))
-    })
-
-    if (verbose) {        
-        log_msg(glue::glue("{filename} data loaded from dataset : {dataset_id} dataframe dimensions: [{paste(dim(data), collapse=', ')}]"))
-    }    
-    return(data)
+select_map_year_data <- function(map_data, year) {
+    year_data <- map_data %>%
+        dplyr::filter(YEAR == year)
+    if (nrow(year_data) == 0) {
+        stop(glue::glue("[ERROR] No MAP data for YEAR {year}."))
+    }
+    year_data
 }
 
 
+#' Build One Choropleth Map
+#'
+#' Draws `value_col` of `map_sf` per ADM2, with a viridis fill scale bounded by `limits` so that
+#' several maps can share the same colour scale.
+#'
+#' @param map_sf sf object. ADM2 shapes joined with the values to map.
+#' @param value_col Character. Column to map.
+#' @param title Character. Map title.
+#' @param subtitle Character. Map subtitle.
+#' @param limits Numeric vector of length 2. Fill scale limits.
+#' @param na_color Character. Fill colour for missing values. Default: "#D3D3D3".
+#' @return ggplot object.
+#'
+#' @export
+build_metric_map <- function(map_sf, value_col, title, subtitle, limits, na_color = "#D3D3D3") {
+    ggplot2::ggplot(map_sf) +
+        ggplot2::geom_sf(ggplot2::aes(fill = .data[[value_col]]), color = "white") +
+        ggplot2::scale_fill_viridis_c(option = "C", limits = limits, na.value = na_color) +
+        ggplot2::labs(title = title, subtitle = subtitle, fill = "Valeur") +
+        ggplot2::theme_void() +
+        ggplot2::theme(
+            plot.title = ggplot2::element_text(face = "bold", size = 10, margin = ggplot2::margin(b = 4)),
+            plot.subtitle = ggplot2::element_text(size = 8, colour = "grey40", margin = ggplot2::margin(b = 8)),
+            legend.position = "right",
+            legend.text = ggplot2::element_text(size = 8),
+            plot.margin = ggplot2::margin(10, 10, 10, 10)
+        )
+}
 
-#' Build one choropleth plot per MAP metric.
+
+#' Build and Save the MAP Metric Maps
 #'
-#' Generates a list of `ggplot` map objects by filtering input rows for each
-#' metric and applying a shared visual style.
+#' For each metric, draws the median (`{METRIC}`) and the population-weighted median
+#' (`{METRIC}_POP_W`) side by side on a shared colour scale, and saves the pair as
+#' `{country_code}_map_{METRIC}_{year}.png`. A metric with no value in either column is skipped
+#' with a warning.
 #'
-#' @param map_data_joined Spatial table containing `METRIC_NAME` and `VALUE`.
-#' @param metrics Character vector of metric names to plot.
-#' @param year reference year of the data/indicator
-#' @param na_color color for missing values
-#' @param plot_caption map caption (defaults to NULL)
-#' 
-#' @return List of `ggplot` objects, one per metric.
-build_metric_plots <- function(
-    map_data_joined,
-    metrics,
-    year,
-    na_color = "#D3D3D3",
-    plot_caption = NULL
-) {
-    purrr::map(metrics, function(metric) {
-        ggplot2::ggplot(map_data_joined %>% dplyr::filter(METRIC_NAME == metric)) +
-            ggplot2::geom_sf(ggplot2::aes(fill = VALUE), color = "white") +
-            ggplot2::scale_fill_viridis_c(option = "C", na.value = na_color) +
-            
-            # titles
-            ggplot2::labs(
-            title = metric,
-            subtitle = year,
-            caption = plot_caption,
-            fill = "Valeur"
-            ) +
-        
-            # map theme
-            ggplot2::theme_void() +
-            ggplot2::theme(
-                plot.title = ggplot2::element_text(
-                    face = "bold", size = 10,
-                    margin = ggplot2::margin(b = 4)
-                ),
-                plot.subtitle = ggplot2::element_text(
-                    size = 8, colour = "grey40",
-                    margin = ggplot2::margin(b = 8)
-                ),
-                plot.caption = ggplot2::element_text(
-                    size = 8,
-                    colour = "grey55",
-                    hjust = 1,
-                    margin = ggplot2::margin(t = 8)
-                ),
-                legend.position = "right",
-                legend.text = ggplot2::element_text(size = 8),
-                plot.margin = ggplot2::margin(10, 10, 10, 10)
-            )
-    })
+#' @param map_sf sf object. ADM2 shapes joined with one year of the wide MAP table.
+#' @param metric_cols Character vector. Metric columns to map, without the `_POP_W` suffix.
+#' @param year Integer. Year shown in the map subtitles and the filenames.
+#' @param figures_path Character. Folder where the maps are saved.
+#' @param country_code Character. Country code used as the filename prefix.
+#' @return Character vector. Paths of the saved maps, in the order of `metric_cols`.
+#'
+#' @export
+save_map_metric_plots <- function(map_sf, metric_cols, year, figures_path, country_code) {
+    out_files <- c()
+    for (metric in metric_cols) {
+        pop_w_col <- paste0(metric, "_POP_W")
+        values <- c(map_sf[[metric]], map_sf[[pop_w_col]])
+        if (all(is.na(values))) {
+            log_msg(glue::glue("No value for {metric} in {year}. Map skipped."), "warning")
+            next
+        }
+        limits <- range(values, na.rm = TRUE)
+
+        median_map <- build_metric_map(map_sf, metric, metric, glue::glue("Médiane - {year}"), limits)
+        pop_w_map <- build_metric_map(
+            map_sf, pop_w_col, metric, glue::glue("Médiane pondérée par la population - {year}"), limits
+        )
+        combined_plot <- gridExtra::arrangeGrob(median_map, pop_w_map, ncol = 2)
+
+        out_file <- file.path(figures_path, glue::glue("{country_code}_map_{metric}_{year}.png"))
+        ggplot2::ggsave(out_file, plot = combined_plot, width = 14, height = 6, dpi = 150, bg = "white")
+        log_msg(glue::glue("Map saved: {out_file}"))
+        out_files <- c(out_files, out_file)
+    }
+    out_files
 }

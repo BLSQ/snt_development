@@ -23,7 +23,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
    1. **Population:** Use the WorldPop raster cached under **`data/worldpop/rasters/`** (**`[country_code]_pop_[YEAR]_*.tif`**, lowercase country code), or download it from WorldPop. The run fails if the download fails, including for a year outside 2015–2030. Write an ADM2 total-population table to **`data/map/aggregated_populations/`**.
    2. **Rasters:** Download the MAP raster of each indicator for the shapes' extent into **`data/map/raster_files/[COUNTRY_CODE]/`**. The MAP release (version) is selected per indicator for the target year, so indicators can come from different releases. An indicator that fails to download is logged as an error and skipped.
    3. **Zonal statistics:** For each raster band (**`Data`**, **`LCI`**, **`UCI`**, or **`GRAY_INDEX`** for single-band rasters), compute the ADM2 median, plus the population-weighted median when a population raster is available. **`Data`** and **`GRAY_INDEX`** give the **`MEDIAN`** statistic.
-   4. Write the long per-year table **`data/map/formatted/[COUNTRY_CODE]_map_data_[YEAR].parquet`** / **`.csv`**. A year with no raster or no valid statistic writes nothing.
+   4. Write the long per-year table **`data/map/formatted/[COUNTRY_CODE]_map_data_[YEAR].parquet`** / **`.csv`**, one row per ADM2 × indicator × **`STATISTIC`** (**`MEDIAN`**, **`LCI`**, **`UCI`**). A year with no raster or no valid statistic writes nothing.
 6. **SNT format:** Keep only the **`MEDIAN`** statistic and combine the per-year tables into one wide table, one row per ADM2 × **`YEAR`**, with a value column and a **`_POP_W`** column per indicator. The **`LCI`** / **`UCI`** rows stay in the per-year tables only. Write **`data/map/formatted_snt/[COUNTRY_CODE]_map_data.parquet`** / **`.csv`**. The run fails if no per-year table could be read, or if these files were not written during this run.
 7. **Dataset publication:** Upload **`[COUNTRY_CODE]_map_data.parquet`**, **`[COUNTRY_CODE]_map_data.csv`** and **`[COUNTRY_CODE]_parameters.json`** to **`SNT_MAP_EXTRACTS`**.
 8. **Reporting:** Run **`snt_map_extracts_report.ipynb`** (also in report-only mode), or **`snt_map_extracts_report_[COUNTRY_CODE].ipynb`** when that country-specific variant exists in the workspace. The run fails if the report fails.
@@ -42,7 +42,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 **Workspace filesystem**
 
 * **`data/map/formatted_snt/[COUNTRY_CODE]_map_data.parquet`** and **`.csv`** — the wide table
-* **`data/map/formatted/[COUNTRY_CODE]_map_data_[YEAR].parquet`** and **`.csv`** — one long table per year (not published)
+* **`data/map/formatted/[COUNTRY_CODE]_map_data_[YEAR].parquet`** and **`.csv`** — one long table per year (not published), with all three statistics (**`MEDIAN`**, **`LCI`**, **`UCI`**), each with its value (**`VALUE`**) and population-weighted value (**`POPULATION_WEIGHTED`**)
 * **`data/map/aggregated_populations/[COUNTRY_CODE]_worldpop_population_[YEAR].parquet`** — ADM2 total population per year (not published, not used by the rest of the pipeline)
 * **`data/map/[COUNTRY_CODE]_parameters.json`**
 * **Cached MAP rasters** under **`data/map/raster_files/[COUNTRY_CODE]/`** and **WorldPop rasters** under **`data/worldpop/rasters/`**
@@ -58,7 +58,7 @@ The **SNT Map Extracts** pipeline downloads Malaria Atlas Project (MAP) rasters 
 >
 > - **Grain:** ADM2 × **`YEAR`**, one row each, across all years of the period.
 > - **Key columns:** **`YEAR`**, **`ADM1_NAME`**, **`ADM1_ID`**, **`ADM2_NAME`**, **`ADM2_ID`**.
-> - **Statistic:** values are the **`MEDIAN`** band (the indicator's main estimate); MAP's credible-interval bounds (**`LCI`** / **`UCI`**) are not published.
+> - **Statistic:** values are the **`MEDIAN`** statistic (from the **`Data`** / **`GRAY_INDEX`** band, the indicator's main estimate); MAP's credible-interval bounds (**`LCI`** / **`UCI`**) are not published, but remain available in the per-year tables under **`data/map/formatted/`**.
 > - **Indicator columns:** **`PF_PARASITE_RATE`**, **`PF_INCIDENCE_RATE`**, **`PF_MORTALITY_RATE`**, **`INSECTICIDE_TREATED_NET_ACCESS`**, **`INSECTICIDE_TREATED_NET_USE_RATE`**, **`IRS_COVERAGE`**, **`ANTIMALARIAL_EFFECTIVE_TREATMENT`**, each followed by its **`_POP_W`** column.
 >   - **`[INDICATOR]`**: median of the raster pixels covering the ADM2, weighted by the share of each pixel inside the ADM2.
 >   - **`[INDICATOR]_POP_W`**: median of the same pixels, weighted by pixel coverage × WorldPop population (resampled onto the MAP grid; pixels without population weigh 0). Empty when the year's population raster could not be used (no CRS, or unreadable).

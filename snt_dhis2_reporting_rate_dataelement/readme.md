@@ -82,8 +82,8 @@ This pipeline estimates **monthly** and **yearly** reporting rates (routine data
 > **Notes for the Data Analyst:**
 >
 > - **Grain:**
->   - **`[COUNTRY_CODE]_reporting_rate_dataelement`**: **ADM2 × month**. Columns: **`YEAR`**, **`MONTH`**, **`ADM2_ID`**, **`REPORTING_RATE`**.
->   - **`[COUNTRY_CODE]_reporting_rate_dataelement_yearly`**: **ADM2 × year**. Columns: **`YEAR`**, **`ADM2_ID`**, **`REPORTING_RATE`**.
+>   - **`[COUNTRY_CODE]_reporting_rate_dataelement`**: **ADM2 × month**. Columns: **`YEAR`**, **`MONTH`**, **`ADM1_ID`**, **`ADM1_NAME`**, **`ADM2_ID`**, **`ADM2_NAME`**, **`REPORTING_RATE`**.
+>   - **`[COUNTRY_CODE]_reporting_rate_dataelement_yearly`**: **ADM2 × year**. Columns: **`YEAR`**, **`ADM1_ID`**, **`ADM1_NAME`**, **`ADM2_ID`**, **`ADM2_NAME`**, **`REPORTING_RATE`**.
 > - **`REPORTING_RATE`** (monthly): proportion (0–1) of expected facilities that were active in the month.
 >   - `ROUTINE_ACTIVE_FACILITIES`: facilities active this month / facilities active at least once in the same year.
 >   - `PYRAMID_OPEN_FACILITIES`: facilities active this month / facilities open this month.

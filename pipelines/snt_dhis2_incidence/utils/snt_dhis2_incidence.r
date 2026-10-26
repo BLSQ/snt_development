@@ -229,30 +229,47 @@ select_population_column <- function(dhis2_population_adm2, DISAGGREGATED_INDICA
 
 #' Load DHS careseeking data
 #'
-#' Loads `{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet` from the latest version
-#' of the `DHS_INDICATORS` dataset. On success, sets the global `careseeking_file_name` (used in
-#' the final log summary). On failure, logs a warning and returns NULL; the run continues.
+#' Loads `{country_code}_DHS_ADM2_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet` from the latest version
+#' of the `DHS_INDICATORS` dataset, falling back to `{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet`
+#' when the ADM2 file is not found. Keeps only `ADM1_ID` and `PCT_PUBLIC_CARE` and removes the
+#' duplicate rows (the ADM1 survey value is repeated for each ADM2), so the single DHS value per
+#' ADM1 applies to all ADM2 units and routine years (a `YEAR` column, if present, is dropped).
+#' Logs a warning if an ADM1_ID still has more than one value. On success, sets the global
+#' `careseeking_file_name` (used in the final log summary). On failure, logs a warning and returns
+#' NULL; the run continues.
 #'
 #' @param country_code Character. Country code used as the filename prefix. Default: `COUNTRY_CODE`.
 #' @param config List. Parsed SNT configuration, with `SNT_DATASET_IDENTIFIERS`.
 #'   Default: `config_json`.
-#' @return Data frame of ADM1 careseeking percentages, or NULL if the file could not be loaded.
+#' @return Data frame with `ADM1_ID` and `PCT_PUBLIC_CARE`, or NULL if no file could be loaded.
 #' @export
 load_dhs_careseeking_data <- function(country_code = COUNTRY_CODE, config = config_json) {
-    # 1. Prepare identifiers
+    # 1. Prepare identifiers (ADM2 file first, ADM1 file as fallback)
     dataset_name <- config$SNT_DATASET_IDENTIFIERS$DHS_INDICATORS
-    file_name    <- glue::glue("{country_code}_DHS_ADM1_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
-    
-    # 2. Attempt to load
-    data <- tryCatch({
-        get_latest_dataset_file_in_memory(dataset_name, file_name)
-    }, error = function(e) {
-        # log_msg(paste("🛑 Error loading DHS data:", conditionMessage(e)), "error")
-        return(NULL)
-    })
-    
+    file_names   <- glue::glue("{country_code}_DHS_{c('ADM2', 'ADM1')}_PCT_CARESEEKING_SAMPLE_AVERAGE.parquet")
+
+    # 2. Attempt to load, stopping at the first file found
+    data <- NULL
+    for (file_name in file_names) {
+        data <- tryCatch({
+            get_latest_dataset_file_in_memory(dataset_name, file_name)
+        }, error = function(e) {
+            # log_msg(paste("🛑 Error loading DHS data:", conditionMessage(e)), "error")
+            return(NULL)
+        })
+        if (!is.null(data)) break
+    }
+
     # 3. Validation & Logging
     if (!is.null(data)) {
+        # DHS values come from a single survey and apply to all routine years:
+        # keep only the columns used downstream (a YEAR column, if present, is not used)
+        data <- dplyr::select(data, dplyr::any_of(c("ADM1_ID", "PCT_PUBLIC_CARE")))
+        # The ADM1 value is repeated for each ADM2: keep one row per ADM1
+        data <- dplyr::distinct(data)
+        if (anyDuplicated(data$ADM1_ID) > 0) {
+            log_msg("[WARNING] DHS careseeking data has more than one value per ADM1_ID; the first one is used.", "warning")
+        }
         log_msg(glue::glue("✅ Care Seeking data: {file_name} loaded from {dataset_name}"))
         log_msg(glue::glue("Dimensions: {nrow(data)} rows, {ncol(data)} columns."))
         # Keep this global becuase it's needed for the final log summary (at the end of the script)

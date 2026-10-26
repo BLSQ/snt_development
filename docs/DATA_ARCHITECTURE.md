@@ -665,11 +665,6 @@ originates. Open: [BACKLOG PIPE-5](BACKLOG.md#pipe-5).
 - The `outliers_detected` DB table carries no method/run provenance (§3.2 Stage C). The dataset
   files have theirs in the companion `{CC}_parameters.json`; the table has no equivalent.
 - No automated test suite anywhere in the repo.
-- **`snt_dhs_indicators` publishes even in report-only mode.** Unlike every other pipeline, its
-  `add_files_to_dataset(...)` call sits outside the `if not run_reports_only:` guard, with 22
-  hardcoded file paths. Running it with "Run reportings only" = ON therefore cuts a **new dataset
-  version from whatever files happen to be on disk** — re-publishing stale data as if it were fresh.
-  Its parameters JSON is the only file excluded from that path.
 - **`snt_era5_climate_data` stamps the wrong pipeline name into its provenance file**:
   `save_pipeline_parameters(pipeline_name="snt_era5_aggregate", …)` — a leftover from the
   deprecated `snt_era5_aggregate` pipeline it replaced. Since the parameters JSON is the only

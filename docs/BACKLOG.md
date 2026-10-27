@@ -181,7 +181,7 @@ Planned, none of it exists yet: a new OpenHEXA dataset, `SNT_CONFIGURATION`, hol
 them, probably writing through a Python pipeline that validates the structure first. That is where the
 schemas in `contracts/` would become an executable gate rather than documentation.
 
-**Source:** `contracts/snt_metadata_json/README.md` §6.
+**Source:** `contracts/snt_metadata_json/README.md` (pre-2026-10-27 version).
 
 ### <a id="cfg-5"></a>CFG-5 · Per-dataset output contracts
 
@@ -210,14 +210,13 @@ visible to-do.*
 
 ### <a id="meta-2"></a>META-2 · Percentage or proportion
 
-`REPORTING_RATE_*` in `SNT_metadata.example.json` has `SCALE: [0.25, 0.5, 0.75]` (fractions) with
-`UNIT_SYMBOL: "%"` and `UNITS: "Proportion"`. As written, a legend would read "0.25 %". Settled for
-the reporting rate itself: `snt_dhis2_reporting_rate_dataelement` writes a bare 0–1 ratio, so entries
-pointing at it take fractional cut points with `UNIT_SYMBOL: null` (as `SNT_metadata_NER.json` does).
-Two things remain: **(a)** the example file still has the inconsistent entry (a one-line fix whenever
-someone touches it); **(b)** whether the Explorer ever scales a fraction to a percentage on ingest.
+The 2026-09-08 draft had `REPORTING_RATE_*` with `SCALE: [0.25, 0.5, 0.75]` (fractions),
+`UNIT_SYMBOL: "%"` and `UNITS: "Proportion"`, so a legend would read "0.25 %". Settled in the repo:
+the reporting-rate pipelines write a bare 0–1 ratio, so entries take fractional cut points with
+`UNIT_SYMBOL: null`, as the master list and the example now do. What remains open is whether the
+Explorer ever scales a fraction to a percentage on ingest.
 
-**Blocked on:** IASO developers, for (b).
+**Blocked on:** IASO developers.
 
 ### <a id="meta-3"></a>META-3 · Is `CATEGORY` a controlled vocabulary?
 
@@ -228,8 +227,8 @@ is added. All master-list `CATEGORY` values are `""` today and still to be decid
 ### <a id="meta-4"></a>META-4 · Which rendering modes does IASO support?
 
 **(a)** Does the Explorer implement `"Ordinal"`, or silently fall back to threshold binning? The
-latter would make the two seasonality layers in `SNT_metadata_NER.json` render wrongly rather than
-not at all. Confirm before treating `"Ordinal"` as delivered. **(b)** Does a genuinely
+latter would make the `Ordinal` layers in the master list (seasonality flags, block durations and
+start months) render wrongly rather than not at all. Confirm before treating `"Ordinal"` as delivered. **(b)** Does a genuinely
 **categorical** layer (unordered, or non-numeric values) need a further `TYPE`, since `SCALE` is an
 array of numbers and cannot hold labels? **(c)** `"Linear"` is supported by the Explorer but
 blocked by an Explorer-side bug. When it is fixed, add `"Linear"` to the `TYPE` enum in
@@ -334,9 +333,8 @@ decided.
 
 `LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` for all 58 layers are a draft written from the code
 (2026-10-15), not yet reviewed by someone with domain knowledge. `CATEGORY` is empty in both
-languages ([META-3](#meta-3)). `SCALE` values are defaults where no earlier scale existed; the
-defaults used are listed in
-[`contracts/snt_metadata_json/README.md`](../contracts/snt_metadata_json/README.md#the-master-list).
+languages ([META-3](#meta-3)). Most `SCALE` values are generic defaults per unit, not drawn from
+data; the few reused from earlier catalogues are the population, reporting-rate and incidence bins.
 
 **Owner:** SNT team.
 
@@ -372,18 +370,22 @@ Excluded until the ADM1 question is agreed.
 R10 and which `COLUMN`'s pattern rejects. Restoring them as layers needs a pipeline change to
 uppercase names.
 
-### <a id="meta-17"></a>META-17 · Niger's catalogue: items to confirm
+### <a id="meta-17"></a>META-17 · Niger's earlier catalogue versus the master list
 
-In `contracts/snt_metadata_json/SNT_metadata_NER.json`:
+Niger's catalogue (converted from its old-format file in 2026-09, archived as
+`deprecated/configuration/SNT_metadata_NER.json`) differs from the master list in ways that matter
+if Niger already uses those layers in the Explorer:
 
-- **`REPORTING_RATE` points at the data-element method**, chosen because the old description read
-  *"Taux de rapportage sur base de l'activité des FOSAs"*. Confirm with whoever wrote the original
-  file: the two reporting-rate methods give different numbers, and nothing recorded which was meant.
-- **The English text is a translation of the French**, not reviewed by a domain speaker. Check
-  `REPORTING_RATE` in particular: the French said only "based on FOSA activity", while the English
-  states the numerator and denominator.
-- **Population layer ids differ** from the master list (`POPULATION_U5` / `POPULATION_FE` there,
-  `POP_UNDER_5` / `POP_PREGNANT_WOMEN` here). Reconcile them before either file is published.
+- **Population layer ids:** `POPULATION_U5` / `POPULATION_FE` in Niger's file, `POP_UNDER_5` /
+  `POP_PREGNANT_WOMEN` in the master list. A layer id is what saved Explorer selections refer to, so
+  if Niger's ids were ever live, switching to the master list's is a breaking change.
+- **Reporting-rate method:** Niger's `REPORTING_RATE` was mapped to the data-element method because
+  the old description read *"Taux de rapportage sur base de l'activité des FOSAs"*. Confirm with
+  whoever wrote the original which method Niger means: the two give different numbers, and the
+  master list offers both.
+- **Wording:** Niger's file credits `SNIS` (the national HIS) where the master list says `DHIS2`, and
+  says "zone spécifique" where the master list says "unité administrative". If Niger wants its own
+  wording, that is country tuning ([META-12](#meta-12)).
 
 **Owner:** NER country team, SNT team.
 

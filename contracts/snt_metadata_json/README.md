@@ -389,7 +389,7 @@ The layer id is the column name, plus a qualifier where two layers would otherwi
 |---|---|---|---|
 | `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
 | `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
-| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_dataelement_yearly.csv`, `…_reporting_rate_dataset.csv` | `snt_dhis2_reporting_rate_*` |
+| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_dataelement_yearly.csv`, `…_reporting_rate_dataset_yearly.csv` | `snt_dhis2_reporting_rate_*` |
 | `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
 | `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
 | `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |

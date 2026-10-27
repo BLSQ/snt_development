@@ -57,9 +57,15 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
     the code that writes the column.
   - **Curated:** `LABEL`, `DESCRIPTION`, `SOURCE`, `UNITS`, `CATEGORY`, `TYPE`, `SCALE`,
     `UNIT_SYMBOL`. These need a person with domain knowledge. Text is a draft written from the code,
-    not yet reviewed ([BACKLOG META-13](../docs/BACKLOG.md#meta-13)); `CATEGORY` is empty. Which
-    layers also exist in older catalogues:
-    [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#comparison-with-older-catalogues).
+    not yet reviewed ([BACKLOG META-13](../docs/BACKLOG.md#meta-13)); `CATEGORY` is `""` in both
+    languages. Most `SCALE` values are generic defaults per unit, not drawn from data.
+- **House style for the text:**
+  - `SOURCE` is `DHIS2`, `ERA5` or `WorldPop`, and `""` where the source depends on the run or mixes
+    several: every `*_TRANSFORMED` layer (DHIS2 or user-provided input), `POPULATION_INCIDENCE`
+    (operator-chosen population source), and `POP_COVERED` / `PCT_HEALTH_ACCESS` (WorldPop population
+    plus DHIS2 or user-provided facilities). `LABEL` ends with `(SOURCE)` only when `SOURCE` is set.
+  - `UNITS` says `Proportion` where the column is a 0–1 fraction (reporting rates, `*_PROPORTION`),
+    with `UNIT_SYMBOL: null` ([BACKLOG META-2](../docs/BACKLOG.md#meta-2)).
 - **When a pipeline adds or renames a published column**, add or update the master list entry in the
   same PR (CLAUDE.md handover checklist). A column with no entry is invisible in the Explorer. An
   entry whose column was renamed is dropped by the trim pipeline as `COLUMN_NOT_FOUND` in every
@@ -67,8 +73,82 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 - **Validate before merging**: `python3 .claude/skills/add-explorer-layer/validate_metadata.py`
   (checks the master list by default) — see
   [`contracts/snt_metadata_json/README.md` §5](../contracts/snt_metadata_json/README.md#5-validating).
-- **What the master list includes, what it leaves out and why:**
-  [`contracts/snt_metadata_json/README.md` §6](../contracts/snt_metadata_json/README.md#the-master-list).
+
+### What it contains
+
+Every column the current pipelines can publish that fits the format — 58 layers. Each `SOURCE_DATA`
+pointer was traced to the code that writes the column (the `add_files_to_dataset(...)` calls in
+`pipeline.py`, and the notebook cells that build the final table); none was checked against a live
+workspace. `snt_assemble_results` is out of scope (retired,
+[ADR 0006](../docs/decisions/0006-retire-snt-assemble-results.md)).
+
+The layer id is the column name, plus a qualifier where two layers would otherwise collide
+([contract §2.2](../contracts/snt_metadata_json/README.md#22-the-layer-id-is-not-the-column-name)).
+
+| Layers | Dataset key | File | Pipeline |
+|---|---|---|---|
+| `POPULATION`, `POP_*` (8) | `DHIS2_DATASET_FORMATTED` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_formatting` |
+| `POPULATION_TRANSFORMED`, `POP_*_TRANSFORMED` (8) | `DHIS2_POPULATION_TRANSFORMATION` | `{COUNTRY_CODE}_population.csv` | `snt_dhis2_population_transformation` |
+| `REPORTING_RATE_DATAELEMENT`, `REPORTING_RATE_DATASET` | `DHIS2_REPORTING_RATE` | `…_reporting_rate_dataelement_yearly.csv`, `…_reporting_rate_dataset.csv` | `snt_dhis2_reporting_rate_*` |
+| `POPULATION_INCIDENCE`, `INCIDENCE_*` (4) | `DHIS2_INCIDENCE` | `{COUNTRY_CODE}_incidence.csv` | `snt_dhis2_incidence` |
+| `<COUNT>_QOC_IMPUTED`, `<COUNT>_QOC_REMOVED` (10 + 10) | `DHIS2_QUALITY_OF_CARE` | `…_quality_of_care_district_year_{imputed,removed}.csv` | `snt_dhis2_quality_of_care` |
+| `SEASONALITY_*`, `SEASONAL_BLOCK_*`, `*_PROPORTION` (4 + 4) | `SNT_SEASONALITY_{CASES,RAINFALL}` | `…_{cases,rainfall}_seasonality.csv` | `snt_seasonality_*` |
+| `PRECIPITATION_{MEAN,MIN,MAX}` | `ERA5_DATASET_CLIMATE` | `{COUNTRY_CODE}_total_precipitation_monthly.parquet` | `snt_era5_climate_data` |
+| `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
+| `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
+
+#### Layers that will not load everywhere
+
+"Every column that *can* be published" includes columns that only some countries or parameter
+choices produce. Expect these layers to fail to load (the trim pipeline drops them) where the column
+is absent:
+
+- **`POP_*` in the formatted population** exist only where `POPULATION_INDICATOR_DEFINITIONS` gives
+  that key DHIS2 ids. In the archived configs that is CMR (`UNDER_5`, `PREGNANT_WOMEN`, `0_1_Y`,
+  `1_2_Y`, `50_PLUS`) and NER (`UNDER_5`, `PREGNANT_WOMEN`). `POP_5_10_Y` and `POP_5_36_M` have no ids
+  in any of them.
+- **`POP_*_TRANSFORMED`** exist only when the operator sets the matching disaggregation parameter,
+  or supplies a disaggregation file.
+- **The quality-of-care counts** are written only if the column is in the routine data, so they vary
+  with each country's `DHIS2_INDICATOR_DEFINITIONS` (`ALLADM`, `ALLDTH`, `ALLOUT` in particular).
+- **Only one variant of an alternative is present at a time.** Quality of care writes the `imputed`
+  or the `removed` file, per run. Both reporting-rate files can coexist, but see the dataset-version
+  caveat below.
+- **`INCIDENCE_ADJ_CARESEEKING`** is always written, but is all `NA` when no care-seeking data was
+  available.
+
+#### Tables that break other assumptions of the format
+
+- **No `YEAR` column:** both seasonality tables and the healthcare-access table
+  ([BACKLOG META-9](../docs/BACKLOG.md#meta-9)). Healthcare access is computed for a single
+  WorldPop year, which is not stored in the table.
+- **Monthly grain** (`YEAR` + `MONTH`): the `REPORTING_RATE_DATASET` table and ERA5
+  ([BACKLOG META-7](../docs/BACKLOG.md#meta-7)). `REPORTING_RATE_DATAELEMENT` reads the yearly
+  table (`YEAR`, no `MONTH`).
+- **`YEAR` stored as text:** the WorldPop table.
+- **Parquet only:** ERA5 publishes no `.csv` twin, so its `FILENAME` is the `.parquet`.
+- **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the
+  files of that run, `"latest"` on `DHIS2_REPORTING_RATE` holds only the variant run last, and the
+  same goes for the two quality-of-care files.
+
+#### What was left out, and why
+
+| Left out | Pipeline | Why |
+|---|---|---|
+| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
+| All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column ([BACKLOG META-15](../docs/BACKLOG.md#meta-15)). |
+| The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects and which breaks repo rule R10 ([BACKLOG META-16](../docs/BACKLOG.md#meta-16)). |
+| `non_malaria_all_cause_outpatients`, `presumed_cases` | `snt_dhis2_quality_of_care` | Lowercase, as above, and copies of `ALLOUT` / `PRES`, which are included. |
+| Routine indicators (`{CC}_routine.*`) | `snt_dhis2_formatting` | **Facility × month** grain, not ADM2. The Explorer would need aggregation the format cannot express. |
+| `{CC}_routine_outliers_imputed.parquet`, `…_removed.parquet` | the five `snt_dhis2_outliers_imputation_*` | Facility × month grain, as above. |
+| `{CC}_routine_outliers_detected.parquet` | the five `snt_dhis2_outliers_imputation_*` | Long format (`INDICATOR` / `VALUE`), facility grain. |
+| `{CC}_reporting.*` | `snt_dhis2_formatting` | Long format (`PRODUCT_METRIC` / `VALUE`). |
+| `{CC}_pyramid.*` | `snt_dhis2_formatting` | Facility list (coordinates, opening/closing dates); no values to map. |
+| All raw extracts (`{CC}_dhis2_raw_*.parquet`) | `snt_dhis2_extract` | Long format, raw DHIS2 ids, no `YEAR`. |
+| Extra columns from an uploaded disaggregation file | `snt_dhis2_population_transformation` | Arbitrary operator-chosen names, not uppercased. Only the template's `POP_*` columns are included. |
+| Admin columns (`ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME`) | `snt_seasonality_*`, `snt_healthcare_access` | Admin columns. |
+
+`snt_workspace_check` publishes nothing to a dataset.
 
 ### Known open points
 

@@ -655,16 +655,16 @@
                 "NAME": "DHIS2_REPORTING_RATE",
                 "VERSION": "latest"
             },
-            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset.csv",
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset_yearly.csv",
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "Reporting rate, based on DHIS2 reports (DHIS2)",
-            "FR": "Taux de rapportage, selon les rapports DHIS2 (DHIS2)"
+            "EN": "Yearly reporting rate, based on DHIS2 reports (DHIS2)",
+            "FR": "Taux de rapportage annuel, selon les rapports DHIS2 (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of reports received in the month, out of the number of reports expected, as recorded in DHIS2 for the selected data sets.",
-            "FR": "Nombre de rapports reçus dans le mois, sur le nombre total de rapports attendus, tel qu'enregistré dans le DHIS2 pour les formulaires sélectionnés."
+            "EN": "Number of reports received in the year, out of the number of reports expected, as recorded in DHIS2 for the selected data sets.",
+            "FR": "Nombre de rapports reçus dans l'année, sur le nombre total de rapports attendus, tel qu'enregistré dans le DHIS2 pour les formulaires sélectionnés."
         },
         "SOURCE": {
             "EN": "DHIS2",

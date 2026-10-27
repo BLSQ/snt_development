@@ -77,7 +77,7 @@ The top-level key is a **layer id**, and it need not equal the column:
 ```jsonc
 "REPORTING_RATE_DATAELEMENT": { … "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement_yearly.csv",
                                   "COLUMN": "REPORTING_RATE" },
-"REPORTING_RATE_DATASET":     { … "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset.csv",
+"REPORTING_RATE_DATASET":     { … "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataset_yearly.csv",
                                   "COLUMN": "REPORTING_RATE" },
 ```
 

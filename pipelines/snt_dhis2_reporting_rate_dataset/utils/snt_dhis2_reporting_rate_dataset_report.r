@@ -1,6 +1,6 @@
 # ================================================
 # Title: Report helpers for the Reporting Rate (Dataset) pipeline
-# Description: Reporting-rate categories, yearly aggregation, plot builders and plot export,
+# Description: Reporting-rate categories, plot builders and plot export,
 #   sourced by the reporting notebook.
 # Dependencies: tidyverse (dplyr, ggplot2, forcats), sf, jsonlite, glue
 # Requires: code/snt_utils.r and code/snt_palettes.r, loaded by the reporting notebook before
@@ -89,30 +89,6 @@ add_reporting_rate_category <- function(df, categories) {
                 include.lowest = TRUE
             )
         )
-}
-
-
-#' Aggregate Reporting Rates to Yearly Means
-#'
-#' Averages the monthly reporting rates per district and year (ignoring NA
-#' values), keeping the geometry for mapping, and recomputes the category on
-#' the yearly mean.
-#'
-#' @param data_to_plot Data frame. Monthly reporting rates joined to the shapes
-#'   (`geometry`, `ADM2_ID`, `ADM2_NAME`, `ADM1_NAME`, `YEAR`, `REPORTING_RATE`).
-#' @param categories List. Output of `build_reporting_rate_categories()`.
-#' @return Data frame with one row per district and year, with `REPORTING_RATE`
-#'   and `REPORTING_RATE_CATEGORY`.
-#'
-#' @export
-aggregate_reporting_rate_yearly <- function(data_to_plot, categories) {
-    data_to_plot %>%
-        group_by(geometry, ADM2_ID, ADM2_NAME, ADM1_NAME, YEAR) %>%
-        summarise(
-            REPORTING_RATE = mean(REPORTING_RATE, na.rm = TRUE),
-            .groups = "drop"
-        ) %>%
-        add_reporting_rate_category(categories)
 }
 
 
@@ -263,11 +239,12 @@ plot_reporting_rate_monthly_map <- function(data_to_plot, palette, subtitle) {
 }
 
 
-#' Map Yearly Mean Reporting Rates by District
+#' Map Yearly Reporting Rates by District
 #'
-#' Choropleth of the yearly-mean category per district, faceted by year.
+#' Choropleth of the yearly reporting-rate category per district, faceted by year.
 #'
-#' @param data_to_plot_year Data frame. Output of `aggregate_reporting_rate_yearly()`.
+#' @param data_to_plot_year Data frame. Yearly reporting rates with
+#'   `REPORTING_RATE_CATEGORY` and a `geometry` column.
 #' @param palette Named character vector. Category colours.
 #' @param subtitle Character. Plot subtitle.
 #' @return ggplot object.
@@ -290,7 +267,7 @@ plot_reporting_rate_yearly_map <- function(data_to_plot_year, palette, subtitle)
             legend.position = "bottom"
         ) +
         labs(
-            title = "Reporting Rate (Dataset) - mean per Year",
+            title = "Reporting Rate (Dataset) - per Year",
             subtitle = subtitle,
             fill = "Reporting Rate: "
         ) +

@@ -358,8 +358,11 @@ against the code:
   `{CC}_map_data_{year}.parquet/.csv` per year to `data/map/formatted/`; `format_data_for_snt`
   keeps their `MEDIAN` rows and combines them into one wide `{CC}_map_data.parquet/.csv` in
   `data/map/formatted_snt/` — one row per ADM2 × `YEAR`, with a value column and a `_POP_W`
-  population-weighted column per indicator. `LCI` / `UCI` stay in the per-year files. Only the wide table (and the parameters JSON) is
-  published; the per-year files stay on disk.
+  population-weighted column per indicator. Both columns are scaled by factors hardcoded in
+  `format_map_indicators` (`conversions`: × 100 to a percentage, × 1,000 for incidence,
+  × 100,000 for mortality) and rounded to 2 decimals; the per-year files keep MAP's native,
+  unscaled values. `LCI` / `UCI` stay in the per-year files. Only the wide table (and the
+  parameters JSON) is published; the per-year files stay on disk.
 
 `snt_dhis2_incidence` input selection (in `pipelines/snt_dhis2_incidence/utils/snt_dhis2_incidence.r`):
 

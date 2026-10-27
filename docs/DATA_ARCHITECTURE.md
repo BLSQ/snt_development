@@ -70,7 +70,7 @@ notebooks — see [Rule 2 in `CLAUDE.md`](../CLAUDE.md)).
 | `snt_worldpop_extract` | A′ | WorldPop rasters → ADM2 population | `DHIS2_DATASET_FORMATTED` (shapes), WorldPop | `WORLDPOP_DATASET_EXTRACT` | `py` |
 | `snt_map_extracts` | A′ | Malaria Atlas Project layers (PfPR, ITN, IRS, …) → ADM2 medians and population-weighted medians | `DHIS2_DATASET_FORMATTED` (shapes), MAP WCS, WorldPop raster cache | `SNT_MAP_EXTRACTS` | `py` |
 | `snt_healthcare_access` | A′ | Travel-time / access to health facilities | `DHIS2_DATASET_FORMATTED` (shapes), WorldPop raster cache, operator FOSA upload | `SNT_HEALTHCARE_ACCESS` | `nb` |
-| `snt_dhs_indicators` | A′ | DHS survey indicators at **ADM1** | `DHIS2_DATASET_FORMATTED`, DHS recode files | `DHS_INDICATORS` | `nb` |
+| `snt_dhs_indicators` | A′ | DHS survey indicators, estimated at **ADM1**, written per ADM2 | `DHIS2_DATASET_FORMATTED`, DHS recode files | `DHS_INDICATORS` | `nb` |
 
 Notes that the table cannot carry:
 
@@ -332,7 +332,7 @@ only relational sink in the system, and likewise overwritten by whichever varian
 | `snt_seasonality_cases` | `DHIS2_DATASET_FORMATTED` | `{CC}_cases_seasonality.*` → `SNT_SEASONALITY_CASES` |
 | `snt_seasonality_rainfall` | `DHIS2_DATASET_FORMATTED`, `ERA5_DATASET_CLIMATE` | `{CC}_rainfall_seasonality.*` → `SNT_SEASONALITY_RAINFALL` |
 | `snt_healthcare_access` | formatted shapes + WorldPop raster (`wpop_year`); optional FOSA CSV, else DHIS2 pyramid | `{CC}_population_covered_health.parquet/.csv` → `SNT_HEALTHCARE_ACCESS`. % of population within **5 km** of a health facility |
-| `snt_dhs_indicators` | DHS recodes + `DHIS2_DATASET_FORMATTED` | 11 indicators × parquet+csv, `{CC}_DHS_ADM1_{INDICATOR}.*` → `DHS_INDICATORS`. **ADM1 grain** (`data_source`/`admin_level` hardcoded) |
+| `snt_dhs_indicators` | DHS recodes + `DHIS2_DATASET_FORMATTED` | 12 tables × parquet+csv, `{CC}_DHS_ADM2_{INDICATOR}.*` → `DHS_INDICATORS`, each with `YEAR` (survey year). One row per ADM2 carrying its **ADM1** estimate (`data_source`/`admin_level` hardcoded) |
 | `snt_map_extracts` | MAP WCS + WorldPop raster + formatted shapes | **only** the wide all-years `{CC}_map_data.parquet/.csv` → `SNT_MAP_EXTRACTS` |
 | `snt_worldpop_extract` | WorldPop + formatted shapes | **only** the concatenated `{CC}_worldpop_population.parquet/.csv` → `WORLDPOP_DATASET_EXTRACT` |
 | `snt_era5_climate_data` | Copernicus CDS + formatted shapes | **only** `{CC}_{variable}_monthly.parquet` → `ERA5_DATASET_CLIMATE` |

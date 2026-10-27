@@ -355,14 +355,6 @@ VERSION`). Locating one metric needs a row filter and a year wildcard in `FILENA
 
 **Blocked on:** a joint decision of the SNT and IASO developers.
 
-### <a id="meta-15"></a>META-15 · DHS layers at ADM1
-
-The 12 `{CC}_DHS_ADM1_*` files from `snt_dhs_indicators` are left out of the master list: they are
-**ADM1 grain**, not ADM2, and have no `YEAR` column (the survey year is computed but not written).
-Excluded until the ADM1 question is agreed.
-
-**Blocked on:** IASO developers.
-
 ### <a id="meta-16"></a>META-16 · Lowercase quality-of-care rates
 
 `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria` and

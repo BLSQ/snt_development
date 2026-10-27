@@ -13,8 +13,8 @@
             "FR": "Population totale (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Total number of people living in a given area.",
-            "FR": "Nombre total de personnes vivant dans une zone spécifique."
+            "EN": "Total number of people living in the administrative unit, as recorded in DHIS2.",
+            "FR": "Nombre total de personnes vivant dans l'unité administrative, tel qu'enregistré dans le DHIS2."
         },
         "SOURCE": {
             "EN": "DHIS2",
@@ -25,8 +25,8 @@
             "FR": "Nombre de personnes"
         },
         "CATEGORY": {
-            "EN": "Variable of population and health",
-            "FR": "Variables de population et de santé"
+            "EN": "Population",
+            "FR": "Population"
         },
         "TYPE": "Threshold",
         "SCALE": [
@@ -53,136 +53,16 @@
             "FR": "Incidence brute (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Number of malaria cases relative to the population.",
-            "FR": "Nombre de nouveaux cas de paludisme, rapportés à la population."
+            "EN": "Number of confirmed malaria cases over the year, relative to the population.",
+            "FR": "Nombre de cas de paludisme confirmés sur l'année, rapporté à la population."
         },
         "SOURCE": {
             "EN": "DHIS2",
             "FR": "DHIS2"
         },
         "UNITS": {
-            "EN": "Per 1000 people",
-            "FR": "Pour 1000 personnes"
-        },
-        "CATEGORY": {
-            "EN": "Epidemiological indicators",
-            "FR": "Indicateurs épidémiologiques"
-        },
-        "TYPE": "Threshold",
-        "SCALE": [
-            50,
-            150,
-            250,
-            350,
-            450,
-            1000
-        ],
-        "UNIT_SYMBOL": null
-    },
-    "INCIDENCE_ADJ_TESTING": {
-        "SOURCE_DATA": {
-            "DATASET": {
-                "NAME": "DHIS2_INCIDENCE",
-                "VERSION": "latest"
-            },
-            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
-            "COLUMN": "INCIDENCE_ADJ_TESTING"
-        },
-        "LABEL": {
-            "EN": "Incidence adjusted for testing (DHIS2)",
-            "FR": "Incidence ajustée pour le dépistage (DHIS2)"
-        },
-        "DESCRIPTION": {
-            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate.",
-            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de positivité des tests, et rapportés à la population."
-        },
-        "SOURCE": {
-            "EN": "DHIS2",
-            "FR": "DHIS2"
-        },
-        "UNITS": {
-            "EN": "Per 1000 people",
-            "FR": "Pour 1000 personnes"
-        },
-        "CATEGORY": {
-            "EN": "Epidemiological indicators",
-            "FR": "Indicateurs épidémiologiques"
-        },
-        "TYPE": "Threshold",
-        "SCALE": [
-            50,
-            150,
-            250,
-            350,
-            450,
-            1000
-        ],
-        "UNIT_SYMBOL": null
-    },
-    "INCIDENCE_ADJ_REPORTING": {
-        "SOURCE_DATA": {
-            "DATASET": {
-                "NAME": "DHIS2_INCIDENCE",
-                "VERSION": "latest"
-            },
-            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
-            "COLUMN": "INCIDENCE_ADJ_REPORTING"
-        },
-        "LABEL": {
-            "EN": "Incidence adjusted for reporting rate (DHIS2)",
-            "FR": "Incidence ajustée pour le taux de rapportage (DHIS2)"
-        },
-        "DESCRIPTION": {
-            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate and reporting rate.",
-            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour le taux de rapportage et le taux de positivité des tests, et rapportés à la population."
-        },
-        "SOURCE": {
-            "EN": "DHIS2",
-            "FR": "DHIS2"
-        },
-        "UNITS": {
-            "EN": "Per 1000 people",
-            "FR": "Pour 1000 personnes"
-        },
-        "CATEGORY": {
-            "EN": "Epidemiological indicators",
-            "FR": "Indicateurs épidémiologiques"
-        },
-        "TYPE": "Threshold",
-        "SCALE": [
-            50,
-            150,
-            250,
-            350,
-            450,
-            1000
-        ],
-        "UNIT_SYMBOL": null
-    },
-    "INCIDENCE_ADJ_CARESEEKING": {
-        "SOURCE_DATA": {
-            "DATASET": {
-                "NAME": "DHIS2_INCIDENCE",
-                "VERSION": "latest"
-            },
-            "FILENAME": "{COUNTRY_CODE}_incidence.csv",
-            "COLUMN": "INCIDENCE_ADJ_CARESEEKING"
-        },
-        "LABEL": {
-            "EN": "Incidence adjusted for careseeking behaviour (DHIS2)",
-            "FR": "Incidence ajustée pour le taux de recherce de soins (DHIS2)"
-        },
-        "DESCRIPTION": {
-            "EN": "Number of malaria cases relative to the population, adjusted for test positivity rate, reporting rate, and careseeking behaviour.",
-            "FR": "Nombre de nouveaux cas de paludisme, ajustés pour la recherche de soins, le taux de rapportage et le taux de positivité des tests, et rapportés à la population"
-        },
-        "SOURCE": {
-            "EN": "DHIS2",
-            "FR": "DHIS2"
-        },
-        "UNITS": {
-            "EN": "Per 1000 people",
-            "FR": "Pour 1000 personnes"
+            "EN": "Cases per 1000 people per year",
+            "FR": "Cas pour 1000 personnes par an"
         },
         "CATEGORY": {
             "EN": "Epidemiological indicators",
@@ -205,36 +85,37 @@
                 "NAME": "DHIS2_REPORTING_RATE",
                 "VERSION": "latest"
             },
-            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement.csv",
+            "FILENAME": "{COUNTRY_CODE}_reporting_rate_dataelement_yearly.csv",
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "",
-            "FR": "Taux de rapportage (DHIS2)"
+            "EN": "Yearly reporting rate, based on facility activity (DHIS2)",
+            "FR": "Taux de rapportage annuel, selon l'activité des FOSA (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "",
-            "FR": "Nombre de rapports reçus, sur le nombre total de rapports attendus."
+            "EN": "Share of expected facility-months in the year in which health facilities reported routine malaria data. Expected facilities are, depending on the pipeline settings, those that reported at least once during the year or those open according to the DHIS2 pyramid.",
+            "FR": "Proportion des mois-FOSA attendus dans l'année pour lesquels les formations sanitaires (FOSA) ont rapporté des données de routine sur le paludisme. Les FOSA attendues sont, selon les paramètres du pipeline, celles ayant rapporté au moins une fois dans l'année ou celles ouvertes selon la pyramide DHIS2."
         },
         "SOURCE": {
-            "EN": "",
+            "EN": "DHIS2",
             "FR": "DHIS2"
         },
         "UNITS": {
             "EN": "Proportion",
-            "FR": ""
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "",
+            "EN": "Data quality",
             "FR": "Qualité des données"
         },
         "TYPE": "Threshold",
         "SCALE": [
-            0.25,
             0.5,
-            0.75
+            0.8,
+            0.9,
+            0.95
         ],
-        "UNIT_SYMBOL": "%"
+        "UNIT_SYMBOL": null
     },
     "REPORTING_RATE_DATASET": {
         "SOURCE_DATA": {
@@ -246,31 +127,68 @@
             "COLUMN": "REPORTING_RATE"
         },
         "LABEL": {
-            "EN": "",
-            "FR": ""
+            "EN": "Reporting rate, based on DHIS2 reports (DHIS2)",
+            "FR": "Taux de rapportage, selon les rapports DHIS2 (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "",
-            "FR": ""
+            "EN": "Number of reports received in the month, out of the number of reports expected, as recorded in DHIS2 for the selected data sets.",
+            "FR": "Nombre de rapports reçus dans le mois, sur le nombre total de rapports attendus, tel qu'enregistré dans le DHIS2 pour les formulaires sélectionnés."
         },
         "SOURCE": {
-            "EN": "",
-            "FR": ""
+            "EN": "DHIS2",
+            "FR": "DHIS2"
         },
         "UNITS": {
             "EN": "Proportion",
-            "FR": ""
+            "FR": "Proportion"
         },
         "CATEGORY": {
-            "EN": "",
+            "EN": "Data quality",
             "FR": "Qualité des données"
         },
         "TYPE": "Threshold",
         "SCALE": [
-            0.25,
             0.5,
-            0.75
+            0.8,
+            0.9,
+            0.95
         ],
-        "UNIT_SYMBOL": "%"
+        "UNIT_SYMBOL": null
+    },
+    "SEASONALITY_RAINFALL": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_SEASONALITY_RAINFALL",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_rainfall_seasonality.csv",
+            "COLUMN": "SEASONALITY_RAINFALL"
+        },
+        "LABEL": {
+            "EN": "Seasonality of rainfall (ERA5)",
+            "FR": "Saisonnalité des précipitations (ERA5)"
+        },
+        "DESCRIPTION": {
+            "EN": "Classification of seasonal malaria transmission based on monthly rainfall: an administrative unit is seasonal when, in enough years, a block of a few consecutive months concentrates a large share of the rainfall. Used to identify administrative units eligible for seasonal interventions.",
+            "FR": "Classification de la transmission saisonnière du paludisme sur base des précipitations mensuelles : une unité administrative est saisonnière quand, pour suffisamment d'années, un bloc de quelques mois consécutifs concentre une grande part des précipitations. Sert à identifier les unités administratives éligibles pour des interventions saisonnières."
+        },
+        "SOURCE": {
+            "EN": "ERA5",
+            "FR": "ERA5"
+        },
+        "UNITS": {
+            "EN": "Not seasonal (0), Seasonal (1)",
+            "FR": "Pas saisonnier (0), Saisonnier (1)"
+        },
+        "CATEGORY": {
+            "EN": "Environmental indicators",
+            "FR": "Indicateurs environnementaux"
+        },
+        "TYPE": "Ordinal",
+        "SCALE": [
+            0,
+            1
+        ],
+        "UNIT_SYMBOL": null
     }
 }

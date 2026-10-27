@@ -52,7 +52,7 @@ __pycache__/
 # Config file -----------------
 # ignore .json files (country data)...
 *.json
-# ...except the archived per-country config copies and old-format SNT_metadata.json
+# ...except the archived per-country config copies and old SNT_metadata*.json catalogues
 # (examples only, nothing reads them; see deprecated/configuration/README.md).
 !deprecated/configuration/*.json
 # ...or the shared Claude Code settings, which must reach every clone for the

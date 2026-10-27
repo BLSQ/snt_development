@@ -180,6 +180,9 @@ Check each claim against the code — see §0 for why this is not optional:
 - **Emphasis:** bold for variable names, file names and dataset identifiers; backticks for code
   identifiers (`ADM2_ID`, `pipeline.py`, `add_files_to_dataset`).
 - **Language:** English.
+- **Admin levels:** write **ADM1** / **ADM2** (e.g. "ADM2 × YEAR"), never "region" / "district":
+  a readme is generic, and what the levels are on the ground differs by country
+  ([glossary](GLOSSARY.md)).
 - **Filename:** `readme.md`, lowercase, in the pipeline's Python directory (`<pipeline_name>/`),
   not under `pipelines/<pipeline_name>/`.
 - **Markdown:** GitHub-flavored, standard headers (`#`, `##`, `###`).

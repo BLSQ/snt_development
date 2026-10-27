@@ -337,22 +337,21 @@ data; the few reused from earlier catalogues are the population, reporting-rate 
 
 **Owner:** SNT team.
 
-### <a id="meta-14"></a>META-14 · Restore the three MAP layers
+### <a id="meta-14"></a>META-14 · Add the MAP layers
 
-`PF_INCIDENCE_RATE`, `PF_PR_RATE` and `PF_MORTALITY_RATE` cannot be expressed in the format today.
-`snt_map_extracts` publishes a **long-format** table, **one file per year**
-(`{CC}_map_data_{year}.csv`, columns `METRIC_CATEGORY, METRIC_NAME, STATISTIC, VALUE, YEAR,
-VERSION`). Locating one metric needs a row filter and a year wildcard in `FILENAME`, and
-`SOURCE_DATA` has a field for neither. Options:
+`snt_map_extracts` publishes a single wide `{CC}_map_data.csv` to `SNT_MAP_EXTRACTS`: one row per
+ADM2 × `YEAR`, and per indicator a value column plus its population-weighted `_POP_W` column,
+scaled by the pipeline to %, per 1,000 or per 100,000 (see the
+[pipeline readme](../snt_map_extracts/readme.md)). Each indicator fits the format as an ordinary
+layer; none is in the master list. To do, as a separate change:
 
-1. `snt_map_extracts` also publishes a **wide** table: one column per metric, one row per
-   `ADM2_ID` × `YEAR`, in a single year-independent file. Each layer is then an ordinary entry.
-   Cheapest, and consistent with every other pipeline.
-2. `SOURCE_DATA` gains an optional **`FILTER`** field (`{"METRIC_NAME": "Pf_Incidence_Rate"}`) plus
-   a way to express per-year filenames. A format change that makes every consumer implement row
-   filtering.
-
-**Blocked on:** a joint decision of the SNT and IASO developers.
+- Decide which columns become layers: the value column, `_POP_W` (preferred for border districts,
+  per the readme), or both.
+- Add the entries. The archived layers in
+  [`deprecated/configuration/SNT_metadata.json`](../deprecated/configuration/SNT_metadata.json)
+  (`PF_PR_RATE`, `PF_INCIDENCE_RATE`, `PF_MORTALITY_RATE`, `ITN_ACCESS_RATE`, …) give labels and
+  scales in the same units; their scales need the outer limits removed and must be sorted ascending
+  ([contract README §3](../contracts/snt_metadata_json/README.md#3-field-reference)).
 
 ### <a id="meta-15"></a>META-15 · DHS layers at ADM1
 

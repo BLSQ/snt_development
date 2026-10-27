@@ -134,7 +134,7 @@ is absent:
 
 | Left out | Pipeline | Why |
 |---|---|---|
-| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
+| All MAP layers (`{CC}_map_data.*`) | `snt_map_extracts` | Not added yet. The pipeline publishes a single wide file (ADM2 × `YEAR`, one column per indicator plus its `_POP_W` column, values already scaled to % or per 1,000 / 100,000 by the pipeline), which fits the format; the layers are to be added separately ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
 | All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column ([BACKLOG META-15](../docs/BACKLOG.md#meta-15)). |
 | The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects and which breaks repo rule R10 ([BACKLOG META-16](../docs/BACKLOG.md#meta-16)). |
 | `non_malaria_all_cause_outpatients`, `presumed_cases` | `snt_dhis2_quality_of_care` | Lowercase, as above, and copies of `ALLOUT` / `PRES`, which are included. |

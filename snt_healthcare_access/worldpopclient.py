@@ -1,12 +1,9 @@
-#%% imports
-
 from pathlib import Path
 import re
 import requests
 from openhexa.sdk import current_run
 import logging
 
-#%% client definition
 
 class WorldPopClient:
     """Mini client for the WorldPop REST API.

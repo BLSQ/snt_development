@@ -76,7 +76,7 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 
 ### What it contains
 
-Every column the current pipelines can publish that fits the format — 58 layers. Each `SOURCE_DATA`
+Every column the current pipelines can publish that fits the format — 71 layers. Each `SOURCE_DATA`
 pointer was traced to the code that writes the column (the `add_files_to_dataset(...)` calls in
 `pipeline.py`, and the notebook cells that build the final table); none was checked against a live
 workspace. `snt_assemble_results` is out of scope (retired,
@@ -96,6 +96,7 @@ The layer id is the column name, plus a qualifier where two layers would otherwi
 | `PRECIPITATION_{MEAN,MIN,MAX}` | `ERA5_DATASET_CLIMATE` | `{COUNTRY_CODE}_total_precipitation_monthly.parquet` | `snt_era5_climate_data` |
 | `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
 | `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
+| `*_SAMPLE_AVERAGE` (10), `PCT_DROPOUT_DTP_*` (3) | `DHS_INDICATORS` | `{COUNTRY_CODE}_DHS_ADM2_<INDICATOR>.csv`, one file per indicator | `snt_dhs_indicators` |
 
 #### Layers that will not load everywhere
 
@@ -126,6 +127,9 @@ is absent:
   reporting-rate layers read the yearly tables (`YEAR`, no `MONTH`).
 - **`YEAR` stored as text:** the WorldPop table.
 - **Parquet only:** ERA5 publishes no `.csv` twin, so its `FILENAME` is the `.parquet`.
+- **ADM1 values on ADM2 rows, one survey year:** the DHS tables have one row per ADM2, but each
+  value is the ADM1 survey estimate, repeated for every ADM2 within that ADM1. `YEAR` is the survey
+  year, so a DHS layer has a single year. The layer descriptions say so.
 - **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the
   files of that run, `"latest"` on `DHIS2_REPORTING_RATE` holds only the variant run last, and the
   same goes for the two quality-of-care files.
@@ -134,8 +138,9 @@ is absent:
 
 | Left out | Pipeline | Why |
 |---|---|---|
-| All MAP layers (`{CC}_map_data.*`) | `snt_map_extracts` | Not added yet. The pipeline publishes a single wide file (ADM2 × `YEAR`, one column per indicator plus its `_POP_W` column, values already scaled to % or per 1,000 / 100,000 by the pipeline), which fits the format; the layers are to be added separately ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
-| All DHS layers (12 files `{CC}_DHS_ADM1_*`: ITN access/use, care-seeking, U5 mortality, U5 RDT prevalence, DTP1–3 and dropout, each with CI bounds) | `snt_dhs_indicators` | **ADM1 grain**, not ADM2, and no `YEAR` column ([BACKLOG META-15](../docs/BACKLOG.md#meta-15)). |
+| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
+| `{CC}_DHS_ADM2_PCT_CARESEEKING_SAMPLE_AVERAGE.*` | `snt_dhs_indicators` | Copies of the `PCT_{NO,PUBLIC,PRIVATE}_CARE` sample averages, which are included from their own files. |
+| DHS `*_CI_LOWER_BOUND`, `*_CI_UPPER_BOUND` | `snt_dhs_indicators` | Confidence bounds of an estimate, not a layer of their own. |
 | The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects and which breaks repo rule R10 ([BACKLOG META-16](../docs/BACKLOG.md#meta-16)). |
 | `non_malaria_all_cause_outpatients`, `presumed_cases` | `snt_dhis2_quality_of_care` | Lowercase, as above, and copies of `ALLOUT` / `PRES`, which are included. |
 | Routine indicators (`{CC}_routine.*`) | `snt_dhis2_formatting` | **Facility × month** grain, not ADM2. The Explorer would need aggregation the format cannot express. |

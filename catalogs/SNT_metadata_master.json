@@ -2254,5 +2254,502 @@
             75
         ],
         "UNIT_SYMBOL": "%"
+    },
+    "U5MR_PERMIL_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_U5MR_PERMIL.csv",
+            "COLUMN": "U5MR_PERMIL_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Under-5 mortality (DHS)",
+            "FR": "Mortalité infanto-juvénile (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Probability that a child dies before their 5th birthday (all causes), over the 10 years before the survey. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Probabilité qu'un enfant décède avant son 5e anniversaire (toutes causes), sur les 10 années précédant l'enquête. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Deaths per 1000 live births",
+            "FR": "Décès pour 1000 naissances vivantes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            25,
+            50,
+            75,
+            100,
+            125,
+            150,
+            175
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PCT_PUBLIC_CARE_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_PUBLIC_CARE.csv",
+            "COLUMN": "PCT_PUBLIC_CARE_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Care-seeking in the public sector (DHS)",
+            "FR": "Recherche de soins dans le secteur public (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children under 5 with fever in the 2 weeks before the survey, for whom advice or treatment was sought in the public sector. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de moins de 5 ans ayant eu de la fièvre dans les 2 semaines précédant l'enquête, pour lesquels des conseils ou un traitement ont été recherchés dans le secteur public. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_PRIVATE_CARE_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_PRIVATE_CARE.csv",
+            "COLUMN": "PCT_PRIVATE_CARE_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Care-seeking in the private sector (DHS)",
+            "FR": "Recherche de soins dans le secteur privé (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children under 5 with fever in the 2 weeks before the survey, for whom advice or treatment was sought in the private sector. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de moins de 5 ans ayant eu de la fièvre dans les 2 semaines précédant l'enquête, pour lesquels des conseils ou un traitement ont été recherchés dans le secteur privé. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_NO_CARE_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_NO_CARE.csv",
+            "COLUMN": "PCT_NO_CARE_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "No care-seeking (DHS)",
+            "FR": "Absence de recherche de soins (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children under 5 with fever in the 2 weeks before the survey, for whom no advice or treatment was sought. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de moins de 5 ans ayant eu de la fièvre dans les 2 semaines précédant l'enquête, pour lesquels aucun conseil ni traitement n'a été recherché. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_U5_PREV_RDT_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_U5_PREV_RDT.csv",
+            "COLUMN": "PCT_U5_PREV_RDT_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Malaria prevalence in children 6-59 months, by RDT (DHS)",
+            "FR": "Prévalence du paludisme chez les enfants de 6 à 59 mois, par TDR (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 6 to 59 months who tested positive for malaria with a rapid diagnostic test (RDT) during the survey. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 6 à 59 mois testés positifs au paludisme par test de diagnostic rapide (TDR) lors de l'enquête. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DTP1_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DTP1.csv",
+            "COLUMN": "PCT_DTP1_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "DTP1 vaccination (DHS)",
+            "FR": "Vaccination DTC1 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received the first dose of the Diphtheria-Tetanus-Pertussis (DTP) vaccine. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu la première dose du vaccin Diphtérie-Tétanos-Coqueluche (DTC). Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DTP2_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DTP2.csv",
+            "COLUMN": "PCT_DTP2_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "DTP2 vaccination (DHS)",
+            "FR": "Vaccination DTC2 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received the second dose of the Diphtheria-Tetanus-Pertussis (DTP) vaccine. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu la deuxième dose du vaccin Diphtérie-Tétanos-Coqueluche (DTC). Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DTP3_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DTP3.csv",
+            "COLUMN": "PCT_DTP3_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "DTP3 vaccination (DHS)",
+            "FR": "Vaccination DTC3 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received the third dose of the Diphtheria-Tetanus-Pertussis (DTP) vaccine. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu la troisième dose du vaccin Diphtérie-Tétanos-Coqueluche (DTC). Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DROPOUT_DTP_1_2": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DROPOUT_DTP.csv",
+            "COLUMN": "PCT_DROPOUT_DTP_1_2"
+        },
+        "LABEL": {
+            "EN": "DTP1-DTP2 dropout (DHS)",
+            "FR": "Abandon vaccinal DTC1-DTC2 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received DTP1 but not DTP2, relative to those who received DTP1. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu le DTC1 mais pas le DTC2, parmi ceux ayant reçu le DTC1. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DROPOUT_DTP_2_3": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DROPOUT_DTP.csv",
+            "COLUMN": "PCT_DROPOUT_DTP_2_3"
+        },
+        "LABEL": {
+            "EN": "DTP2-DTP3 dropout (DHS)",
+            "FR": "Abandon vaccinal DTC2-DTC3 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received DTP2 but not DTP3, relative to those who received DTP2. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu le DTC2 mais pas le DTC3, parmi ceux ayant reçu le DTC2. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_DROPOUT_DTP_1_3": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_DROPOUT_DTP.csv",
+            "COLUMN": "PCT_DROPOUT_DTP_1_3"
+        },
+        "LABEL": {
+            "EN": "DTP1-DTP3 dropout (DHS)",
+            "FR": "Abandon vaccinal DTC1-DTC3 (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 12 to 35 months who received DTP1 but not DTP3, relative to those who received DTP1. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage des enfants de 12 à 35 mois ayant reçu le DTC1 mais pas le DTC3, parmi ceux ayant reçu le DTC1. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of children",
+            "FR": "Pourcentage des enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_ITN_ACCESS_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_ITN_ACCESS.csv",
+            "COLUMN": "PCT_ITN_ACCESS_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Access to insecticide-treated nets (DHS)",
+            "FR": "Accès aux moustiquaires imprégnées d'insecticide (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of the population who could sleep under an insecticide-treated net (ITN) in their household, assuming each ITN is used by up to two people. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage de la population pouvant dormir sous une moustiquaire imprégnée d'insecticide (MII) du ménage, en supposant que chaque MII est utilisée par deux personnes au plus. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of the population",
+            "FR": "Pourcentage de la population"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PCT_ITN_USE_SAMPLE_AVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "DHS_INDICATORS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_DHS_ADM2_PCT_ITN_USE.csv",
+            "COLUMN": "PCT_ITN_USE_SAMPLE_AVERAGE"
+        },
+        "LABEL": {
+            "EN": "Use of insecticide-treated nets (DHS)",
+            "FR": "Utilisation des moustiquaires imprégnées d'insecticide (DHS)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of the population who slept under an insecticide-treated net (ITN) the night before the survey. Estimated per ADM1 from the latest DHS survey; every ADM2 within an ADM1 shares its value.",
+            "FR": "Pourcentage de la population ayant dormi sous une moustiquaire imprégnée d'insecticide (MII) la nuit précédant l'enquête. Estimé par ADM1 à partir de la dernière enquête EDS (DHS) ; toutes les unités ADM2 d'une même ADM1 partagent cette valeur."
+        },
+        "SOURCE": {
+            "EN": "DHS",
+            "FR": "DHS"
+        },
+        "UNITS": {
+            "EN": "Percentage of the population",
+            "FR": "Pourcentage de la population"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
     }
 }

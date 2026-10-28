@@ -353,14 +353,6 @@ layer; none is in the master list. To do, as a separate change:
   scales in the same units; their scales need the outer limits removed and must be sorted ascending
   ([contract README §3](../contracts/snt_metadata_json/README.md#3-field-reference)).
 
-### <a id="meta-15"></a>META-15 · DHS layers at ADM1
-
-The 12 `{CC}_DHS_ADM1_*` files from `snt_dhs_indicators` are left out of the master list: they are
-**ADM1 grain**, not ADM2, and have no `YEAR` column (the survey year is computed but not written).
-Excluded until the ADM1 question is agreed.
-
-**Blocked on:** IASO developers.
-
 ### <a id="meta-16"></a>META-16 · Lowercase quality-of-care rates
 
 `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria` and

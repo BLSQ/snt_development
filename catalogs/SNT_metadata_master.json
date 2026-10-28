@@ -625,8 +625,8 @@
             "FR": "Taux de rapportage annuel, selon l'activité des FOSA (DHIS2)"
         },
         "DESCRIPTION": {
-            "EN": "Share of expected facility-months in the year in which health facilities reported routine malaria data. Expected facilities are, depending on the pipeline settings, those that reported at least once during the year or those open according to the DHIS2 pyramid.",
-            "FR": "Proportion des mois-FOSA attendus dans l'année pour lesquels les formations sanitaires (FOSA) ont rapporté des données de routine sur le paludisme. Les FOSA attendues sont, selon les paramètres du pipeline, celles ayant rapporté au moins une fois dans l'année ou celles ouvertes selon la pyramide DHIS2."
+            "EN": "Share of expected facility-months in the year in which health facilities reported routine malaria data. Expected facilities are, depending on the pipeline settings, those that reported at least once during the year or those open according to the DHIS2 pyramid. Depending on the pipeline settings, facilities can also be weighted by their volume of activity (cases).",
+            "FR": "Proportion des mois-FOSA attendus dans l'année pour lesquels les formations sanitaires (FOSA) ont rapporté des données de routine sur le paludisme. Les FOSA attendues sont, selon les paramètres du pipeline, celles ayant rapporté au moins une fois dans l'année ou celles ouvertes selon la pyramide DHIS2. Selon les paramètres du pipeline, les FOSA peuvent aussi être pondérées par leur volume d'activité (cas)."
         },
         "SOURCE": {
             "EN": "DHIS2",

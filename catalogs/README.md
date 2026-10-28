@@ -113,8 +113,9 @@ is absent:
 - **The quality-of-care counts** are written only if the column is in the routine data, so they vary
   with each country's `DHIS2_INDICATOR_DEFINITIONS` (`ALLADM`, `ALLDTH`, `ALLOUT` in particular).
 - **Only one variant of an alternative is present at a time.** Quality of care writes the `imputed`
-  or the `removed` file, per run. Both reporting-rate files can coexist, but see the dataset-version
-  caveat below.
+  or the `removed` file, per run. `DHIS2_REPORTING_RATE` holds only the files of the last successful
+  run, so either the data-element or the dataset files, never both: only one of the two
+  reporting-rate layers loads.
 - **`INCIDENCE_ADJ_CARESEEKING`** is always written, but is all `NA` when no care-seeking data was
   available.
 
@@ -130,9 +131,6 @@ is absent:
 - **ADM1 values on ADM2 rows, one survey year:** the DHS tables have one row per ADM2, but each
   value is the ADM1 survey estimate, repeated for every ADM2 within that ADM1. `YEAR` is the survey
   year, so a DHS layer has a single year. The layer descriptions say so.
-- **Dataset versions (UNVERIFIED):** if `add_files_to_dataset` creates a version holding only the
-  files of that run, `"latest"` on `DHIS2_REPORTING_RATE` holds only the variant run last, and the
-  same goes for the two quality-of-care files.
 
 #### What was left out, and why
 

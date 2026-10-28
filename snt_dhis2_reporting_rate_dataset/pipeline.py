@@ -112,6 +112,8 @@ def snt_dhis2_reporting_rate_dataset(run_report_only: bool, pull_scripts: bool):
         expected_outputs = [
             data_path / f"{country_code}_reporting_rate_dataset.parquet",
             data_path / f"{country_code}_reporting_rate_dataset.csv",
+            data_path / f"{country_code}_reporting_rate_dataset_yearly.parquet",
+            data_path / f"{country_code}_reporting_rate_dataset_yearly.csv",
         ]
         check_outputs_generated(file_paths=expected_outputs, run_start_ts=run_start_ts)
         add_files_to_dataset(

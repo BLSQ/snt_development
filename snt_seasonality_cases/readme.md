@@ -26,7 +26,7 @@ This pipeline measures **malaria case seasonality** at **ADM2** using **monthly*
 
 - **`configuration/SNT_config.json`**: Supplies dataset identifiers (DHIS2 formatted routine) and geometry references.
 - **`{COUNTRY_CODE}_routine.parquet`**: Monthly DHIS2 extract containing `CONF`, `ADM2_ID`, `YEAR`, and `MONTH` (plus other routine columns ignored by this pipeline’s seasonality math).
-- **ADM2 boundary attributes** pulled with the spatial helpers in the notebook for naming and QC columns.
+- **`{COUNTRY_CODE}_shapes.geojson`** (from **`DHIS2_DATASET_FORMATTED`**): ADM2 boundary attributes (IDs and names) attached to the outputs.
 
 ## Outputs
 

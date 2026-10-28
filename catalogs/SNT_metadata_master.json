@@ -2751,5 +2751,569 @@
             80
         ],
         "UNIT_SYMBOL": "%"
+    },
+    "PF_PARASITE_RATE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_PARASITE_RATE"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum prevalence in children aged 2-10 (MAP)",
+            "FR": "Prévalence de Plasmodium falciparum chez les enfants de 2 à 10 ans (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 2 to 10 infected with Plasmodium falciparum, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Pourcentage des enfants de 2 à 10 ans infectés par Plasmodium falciparum, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 children",
+            "FR": "Pour 100 enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PF_PARASITE_RATE_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_PARASITE_RATE_POP_W"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum prevalence in children aged 2-10, population-weighted (MAP)",
+            "FR": "Prévalence de Plasmodium falciparum chez les enfants de 2 à 10 ans, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of children aged 2 to 10 infected with Plasmodium falciparum, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Pourcentage des enfants de 2 à 10 ans infectés par Plasmodium falciparum, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 children",
+            "FR": "Pour 100 enfants"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            20,
+            40,
+            60,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "PF_INCIDENCE_RATE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_INCIDENCE_RATE"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum incidence (MAP)",
+            "FR": "Incidence de Plasmodium falciparum (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of new Plasmodium falciparum cases per 1,000 people per year, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Nombre de nouveaux cas de Plasmodium falciparum pour 1 000 personnes par an, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 1,000 people",
+            "FR": "Pour 1 000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            150,
+            250,
+            350,
+            450
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PF_INCIDENCE_RATE_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_INCIDENCE_RATE_POP_W"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum incidence, population-weighted (MAP)",
+            "FR": "Incidence de Plasmodium falciparum, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of new Plasmodium falciparum cases per 1,000 people per year, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Nombre de nouveaux cas de Plasmodium falciparum pour 1 000 personnes par an, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 1,000 people",
+            "FR": "Pour 1 000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            150,
+            250,
+            350,
+            450
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PF_MORTALITY_RATE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_MORTALITY_RATE"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum mortality rate (MAP)",
+            "FR": "Taux de mortalité par Plasmodium falciparum (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of deaths due to Plasmodium falciparum per 100,000 people per year, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Nombre de décès dus à Plasmodium falciparum pour 100 000 personnes par an, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100,000 people",
+            "FR": "Pour 100 000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            100,
+            200,
+            300
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "PF_MORTALITY_RATE_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "PF_MORTALITY_RATE_POP_W"
+        },
+        "LABEL": {
+            "EN": "Plasmodium falciparum mortality rate, population-weighted (MAP)",
+            "FR": "Taux de mortalité par Plasmodium falciparum, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Number of deaths due to Plasmodium falciparum per 100,000 people per year, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Nombre de décès dus à Plasmodium falciparum pour 100 000 personnes par an, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100,000 people",
+            "FR": "Pour 100 000 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            50,
+            100,
+            200,
+            300
+        ],
+        "UNIT_SYMBOL": null
+    },
+    "INSECTICIDE_TREATED_NET_ACCESS": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "INSECTICIDE_TREATED_NET_ACCESS"
+        },
+        "LABEL": {
+            "EN": "Access to insecticide-treated nets (MAP)",
+            "FR": "Accès aux moustiquaires imprégnées d'insecticide (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of the population with access to an insecticide-treated net (ITN) in their household, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Pourcentage de la population ayant accès à une moustiquaire imprégnée d'insecticide (MII) dans le ménage, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 people",
+            "FR": "Pour 100 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "INSECTICIDE_TREATED_NET_ACCESS_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "INSECTICIDE_TREATED_NET_ACCESS_POP_W"
+        },
+        "LABEL": {
+            "EN": "Access to insecticide-treated nets, population-weighted (MAP)",
+            "FR": "Accès aux moustiquaires imprégnées d'insecticide, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of the population with access to an insecticide-treated net (ITN) in their household, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Pourcentage de la population ayant accès à une moustiquaire imprégnée d'insecticide (MII) dans le ménage, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 people",
+            "FR": "Pour 100 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "INSECTICIDE_TREATED_NET_USE_RATE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "INSECTICIDE_TREATED_NET_USE_RATE"
+        },
+        "LABEL": {
+            "EN": "Use of insecticide-treated nets (MAP)",
+            "FR": "Utilisation des moustiquaires imprégnées d'insecticide (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of people who slept under an insecticide-treated net (ITN), among those with access to one in their household, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Pourcentage des personnes ayant dormi sous une moustiquaire imprégnée d'insecticide (MII), parmi celles y ayant accès dans le ménage, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 people",
+            "FR": "Pour 100 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "INSECTICIDE_TREATED_NET_USE_RATE_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "INSECTICIDE_TREATED_NET_USE_RATE_POP_W"
+        },
+        "LABEL": {
+            "EN": "Use of insecticide-treated nets, population-weighted (MAP)",
+            "FR": "Utilisation des moustiquaires imprégnées d'insecticide, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of people who slept under an insecticide-treated net (ITN), among those with access to one in their household, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Pourcentage des personnes ayant dormi sous une moustiquaire imprégnée d'insecticide (MII), parmi celles y ayant accès dans le ménage, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 people",
+            "FR": "Pour 100 personnes"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "IRS_COVERAGE": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "IRS_COVERAGE"
+        },
+        "LABEL": {
+            "EN": "Indoor residual spraying coverage (MAP)",
+            "FR": "Couverture de la pulvérisation intra-domiciliaire (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of households covered by indoor residual spraying (IRS), in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Pourcentage des ménages couverts par la pulvérisation intra-domiciliaire (PID), au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 households",
+            "FR": "Pour 100 ménages"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "IRS_COVERAGE_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "IRS_COVERAGE_POP_W"
+        },
+        "LABEL": {
+            "EN": "Indoor residual spraying coverage, population-weighted (MAP)",
+            "FR": "Couverture de la pulvérisation intra-domiciliaire, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of households covered by indoor residual spraying (IRS), in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Pourcentage des ménages couverts par la pulvérisation intra-domiciliaire (PID), au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 households",
+            "FR": "Pour 100 ménages"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "ANTIMALARIAL_EFFECTIVE_TREATMENT": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "ANTIMALARIAL_EFFECTIVE_TREATMENT"
+        },
+        "LABEL": {
+            "EN": "Effective antimalarial treatment (MAP)",
+            "FR": "Traitement antipaludique efficace (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of malaria cases that receive effective treatment with an antimalarial medicine, in a given year. Median of the MAP raster pixels within the ADM2.",
+            "FR": "Pourcentage des cas de paludisme recevant un traitement efficace par un médicament antipaludique, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 cases",
+            "FR": "Pour 100 cas"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
+    },
+    "ANTIMALARIAL_EFFECTIVE_TREATMENT_POP_W": {
+        "SOURCE_DATA": {
+            "DATASET": {
+                "NAME": "SNT_MAP_EXTRACTS",
+                "VERSION": "latest"
+            },
+            "FILENAME": "{COUNTRY_CODE}_map_data.csv",
+            "COLUMN": "ANTIMALARIAL_EFFECTIVE_TREATMENT_POP_W"
+        },
+        "LABEL": {
+            "EN": "Effective antimalarial treatment, population-weighted (MAP)",
+            "FR": "Traitement antipaludique efficace, pondérée par la population (MAP)"
+        },
+        "DESCRIPTION": {
+            "EN": "Percentage of malaria cases that receive effective treatment with an antimalarial medicine, in a given year. Median of the MAP raster pixels within the ADM2, weighted by WorldPop population.",
+            "FR": "Pourcentage des cas de paludisme recevant un traitement efficace par un médicament antipaludique, au cours d'une année donnée. Médiane des pixels du raster MAP dans l'ADM2, pondérée par la population WorldPop."
+        },
+        "SOURCE": {
+            "EN": "MAP",
+            "FR": "MAP"
+        },
+        "UNITS": {
+            "EN": "Per 100 cases",
+            "FR": "Pour 100 cas"
+        },
+        "CATEGORY": {
+            "EN": "",
+            "FR": ""
+        },
+        "TYPE": "Threshold",
+        "SCALE": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80
+        ],
+        "UNIT_SYMBOL": "%"
     }
 }

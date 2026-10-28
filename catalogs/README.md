@@ -76,7 +76,7 @@ trim report as `MASTER.SHA256`, can be checked against `release_manifest.json`.
 
 ### What it contains
 
-Every column the current pipelines can publish that fits the format — 71 layers. Each `SOURCE_DATA`
+Every column the current pipelines can publish that fits the format — 85 layers. Each `SOURCE_DATA`
 pointer was traced to the code that writes the column (the `add_files_to_dataset(...)` calls in
 `pipeline.py`, and the notebook cells that build the final table); none was checked against a live
 workspace. `snt_assemble_results` is out of scope (retired,
@@ -97,6 +97,7 @@ The layer id is the column name, plus a qualifier where two layers would otherwi
 | `POPULATION_WORLDPOP` | `WORLDPOP_DATASET_EXTRACT` | `{COUNTRY_CODE}_worldpop_population.csv` | `snt_worldpop_extract` |
 | `POP_TOTAL`, `POP_COVERED`, `PCT_HEALTH_ACCESS` | `SNT_HEALTHCARE_ACCESS` | `{COUNTRY_CODE}_population_covered_health.csv` | `snt_healthcare_access` |
 | `*_SAMPLE_AVERAGE` (10), `PCT_DROPOUT_DTP_*` (3) | `DHS_INDICATORS` | `{COUNTRY_CODE}_DHS_ADM2_<INDICATOR>.csv`, one file per indicator | `snt_dhs_indicators` |
+| `PF_*`, `INSECTICIDE_TREATED_NET_*`, `IRS_COVERAGE`, `ANTIMALARIAL_EFFECTIVE_TREATMENT`, each also as `*_POP_W` (7 + 7) | `SNT_MAP_EXTRACTS` | `{COUNTRY_CODE}_map_data.csv` | `snt_map_extracts` |
 
 #### Layers that will not load everywhere
 
@@ -138,7 +139,7 @@ is absent:
 
 | Left out | Pipeline | Why |
 |---|---|---|
-| All MAP layers (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Long format, one file per year ([BACKLOG META-14](../docs/BACKLOG.md#meta-14)). |
+| MAP `LCI` / `UCI` statistics (`{CC}_map_data_{year}.*`) | `snt_map_extracts` | Confidence bounds, kept only in the unpublished per-year long tables. |
 | `{CC}_DHS_ADM2_PCT_CARESEEKING_SAMPLE_AVERAGE.*` | `snt_dhs_indicators` | Copies of the `PCT_{NO,PUBLIC,PRIVATE}_CARE` sample averages, which are included from their own files. |
 | DHS `*_CI_LOWER_BOUND`, `*_CI_UPPER_BOUND` | `snt_dhs_indicators` | Confidence bounds of an estimate, not a layer of their own. |
 | The five quality-of-care rates: `testing_rate`, `treatment_rate`, `case_fatality_rate`, `prop_adm_malaria`, `prop_malaria_deaths` | `snt_dhis2_quality_of_care` | Written in **lowercase**, which `COLUMN`'s pattern rejects and which breaks repo rule R10 ([BACKLOG META-16](../docs/BACKLOG.md#meta-16)). |

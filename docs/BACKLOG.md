@@ -330,28 +330,13 @@ decided.
 
 ### <a id="meta-13"></a>META-13 · Review the master-list text
 
-`LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` for all 58 layers are a draft written from the code
+`LABEL`, `DESCRIPTION`, `SOURCE` and `UNITS` for all layers are a draft written from the code
 (2026-10-15), not yet reviewed by someone with domain knowledge. `CATEGORY` is empty in both
 languages ([META-3](#meta-3)). Most `SCALE` values are generic defaults per unit, not drawn from
-data; the few reused from earlier catalogues are the population, reporting-rate and incidence bins.
+data; the few reused from earlier catalogues are the population, reporting-rate, incidence and MAP
+bins.
 
 **Owner:** SNT team.
-
-### <a id="meta-14"></a>META-14 · Add the MAP layers
-
-`snt_map_extracts` publishes a single wide `{CC}_map_data.csv` to `SNT_MAP_EXTRACTS`: one row per
-ADM2 × `YEAR`, and per indicator a value column plus its population-weighted `_POP_W` column,
-scaled by the pipeline to %, per 1,000 or per 100,000 (see the
-[pipeline readme](../snt_map_extracts/readme.md)). Each indicator fits the format as an ordinary
-layer; none is in the master list. To do, as a separate change:
-
-- Decide which columns become layers: the value column, `_POP_W` (preferred for border districts,
-  per the readme), or both.
-- Add the entries. The archived layers in
-  [`deprecated/configuration/SNT_metadata.json`](../deprecated/configuration/SNT_metadata.json)
-  (`PF_PR_RATE`, `PF_INCIDENCE_RATE`, `PF_MORTALITY_RATE`, `ITN_ACCESS_RATE`, …) give labels and
-  scales in the same units; their scales need the outer limits removed and must be sorted ascending
-  ([contract README §3](../contracts/snt_metadata_json/README.md#3-field-reference)).
 
 ### <a id="meta-16"></a>META-16 · Lowercase quality-of-care rates
 

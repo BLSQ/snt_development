@@ -150,7 +150,7 @@ is absent:
 | `{CC}_pyramid.*` | `snt_dhis2_formatting` | Facility list (coordinates, opening/closing dates); no values to map. |
 | All raw extracts (`{CC}_dhis2_raw_*.parquet`) | `snt_dhis2_extract` | Long format, raw DHIS2 ids, no `YEAR`. |
 | Extra columns from an uploaded disaggregation file | `snt_dhis2_population_transformation` | Arbitrary operator-chosen names, not uppercased. Only the template's `POP_*` columns are included. |
-| Admin columns (`ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME`) | `snt_seasonality_cases`, `snt_healthcare_access` | Admin columns. |
+| Admin columns (`ADM1_LEVEL_NAME`, `ADM2_LEVEL_NAME`) | `snt_healthcare_access` | Admin columns. |
 
 `snt_workspace_check` publishes nothing to a dataset.
 

@@ -33,7 +33,10 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_threshold_for_seasonality",
     name="Minimal proportion of cases for seasonality",
-    help="The proportion of annual cases that must fall within the block to qualify as seasonal (e.g., 0.6 = 60%).",
+    help=(
+        "The proportion of annual cases that must fall within the block to qualify "
+        "as seasonal (e.g., 0.6 = 60%)."
+    ),
     type=float,
     default=0.6,
     required=True,
@@ -41,7 +44,10 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "get_threshold_proportion_seasonal_years",
     name="Minimal proportion of seasonal years",
-    help="The proportion of years that must be classified as seasonal for an ADM2 to be considered seasonal overall.",
+    help=(
+        "The proportion of years that must be classified as seasonal for an ADM2 to be considered "
+        "seasonal overall."
+    ),
     type=float,
     default=0.5,
     required=False,
@@ -49,7 +55,10 @@ from snt_lib.snt_pipeline_utils import (
 @parameter(
     "use_calendar_year_denominator",
     name="Use calendar year as denominator",
-    help="Method to define 'annual' cases for the denominator. FALSE (default): 12-month forward-looking sliding window (WHO approach). TRUE: calendar year (Jan-Dec).",
+    help=(
+        "Method to define 'annual' cases for the denominator. FALSE (default): 12-month forward-looking "
+        "sliding window (WHO approach). TRUE: calendar year (Jan-Dec)."
+    ),
     type=bool,
     default=False,
     required=False,
@@ -101,22 +110,30 @@ def snt_seasonality_cases(
             code_scripts=["snt_seasonality_cases.ipynb"],
         )
 
+    try:
+        # config input
+        snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
+        validate_config(snt_config)
+        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
+    except Exception as e:
+        current_run.log_error(f"Failed to load configuration: {e!s}")
+        raise
+
     if not run_report_only:
+        input_params = {
+            "minimum_month_block_size": get_minimum_month_block_size,
+            "maximum_month_block_size": get_maximum_month_block_size,
+            "threshold_for_seasonality": get_threshold_for_seasonality,
+            "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
+            "use_calendar_year_denominator": use_calendar_year_denominator,
+        }
         try:
-            # config input
-            snt_config = load_configuration_snt(config_path=root_path / "configuration" / "SNT_config.json")
-            validate_config(snt_config)
-            country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
-
-            input_params = {
-                "minimum_month_block_size": get_minimum_month_block_size,
-                "maximum_month_block_size": get_maximum_month_block_size,
-                "threshold_for_seasonality": get_threshold_for_seasonality,
-                "threshold_proportion_seasonal_years": get_threshold_proportion_seasonal_years,
-                "use_calendar_year_denominator": use_calendar_year_denominator,
-            }
             validate_parameters(input_params)
+        except Exception as e:
+            current_run.log_error(f"Invalid input parameters: {e!s}")
+            raise
 
+        try:
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_seasonality_cases.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -124,41 +141,44 @@ def snt_seasonality_cases(
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
                 country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Pipeline failed: {e!s}")
+            raise
 
+        try:
             parameters_file = save_pipeline_parameters(
                 pipeline_name="snt_seasonality_cases",
                 parameters=input_params,
                 output_path=data_path,
                 country_code=country_code,
             )
-
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY_CASES"],
-                country_code=country_code,
-                file_paths=[
-                    data_path / f"{country_code}_cases_seasonality.parquet",
-                    data_path / f"{country_code}_cases_seasonality.csv",
-                    parameters_file,
-                ],
-            )
-
         except Exception as e:
-            current_run.log_error(f"Pipeline failed: {e!s}")
+            current_run.log_error(f"Failed to save pipeline parameters: {e!s}")
             raise
+
+        add_files_to_dataset(
+            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"]["SNT_SEASONALITY_CASES"],
+            country_code=country_code,
+            file_paths=[
+                data_path / f"{country_code}_cases_seasonality.parquet",
+                data_path / f"{country_code}_cases_seasonality.csv",
+                parameters_file,
+            ],
+        )
 
     else:
         current_run.log_info("Skipping calculations, running only the reporting.")
-        snt_config = load_configuration_snt(
-            config_path=root_path / "configuration" / "SNT_config.json"
-        )
-        country_code = snt_config["SNT_CONFIG"]["COUNTRY_CODE"]
 
-    run_report_notebook(
-        nb_file=pipeline_path / "reporting" / "snt_seasonality_cases_report.ipynb",
-        nb_output_path=pipeline_path / "reporting" / "outputs",
-        error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_seasonality_cases_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Reporting failed: {e!s}")
+        raise
 
 
 def validate_parameters(parameters: dict):

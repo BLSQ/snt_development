@@ -20,10 +20,11 @@ This pipeline estimates, for each **ADM2**, the share of the population living w
 1. Validation:
   - If an **`input_fosa_file`** exists: validate custom extension (must be **`.csv`**).
   - Validate the **`wpop_year`** to download WorldPop population raster data.
-2. Load **`configuration/SNT_config.json`**, determine **`COUNTRY_CODE`**, and run **`pipelines/snt_healthcare_access/code/snt_healthcare_access.ipynb`** via Papermill with **`FOSA_FILE`** and **`wpop_year`**.
-3. Inside the notebook: load **ADM2** polygons, facility coordinates, population raster, build buffers in the metric CRS used in the notebook (see notebook for EPSG), rasterize inclusion masks, and compute zonal sums of total versus covered population per **`ADM2_ID`**.
-4. Save parameter JSON and upload **`{COUNTRY_CODE}_population_covered_health`** parquet and CSV plus parameters to **`SNT_HEALTHCARE_ACCESS`** when the dataset identifier is present.
-5. Execute **`snt_healthcare_access_report.ipynb`**.
+2. Load **`configuration/SNT_config.json`**, determine **`COUNTRY_CODE`**, and retrieve the **ADM2** shapes (**`{COUNTRY_CODE}_shapes.geojson`** from **`DHIS2_DATASET_FORMATTED`**), dropping units with missing or empty geometry; the run stops if no valid shapes remain.
+3. Save the parameters JSON, download the WorldPop raster for **`wpop_year`** into **`data/worldpop/rasters/`** if it is not already there (the run stops if it cannot be retrieved), and run **`pipelines/snt_healthcare_access/code/snt_healthcare_access.ipynb`** via Papermill with **`INPUT_FOSA_FILE`** and **`WORLDPOP_YEAR`**.
+4. Inside the notebook: load **ADM2** polygons, facility coordinates, population raster, build buffers in the metric CRS used in the notebook (see notebook for EPSG), rasterize inclusion masks, and compute zonal sums of total versus covered population per **`ADM2_ID`**.
+5. Upload **`{COUNTRY_CODE}_population_covered_health`** parquet and CSV plus the parameters JSON to **`SNT_HEALTHCARE_ACCESS`**; the run fails if that dataset identifier is missing from the configuration.
+6. Execute **`snt_healthcare_access_report.ipynb`**.
 
 ## Inputs
 
@@ -34,13 +35,14 @@ This pipeline estimates, for each **ADM2**, the share of the population living w
 
 ## Outputs
 
-* **`{COUNTRY_CODE}_population_covered_health.parquet`** and **`.csv`**: **ADM2**-level totals, covered population counts, and derived coverage fractions.
+* **`{COUNTRY_CODE}_population_covered_health.parquet`** and **`.csv`**: one row per **ADM2** with the ADM1/ADM2 IDs and names, total population (**`POP_TOTAL`**), covered population (**`POP_COVERED`**) and the coverage percentage (**`PCT_HEALTH_ACCESS`**, 0–100).
 * **Pipeline parameters JSON** saved under **`data/healthcare_access/`**.
-* **Intermediate rasters** (if written during notebook execution) and **reporting artefacts** under **`reporting/outputs/`**.
+* **Intermediate files** under **`pipelines/snt_healthcare_access/intermediate_results/`**: the filtered facility points and coverage buffers (**`{COUNTRY_CODE}_FOSA_filtered.gpkg`**, **`{COUNTRY_CODE}_health_coverage_buffers.gpkg`**, both read by the reporting notebook) and the covered-population raster (**`.pop_covered_healthcare.tif`**).
+* **Reporting artefacts** under **`reporting/outputs/`**.
 
 > **Notes for the Data Analyst:**
 >
 > - **`Spatial resolution`**: Analyses inherit the **native cell size** of the population GeoTIFF; **ADM2** summaries come from **zonal statistics** on that grid.
-> - **Radius**: The 5000m meters around health facilities describe **Euclidean** buffers around facility points; results are not network travel times.
+> - **Radius**: The 5000 m (5 km) radius around health facilities describes **Euclidean** buffers around facility points; results are not network travel times.
 > - **`input_fosa_file`**: If an optional FOSA location file is supplied, it must be .csv and must have the mandatory **`LATITUDE`** and **`LONGITUDE`** columns; failing that, the pipeline defaults to using DHIS2 data from **`DHIS2_DATASET_FORMATTED`**
 > - **`CRS choice`**: Buffer operations use a fixed metric CRS inside the notebook; very large countries may need methodological review for edge districts.

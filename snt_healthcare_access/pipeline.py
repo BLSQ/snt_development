@@ -62,13 +62,12 @@ def snt_healthcare_access(
     pipeline_path = snt_root_path / "pipelines" / "snt_healthcare_access"
     wpop_raster_path = snt_root_path / "data" / "worldpop" / "rasters"
     data_output_path = snt_root_path / "data" / "healthcare_access"
-    data_intermediate_path = data_output_path / "intermediate_results"
 
     # ensure necessary directories exist
     pipeline_path.mkdir(parents=True, exist_ok=True)
     (pipeline_path / "reporting" / "outputs" / "figures").mkdir(parents=True, exist_ok=True)
+    (pipeline_path / "intermediate_results").mkdir(parents=True, exist_ok=True)
     data_output_path.mkdir(parents=True, exist_ok=True)
-    data_intermediate_path.mkdir(parents=True, exist_ok=True)
 
     # validate input parameter values (all in one)
     if input_fosa_file is None:

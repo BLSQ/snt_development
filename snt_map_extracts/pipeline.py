@@ -261,7 +261,18 @@ def format_map_indicators(
     pl.DataFrame
         Wide table with one row per ADM2 and year, holding the `MEDIAN` statistic only, and for
         each metric a value column followed by its population-weighted `{METRIC}_POP_W` column.
+        Metrics in `conversions` are scaled (both columns) and rounded to 2 decimals.
     """
+    # Conversion factors per metric, keyed on the uppercased metric names.
+    conversions = {
+        "PF_PARASITE_RATE": 100,
+        "PF_MORTALITY_RATE": 100000,
+        "PF_INCIDENCE_RATE": 1000,
+        "INSECTICIDE_TREATED_NET_ACCESS": 100,
+        "INSECTICIDE_TREATED_NET_USE_RATE": 100,
+        "IRS_COVERAGE": 100,
+        "ANTIMALARIAL_EFFECTIVE_TREATMENT": 100,
+    }
     # Keep only the MEDIAN statistic; the STATISTIC column is then constant and dropped.
     df = df.filter(pl.col("STATISTIC") == "MEDIAN").drop("STATISTIC")
 
@@ -292,6 +303,16 @@ def format_map_indicators(
         )
         template_df = template_df.update(df_metric_value, on=fixed_columns, how="left")
         template_df = template_df.update(df_metric_pop_w, on=fixed_columns, how="left")
+
+    # Scale each metric and its population-weighted column by the same factor, in one pass.
+    template_df = template_df.with_columns(
+        [
+            (pl.col(col) * factor).round(2)
+            for metric, factor in conversions.items()
+            for col in (metric, f"{metric}_POP_W")
+            if col in template_df.columns
+        ]
+    )
 
     return template_df.sort(["YEAR", "ADM1_NAME", "ADM2_NAME"])
 

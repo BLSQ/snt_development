@@ -47,7 +47,7 @@
                 },
                 "DESCRIPTION": {
                     "$ref": "#/$defs/localizedText",
-                    "description": "One or two sentences defining the indicator for a non-technical reader: what is counted, over what population, with what adjustment. Shown on hover / in the layer's info panel."
+                    "description": "One or two sentences defining the indicator for a non-technical reader: what is counted, over what population, with what adjustment. Shown on hover / in the layer's info panel. Refer to admin levels as ADM1 / ADM2, never \"region\" / \"district\": their names differ by country."
                 },
                 "SOURCE": {
                     "$ref": "#/$defs/localizedText",

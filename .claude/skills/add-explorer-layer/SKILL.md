@@ -37,7 +37,9 @@ index), not raw JSON line numbers.
    confirm it matches when checking.
 4. **Edit** following contract README §4 *Add a layer* (id, all nine fields, `CATEGORY` reused string
    for string in both languages, `SCALE` without outer limits — §3, `{COUNTRY_CODE}` never a literal
-   code).
+   code). In `LABEL` and `DESCRIPTION`, name admin levels **ADM1 / ADM2**, never "region" /
+   "district" (FR: "région" / "district"): the list serves every country, and what ADM2 is on the
+   ground differs between them.
 5. **Validate:**
 
    ```bash

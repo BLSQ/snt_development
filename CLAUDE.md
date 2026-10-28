@@ -205,6 +205,9 @@ In descending order of what is actually achievable:
 - **Country escape hatches are hardcoded** in `snt_dhis2_extract/pipeline.py`: BFA filters
   `level_4_name` starting `"DS"`; NER fetches org-unit groups and rewrites the pyramid through an R
   notebook. Adding a country may mean adding a branch there — check the pyramid levels first.
+- **Say "ADM1" / "ADM2", never "region" / "district"** in any generic text: layer labels and
+  descriptions, readmes, docs, log and report messages. Neither name holds in every country
+  ([glossary](docs/GLOSSARY.md)). Output file names like `…_district_year_*` stay unchanged.
 - **`deprecated/` is history**, never a template.
 - **`snt_lib`** (`github.com/BLSQ/snt_utils`) is an **external, unpinned** dependency. Do not guess
   its signatures; read the upstream repo or an existing call site.

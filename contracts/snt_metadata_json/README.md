@@ -186,7 +186,7 @@ The authoritative description of every field is the `description` text inside
 | `SOURCE_DATA.FILENAME` | string | **Must** start with the literal `{COUNTRY_CODE}`. |
 | `SOURCE_DATA.COLUMN` | `UPPER_SNAKE_CASE` | Repo rule R10. Need not be unique. |
 | `LABEL` | `{EN, FR}` | Legend-length name. House style ends with the source in parentheses. |
-| `DESCRIPTION` | `{EN, FR}` | 1–2 sentences for a non-technical reader. |
+| `DESCRIPTION` | `{EN, FR}` | 1–2 sentences for a non-technical reader. Say **ADM1 / ADM2**, never "region" / "district": the master list serves every country, and the levels' names differ by country ([glossary](../../docs/GLOSSARY.md)). Same for `LABEL`. |
 | `SOURCE` | `{EN, FR}` | Display credit (`DHIS2`, `ERA5`, …), not a machine reference. |
 | `UNITS` | `{EN, FR}` | Spelled out (`Cases per 1000 people per year`). |
 | `CATEGORY` | `{EN, FR}` | Grouping in the layer list. Must match sibling layers **exactly**. |

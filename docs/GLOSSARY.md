@@ -248,14 +248,21 @@ Keys of `DHIS2_DATA_DEFINITIONS.POPULATION_INDICATOR_DEFINITIONS`. Denominators 
 | **Org unit (OU)** | *Unité d'organisation* | DHIS2's unit of reporting geography. In this repo `OU_ID` almost always means a **health facility**, the leaf of the hierarchy. | ✅ |
 | **Pyramid** | *Pyramide sanitaire* | The DHIS2 organisation-unit **hierarchy** — the country's nested administrative and health-facility tree, with each unit's level, parent, name, coordinates and opening/closing dates. Extracted as `{CC}_pyramid.parquet` and used to know which facilities *should* have reported. | ✅ |
 | **FOSA** | *FOrmation SAnitaire* | **Health facility** (French). The term is used interchangeably with "facility" in `snt_healthcare_access`, whose `input_fosa_file` supplies facility coordinates when the pyramid's are unusable. | ✅ |
-| **ADM1** | *Niveau administratif 1* | First subnational administrative level — region/province. The grain of DHS-derived indicators (survey samples are not powered below it). | ✅ |
-| **ADM2** | *District sanitaire* | Second subnational administrative level — **health district**. **The grain of the whole SNT exercise**: the data layers are one row per `ADM2_ID` (per year), and it is the unit at which interventions are tailored. | ✅ |
+| **ADM1** | *Niveau administratif 1* | First subnational administrative level. What it is on the ground depends on the country (region, province, …). The grain of DHS-derived indicators (survey samples are not powered below it). | ✅ |
+| **ADM2** | *Niveau administratif 2* | Second subnational administrative level. What it is on the ground depends on the country (health district in some, health zone or commune in others). **The grain of the whole SNT exercise**: the data layers are one row per `ADM2_ID` (per year), and it is the unit at which interventions are tailored. | ✅ |
+
+> **Write "ADM1" / "ADM2", never "region" / "district".** The names of the levels differ by
+> country, so a generic text that says "district" is wrong for every country where ADM2 is
+> something else. This applies to every text that is not country-specific: layer `LABEL` /
+> `DESCRIPTION` in `SNT_metadata_master.json`, pipeline readmes, docs, log messages, report text. A
+> country-specific text may use the country's own name for the level. Existing file names such as
+> `{CC}_quality_of_care_district_year_*` are outputs and stay as they are.
 | **Shapes** | *Contours / limites administratives* | ADM2 polygon geometries, published as `{CC}_shapes.geojson` by `snt_dhis2_formatting`. Every external-source pipeline (ERA5, MAP, WorldPop, healthcare access) starts by fetching this file — they look like independent roots but are not. | ✅ |
 
 > **The two admin-level config keys are not interchangeable.** `ANALYTICS_ORG_UNITS_LEVEL` (an
 > integer, e.g. `6`) is the **facility** level at which routine analytics are extracted.
-> `DHIS2_ADMINISTRATION_2` (a string, e.g. `"level_4_name"`) is the **district** level at which
-> population, shapes and reporting indicators live. `DHIS2_ADMINISTRATION_1` is the region level.
+> `DHIS2_ADMINISTRATION_2` (a string, e.g. `"level_4_name"`) is the **ADM2** level at which
+> population, shapes and reporting indicators live. `DHIS2_ADMINISTRATION_1` is the ADM1 level.
 > All three differ per country. Never hardcode any of them (rule **R13**).
 
 ### 3.2. Time
@@ -435,7 +442,7 @@ Explorer user saw.
 
 | | | | |
 |---|---|---|---|
-| **ADM1** region/province | **ADM2** health district | **CDS** Copernicus Climate Data Store | **CPN** consultation prénatale (ANC) |
+| **ADM1** administrative level 1 | **ADM2** administrative level 2 | **CDS** Copernicus Climate Data Store | **CPN** consultation prénatale (ANC) |
 | **CRS** coordinate reference system | **CSB** care-seeking behaviour | **DHIS2** District Health Information Software 2 | **DHS** Demographic and Health Surveys |
 | **DTP** diphtheria–tetanus–pertussis | **EFT** effective treatment ❓ | **FOSA** formation sanitaire (health facility) | **IQR** interquartile range |
 | **IRS** indoor residual spraying | **ITN** insecticide-treated net | **LCI/UCI** lower/upper confidence interval | **LLIN/MILDA** long-lasting insecticidal net |

@@ -189,7 +189,7 @@ Migration: [BACKLOG PIPE-3](BACKLOG.md#pipe-3).
 Read `DHIS2_ADMINISTRATION_1` / `DHIS2_ADMINISTRATION_2` (strings like `"level_3_name"`, parsed with
 `re.search(r"level_(\d+)_", …)`) and `ANALYTICS_ORG_UNITS_LEVEL` (integer). They differ per country
 and are *not* interchangeable: `ANALYTICS_ORG_UNITS_LEVEL` is the facility level for routine data,
-`DHIS2_ADMINISTRATION_2` the district level for population, shapes and reporting indicators.
+`DHIS2_ADMINISTRATION_2` the ADM2 level for population, shapes and reporting indicators.
 Validate against `pyramid["level"].max()` as the existing tasks do.
 
 <a id="r21"></a>

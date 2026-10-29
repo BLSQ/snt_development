@@ -1,6 +1,3 @@
-#%% imports
-
-import os
 from pathlib import Path
 import geopandas as gpd
 from openhexa.sdk import current_run, pipeline, File, parameter, workspace
@@ -13,10 +10,9 @@ from snt_lib.snt_pipeline_utils import (
     run_report_notebook,
     validate_config,
     pull_scripts_from_repository,
-    save_pipeline_parameters
+    save_pipeline_parameters,
 )
 
-#%% pipeline definition
 
 @pipeline("snt_healthcare_access")
 @parameter(
@@ -66,12 +62,12 @@ def snt_healthcare_access(
     pipeline_path = snt_root_path / "pipelines" / "snt_healthcare_access"
     wpop_raster_path = snt_root_path / "data" / "worldpop" / "rasters"
     data_output_path = snt_root_path / "data" / "healthcare_access"
-    data_intermediate_path = data_output_path / "intermediate_results"
+
     # ensure necessary directories exist
     pipeline_path.mkdir(parents=True, exist_ok=True)
     (pipeline_path / "reporting" / "outputs" / "figures").mkdir(parents=True, exist_ok=True)
+    (pipeline_path / "intermediate_results").mkdir(parents=True, exist_ok=True)
     data_output_path.mkdir(parents=True, exist_ok=True)
-    data_intermediate_path.mkdir(parents=True, exist_ok=True)
 
     # validate input parameter values (all in one)
     if input_fosa_file is None:
@@ -84,11 +80,11 @@ def snt_healthcare_access(
         current_run.log_info(f"Using FOSA coordinates file: {input_fosa_file.path}")
 
     if not (2015 <= wpop_year <= 2030):
-        msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015–2030."
-        current_run.log_warning(msg)
+        msg = f"Year {wpop_year} is out of range. WorldPop rasters are available for 2015-2030."
+        current_run.log_error(msg)
         raise ValueError(msg)
-    else:
-        current_run.log_info(f"Year for raster population data: {wpop_year}.")
+
+    current_run.log_info(f"Year for raster population data: {wpop_year}.")
 
     if pull_scripts:
         current_run.log_info("Pulling pipeline scripts from repository.")
@@ -99,49 +95,59 @@ def snt_healthcare_access(
         )
 
     try:
- 
         # Load & validate configuration file
         snt_config = load_configuration_snt(config_path=snt_root_path / "configuration" / "SNT_config.json")
         validate_config(snt_config)
         country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
+    except Exception as e:
+        current_run.log_error(f"Error loading configuration: {e!s}")
+        raise
 
+    try:
         shapes = retrieve_shapes(snt_config=snt_config)
         if shapes is None:
-            current_run.log_error("No valid shapes available. Processing stopped.")
-            raise ValueError
+            raise ValueError("No valid shapes available. Processing stopped.")
+    except Exception as e:
+        current_run.log_error(f"Error retrieving shapes: {e!s}")
+        raise
 
-        # if user chooses to run the computation notebook
-        if not run_report_only:
-
+    # if user chooses to run the computation notebook
+    if not run_report_only:
+        try:
             # save the input parameter values to file
             parameters_file = save_pipeline_parameters(
-            pipeline_name="snt_healthcare_access",
-            parameters={
-                "input_fosa_file": input_fosa_file,
-                "wpop_year": wpop_year,
-                "run_report_only": run_report_only,
-                "pull_scripts": pull_scripts,
-            },
-            output_path=data_output_path,
-            country_code=country_code
+                pipeline_name="snt_healthcare_access",
+                parameters={
+                    "input_fosa_file": input_fosa_file,
+                    "wpop_year": wpop_year,
+                    "run_report_only": run_report_only,
+                    "pull_scripts": pull_scripts,
+                },
+                output_path=data_output_path,
+                country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Error saving pipeline parameters: {e!s}")
+            raise
 
-            # the params to use in the computation notebook
-            input_params = {
-                "INPUT_FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
-                "WORLDPOP_YEAR": wpop_year
-                }
+        # the params to use in the computation notebook
+        input_params = {
+            "INPUT_FOSA_FILE": input_fosa_file.path if input_fosa_file is not None else None,
+            "WORLDPOP_YEAR": wpop_year,
+        }
 
-            # download worldpop data if it doesn't already exist in the folder
-            pop_path = get_or_download_worldpop_raster(
-                    country_code=country_code,
-                    ref_year=wpop_year,
-                    raster_dir=wpop_raster_path,
-                )
-            if pop_path is None:
-                current_run.log_error(f"Could not retrieve population raster for {wpop_year}. Processing stopped.")
-                raise ValueError(f"Population raster unavailable for {wpop_year}.")
-            
+        # download worldpop data if it doesn't already exist in the folder
+        pop_path = get_or_download_worldpop_raster(
+            country_code=country_code,
+            ref_year=wpop_year,
+            raster_dir=wpop_raster_path,
+        )
+        if pop_path is None:
+            msg = f"Could not retrieve population raster for {wpop_year}. Processing stopped."
+            current_run.log_error(msg)
+            raise ValueError(msg)
+
+        try:
             run_notebook(
                 nb_path=pipeline_path / "code" / "snt_healthcare_access.ipynb",
                 out_nb_path=pipeline_path / "papermill_outputs",
@@ -149,21 +155,25 @@ def snt_healthcare_access(
                 error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
                 country_code=country_code,
             )
+        except Exception as e:
+            current_run.log_error(f"Error running computation notebook: {e!s}")
+            raise
 
-            # add files to a new dataset version
-            add_files_to_dataset(
-                dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS", None),
-                country_code=country_code,
-                file_paths=[
-                    data_output_path / f"{country_code}_population_covered_health.parquet",
-                    data_output_path / f"{country_code}_population_covered_health.csv",
-                    parameters_file,
-                ],
-            )
+        # add files to a new dataset version
+        add_files_to_dataset(
+            dataset_id=snt_config["SNT_DATASET_IDENTIFIERS"].get("SNT_HEALTHCARE_ACCESS", None),
+            country_code=country_code,
+            file_paths=[
+                data_output_path / f"{country_code}_population_covered_health.parquet",
+                data_output_path / f"{country_code}_population_covered_health.csv",
+                parameters_file,
+            ],
+        )
 
-        else:
-            current_run.log_info("Skipping calculations, running reporting only.")
+    else:
+        current_run.log_info("Skipping calculations, running reporting only.")
 
+    try:
         # in all cases, run the reporting notebook
         run_report_notebook(
             nb_file=pipeline_path / "reporting" / "snt_healthcare_access_report.ipynb",
@@ -171,32 +181,58 @@ def snt_healthcare_access(
             error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"},
             country_code=country_code,
         )
-
-        current_run.log_info("Pipeline executed successfully!")
     except Exception as e:
-        current_run.log_error(f"Error occurred while executing the pipeline: {e}")
+        current_run.log_error(f"Error running reporting notebook: {e!s}")
         raise
 
+    current_run.log_info("Pipeline executed successfully!")
 
-#%% functions used in pipeline
 
-def has_allowed_extension(file) -> bool:
-    allowed_extensions = {'.csv'}
-    _, ext = os.path.splitext(file.name)
-    return ext.lower() in allowed_extensions
+def has_allowed_extension(file: File) -> bool:
+    """Check whether an uploaded file has an allowed extension (.csv).
+
+    Parameters
+    ----------
+    file : File
+        The uploaded OpenHEXA file to check.
+
+    Returns
+    -------
+    bool
+        True if the file extension is allowed (case-insensitive), False otherwise.
+    """
+    allowed_extensions = {".csv"}
+    return Path(file.name).suffix.lower() in allowed_extensions
+
 
 def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir: Path) -> Path | None:
     """Return the path to the population raster for the given country and year.
-    Uses an existing file if found, otherwise downloads it from WorldPop.
-    """
 
+    Uses an existing file if found, otherwise downloads it from WorldPop.
+
+    Parameters
+    ----------
+    country_code : str
+        Country code; lowercased to match the shared raster cache filenames.
+    ref_year : int
+        Reference year of the WorldPop population raster.
+    raster_dir : Path
+        Folder where the rasters are looked up and downloaded to.
+
+    Returns
+    -------
+    Path | None
+        Path to the population raster, or None if the folder could not be created or the
+        download failed.
+    """
     try:
         raster_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         current_run.log_warning(f"Failed to create directory {raster_dir}: {e}")
         return None
 
-    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_CN_100m_*.tif")) # the MAP pipeline saves extractions using lowercase for the country name => using the same here
+    # the MAP pipeline saves extractions using lowercase for the country name => using the same here
+    existing = list(raster_dir.glob(f"{country_code.lower()}_pop_{ref_year}_CN_100m_*.tif"))
     if existing:
         current_run.log_info(f"Population raster found: {existing[0]}.")
         return existing[0]
@@ -217,8 +253,20 @@ def get_or_download_worldpop_raster(country_code: str, ref_year: int, raster_dir
         current_run.log_warning(f"WorldPop download failed for {country_code} - {ref_year}: {e}")
         return None
 
+
 def retrieve_shapes(snt_config: dict) -> gpd.GeoDataFrame | None:
-    """Retrieve and validate shapes for the specified country."""
+    """Retrieve and validate shapes for the specified country.
+
+    Parameters
+    ----------
+    snt_config : dict
+        The loaded SNT configuration, used for the country code and the formatted DHIS2 dataset id.
+
+    Returns
+    -------
+    gpd.GeoDataFrame | None
+        The shapes with missing and empty geometries dropped, or None if no valid shapes remain.
+    """
     country_code = snt_config["SNT_CONFIG"].get("COUNTRY_CODE")
     dataset_shapes_id = snt_config.get("SNT_DATASET_IDENTIFIERS", {}).get("DHIS2_DATASET_FORMATTED")
     shapes = get_file_from_dataset(dataset_shapes_id, f"{country_code}_shapes.geojson")

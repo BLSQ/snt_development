@@ -80,7 +80,9 @@ Notes that the table cannot carry:
   filenames and the last run wins, by design — see [§3.2](#32-stages).
 - **The two Stage D reporting-rate pipelines are likewise alternatives**, both writing to
   `DHIS2_REPORTING_RATE`. Both also publish a yearly file (`{CC}_reporting_rate_dataelement_yearly`,
-  `{CC}_reporting_rate_dataset_yearly`); `snt_dhis2_incidence` reads only the monthly files.
+  `{CC}_reporting_rate_dataset_yearly`); `snt_dhis2_incidence` reads only the monthly files. Their
+  filenames differ, but the dataset holds only the files of the last successful run, so it carries
+  one variant at a time: last run wins here too.
 - **Population has three interchangeable sources**, all publishing the same filename
   `{CC}_population.parquet` to different datasets: DHIS2 (`DHIS2_DATASET_FORMATTED`), operator-supplied
   (`snt_user_population` → `SNT_POPULATION_USER_PROVIDED`) and transformed

@@ -2188,8 +2188,8 @@
             "COLUMN": "POP_COVERED"
         },
         "LABEL": {
-            "EN": "Population within 5 km of a health facility",
-            "FR": "Population à moins de 5 km d'une FOSA"
+            "EN": "Population (WorldPop) within 5 km of a health facility",
+            "FR": "Population (WorldPop) à moins de 5 km d'une FOSA"
         },
         "DESCRIPTION": {
             "EN": "Estimated number of people (WorldPop) living within 5 km, in a straight line, of a health facility.",

@@ -269,12 +269,13 @@ nothing records which format version a file follows. Worth adding once the shape
 
 ### <a id="meta-9"></a>META-9 · Year-independent layers
 
-Rule R21 and the format assume every layer's table carries `YEAR`. **Rainfall seasonality is by
-construction a multi-year classification**: `snt_seasonality_rainfall` decides whether an `ADM2` is
-seasonal by how often, across the whole rainfall series, a month starts a concentrated block. The
-published table is keyed on `ADM2_ID` alone. There is no year to attach, and inventing one would
-misrepresent the analysis. The healthcare-access table is the same: it is computed for one WorldPop
-year, which is not stored. Options, roughly in order of preference:
+Rule R21 and the format assume every layer's table carries `YEAR`. **Seasonality is by construction
+a multi-year classification**: `snt_seasonality_rainfall` and `snt_seasonality_cases` decide whether
+an `ADM2` is seasonal by how often, across the whole rainfall or confirmed-cases series, a month
+starts a concentrated block. Both published tables (`{CC}_rainfall_seasonality` and
+`{CC}_cases_seasonality`) are keyed on `ADM2_ID` alone. There is no year to attach, and inventing
+one would misrepresent the analysis. The healthcare-access table is the same: it is computed for one
+WorldPop year, which is not stored. Options, roughly in order of preference:
 
 - **The Explorer tolerates a table with no `YEAR`** and renders the layer as time-invariant (no year
   selector, or the layer greyed out rather than dropped). Cheapest, and honest about the data. Needs
@@ -288,7 +289,7 @@ year, which is not stored. Options, roughly in order of preference:
   result the analysis never produced.
 
 Until this is settled, R21 has a genuine exception. Whichever way it goes, R21's wording in
-`CLAUDE.md` should gain the exception, so the next person does not "fix" the seasonality table by
+`CLAUDE.md` should gain the exception, so the next person does not "fix" the seasonality tables by
 adding a meaningless `YEAR`.
 
 **Blocked on:** IASO developers.
@@ -458,6 +459,35 @@ aggregation in `snt_dhis2_incidence.ipynb`. Things to check:
 
 **Owner:** Giulia. **Source:** [PR #138 comment](https://github.com/BLSQ/snt_development/pull/138#issuecomment-5956725607)
 (2026-10-02) and the merge note (2026-10-05).
+
+### <a id="pipe-9"></a>PIPE-9 · `snt_healthcare_access`: the 5 km buffer assumes UTM zone 30N
+
+`snt_healthcare_access.ipynb` (cell 7) hardcodes `country_epsg_meters <- 32630` (UTM zone 30N,
+central meridian 3°W) for every country, and draws the 5 km circles around each health facility in
+that projection. The reporting notebook has the same hardcoded value. Distance distortion grows with
+distance from 3°W, so the real radius on the ground is smaller than 5 km and `POP_COVERED` /
+`PCT_HEALTH_ACCESS` are biased low. Approximate real radius, from the UTM scale factor at the
+country's centre: BFA ≈ 5 km, NER ≈ 4.9 km, CMR ≈ 4.8 km, COD ≈ 4.2–4.5 km, BDI ≈ 4.2 km. The
+published layers still say "5 km".
+
+Options, roughly in order of preference:
+
+- **Derive the projection from the shapes.** For example, build a transverse Mercator centred on the
+  country's centroid (`+proj=tmerc +lon_0=<centroid lon> +k=1 +units=m`), or take the UTM zone of
+  the centroid. Nothing to maintain, a new country works without a code change, and a projection
+  centred on the country also keeps distortion small in wide countries like COD, which span several
+  UTM zones.
+- **A per-country value in `SNT_config.json`** (e.g. `SNT_CONFIG.EPSG_METERS`). Explicit and
+  reviewable, but it changes the config contract ([CFG-3](#cfg-3)). Every new country also needs
+  someone to choose the value correctly, and a missing value needs a fallback.
+- **A country-code → EPSG mapping file in the repo.** The same trade-off as the config option, plus
+  one more file to keep in step with the list of countries.
+
+Whatever the choice, apply it to both notebooks, log the projection used, and rerun the pipeline in
+the affected countries. Operators must run with `Pull scripts` = ON to pick up the change.
+
+**Owner:** `snt_healthcare_access` owner (`_TBD_` in [OWNERSHIP.md](OWNERSHIP.md)). **Source:**
+master-list check of the healthcare-access layers, 2026-10-29.
 
 ---
 

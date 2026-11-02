@@ -7,6 +7,10 @@ own.
 > **Interim home.** GitHub issues are the intended future home for these items. Until they move,
 > this file is the one place to look.
 
+> **One exception:** the migration to the `snt-stratification` monorepo is tracked in its own plan,
+> [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md). The items below carry over into the new repo's backlog
+> (plan Phase 2).
+
 **How this file works**
 
 - Each item has a stable ID (`META-3`, `PIPE-2`, …). Link to it as `docs/BACKLOG.md#meta-3`. Do not

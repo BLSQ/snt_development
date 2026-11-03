@@ -363,18 +363,19 @@ tokens that mix upper case, lower case and digits, so a second pass is needed af
 | **leave out** | orchestrator `docs/research/personas/persona_questionnaire_answered-20260713.md` | Real people's answers on internal strategy |
 | redact | `…/snt_dhis2_extract/utils/snt_dhis2_extract_report.r` | Shared helper with a NER-only fix: 7 facility UIDs + real coordinates → move to a NER-only file that is not imported |
 | **leave out** (D-13) | Every `*_<CC>.ipynb`, e.g. `…/snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`, `…/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb` | Country variants are not imported. These two also held Jira refs, a Google Sheets link, a live workspace URL (`ner-snt-process`) and 1 UID |
-| redact | `…/snt_dhs_indicators/code/snt_dhs_vaccination_computation.ipynb` | Saved outputs in 3 cells (dataset version name, COD shapes size). Strip them (R2) |
+| done | `…/snt_dhs_indicators/code/snt_dhs_vaccination_computation.ipynb` | Had saved outputs in 3 cells (dataset version name, COD shapes size). Stripped on `main`, 2026-11-03 |
 | redact | 2 notebooks (`reporting_rate_dataset`, `outliers_imputation_path`), 1 UID each in a comment | Replace with a placeholder |
 | redact | editor `docs/{config_field_matrix,config_analysis_notes,PRODUCT_SPEC}.md`, `prototype/index.html` | Real UIDs from country configs used as examples (18 in total), bucket name `snt-ner-files` |
 | redact | Live country workspace slugs: `ner-snt-process` (`snt_metadata_json_trim/readme.md`), `cmr-snt-process` (orchestrator `BACKLOG.md`, a wireframe) | Live country workspaces |
 | ok (D-13) | Jira refs (`bluesquare.atlassian.net/browse/SNT25-*`), about 30 across all four repos | Kept |
 | ok (D-13) | Bluesquare dev-workspace slugs (`snt-development`, `snt-development-sandbox`, `snt-testing`, `snt-app-dev`), about 25 mentions | Kept |
-| **decide** | Team-glossary Google Sheets link, shared as "anyone with the link" (`docs/GLOSSARY.md`, `snt_dhis2_incidence.ipynb`) | Unlike a Jira link, a public reader *can* open it. Keep it only if the sheet is meant to be public |
+| ok (public by choice) | Team-glossary Google Sheets link, shared as "anyone with the link" (`docs/GLOSSARY.md`, `snt_dhis2_incidence.ipynb`) | A public reader can open it. Kept: the sheet may be public (Giulia, 2026-11-03) |
 | ok | Owner names (Giulia / `@sPuntinG`) in OWNERSHIP, ADRs; `secrets.OH_TOKEN` references in workflows; dummy `mario.rossi@example.org` | — |
 
 Checked 2026-11-03 (`git ls-files`): the `Zone.Identifier` files are **not tracked** (they exist only
-locally). `snt_dhs_vaccination_computation.ipynb` **is tracked with its outputs**, so `main` of the
-old repo breaks R2. Fix it in the old repo with `nbstripout`, in its own small PR from `main`.
+locally). `snt_dhs_vaccination_computation.ipynb` was **tracked with its outputs** (R2 broken on
+`main`). It was stripped with `nbstripout` and merged to `main` on 2026-11-03 (branch
+`fix/strip-dhs-vaccination-outputs`).
 
 ### Phase 1 — Snapshot import + layout (behaviour-neutral)
 - [ ] Create the empty public repo (Giulia does this by hand). Set the **tag ruleset** on `v*`
@@ -578,7 +579,7 @@ proceed in parallel against the new schema.
 | Date | Session summary | Next step |
 |---|---|---|
 | 2026-11-02 | Read md docs of snt_development, orchestrator, bootstrap, config editor. Agreed D-1…D-10 (D-10 = docs placement rule); plan made public in `docs/`; OD-4 has a leaning, not decided; S2(b) self-sync preferred | Phase 0: skeleton diff, spikes S1–S4, public-exposure audit |
-| 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`), D-12 (report-only, was OD-7), D-13 (keep Jira links + dev slugs, leave out country notebooks); D-5 confirmed; OD-10 opened (versioning country/analyst-edited notebooks) | Glossary Sheets link (keep?); strip the DHS notebook in the old repo; clean up the spike pipelines; second audit pass at the start of Phase 1 |
+| 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`), D-12 (report-only, was OD-7), D-13 (keep Jira links + dev slugs, leave out country notebooks); D-5 confirmed; OD-10 opened (versioning country/analyst-edited notebooks) | Glossary link kept (public by choice); DHS notebook stripped on `main`. Left: delete the spike pipelines + template; second audit pass at the start of Phase 1 |
 
 ---
 

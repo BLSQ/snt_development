@@ -64,12 +64,13 @@ and documented separately:
 | D-2 | **One release train.** One tag `vX.Y.Z` = one tested combination of pipelines + webapps + bootstrap. Webapps get a `webapps` section in the manifest and a `version.json` stamped at release time. A webapp-only fix = a patch release (the deployer skips unchanged pipelines, D22) | 2026-11-02 |
 | D-3 | **Short term:** `snt_lib` (`BLSQ/snt_utils`, managed by a colleague) stays **external, pinned to a real tag** in every `requirements.txt` (closes DEP-1 for it); changes to it are coordinated cross-repo PRs. **Long term:** it moves into `snt-stratification` as `packages/snt_lib/`, with a companion R package next to it (§10) | 2026-11-02 |
 | D-4 | Old `snt_development` goes **maintenance-only**: critical fixes for live countries only, ported by hand; all new work happens in the new repo. Archive once no workspace depends on its template CI or Pull scripts | 2026-11-02 |
-| D-5 | Co-locate each pipeline's R half with its `pipeline.py` **only if spike S1 passes**. Otherwise use the fallback layout (§4.3). For S2, the preferred outcome is **self-sync** (option b) | 2026-11-02 (conditional) |
+| D-5 | Co-locate each pipeline's R half with its `pipeline.py` **only if spike S1 passes**. Otherwise use the fallback layout (§4.3). For S2, the preferred outcome is **self-sync** (option b). **Condition met 2026-11-03:** S1 and S2(b) both passed → co-locate + self-sync | 2026-11-02 (confirmed 2026-11-03) |
 | D-6 | Repo name **`snt-stratification`** (dash, matching most BLSQ repos). The conda env follows the same name | 2026-11-02 |
 | D-7 | The config editor **is included** from the first snapshot, as `webapps/config_editor/`. Its throwaway prototype goes to `webapps/config_editor/design/`; its `ignore/` (NER draft configs) is **not** carried over | 2026-11-02 |
 | D-8 | Tag numbering starts from scratch (e.g. `v0.1.0`; first production release `v1.0.0`). The old repo's tags are tests only, so no live workspace's marker can collide | 2026-11-02 |
 | D-9 | **Repo path = workspace path** for every file that lands on the workspace filesystem. No mapping layer. The shared R library is renamed `code/` → **`shared/r/`**, in the repo and in the workspace (§4.2) | 2026-11-02 |
 | D-10 | **Docs placement rule:** a unit's own docs live with the unit (`webapps/<name>/{docs,design}/`, beside the deployable `app/`; a pipeline's `readme.md`); docs spanning several units live in `docs/`; contract prose lives in `contracts/<name>/` (§4.1) | 2026-11-02 |
+| D-11 | **One config skeleton:** the `snt_development` copy becomes the single copy (`contracts/snt_config/`), and every empty single value is written as **`null`**, the pipelines' convention. The editor's `""` for empty strings changes to `null` | 2026-11-03 |
 
 ## 3. Open decisions (owner: Giulia unless stated)
 
@@ -82,9 +83,9 @@ blocks, and move it to the Decision log.
 | OD-4 | How do the bootstrap pipelines (deployer, checker, single-pipeline deployer) reach a workspace? | **Leaning (Giulia):** as regular OH **template pipelines**, kept in this repo as `kind: bootstrap` folders in `pipelines/`, with their **own CI** that pushes every merge to `main` into the new templates workspace (not tied to the release train). Implications to keep in mind: (a) a deployer on `main` must stay able to read every manifest schema version it may be asked to deploy, or refuse old ones with a clear `[ERROR]`; (b) they are then **outside** the release manifest's `pipelines` (or listed with `kind: bootstrap` for provenance only, never deployed by the deployer); (c) this supersedes bootstrap D19 ("no deploy workflow") and solves roadmap §3 (chicken-and-egg). Not decided | Phase 3 (CI) / Phase 4 |
 | OD-5 | Import ADRs: one renumbered sequence, or per-origin folders? | One sequence with an "Originally: `<repo>` ADR NNNN / D<n>" line and a mapping table in `decisions/README.md`. Bootstrap D-entries that are only implementation detail stay in `docs/bootstrap/decisions.md` | Phase 2 |
 | OD-6 | Testing releases: keep a sandbox repo, or use pre-releases? | Pre-release tags (`v0.x.y`, marked pre-release) on the new repo + a test workspace. Drop `snt_development_sandbox`. The deployer already ignores pre-releases unless asked (D27) | Phase 4 |
-| OD-7 | Fix for the report-only problem | First check S4 (the webapp reads the run's own `config.run_report_only`). Only if that fails, add `RUN_MODE` to `{CC}_parameters.json` | Phase 5 |
+| OD-7 | Fix for the report-only problem | **S4 passed (2026-11-03):** the webapp can read the run's own `config.run_report_only` through the proxy. So: the orchestrator reads it, and no `RUN_MODE` is needed. Ready to move to the Decision log | Phase 5 |
 | OD-8 | CODEOWNERS (ADR 0005 said no) | Revisit: three areas with different reviewers is the case where it pays off | Phase 2 |
-| OD-9 | Retiring Pull scripts | Depends on S2. If self-sync (S2b, preferred) works, Pull scripts goes for both routes; otherwise it stays as the R-half route for template users only | Phase 6 |
+| OD-9 | Retiring Pull scripts | **S2b passed (2026-11-03):** self-sync works, so Pull scripts can go for both routes. Still open: the S2b sub-questions (§4.3), in particular the per-run escape hatch | Phase 6 |
 
 ---
 
@@ -252,21 +253,125 @@ in **new test workspaces** (names TBD, e.g. `snt-mono-test`, `snt-mono-templates
       reimplements `validate_config()` in JS, and targets `configuration/SNT_config.json` with
       drafts in `configuration/snt_config_history/`, with a `DatasetStore` (`SNT_CONFIGURATION`) as
       the long-term goal. → see Phase 5 sequencing note.
-- [ ] Diff the editor's skeleton against `snt_development/contracts/snt_config_json/SNT_config.skeleton.json`
+- [x] Diff the editor's skeleton against `snt_development/contracts/snt_config_json/SNT_config.skeleton.json`
       (`""`/`null` placeholder differences are known). Decide which one becomes the single copy.
-- [ ] Spike S1 (push a nested toy pipeline, inspect the zip).
-- [ ] Spike S2: self-sync (b, preferred) first, bundle execution (a) only as a fallback.
-- [ ] Spike S3 — **template code derivation.** In a scratch workspace, publish a template, create a
+      → 2026-11-03, D-11; see [Phase 0 findings](#phase-0-findings).
+- [x] Spike S1 (push a nested toy pipeline, inspect the zip). → **passed** 2026-11-03.
+- [x] Spike S2: self-sync (b, preferred) first, bundle execution (a) only as a fallback. → **both
+      passed** 2026-11-03.
+- [x] Spike S3 — **template code derivation.** In a scratch workspace, publish a template, create a
       pipeline from it, and record how the code is derived (from the template name? from the pipeline
       name?). Goal: the new templates produce code `snt-map-extracts`, not `b-2-map-extracts`.
-- [ ] Spike S4 — can the orchestrator read `PipelineRun.config` (the run's `run_report_only` value)
+- [x] Spike S4 — can the orchestrator read `PipelineRun.config` (the run's `run_report_only` value)
       through the webapp proxy with `PIPELINES_READ`? Grep `reference/openhexa/schema.generated.graphql`
-      first.
+      first. → **yes**, 2026-11-03.
 - [ ] Spike S5 (optional, Phase 7 input) — `updateWebapp(files:)` with a CUSTOM-connection token.
-- [ ] Pre-publication audit list: which files in the source trees are unfit for a public repo? Known
+- [~] Pre-publication audit list (first pass done 2026-11-03; see findings): which files in the source trees are unfit for a public repo? Known
       candidates: the persona questionnaire (`docs/research/personas/…`, answers from real people),
       country-specific `_<CC>` notebooks with DHIS2 UIDs, workspace slugs, Jira references,
       `ignore/` content (incl. the editor's NER draft configs).
+
+#### Phase 0 findings
+
+Spike code lives in `snt_development/ignore/spikes/` (git-ignored, throwaway); only the results are
+recorded here. Test workspaces: `snt-testing` (runs) and `snt-development-sandbox` (template publishing).
+
+**Skeleton diff (2026-11-03).** The editor's copy (`docs/SNT_config.skeleton.json`, 2,180 B) is
+**older** than `contracts/snt_config_json/SNT_config.skeleton.json` (2,630 B). Every structural
+difference is resolved in favour of the `snt_development` copy by the pipeline code:
+
+| Path | `snt_development` | editor | Which is right |
+|---|---|---|---|
+| `SNT_DATASET_IDENTIFIERS.SNT_POPULATION_USER_PROVIDED` | present | missing | dev — read by `snt_user_population` |
+| `SNT_DATASET_IDENTIFIERS.SNT_RESULTS` | missing | present | dev — retired with `snt_assemble_results` (ADR 0006) |
+| `DHIS2_REPORTING_RATES.REPORTING_INDICATORS` | `{ACTUAL_REPORTS, EXPECTED_REPORTS}: null` | missing | dev — read by `snt_dhis2_extract` (`pipeline.py` ~l.375) |
+| `DHIS2_REPORTING_RATES.REPORTING_DATASETS` | one example entry (`DATASET: null`, `METRICS`) | `[]` | either; dev's shows the entry shape |
+| `SNT_CONFIG.{COUNTRY_CODE, COUNTRY_NAME, DHIS2_ADMINISTRATION_1/2}` | `null` | `""` | known placeholder difference — **convention to settle** |
+
+Key order is otherwise identical. **Decided (D-11):** the `snt_development` copy becomes the single
+copy at `contracts/snt_config/` (Phase 1), with `null` for every empty single value. The editor's
+"emit `""` for empty strings" rule then changes to `null` (its rule 4 already treats `null` as empty).
+The conformance fixtures (Phase 3) confirm `validate_config()` accepts it.
+
+**S1, local half (2026-11-03).** `openhexa` SDK 2.22.7, `openhexa/cli/api.py::generate_zip_file()`:
+it recurses (`glob("**/*")`) and keeps relative paths, so `code/`, `reporting/`, `utils/` and deeper
+folders all go into the zip. Only files with these extensions are kept: **`.py .ipynb .txt .md .r .sql`**.
+Consequences:
+- **`.json` never travels in a pipeline zip.** A bundled hash manifest or config for self-sync (S2b)
+  must be `.txt`/`.py`, or be computed at run time.
+- Only `<dir>/workspace` and virtualenvs are excluded. **`.gitignore` is not respected**: a local
+  `ignore/` subfolder with executed notebooks ships if it exists. Example:
+  `pipelines/snt_dhis2_formatting/reporting/ignore/` (19 MB locally) made a 12.6 MB zip. CI pushes
+  from a clean checkout so it is not affected, but anyone pushing by hand from a working tree is.
+- Size, with every real pipeline's R half copied into its folder (clean tree, no `ignore/`): every
+  zip is 10–56 KB. Size is not a concern.
+
+**S1 + S2, on OpenHEXA (2026-11-03, `snt-testing`, toy `spike_monorepo_layout`, 4 runs).**
+- **S1 passed.** The runner unpacks the whole nested zip at `/home/jovyan/pipeline` (= the folder of
+  `__file__`): `code/`, `reporting/`, `utils/` and `_shared/r/`, all 7 files. The cwd is
+  `/home/jovyan`, the workspace is `/home/hexa/workspace`, and the bundle folder is writable.
+- **S2b (self-sync) passed.**
+  - First run: copied the 4 missing files, then ran the **synced** notebook with the `ir` kernel
+    (R 4.5.3). The notebook sourced both the pipeline's own `utils/` and the `shared/r` stand-in.
+  - Second run, after a simulated analyst edit and a `spike_BFA.ipynb` variant: replaced exactly the
+    edited file (hash differed), archived the old copy to `_archive/<stamp>/`, left 3 files unchanged,
+    and **left the `_BFA` variant untouched**.
+  - The archive stamp is in UTC (container clock).
+- **S2a (bundle execution) passed as well.** Papermill ran `/home/jovyan/pipeline/code/spike.ipynb`
+  directly, and it sourced the `.r` files from the bundle.
+- **Trap for both:** R's working directory is `/home/jovyan`, *not* the notebook's folder. Notebooks
+  must build every path from an injected root (as the SNT notebooks already do from
+  `SNT_ROOT_PATH`). A `source("utils/x.r")` relative to the notebook's own folder will fail.
+- **Still open (S2b sub-questions, settle in Phase 1/6):**
+  - "older" was decided by sha256 against the bundle, which works. Consequence: any edit an analyst
+    makes to a *generic* notebook is archived and overwritten on the next run, so the per-run escape
+    hatch is required. It is implemented (`skip_sync`) but has not been run.
+  - `shared/r/`: duplicate it in every zip (as tested) or have one pipeline sync it.
+
+**S4 passed (2026-11-03, orchestrator in `snt-testing`).** The query
+`pipelines{runs{id status config}}` through the webapp proxy returns each run's `config`, including
+`run_report_only`. `PIPELINES_READ` is enough → OD-7 needs no `RUN_MODE`.
+
+**S3 (2026-11-03, published from `snt-development-sandbox`, installed in `snt-testing`).** The publish
+UI has **no code field**. A template named `SNT Spike Template` produced pipeline code
+**`spike-monorepo-layout`**. So the code comes from the **source pipeline** (its code
+`spike-monorepo-layout`, which here equals the `@pipeline("spike_monorepo_layout")` id), **not from
+the template name**. If that code already exists, the new pipeline gets a random suffix:
+`spike-monorepo-layout-599458`, `-2ab2b6`, …
+- **For the new templates (Phase 6):** the source pipelines in the publishing workspace must
+  already have the code `snt-<name>`. The template's display name can be anything.
+- **For the deployer/checker:** a template-created pipeline can have the code `snt-<name>-<6 hex>`,
+  so matching on the code must accept that suffix (or report it).
+- The old `b-2-map-extracts` codes are explained if the source pipelines in `snt-development` carry
+  those codes. Not verified.
+- Not separated by this test: whether the code comes from the source pipeline's code or from its
+  `@pipeline` id. Both were the same here.
+
+**Pre-publication audit (2026-11-03, first pass).** A text scan of the four local source trees.
+It found no credentials, `.env` files or raw country data files. The UID scan only catches 11-character
+tokens that mix upper case, lower case and digits, so a second pass is needed after the snapshot copy.
+**The import is a file copy, so `.gitignore` does not protect it**: the copy step itself must leave out
+`ignore/`, `deprecated/`, `.ruff_cache/`, `.pytest_cache/`, `__pycache__/` and `*:Zone.Identifier`.
+
+| Verdict | File(s) | Why |
+|---|---|---|
+| **leave out** | `snt_development/pipelines/snt_dhis2_extract/code/NER_pyramid_format.ipynb` | NER notebook *without* the `_NER` suffix: 14 org-unit-group UIDs + a Jira link |
+| **leave out** | `…/snt_dhis2_formatting/country_specific/snt_dhis2_formatting_pyramid_BDI.ipynb` | Facility UIDs next to facility names |
+| **leave out** | `…/pipelines/snt_dhis2_outliers_{detection,removal_imputation}/code/*:Zone.Identifier` | Windows metadata with a personal email in notebook URLs |
+| **leave out** | orchestrator `docs/research/personas/persona_questionnaire_answered-20260713.md` | Real people's answers on internal strategy |
+| redact | `…/snt_dhis2_extract/utils/snt_dhis2_extract_report.r` | Shared helper with a NER-only fix: 7 facility UIDs + real coordinates → move to a NER-only file that is not imported |
+| redact | `…/snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`, `…/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb` | Jira refs, a Google Sheets link, a live workspace URL (`ner-snt-process`), 1 UID. Country variants: decide import vs leave out as a class |
+| redact | `…/snt_dhs_indicators/code/snt_dhs_vaccination_computation.ipynb` | Saved outputs in 3 cells (dataset version name, COD shapes size). Strip them (R2) |
+| redact | 2 notebooks (`reporting_rate_dataset`, `outliers_imputation_path`), 1 UID each in a comment | Replace with a placeholder |
+| redact | editor `docs/{config_field_matrix,config_analysis_notes,PRODUCT_SPEC}.md`, `prototype/index.html` | Real UIDs from country configs used as examples (18 in total), bucket name `snt-ner-files` |
+| redact | Live country workspace slugs: `ner-snt-process` (`snt_metadata_json_trim/readme.md`), `cmr-snt-process` (orchestrator `BACKLOG.md`, a wireframe) | Live country workspaces |
+| decide | Jira refs (`bluesquare.atlassian.net/browse/SNT25-*`), about 30 across all four repos; the team-glossary Google Sheets link (`docs/GLOSSARY.md`, incidence notebook) | Not sensitive in themselves, but they are dead links for the public. Keep the ticket id, drop the URL? |
+| decide | Bluesquare dev-workspace slugs (`snt-development`, `snt-development-sandbox`, `snt-testing`, `snt-app-dev`), about 25 mentions | Not country data. Probably fine to keep |
+| ok | Owner names (Giulia / `@sPuntinG`) in OWNERSHIP, ADRs; `secrets.OH_TOKEN` references in workflows; dummy `mario.rossi@example.org` | — |
+
+Checked 2026-11-03 (`git ls-files`): the `Zone.Identifier` files are **not tracked** (they exist only
+locally). `snt_dhs_vaccination_computation.ipynb` **is tracked with its outputs**, so `main` of the
+old repo breaks R2. Fix it in the old repo with `nbstripout`, in its own small PR from `main`.
 
 ### Phase 1 — Snapshot import + layout (behaviour-neutral)
 - [ ] Create the empty public repo (Giulia does this by hand). Set the **tag ruleset** on `v*`
@@ -469,6 +574,7 @@ proceed in parallel against the new schema.
 | Date | Session summary | Next step |
 |---|---|---|
 | 2026-11-02 | Read md docs of snt_development, orchestrator, bootstrap, config editor. Agreed D-1…D-10 (D-10 = docs placement rule); plan made public in `docs/`; OD-4 has a leaning, not decided; S2(b) self-sync preferred | Phase 0: skeleton diff, spikes S1–S4, public-exposure audit |
+| 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`); D-5 confirmed | Decide the audit "decide" rows and the `_<CC>` notebooks question; promote OD-7; strip the DHS notebook in the old repo; clean up the spike pipelines |
 
 ---
 

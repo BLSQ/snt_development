@@ -71,6 +71,8 @@ and documented separately:
 | D-9 | **Repo path = workspace path** for every file that lands on the workspace filesystem. No mapping layer. The shared R library is renamed `code/` → **`shared/r/`**, in the repo and in the workspace (§4.2) | 2026-11-02 |
 | D-10 | **Docs placement rule:** a unit's own docs live with the unit (`webapps/<name>/{docs,design}/`, beside the deployable `app/`; a pipeline's `readme.md`); docs spanning several units live in `docs/`; contract prose lives in `contracts/<name>/` (§4.1) | 2026-11-02 |
 | D-11 | **One config skeleton:** the `snt_development` copy becomes the single copy (`contracts/snt_config/`), and every empty single value is written as **`null`**, the pipelines' convention. The editor's `""` for empty strings changes to `null` | 2026-11-03 |
+| D-12 | **Report-only fix** (was OD-7): the orchestrator reads the run's own `config.run_report_only` through the proxy (`PIPELINES_READ`, proven by S4) and counts only full runs as "processed". No `RUN_MODE` in `{CC}_parameters.json` | 2026-11-03 |
+| D-13 | **Public-import scope:** Jira links and Bluesquare dev-workspace slugs (`snt-development`, `snt-development-sandbox`, `snt-testing`, `snt-app-dev`) are **kept**. **Country-specific notebooks (`*_<CC>.ipynb`, plus the un-suffixed `NER_pyramid_format.ipynb`) are left out.** They stay findable in the old `snt_development` repo at the commit SHA in the provenance table (it stays readable after archiving), and in the country workspaces themselves. How they are versioned in the future is OD-10 | 2026-11-03 |
 
 ## 3. Open decisions (owner: Giulia unless stated)
 
@@ -83,9 +85,9 @@ blocks, and move it to the Decision log.
 | OD-4 | How do the bootstrap pipelines (deployer, checker, single-pipeline deployer) reach a workspace? | **Leaning (Giulia):** as regular OH **template pipelines**, kept in this repo as `kind: bootstrap` folders in `pipelines/`, with their **own CI** that pushes every merge to `main` into the new templates workspace (not tied to the release train). Implications to keep in mind: (a) a deployer on `main` must stay able to read every manifest schema version it may be asked to deploy, or refuse old ones with a clear `[ERROR]`; (b) they are then **outside** the release manifest's `pipelines` (or listed with `kind: bootstrap` for provenance only, never deployed by the deployer); (c) this supersedes bootstrap D19 ("no deploy workflow") and solves roadmap §3 (chicken-and-egg). Not decided | Phase 3 (CI) / Phase 4 |
 | OD-5 | Import ADRs: one renumbered sequence, or per-origin folders? | One sequence with an "Originally: `<repo>` ADR NNNN / D<n>" line and a mapping table in `decisions/README.md`. Bootstrap D-entries that are only implementation detail stay in `docs/bootstrap/decisions.md` | Phase 2 |
 | OD-6 | Testing releases: keep a sandbox repo, or use pre-releases? | Pre-release tags (`v0.x.y`, marked pre-release) on the new repo + a test workspace. Drop `snt_development_sandbox`. The deployer already ignores pre-releases unless asked (D27) | Phase 4 |
-| OD-7 | Fix for the report-only problem | **S4 passed (2026-11-03):** the webapp can read the run's own `config.run_report_only` through the proxy. So: the orchestrator reads it, and no `RUN_MODE` is needed. Ready to move to the Decision log | Phase 5 |
 | OD-8 | CODEOWNERS (ADR 0005 said no) | Revisit: three areas with different reviewers is the case where it pays off | Phase 2 |
 | OD-9 | Retiring Pull scripts | **S2b passed (2026-11-03):** self-sync works, so Pull scripts can go for both routes. Still open: the S2b sub-questions (§4.3), in particular the per-run escape hatch | Phase 6 |
+| OD-10 | **How to version country-specific notebooks, and analyst-edited ones** (raised 2026-11-03). Today nothing versions `_<CC>` variants, and no route delivers them to their country. Analysts also edit notebooks in their workspace, and updates (templates, deployer, self-sync) must not silently overwrite those edits. We need one system that keeps good practice (versioned, reviewable, no country data in the public repo) and still lets users run what they edited | No leaning yet. Constraints so far: country variants are not in the public repo (D-13); self-sync skips `_<CC>` files and archives what it replaces (S2b). Inputs: OD-9's escape hatch, and possibly a private per-country repo or dataset | None (not scheduled). Must be settled before Pull scripts is retired (OD-9) |
 
 ---
 
@@ -360,13 +362,14 @@ tokens that mix upper case, lower case and digits, so a second pass is needed af
 | **leave out** | `…/pipelines/snt_dhis2_outliers_{detection,removal_imputation}/code/*:Zone.Identifier` | Windows metadata with a personal email in notebook URLs |
 | **leave out** | orchestrator `docs/research/personas/persona_questionnaire_answered-20260713.md` | Real people's answers on internal strategy |
 | redact | `…/snt_dhis2_extract/utils/snt_dhis2_extract_report.r` | Shared helper with a NER-only fix: 7 facility UIDs + real coordinates → move to a NER-only file that is not imported |
-| redact | `…/snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`, `…/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb` | Jira refs, a Google Sheets link, a live workspace URL (`ner-snt-process`), 1 UID. Country variants: decide import vs leave out as a class |
+| **leave out** (D-13) | Every `*_<CC>.ipynb`, e.g. `…/snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`, `…/snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb` | Country variants are not imported. These two also held Jira refs, a Google Sheets link, a live workspace URL (`ner-snt-process`) and 1 UID |
 | redact | `…/snt_dhs_indicators/code/snt_dhs_vaccination_computation.ipynb` | Saved outputs in 3 cells (dataset version name, COD shapes size). Strip them (R2) |
 | redact | 2 notebooks (`reporting_rate_dataset`, `outliers_imputation_path`), 1 UID each in a comment | Replace with a placeholder |
 | redact | editor `docs/{config_field_matrix,config_analysis_notes,PRODUCT_SPEC}.md`, `prototype/index.html` | Real UIDs from country configs used as examples (18 in total), bucket name `snt-ner-files` |
 | redact | Live country workspace slugs: `ner-snt-process` (`snt_metadata_json_trim/readme.md`), `cmr-snt-process` (orchestrator `BACKLOG.md`, a wireframe) | Live country workspaces |
-| decide | Jira refs (`bluesquare.atlassian.net/browse/SNT25-*`), about 30 across all four repos; the team-glossary Google Sheets link (`docs/GLOSSARY.md`, incidence notebook) | Not sensitive in themselves, but they are dead links for the public. Keep the ticket id, drop the URL? |
-| decide | Bluesquare dev-workspace slugs (`snt-development`, `snt-development-sandbox`, `snt-testing`, `snt-app-dev`), about 25 mentions | Not country data. Probably fine to keep |
+| ok (D-13) | Jira refs (`bluesquare.atlassian.net/browse/SNT25-*`), about 30 across all four repos | Kept |
+| ok (D-13) | Bluesquare dev-workspace slugs (`snt-development`, `snt-development-sandbox`, `snt-testing`, `snt-app-dev`), about 25 mentions | Kept |
+| **decide** | Team-glossary Google Sheets link, shared as "anyone with the link" (`docs/GLOSSARY.md`, `snt_dhis2_incidence.ipynb`) | Unlike a Jira link, a public reader *can* open it. Keep it only if the sheet is meant to be public |
 | ok | Owner names (Giulia / `@sPuntinG`) in OWNERSHIP, ADRs; `secrets.OH_TOKEN` references in workflows; dummy `mario.rossi@example.org` | — |
 
 Checked 2026-11-03 (`git ls-files`): the `Zone.Identifier` files are **not tracked** (they exist only
@@ -381,7 +384,8 @@ old repo breaks R2. Fix it in the old repo with `nbstripout`, in its own small P
 - [ ] Record a **provenance table** in `README.md`: source repo + commit SHA for each imported tree.
 - [ ] Copy the trees at those SHAs into the §4.1 layout. Every pipeline (SNT, support, bootstrap) goes
       to `pipelines/<name>/` with its R half per S1, plus a `pipelines/registry.json` entry.
-      `code/` goes to `shared/r/`. The orchestrator goes to `webapps/orchestrator/`, split per D-10:
+      `code/` goes to `shared/r/`. Leave out country notebooks (D-13) and everything in the Phase 0
+      audit's exclusion list. The orchestrator goes to `webapps/orchestrator/`, split per D-10:
       the bundle files → `app/`, its docs → `docs/`, its top-level `design/` → `design/`. Its
       `OPENHEXA_WEBAPP_RUNTIME.md` → root `docs/`, its `reference/` → root `reference/`. Update the
       orchestrator's CLAUDE.md and DEPLOYMENT.md for the `app/` subfolder (the drag-and-drop route
@@ -574,7 +578,7 @@ proceed in parallel against the new schema.
 | Date | Session summary | Next step |
 |---|---|---|
 | 2026-11-02 | Read md docs of snt_development, orchestrator, bootstrap, config editor. Agreed D-1…D-10 (D-10 = docs placement rule); plan made public in `docs/`; OD-4 has a leaning, not decided; S2(b) self-sync preferred | Phase 0: skeleton diff, spikes S1–S4, public-exposure audit |
-| 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`); D-5 confirmed | Decide the audit "decide" rows and the `_<CC>` notebooks question; promote OD-7; strip the DHS notebook in the old repo; clean up the spike pipelines |
+| 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`), D-12 (report-only, was OD-7), D-13 (keep Jira links + dev slugs, leave out country notebooks); D-5 confirmed; OD-10 opened (versioning country/analyst-edited notebooks) | Glossary Sheets link (keep?); strip the DHS notebook in the old repo; clean up the spike pipelines; second audit pass at the start of Phase 1 |
 
 ---
 

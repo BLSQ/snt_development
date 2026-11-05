@@ -215,6 +215,10 @@ Stated plainly, so nobody spends a day rediscovering them:
 Everything still open — tasks, questions, pending decisions — is in
 [`docs/BACKLOG.md`](docs/BACKLOG.md). Why things are the way they are: [`docs/decisions/`](docs/decisions/README.md).
 
+> **This repo is being migrated.** All SNT stratification code (these pipelines, the orchestrator and
+> config-editor webapps, the workspace bootstrap pipelines) is moving into one new public repo,
+> `BLSQ/snt-stratification`. Plan, decisions and progress: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md).
+
 ---
 
 ## ⚖️ Licence

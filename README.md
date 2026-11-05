@@ -217,7 +217,8 @@ Everything still open — tasks, questions, pending decisions — is in
 
 > **This repo is being migrated.** All SNT stratification code (these pipelines, the orchestrator and
 > config-editor webapps, the workspace bootstrap pipelines) is moving into one new public repo,
-> `BLSQ/snt-stratification`. Plan, decisions and progress: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md).
+> `BLSQ/snt-stratification`. Plan, decisions and progress: its
+> [`docs/MIGRATION_PLAN.md`](https://github.com/BLSQ/snt-stratification/blob/main/docs/MIGRATION_PLAN.md).
 
 ---
 

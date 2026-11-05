@@ -275,7 +275,6 @@ Before calling a change done — each item maps to a rule in the [Register](#reg
 | Who to ask, how review works | [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) |
 | Open items (do not start a list elsewhere) | [`docs/BACKLOG.md`](docs/BACKLOG.md) |
 | Why things are the way they are | [`docs/decisions/`](docs/decisions/README.md) |
-| Migration to the `snt-stratification` monorepo (a plan, not current state — read only for that work) | [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md) |
 | Local setup | [`dev/README.md`](dev/README.md) |
 | How the git guardrail is enforced | [`.claude/README.md`](.claude/README.md) |
 | Skill: run the handover checklist + write the note (incl. R11/R12 parameter checker) | [`.claude/skills/handover/`](.claude/skills/handover/SKILL.md) |

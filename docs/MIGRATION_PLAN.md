@@ -216,7 +216,8 @@ checker change **in the same PR**, which is the monorepo's main benefit.
 **Watch for:** anything that hardcodes `code/` as the shared-R path. That includes the notebooks, the
 `.r` utils, `snt_lib` (`pull_scripts_from_repository`, and possibly path helpers) and the checker's
 scan exclusions. Grep for all of these in Phase 1. If `snt_lib` hardcodes it, a pinned `snt_lib`
-release is a prerequisite of the rename (D-3).
+release is a prerequisite of the rename (D-3). → **Checked 2026-11-05:** `snt_lib` does not, so no
+release is needed. The list of references is under Phase 1, "Facts checked".
 
 ### 4.3 R-half layout — spikes first (D-5)
 
@@ -378,29 +379,167 @@ locally). `snt_dhs_vaccination_computation.ipynb` was **tracked with its outputs
 `fix/strip-dhs-vaccination-outputs`).
 
 ### Phase 1 — Snapshot import + layout (behaviour-neutral)
-- [ ] Create the empty public repo (Giulia does this by hand). Set the **tag ruleset** on `v*`
-      (no update/delete, empty bypass list) and protect `main` from day one.
-- [ ] Move this plan to `snt-stratification/docs/MIGRATION_PLAN.md`. Leave a one-line pointer here
-      and drop the `snt_development` CLAUDE.md / README / BACKLOG pointers to it.
-- [ ] Record a **provenance table** in `README.md`: source repo + commit SHA for each imported tree.
-- [ ] Copy the trees at those SHAs into the §4.1 layout. Every pipeline (SNT, support, bootstrap) goes
-      to `pipelines/<name>/` with its R half per S1, plus a `pipelines/registry.json` entry.
-      `code/` goes to `shared/r/`. Leave out country notebooks (D-13) and everything in the Phase 0
-      audit's exclusion list. The orchestrator goes to `webapps/orchestrator/`, split per D-10:
-      the bundle files → `app/`, its docs → `docs/`, its top-level `design/` → `design/`. Its
-      `OPENHEXA_WEBAPP_RUNTIME.md` → root `docs/`, its `reference/` → root `reference/`. Update the
-      orchestrator's CLAUDE.md and DEPLOYMENT.md for the `app/` subfolder (the drag-and-drop route
-      now uploads `app/`'s contents, not the unit folder).
-- [ ] Rename the shared-R path (D-9): grep every `code/` reference (notebooks, `.r` utils, the
-      checker's exclusions, `snt_lib`) and change them in their own commit. If `snt_lib` hardcodes it,
-      wait for its pinned release.
-- [ ] Config editor (D-7, D-10): `PRODUCT_SPEC` + `EXTERNAL_CHECKS` → `webapps/config_editor/docs/`;
-      its CLAUDE.md → `webapps/config_editor/CLAUDE.md` (with an empty `app/`); prototype →
-      `webapps/config_editor/design/`; skeleton, `config_analysis_notes`, `config_field_matrix` →
-      `contracts/snt_config/`. Fix the relative links these moves break (its CLAUDE.md links
-      `docs/…` for all four).
-- [ ] `.gitignore` allowlist written and tested (`git check-ignore -v` on every JSON that must be tracked).
-- [ ] Single import commit. Then strip notebook outputs, run ruff, and fix any path breakage in its own commit.
+
+**Outcome:** `BLSQ/snt-stratification` holds every source tree in the §4.1 layout, landed through
+**one PR** (branch `phase-1/snapshot-import`), plus one small PR in `snt_development` that turns this
+file into a pointer. No pipeline, workflow or workspace behaviour changes. The runbook below was
+written on 2026-11-05. Follow it in order and tick each step. **Agents:** run no `git`/`gh` command
+yourself (R19). Give Giulia the exact commands.
+
+**Rules for this phase**
+- **Export with `git archive <sha>`**, never by copying a working tree. It exports tracked files only,
+  so `ignore/`, `__pycache__/`, `*:Zone.Identifier` and executed notebooks under `ignore/` stay out.
+  It is read-only: it changes nothing locally or on GitHub (it is unrelated to archiving a repo).
+- **Remove everything that must not be public *before* the import commit**: leave-outs, redactions,
+  notebook outputs. History is permanent. A later "remove" commit does not unpublish anything.
+- **Import no `.github/` folder.** The old `push_snt_*.yaml` deploy to `snt-development`. Phase 3 reads
+  `generate_manifest.yaml` at its provenance SHA.
+- **Merge the PR with "Create a merge commit"**, not squash. The import commit (files exactly as at
+  the source SHA, at their new path) must stay separate from the edits made after it.
+- Keep source file names. Renames beyond the mapping below wait for Phase 2.
+- If a source repo's `main` moves after P1-5, redo P1-5 → P1-7.
+
+**Facts checked 2026-11-05** (they settle §4.2 "Watch for"):
+- `snt_lib` 0.23.0 does **not** hardcode the shared root `code/`. Its only `"code"` is the
+  per-pipeline `pipelines/<name>/code/` (`pull_scripts_from_repository`), which does not move. So
+  **the rename needs no `snt_lib` release**.
+- Shared-R references to change (commit 5):
+  - About 33 notebooks and `.r` files build `file.path(ROOT_PATH | SNT_ROOT_PATH, "code", …)`, either
+    in `source(… "snt_utils.r" | "snt_report.r" | "snt_palettes.r")` or in `CODE_PATH <- …`.
+  - `snt_dhis2_extract/pipeline.py` creates the workspace folder `"code"` (`folders_to_create`,
+    ~l.1465).
+  - `snt_pipeline_deployer` mentions `code/` in docstrings and log messages. Its logic
+    (`parts[0] != "pipelines"`) changes in Phase 4.
+- The old `snt_development/.gitignore` ignores `**/[Tt]est*`, which would hide `tests/`. It also
+  ignores every `*.json`, `*.yaml` and `*.yml`.
+- `pipelines/snt_dhis2_outliers_{detection,removal_imputation}/` and the root `snt_workspace_check/`
+  and `snt_workspace_manager/` hold only untracked files, so `git archive` drops them.
+- Bootstrap tests find the code through `Path(__file__).parents[1] / "snt_<…>"`, so they break after
+  the move. Fixed in commit 8.
+- LICENSE: all four repos use MIT (Bluesquare). Only the year differs (2026 in the orchestrator).
+  DOC-5 is still open.
+
+**Source → target mapping** (implemented by the staging script, P1-6)
+
+| Source (at its SHA) | Target |
+|---|---|
+| ***snt_development*** | |
+| `<name>/` (root folder with `pipeline.py`) + `pipelines/<name>/` | `pipelines/<name>/` (merged) |
+| `pipelines/CLAUDE.md` | `pipelines/CLAUDE.md` |
+| `code/*.r` | `shared/r/` |
+| `contracts/snt_config_json/` | `contracts/snt_config/` |
+| rest of `contracts/`, `catalogs/`, `docs/`, `dev/`, `pyproject.toml`, `LICENSE`, `README.md`, `CLAUDE.md` | same path (root `CLAUDE.md` is interim until Phase 2) |
+| `.claude/` | already on `main` (P1-3) |
+| `.gitignore` | base of commit 1, not imported as is |
+| `deprecated/`, `.github/`, `snt_workspace_check/`, `snt_workspace_manager/` | **left out** |
+| ***snt_webapp_orchestrator*** | |
+| `webapps/orchestrator/CLAUDE.md` | `webapps/orchestrator/CLAUDE.md` |
+| rest of `webapps/orchestrator/` (`index.html`, `app.js`, `styles.css`, `*.json`, …) | `webapps/orchestrator/app/` |
+| `docs/OPENHEXA_WEBAPP_RUNTIME.md` | `docs/` |
+| rest of `docs/` (incl. `decisions/`; `research/` minus the persona questionnaire) | `webapps/orchestrator/docs/` (ADRs and BACKLOG merged in Phase 2) |
+| `design/` | `webapps/orchestrator/design/` |
+| `contracts/*.schema.json` | `contracts/orchestrator/` |
+| `reference/` | `reference/` |
+| `pipelines/create_pipeline_cards/` | `pipelines/create_pipeline_cards/` |
+| `CLAUDE.md` (repo rules R1–R12) | `webapps/CLAUDE.md` (interim) |
+| `README.md` | `webapps/orchestrator/README.md` |
+| `.claude/`, `.github/`, `.gitignore`, `LICENSE` | left out (`.gitignore` rules go into commit 1, `.claude/` is merged in Phase 2) |
+| ***snt_workspace_bootstrap*** | |
+| `snt_workspace_deployer/`, `snt_pipeline_deployer/`, `snt_workspace_checker/` | `pipelines/<same name>/` |
+| `docs/contracts/*` | `contracts/` |
+| rest of `docs/` (incl. `context/`) | `docs/bootstrap/` |
+| `CLAUDE.md` | `docs/bootstrap/CLAUDE.md` (interim) |
+| `tests/`, `tools/` | `tests/`, `tools/` |
+| `pyproject.toml`, `dev/environment.yml` | merged in commit 4, not imported as is |
+| `.claude/`, `.gitignore`, `LICENSE` | left out (as above) |
+| ***openhexa-webapps-edit-snt-config-json*** | |
+| `CLAUDE.md` | `webapps/config_editor/CLAUDE.md` |
+| `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_CHECKS.md` | `webapps/config_editor/docs/` |
+| `docs/config_analysis_notes.md`, `docs/config_field_matrix.md` | `contracts/snt_config/` |
+| `prototype/index.html` | `webapps/config_editor/design/index.html` |
+| `docs/SNT_config.skeleton.json`, `ignore/`, `LICENSE` | left out (D-11, D-7) |
+
+**Steps**
+- [ ] **P1-0 Close Phase 0.** Merge `plan/snt-single-repo` into `main`. The local spike code stays in
+      `ignore/spikes/` (git-ignored). Optional, not blocking: delete the spike pipelines and the
+      template in `snt-testing` and `snt-development-sandbox`.
+- [ ] **P1-1 Land this runbook** in `snt_development` (branch `plan/phase-1-runbook`, commit
+      `plan: Phase 1 runbook`).
+- [ ] **P1-2 Create the repo** (GitHub UI, Giulia). Name `BLSQ/snt-stratification`, with **no**
+      README, `.gitignore` or licence. Recommended visibility: **private until P1-10**, so that the
+      second audit pass (P1-7) and DOC-5 come before anything is public. Clone it to
+      `~/Bluesquare/snt-stratification`.
+- [ ] **P1-3 Seed `main`** by a direct push, before protection exists:
+  - a `README.md` stub;
+  - `.claude/` from `snt_development` (`settings.json`, `hooks/block-destructive-git.py`,
+    `README.md`, `skills/`; no `__pycache__/`).
+
+  Test the guardrail as `.claude/README.md` describes. Commit:
+  `chore: initialise snt-stratification with the R19 git guardrail`.
+- [ ] **P1-4 Protect** (GitHub settings):
+  - Ruleset on `main`: require a pull request (0 approvals, so Giulia can merge her own PRs), block
+    force pushes, block deletion.
+  - Tag ruleset on `v*`: restrict updates and deletions, with an empty bypass list.
+- [ ] **P1-5 Record the source SHAs.** For each of the four source repos, confirm that `main` is clean,
+      pushed and holds everything wanted. Then run `git -C ~/Bluesquare/<repo> fetch origin` and
+      `git -C ~/Bluesquare/<repo> rev-parse origin/main`. Write the four SHAs into the Session log.
+- [ ] **P1-6 Stage the export** into `~/Bluesquare/_import_staging/` (outside every repo), using a
+      throwaway script `snt_development/ignore/phase1/stage_import.sh` that implements the mapping:
+  1. For each repo, `git -C <repo> archive <sha>`, extracted into `src/<repo>/`.
+  2. Copy into `tree/` according to the mapping.
+  3. Delete the persona questionnaire and the 4 country notebooks (D-13), plus any `country_specific/`
+     folder left empty:
+     - `snt_seasonality_rainfall/code/snt_seasonality_rainfall_NER.ipynb`
+     - `snt_dhis2_extract/code/NER_pyramid_format.ipynb`
+     - `snt_dhis2_incidence/country_specific/snt_dhis2_incidence_NER.ipynb`
+     - `snt_dhis2_formatting/country_specific/snt_dhis2_formatting_pyramid_BDI.ipynb`
+  4. Redact each `redact` row of the Phase 0 audit table. Placeholders: `<DHIS2_UID>`,
+     `<country-workspace>`. The NER-only block of `snt_dhis2_extract_report.r` is removed (NER does
+     not run from this repo, D-13).
+  5. Run `nbstripout` on every `.ipynb` in `tree/`.
+  6. Write `import_manifest.tsv` with target path, source repo, source path and sha256, and mark
+     every redacted file `modified`.
+- [ ] **P1-7 Second audit pass** on `tree/`. Grep for:
+  - 11-character UID-shaped tokens (`\b[A-Za-z][A-Za-z0-9]{10}\b` that contain a digit; review the
+    hits by hand);
+  - `-snt-process`;
+  - e-mail addresses;
+  - `token|secret|password`;
+  - long decimal coordinates.
+
+  Fix anything found in the script and rerun P1-6, never by hand. Record the result in the Phase 0
+  audit table and close its `[~]` item.
+- [ ] **P1-8 Build the PR** on `phase-1/snapshot-import`, one commit per row, in this order:
+
+| # | Content | Commit message |
+|---|---|---|
+| 1 | `.gitignore`: the rules of the three repos, made valid for the new tree. `**/[Tt]est*` dropped. Allowlist: `pipelines/registry.json`, `webapps/*/app/**/*.json`, `tests/fixtures/*.json`, `contracts/**/*.json`, `catalogs/SNT_metadata_master.json`, `.claude/settings.json`, `dev/environment.yml`, `.github/workflows/*.yaml` | `chore: .gitignore allowlist for the monorepo layout` |
+| 2 | `tree/` copied in, `git add -A`, nothing else | `import: snapshot of snt_development, snt_webapp_orchestrator, snt_workspace_bootstrap and the config editor` |
+| 3 | `README.md` provenance table (repo, SHA, files left out or redacted); `pipelines/registry.json` (`kind`: `snt`; `support` for `create_pipeline_cards` and `snt_metadata_json_trim`; `bootstrap` for the 3 bootstrap pipelines); `webapps/config_editor/app/.gitkeep` | `docs: provenance table and pipelines/registry.json` |
+| 4 | One `pyproject.toml` (ruff from `snt_development`, pytest from bootstrap); one `dev/environment.yml` named `snt-stratification` (union of both envs) | `chore: one pyproject.toml and one conda env, snt-stratification` |
+| 5 | Every shared-library `"code"` → `"shared", "r"`; `folders_to_create`; deployer wording. Per-pipeline `pipelines/<name>/code/` untouched | `refactor: shared R library path code/ → shared/r/ (D-9)` |
+| 6 | Orchestrator `CLAUDE.md` + `docs/DEPLOYMENT.md`: the bundle is `app/`, and drag-and-drop uploads its contents. Editor `CLAUDE.md` links. Any other link broken by the moves | `docs(webapps): paths and links for the app/ + docs/ split (D-10)` |
+| 7 | `ruff format .` and `ruff check --fix .`, no manual edits | `style: ruff format and autofix` |
+| 8 | Bootstrap test paths (`pipelines/…`, `contracts/`), remaining path breakage, `pytest` green | `fix: test paths and path breakage after the import` |
+| 9 | This file: header ("Where it lives"), Phase 1 checkboxes, Session log | `plan: Phase 1 results` |
+
+- [ ] **P1-9 Verify** and paste the results into the PR description:
+  - `git ls-files --others --ignored --exclude-standard` is empty, or lists only files that should
+    be ignored.
+  - Each file from commit 2 matches `import_manifest.tsv` (same sha256, or marked `modified`).
+  - No notebook has outputs.
+  - No `ROOT_PATH, "code"` left in any `.ipynb` or `.r`.
+  - `ruff check .` is clean and `pytest` is green.
+  - State that nothing was run on OpenHEXA. That happens in Phase 4.
+- [ ] **P1-10 Merge** the PR with a merge commit. Then make the repo public if P1-7 passed and DOC-5
+      is settled.
+- [ ] **P1-11 Pointer PR in `snt_development`** (branch `docs/migration-plan-moved`):
+  - This file becomes a one-line pointer to the new repo's copy.
+  - Drop the MIGRATION_PLAN row from CLAUDE.md "Where to find things", and the README and BACKLOG
+    pointers.
+  - Commit: `docs: MIGRATION_PLAN moved to BLSQ/snt-stratification`.
+
+  From then on, plan updates happen in the new repo, and `snt_development` is maintenance-only (D-4).
 
 ### Phase 2 — Docs and agent setup
 - [ ] Root `CLAUDE.md` router (≤15 KB) with the **merged Register**. Rules shared by all three repos
@@ -580,6 +719,7 @@ proceed in parallel against the new schema.
 |---|---|---|
 | 2026-11-02 | Read md docs of snt_development, orchestrator, bootstrap, config editor. Agreed D-1…D-10 (D-10 = docs placement rule); plan made public in `docs/`; OD-4 has a leaning, not decided; S2(b) self-sync preferred | Phase 0: skeleton diff, spikes S1–S4, public-exposure audit |
 | 2026-11-03 | Phase 0, desk half: skeleton diff (dev copy wins; `null` vs `""` to settle), S1 read from the SDK source (recurses; extension allowlist excludes `.json`; ignores `.gitignore`), S3 and S4 schema checks, first-pass public audit. Toy pipeline `spike_monorepo_layout` written for S1/S2. Then on OpenHEXA: **S1, S2a, S2b and S4 passed**. S3 showed that the code comes from the source pipeline, not from the template name, with a random suffix on collision. Decided D-11 (`null`), D-12 (report-only, was OD-7), D-13 (keep Jira links + dev slugs, leave out country notebooks); D-5 confirmed; OD-10 opened (versioning country/analyst-edited notebooks) | Glossary link kept (public by choice); DHS notebook stripped on `main`. Left: delete the spike pipelines + template; second audit pass at the start of Phase 1 |
+| 2026-11-05 | Phase 1 prepared: checked the four source trees and `snt_lib` (no hardcoded shared `code/`, so the rename needs no release); wrote the Phase 1 runbook (mapping, steps P1-0…P1-11, commit sequence). Local spike code kept in `ignore/spikes/` | P1-0, then P1-1 (land the runbook), then P1-2 (create the repo) |
 
 ---
 

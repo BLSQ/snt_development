@@ -179,7 +179,6 @@ def snt_seasonality_rainfall(
         )
     except Exception as e:
         current_run.log_error(f"An error occurred while running the report notebook: {e}")
-        raise
 
 
 def validate_parameters(parameters: dict):

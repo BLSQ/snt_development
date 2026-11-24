@@ -170,7 +170,6 @@ def snt_dhis2_outliers_imputation_magic_glasses(
         )
     except Exception as e:
         current_run.log_error(f"Failed to run reporting notebook: {e}")
-        raise
 
     current_run.log_info("Pipeline finished successfully.")
 

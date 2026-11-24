@@ -535,6 +535,10 @@ five `*_ready` flags gate `add_files_to_dataset_for_extracts`.
   `[WARNING]` is mapped to the OpenHEXA log severity via
   `error_label_severity_map={"[ERROR]": "error", "[WARNING]": "warning"}`. A `[WARNING]`-labelled
   failure suppresses HTML report generation but does not fail the run.
+- Every `pipeline.py` wraps `run_report_notebook()` in `try/except`, logs any failure with
+  `current_run.log_error` and does not re-raise, so a broken report never fails the run, whatever
+  its label. A failed report shows up only in the run log, and `reporting/outputs/` may then be
+  stale.
 - Executed notebooks are archived to `pipelines/<name>/papermill_outputs/` and reports to
   `pipelines/<name>/reporting/outputs/` as `*_OUTPUT_<YYYY-MM-DD_HHMMSS>.ipynb` + HTML.
 

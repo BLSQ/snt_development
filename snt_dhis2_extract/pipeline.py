@@ -1505,7 +1505,6 @@ def run_report_notebook_task(
         )
     except Exception as e:
         current_run.log_error(f"Error in running report notebook: {e}")
-        raise
 
 
 def validate_yyyymm(value: int) -> None:

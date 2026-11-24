@@ -340,7 +340,6 @@ def snt_dhis2_population_transformation(
         )
     except Exception as e:
         current_run.log_error(f"Failed to run reporting notebook: {e}")
-        raise
 
 
 def dhis2_population_transformation(

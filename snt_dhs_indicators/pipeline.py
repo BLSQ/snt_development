@@ -254,7 +254,6 @@ def run_dhs_indicator_notebooks(
         )
     except Exception as e:
         current_run.log_error(f"Error running reporting notebook '{reporting_notebook_name}': {e}")
-        raise
 
 
 if __name__ == "__main__":

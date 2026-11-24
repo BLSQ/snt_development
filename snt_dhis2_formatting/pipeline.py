@@ -132,7 +132,6 @@ def snt_dhis2_formatting(run_report_only: bool, pull_scripts: bool):
         )
     except Exception as e:
         current_run.log_error(f"Error in running report notebook: {e}")
-        raise
 
 
 def dhis2_analytics_formatting(

@@ -229,11 +229,14 @@ def snt_era5_climate_data(
             "run_report_only=True: skipping ERA5 climate-data processing and dataset publication."
         )
 
-    run_report_notebook(
-        nb_file=report_nb,
-        nb_output_path=report_out,
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=report_nb,
+            nb_output_path=report_out,
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Error in running report notebook: {e}")
 
 
 def get_bounds(boundaries: gpd.GeoDataFrame) -> tuple[int, int, int, int]:

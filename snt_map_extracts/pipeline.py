@@ -187,7 +187,6 @@ def snt_map_extracts(year_start: int, year_end: int, run_report_only: bool, pull
         )
     except Exception as e:
         current_run.log_error(f"Failed to run report notebook: {e}")
-        raise RuntimeError(f"Failed to run report notebook witherror: {e}") from e
 
     current_run.log_info("Pipeline completed successfully!")
 

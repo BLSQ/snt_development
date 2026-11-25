@@ -136,7 +136,6 @@ def snt_dhis2_reporting_rate_dataset(run_report_only: bool, pull_scripts: bool):
         )
     except Exception as e:
         current_run.log_error(f"Running report notebook failed: {e}")
-        raise
 
     current_run.log_info("Pipeline completed successfully!")
 

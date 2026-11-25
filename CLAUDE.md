@@ -200,6 +200,10 @@ In descending order of what is actually achievable:
   `dataset_file_exists()`; `download_dhis2_analytics` catches per-period errors and continues. A
   partial run looks successful. Adding a stage: decide deliberately between skip and raise, and log
   the choice.
+- **A failed report does not fail the run either.** Every `pipeline.py` catches a
+  `run_report_notebook()` failure and logs it as an error without re-raising, so a green run can
+  still have a stale `reporting/outputs/`. Keep that pattern in new pipelines
+  ([`DATA_ARCHITECTURE.md` §4.4](docs/DATA_ARCHITECTURE.md#44-notebook-execution-contract)).
 - **Pipelines are not a DAG.** A results table can mix data vintages. Never assume your upstream ran
   today.
 - **Country escape hatches are hardcoded** in `snt_dhis2_extract/pipeline.py`: BFA filters

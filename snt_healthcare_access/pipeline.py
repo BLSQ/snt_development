@@ -183,7 +183,6 @@ def snt_healthcare_access(
         )
     except Exception as e:
         current_run.log_error(f"Error running reporting notebook: {e!s}")
-        raise
 
     current_run.log_info("Pipeline executed successfully!")
 

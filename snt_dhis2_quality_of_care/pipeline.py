@@ -129,7 +129,6 @@ def snt_dhis2_quality_of_care(
         )
     except Exception as e:
         current_run.log_error(f"Reporting notebook failed: {e}")
-        raise
 
     current_run.log_info("Quality of Care pipeline finished successfully.")
 

@@ -178,7 +178,6 @@ def snt_seasonality_cases(
         )
     except Exception as e:
         current_run.log_error(f"Reporting failed: {e!s}")
-        raise
 
 
 def validate_parameters(parameters: dict):

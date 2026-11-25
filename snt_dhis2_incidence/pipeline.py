@@ -198,7 +198,6 @@ def snt_dhis2_incidence(
         )
     except Exception as e:
         current_run.log_error(f"Report notebook execution failed: {e}")
-        raise
 
     current_run.log_info("Pipeline finished!")
 

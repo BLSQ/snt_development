@@ -74,12 +74,15 @@ def snt_worldpop_extract(year_start: int, year_end: int, run_report_only: bool, 
 
     if run_report_only:
         current_run.log_info("Running report notebook only.")
-        run_report_notebook(
-            nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
-            nb_output_path=pipeline_path / "reporting" / "outputs",
-            country_code=country_code,
-        )
-        current_run.log_info("Report notebook executed successfully. Ending pipeline run.")
+        try:
+            run_report_notebook(
+                nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
+                nb_output_path=pipeline_path / "reporting" / "outputs",
+                country_code=country_code,
+            )
+            current_run.log_info("Report notebook executed successfully. Ending pipeline run.")
+        except Exception as e:
+            current_run.log_error(f"Error in running report notebook: {e}")
         return
 
     try:
@@ -147,11 +150,14 @@ def snt_worldpop_extract(year_start: int, year_end: int, run_report_only: bool, 
         file_paths=files_to_publish + [parameters_file],
     )
 
-    run_report_notebook(
-        nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
-        nb_output_path=pipeline_path / "reporting" / "outputs",
-        country_code=country_code,
-    )
+    try:
+        run_report_notebook(
+            nb_file=pipeline_path / "reporting" / "snt_worldpop_extract_report.ipynb",
+            nb_output_path=pipeline_path / "reporting" / "outputs",
+            country_code=country_code,
+        )
+    except Exception as e:
+        current_run.log_error(f"Error in running report notebook: {e}")
 
 
 def retrieve_population_data(
